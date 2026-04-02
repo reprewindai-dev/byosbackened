@@ -73,12 +73,18 @@ Write-Host "[byos] Running Alembic migrations..." -ForegroundColor Cyan
 docker compose -f $ComposeFile run --rm --no-deps api `
     alembic upgrade head
 
-# ── 5. Start full stack ─────────────────────────────────────────────────────
+# ── 5. Seed dev API key (idempotent — skips if already exists) ──────────────
+
+Write-Host "[byos] Seeding dev API key..." -ForegroundColor Cyan
+docker compose -f $ComposeFile run --rm --no-deps api `
+    python scripts/seed_dev_apikey.py
+
+# ── 6. Start full stack ─────────────────────────────────────────────────────
 
 Write-Host "[byos] Starting API service..." -ForegroundColor Cyan
 docker compose -f $ComposeFile up -d
 
-# ── 6. Health check ─────────────────────────────────────────────────────────
+# ── 7. Health check ─────────────────────────────────────────────────────────
 
 Write-Host "[byos] Waiting for API to be ready..." -ForegroundColor Cyan
 $retries = 0

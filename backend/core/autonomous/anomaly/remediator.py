@@ -8,7 +8,9 @@ from core.safety.rate_limiting import RateLimiter
 from core.incident.alerting import send_alert
 from db.models import Anomaly
 from db.models.anomaly import AnomalyType, AnomalySeverity, AnomalyStatus
+from db.models.security_audit import SecurityAuditLog
 from core.autonomous.schemas.anomaly import validate_anomaly_metadata
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -153,6 +155,26 @@ class AutoRemediator:
                 logger.info(
                     f"Created {len(anomaly_records)} anomaly records for workspace {workspace_id}"
                 )
+
+                # Write SecurityAuditLog for every remediation action taken
+                for record in anomaly_records:
+                    if record.remediation_action:
+                        audit = SecurityAuditLog(
+                            workspace_id=workspace_id,
+                            event_type="auto_remediation",
+                            event_category="autonomous_ml",
+                            success=True,
+                            details=json.dumps({
+                                "anomaly_id": record.id,
+                                "anomaly_type": record.anomaly_type.value,
+                                "severity": record.severity.value,
+                                "remediation_action": record.remediation_action,
+                                "remediation_result": record.remediation_result,
+                            }),
+                        )
+                        db.add(audit)
+                db.commit()
+
             except Exception as e:
                 logger.error(f"Error creating anomaly records: {e}")
                 db.rollback()
@@ -187,9 +209,24 @@ class AutoRemediator:
         )
         anomaly.remediated_at = datetime.utcnow()
         
+        audit = SecurityAuditLog(
+            workspace_id=anomaly.workspace_id,
+            event_type="auto_remediation_result",
+            event_category="autonomous_ml",
+            success=success,
+            failure_reason=None if success else (result_details or "Unknown error"),
+            details=json.dumps({
+                "anomaly_id": anomaly_id,
+                "anomaly_type": anomaly.anomaly_type.value,
+                "severity": anomaly.severity.value,
+                "remediation_action": anomaly.remediation_action,
+                "remediation_result": anomaly.remediation_result,
+            }),
+        )
+        db.add(audit)
         db.commit()
         db.refresh(anomaly)
-        
+
         logger.info(
             f"Updated remediation result for anomaly {anomaly_id}: "
             f"success={success}, result={anomaly.remediation_result}"

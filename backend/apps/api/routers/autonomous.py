@@ -8,9 +8,11 @@ from core.autonomous.ml_models.routing_optimizer import get_routing_optimizer_ml
 from core.autonomous.ml_models.quality_predictor import get_quality_predictor_ml
 from core.autonomous.optimization.quality_optimizer import get_quality_optimizer
 from core.autonomous.training.pipeline import get_training_pipeline
+from db.models.security_audit import SecurityAuditLog
 from pydantic import BaseModel
 from typing import Optional, List
 from decimal import Decimal
+import json
 
 router = APIRouter(prefix="/autonomous", tags=["autonomous"])
 cost_predictor_ml = get_cost_predictor_ml()
@@ -93,6 +95,7 @@ async def update_routing_outcome(
     actual_latency_ms: int,
     baseline_cost: Decimal,
     workspace_id: str = Depends(get_current_workspace_id),
+    db: Session = Depends(get_db),
 ):
     """Update routing model with actual outcome (learning loop)."""
     routing_optimizer_ml.update_routing_outcome(
@@ -104,7 +107,24 @@ async def update_routing_outcome(
         actual_latency_ms=actual_latency_ms,
         baseline_cost=baseline_cost,
     )
-    
+
+    audit = SecurityAuditLog(
+        workspace_id=workspace_id,
+        event_type="routing_outcome_recorded",
+        event_category="autonomous_ml",
+        success=True,
+        details=json.dumps({
+            "operation_type": operation_type,
+            "provider": provider,
+            "actual_cost": str(actual_cost),
+            "actual_quality": actual_quality,
+            "actual_latency_ms": actual_latency_ms,
+            "baseline_cost": str(baseline_cost),
+        }),
+    )
+    db.add(audit)
+    db.commit()
+
     return {
         "message": "Routing outcome recorded",
         "workspace_id": workspace_id,
@@ -199,7 +219,24 @@ async def train_models(
         workspace_id=workspace_id,
         min_samples=request.min_samples,
     )
-    
+
+    audit = SecurityAuditLog(
+        workspace_id=workspace_id,
+        event_type="ml_model_training",
+        event_category="autonomous_ml",
+        success=True,
+        details=json.dumps({
+            "min_samples": request.min_samples,
+            "models_trained": list(results.keys()) if isinstance(results, dict) else [],
+            "results_summary": {
+                k: v.get("trained", False) if isinstance(v, dict) else str(v)
+                for k, v in (results.items() if isinstance(results, dict) else {}.items())
+            },
+        }),
+    )
+    db.add(audit)
+    db.commit()
+
     return {
         "message": "Training initiated",
         "results": results,

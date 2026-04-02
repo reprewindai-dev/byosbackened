@@ -1,256 +1,238 @@
-# Quick Start Guide
+﻿# BYOS AI — Quick Start Guide (Windows)
 
-## What You've Built
-
-A **secure, future-proof, cost-intelligent AI backend** with:
-
-1. **Cost Intelligence** - Predict costs, route intelligently, track budgets
-2. **Compliance** - GDPR-ready audit trails, PII protection
-3. **Security** - Zero-trust, encryption, secrets management
-4. **Privacy** - Privacy-by-design, data retention, right to deletion
-5. **Future-Proofing** - Plugin system, provider abstraction, regulatory framework
-6. **Innovation** - Quality scoring, explainability, real-time optimization
-
-## Getting Started
-
-### 1. Configure Environment
-
-```bash
-cd backend
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-**Required**:
-- `HUGGINGFACE_API_KEY` - Get from https://huggingface.co/settings/tokens
-- `SERPAPI_KEY` - Get from https://serpapi.com/dashboard
-- `SECRET_KEY` - Generate with: `openssl rand -hex 32`
-
-**Optional**:
-- `OPENAI_API_KEY` - Only if you need OpenAI (must be documented)
-
-### 2. Start Services (Modular)
-
-The Docker setup is **truly modular** - start only what you need:
-
-#### Start All Services
-
-```bash
-cd infra/docker
-docker compose --profile all up -d
-```
-
-#### Start Core + API Only (Development)
-
-```bash
-docker compose --profile api up -d
-```
-
-#### Start Core + API + Worker (Production)
-
-```bash
-docker compose --profile api --profile worker up -d
-```
-
-#### Start with Self-Hosted AI
-
-```bash
-docker compose --profile api --profile worker --profile whisper --profile llm up -d
-```
-
-**Available Services**:
-- **Core** (always runs): postgres, redis, minio
-- **Application**: api, worker, caddy
-- **Optional AI**: whisper, llm
-
-See `infra/scripts/MODULAR_SERVICES.md` for full guide.
-
-### 3. Run Migrations
-
-```bash
-docker exec -it byos_api alembic upgrade head
-```
-
-### 4. Access API
-
-- **API Docs**: http://localhost:8000/api/v1/docs (or http://localhost/api/v1/docs with Caddy)
-- **Health**: http://localhost:8000/health
-- **Metrics**: http://localhost:8000/metrics
-
-## First Steps
-
-### 1. Create Workspace
-
-```bash
-# Via API (requires auth token)
-POST /api/v1/workspaces
-{
-  "name": "My Workspace",
-  "slug": "my-workspace"
-}
-```
-
-### 2. Test Cost Prediction
-
-```bash
-POST /api/v1/cost/predict
-{
-  "operation_type": "transcribe",
-  "provider": "huggingface",
-  "input_text": "This is a test transcription..."
-}
-
-# Response shows predicted cost, confidence interval, alternatives
-```
-
-### 3. Test Intelligent Routing
-
-```bash
-POST /api/v1/routing/test
-{
-  "operation_type": "transcribe",
-  "constraints": {
-    "strategy": "cost_optimized",
-    "max_cost": "0.002"
-  }
-}
-
-# Response shows selected provider and reasoning
-```
-
-### 4. Set Budget
-
-```bash
-POST /api/v1/budget
-{
-  "budget_type": "monthly",
-  "amount": "100.00",
-  "alert_thresholds": [50, 80, 95]
-}
-```
-
-### 5. Upload and Transcribe
-
-```bash
-# Upload file
-POST /api/v1/upload
-# (multipart form with file)
-
-# Transcribe
-POST /api/v1/transcribe
-{
-  "asset_id": "...",
-  "provider": "huggingface"
-}
-
-# Check job status
-GET /api/v1/jobs/{job_id}
-```
-
-## Service Management
-
-### Start/Stop Individual Services
-
-```bash
-# Start single service
-docker compose --profile api up -d api
-
-# Stop single service
-docker compose stop api
-
-# Restart service
-docker compose restart api
-
-# View logs
-docker compose logs api -f
-```
-
-### Helper Scripts (Linux/Mac)
-
-```bash
-# Start all enabled services
-./infra/scripts/start-services.sh
-
-# Start single service
-./infra/scripts/start-service.sh api
-
-# Check status
-./infra/scripts/status.sh
-```
-
-### Helper Scripts (Windows PowerShell)
-
-```powershell
-# Start all enabled services
-.\infra\scripts\start-services.ps1
-```
-
-## Key Features to Test
-
-### Cost Intelligence
-
-1. **Predict cost** before operation
-2. **Route intelligently** to save money
-3. **Track budget** and get alerts
-4. **Allocate costs** to projects/clients
-5. **Generate billing reports**
-
-### Compliance
-
-1. **Export data** (GDPR right to access)
-2. **Delete data** (GDPR right to deletion)
-3. **Detect PII** in text
-4. **Query audit logs**
-5. **Generate compliance reports**
-
-### Security
-
-1. **All requests authenticated** (zero-trust)
-2. **Secrets encrypted** in database
-3. **Security events logged**
-4. **Rate limiting** enforced
-
-### Privacy
-
-1. **PII automatically detected**
-2. **Data retention** policies enforced
-3. **Privacy endpoints** available
-
-## Production Checklist
-
-Before deploying to production:
-
-- [ ] Set strong `SECRET_KEY` (generate with `openssl rand -hex 32`)
-- [ ] Set `ENCRYPTION_KEY` (different from SECRET_KEY)
-- [ ] Configure domain in Caddyfile
-- [ ] Set up API keys (HF, SERP, optional OpenAI)
-- [ ] Configure backups (cron for `backup.sh`)
-- [ ] Set up monitoring (health endpoint, metrics)
-- [ ] Test restore procedure
-- [ ] Review security settings
-- [ ] Configure data retention policies
-- [ ] Set up alerting
-- [ ] Choose service profiles (start only what you need)
-
-## Documentation
-
-- `README.md` - Overview and architecture
-- `DEPLOYMENT.md` - Production deployment guide
-- `infra/scripts/MODULAR_SERVICES.md` - Service management guide
-- `docs/SECURITY.md` - Security architecture
-- `docs/PRIVACY.md` - Privacy protection
-- `docs/COST_INTELLIGENCE.md` - Cost features
-- `docs/COMPLIANCE.md` - Compliance features
-- `docs/PLUGIN_SYSTEM.md` - Plugin development
-- `IMPLEMENTATION_SUMMARY.md` - What was built
-- `COMPETITIVE_ADVANTAGE.md` - What sets us apart
-
-## Support
-
-See `STRATEGY.md` for market positioning and business model.
+Get fully running in under 10 minutes.
 
 ---
 
-**You now have a production-ready, secure, compliant, cost-intelligent AI backend that sets you apart from the competition.**
+## Prerequisites
 
-**Modular by design - run what you need, when you need it.**
+| Requirement | Install / Notes |
+|---|---|
+| Windows 10/11 | x64 required |
+| Docker Desktop | https://docker.com/products/docker-desktop — enable WSL2 backend |
+| Ollama | https://ollama.com/download — install and let it run in the tray |
+| Git | https://git-scm.com |
+| Python 3.11+ | Only needed to run tests locally |
+
+---
+
+## Step 1 — Copy Environment File
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+```
+
+Open `.env` and fill in at minimum:
+
+```env
+SECRET_KEY=<run: openssl rand -hex 32>
+ENCRYPTION_KEY=<run: openssl rand -hex 32>
+POSTGRES_PASSWORD=choose_a_strong_password
+REDIS_PASSWORD=choose_a_strong_password
+```
+
+**Optional but strongly recommended — enables self-healing fallback:**
+```env
+GROQ_API_KEY=gsk_...   # free at https://console.groq.com
+```
+
+Leave everything else as the defaults for local dev.
+
+---
+
+## Step 2 — Start Everything
+
+```powershell
+.\start.ps1
+```
+
+The script will:
+1. Check Ollama is running
+2. Pull `qwen2.5:3b` if you don't have it yet (~2GB download, one time)
+3. Build Docker images
+4. Start Postgres, Redis, MinIO
+5. Wait for Postgres to be healthy
+6. Run Alembic migrations (`alembic upgrade head`)
+7. Seed a dev API key — **the key is printed to your console, copy it**
+8. Start the FastAPI server
+9. Tail logs
+
+When you see `Application startup complete`, you're live.
+
+---
+
+## Step 3 — Verify It's Working
+
+```powershell
+# Health check
+curl http://localhost:8000/status
+
+# Landing page
+start http://localhost:8000
+
+# Swagger API docs
+start http://localhost:8000/api/v1/docs
+```
+
+Expected `/status` response:
+```json
+{
+  "db_ok": true,
+  "redis_ok": true,
+  "llm_ok": true,
+  "llm_model": "qwen2.5:3b",
+  "groq_fallback_enabled": true,
+  "circuit_breaker": { "state": "CLOSED", "failures": 0, "threshold": 3 }
+}
+```
+
+---
+
+## Step 4 — Make Your First AI Call
+
+Use the dev API key printed during start (format: `byos_xxxxxxxx`):
+
+```powershell
+curl -X POST http://localhost:8000/v1/exec `
+  -H "X-API-Key: byos_your_key_here" `
+  -H "Content-Type: application/json" `
+  -d '{"prompt": "Summarise the key risks in a non-disclosure agreement in 3 bullet points."}'
+```
+
+Response:
+```json
+{
+  "response": "1. Confidentiality scope...",
+  "provider": "ollama",
+  "model": "qwen2.5:3b",
+  "total_tokens": 287,
+  "latency_ms": 1840,
+  "log_id": "exec_abc123..."
+}
+```
+
+---
+
+## Step 5 — Test Conversation Memory
+
+Pass the same `conversation_id` across multiple calls and the backend maintains context:
+
+```powershell
+# First message
+curl -X POST http://localhost:8000/v1/exec `
+  -H "X-API-Key: byos_your_key_here" `
+  -H "Content-Type: application/json" `
+  -d '{"prompt": "My company name is AcmeCorp.", "conversation_id": "session-001"}'
+
+# Follow-up — backend remembers the context
+curl -X POST http://localhost:8000/v1/exec `
+  -H "X-API-Key: byos_your_key_here" `
+  -H "Content-Type: application/json" `
+  -d '{"prompt": "What is my company name?", "conversation_id": "session-001"}'
+# Response: "Your company name is AcmeCorp."
+```
+
+---
+
+## Choosing a Model
+
+Edit `.env` → `LLM_MODEL_DEFAULT`:
+
+| Your Hardware | Best Model | Why |
+|---|---|---|
+| i5/i7 + 16GB RAM (CPU only) | `qwen2.5:3b` | Best quality/speed ratio for CPU inference |
+| Any GPU with 4GB VRAM | `llama3.2:3b` | Faster, GPU-accelerated |
+| GPU with 8GB+ VRAM | `llama3.1:8b` | High quality, 8B parameter |
+| GPU with 24GB+ VRAM | `llama3.1:70b` | Near-GPT-4 quality |
+
+Pull any model: `ollama pull <model-name>`
+
+---
+
+## Enabling Self-Healing (Groq Fallback)
+
+1. Get a free Groq key at https://console.groq.com
+2. Add to `.env`: `GROQ_API_KEY=gsk_...`
+3. Restart: `docker compose -f docker-compose.dev.yml restart api`
+
+Now if Ollama goes down or is unresponsive, the circuit breaker:
+- Opens after 3 failures
+- Routes all traffic to Groq (`llama-3.1-8b-instant`) instantly
+- Probes Ollama every 60 seconds
+- Closes the circuit and returns to local inference automatically
+
+The `provider` field in every response tells you whether `"ollama"` or `"groq"` served it.
+
+---
+
+## Useful Commands
+
+```powershell
+# View live logs
+docker compose -f docker-compose.dev.yml logs api -f
+
+# Restart API only (after code change)
+docker compose -f docker-compose.dev.yml restart api
+
+# Stop everything
+docker compose -f docker-compose.dev.yml down
+
+# Stop and wipe data (fresh start)
+docker compose -f docker-compose.dev.yml down -v
+
+# Run migrations manually
+docker exec -it byos_api alembic upgrade head
+
+# Open Postgres shell
+docker exec -it byos_postgres psql -U byos byos_ai
+
+# Open Redis CLI
+docker exec -it byos_redis redis-cli
+
+# Run tests
+docker exec -it byos_api pytest tests/test_exec_endpoints.py -v
+```
+
+---
+
+## Service URLs (Local Dev)
+
+| Service | URL | Notes |
+|---|---|---|
+| API + Swagger | http://localhost:8000/api/v1/docs | Interactive API explorer |
+| Landing Page | http://localhost:8000 | Public-facing marketing page |
+| System Status | http://localhost:8000/status | Health + circuit breaker |
+| Prometheus | http://localhost:9090 | Metrics (prod stack) |
+| Grafana | http://localhost:3000 | Dashboards (prod stack) |
+| MinIO Console | http://localhost:9001 | File storage UI |
+
+---
+
+## Production Deployment
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for:
+- DigitalOcean one-command deploy: `bash deploy-digitalocean.sh yourdomain.com`
+- Render deploy via `render.yaml`
+- SSL/TLS with Certbot
+- Nginx reverse proxy config
+- Grafana + Prometheus + Loki observability stack
+
+---
+
+## Pre-Production Checklist
+
+- [ ] `SECRET_KEY` — generate with `openssl rand -hex 32` (not the default)
+- [ ] `ENCRYPTION_KEY` — separate from SECRET_KEY
+- [ ] `POSTGRES_PASSWORD` — strong, not CHANGE_ME
+- [ ] `REDIS_PASSWORD` — strong, not CHANGE_ME
+- [ ] `GROQ_API_KEY` — set for self-healing fallback
+- [ ] `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` — for billing
+- [ ] `CORS_ORIGINS` — set to your actual frontend domain
+- [ ] `AGE_VERIFICATION_REQUIRED=true` — if running adult content platform
+- [ ] Migrations run: `alembic upgrade head`
+- [ ] Test `/status` endpoint returns all green
+
+---
+
+For the full reference — every endpoint, every config variable, every feature workflow — see **[USER_MANUAL.md](USER_MANUAL.md)**.

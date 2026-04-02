@@ -2,7 +2,7 @@
 # Run from the backend/ directory:  .\start.ps1
 #
 # What this does:
-#   1. Verifies Ollama is running and llama3.2:1b is available
+#   1. Verifies Ollama is running and qwen2.5:3b is available
 #   2. Runs DB migrations (inside a temp container)
 #   3. Brings up the dev stack (postgres, redis, minio, api)
 #   4. Tails logs until Ctrl+C
@@ -29,11 +29,11 @@ if (-not $SkipOllamaCheck) {
     try {
         $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 3
         $models = $tags.models | ForEach-Object { $_.name }
-        if ("llama3.2:1b" -notin $models) {
-            Write-Host "[byos] WARNING: llama3.2:1b not found in Ollama. Pulling now..." -ForegroundColor Yellow
-            ollama pull llama3.2:1b
+        if ("qwen2.5:3b" -notin $models) {
+            Write-Host "[byos] Pulling qwen2.5:3b (best model for CPU-only / 16GB RAM)..." -ForegroundColor Yellow
+            ollama pull qwen2.5:3b
         } else {
-            Write-Host "[byos] Ollama OK — llama3.2:1b available" -ForegroundColor Green
+            Write-Host "[byos] Ollama OK — qwen2.5:3b available" -ForegroundColor Green
         }
     } catch {
         Write-Host "[byos] ERROR: Ollama is not running at http://127.0.0.1:11434" -ForegroundColor Red

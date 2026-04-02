@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BYOS AI Backend</title>
+    <meta name="description" content="A portable, enterprise-grade backend for multi-tenant AI workflows with cost guardrails, security controls, and operational reliability." />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="container">
+        <div class="brand">
+          <div class="logo">BYOS</div>
+          <div class="brand-text">
+            <div class="name">BYOS AI Backend</div>
+            <div class="tagline">Portable infrastructure for secure, multi-tenant AI operations.</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="/api/v1/docs" class="nav-link">API Docs</a>
+          <a href="/health" class="nav-link">Health</a>
+          <a href="/metrics" class="nav-link">Metrics</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container">
+          <h1>Run AI-backed workflows like a platform, not a prototype.</h1>
+          <p class="lead">
+            This backend is designed for teams that need predictable cost, strong isolation, and the ability to swap providers without rewriting the business.
+            It’s a foundation for agencies and businesses running high-volume, multi-client operations.
+          </p>
+          <div class="cta-row">
+            <a class="button primary" href="/api/v1/docs">Explore the API</a>
+            <a class="button" href="#capabilities">See capabilities</a>
+          </div>
+
+          <div class="hero-cards" id="capabilities">
+            <div class="card">
+              <div class="card-title">Multi-tenant by default</div>
+              <div class="card-body">Workspace-scoped execution, app context middleware, and tenant isolation tests as a release gate.</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Cost guardrails</div>
+              <div class="card-body">Budget caps, cost kill switches, and operational runbooks built into the deployment process.</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Security posture</div>
+              <div class="card-body">Zero-trust request verification, hardened headers, DDoS protections, and secrets validation on startup.</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Operational reliability</div>
+              <div class="card-body">Canary workflows, feature flags, alert routing, and metrics for real-world operations.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container">
+          <h2>What you can demo immediately</h2>
+          <div class="grid">
+            <div class="panel">
+              <div class="panel-title">Interactive API docs</div>
+              <div class="panel-body">
+                Use the FastAPI docs to explore routes, schemas, and auth patterns.
+                <div class="panel-links">
+                  <a href="/api/v1/docs">Open Swagger</a>
+                  <a href="/api/v1/redoc">Open Redoc</a>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Health + readiness</div>
+              <div class="panel-body">
+                Verify the service quickly and wire it into deployment health checks.
+                <div class="panel-links">
+                  <a href="/health">/health</a>
+                  <a href="/api/v1/health">/api/v1/health</a>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Metrics endpoint</div>
+              <div class="panel-body">
+                Prometheus-style metrics for dashboards and alerts.
+                <div class="panel-links">
+                  <a href="/metrics">/metrics</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footnote">
+            This landing page is intentionally plain HTML/CSS so it can ship with the backend without adding frontend build tooling.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-row">
+          <div class="muted">BYOS AI Backend</div>
+          <div class="muted">Production-focused. Provider-agnostic. Multi-tenant.</div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

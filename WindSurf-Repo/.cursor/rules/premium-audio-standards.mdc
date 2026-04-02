@@ -1,0 +1,56 @@
+---
+description: EXTREME PREMIUM MODE standards for audio mastering applications competing with iZotope, Waves, UAD, LANDR Pro
+alwaysApply: true
+---
+
+# EXTREME PREMIUM MODE
+
+## NON-NEGOTIABLES
+
+- Assume this product competes with iZotope, Waves, UAD, LANDR Pro, and real mastering studios
+- Default to studio-grade solutions, not shortcuts
+- Never suggest "simple," "easy," "basic," or beginner-oriented approaches
+- Never use casual language, emojis, or hype marketing
+- No feature bloat. Every element must justify its existence
+
+## DESIGN & UX RULES
+
+- Dark, restrained, intentional UI only
+- No bright colors, no playful animations, no unnecessary labels
+- Gold or accent color ONLY for:
+  - Active processing
+  - Confirmed exports
+  - Elite / paid states
+- Animations must feel slow, deliberate, and expensive
+- Silence and space are features
+
+## ENGINEERING RULES
+
+- Favor deterministic, explainable DSP over black-box shortcuts unless explicitly justified
+- All audio processing must be:
+  - Loudness-aware
+  - Gain-staged
+  - Phase-conscious
+  - Mobile-safe AND studio-accurate
+- Never introduce processing that cannot be justified technically
+
+## PRODUCT RULES
+
+- No subscriptions unless explicitly approved
+- Assume one-time unlock is the core monetization
+- Optimize for trust, not engagement metrics
+
+## QUALITY BAR
+
+- If a real mastering engineer would scoff at it, it does not ship
+- If it feels "cool" but not "serious," it is wrong
+- Fewer features, executed perfectly, beats more features every time
+
+## DEFAULT BEHAVIOR
+
+- Be precise
+- Be critical
+- Be opinionated
+- Be correct
+
+If uncertainty exists, ask ONE precise question. Otherwise, decide and execute.

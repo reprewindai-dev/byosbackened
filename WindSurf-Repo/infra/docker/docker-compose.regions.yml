@@ -1,0 +1,94 @@
+# Multi-region Docker Compose template
+# Deploy API/worker to multiple regions (US-East, EU-West, Asia-Pacific)
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.regions.yml up
+
+version: '3.8'
+
+services:
+  # US-East Region
+  api-us-east:
+    extends:
+      service: api
+    environment:
+      - REGION=us-east
+      - DATABASE_URL=${DATABASE_URL_US_EAST:-${DATABASE_URL}}
+      - REDIS_URL=${REDIS_URL_US_EAST:-${REDIS_URL}}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL_US_EAST:-${S3_ENDPOINT_URL}}
+    ports:
+      - "8001:8000"  # Different port for US-East
+    labels:
+      - "region=us-east"
+      - "service=api"
+
+  worker-us-east:
+    extends:
+      service: worker
+    environment:
+      - REGION=us-east
+      - DATABASE_URL=${DATABASE_URL_US_EAST:-${DATABASE_URL}}
+      - REDIS_URL=${REDIS_URL_US_EAST:-${REDIS_URL}}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL_US_EAST:-${S3_ENDPOINT_URL}}
+    labels:
+      - "region=us-east"
+      - "service=worker"
+
+  # EU-West Region
+  api-eu-west:
+    extends:
+      service: api
+    environment:
+      - REGION=eu-west
+      - DATABASE_URL=${DATABASE_URL_EU_WEST:-${DATABASE_URL}}
+      - REDIS_URL=${REDIS_URL_EU_WEST:-${REDIS_URL}}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL_EU_WEST:-${S3_ENDPOINT_URL}}
+    ports:
+      - "8002:8000"  # Different port for EU-West
+    labels:
+      - "region=eu-west"
+      - "service=api"
+
+  worker-eu-west:
+    extends:
+      service: worker
+    environment:
+      - REGION=eu-west
+      - DATABASE_URL=${DATABASE_URL_EU_WEST:-${DATABASE_URL}}
+      - REDIS_URL=${REDIS_URL_EU_WEST:-${REDIS_URL}}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL_EU_WEST:-${S3_ENDPOINT_URL}}
+    labels:
+      - "region=eu-west"
+      - "service=worker"
+
+  # Asia-Pacific Region
+  api-asia-pacific:
+    extends:
+      service: api
+    environment:
+      - REGION=asia-pacific
+      - DATABASE_URL=${DATABASE_URL_ASIA_PACIFIC:-${DATABASE_URL}}
+      - REDIS_URL=${REDIS_URL_ASIA_PACIFIC:-${REDIS_URL}}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL_ASIA_PACIFIC:-${S3_ENDPOINT_URL}}
+    ports:
+      - "8003:8000"  # Different port for Asia-Pacific
+    labels:
+      - "region=asia-pacific"
+      - "service=api"
+
+  worker-asia-pacific:
+    extends:
+      service: worker
+    environment:
+      - REGION=asia-pacific
+      - DATABASE_URL=${DATABASE_URL_ASIA_PACIFIC:-${DATABASE_URL}}
+      - REDIS_URL=${REDIS_URL_ASIA_PACIFIC:-${REDIS_URL}}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL_ASIA_PACIFIC:-${S3_ENDPOINT_URL}}
+    labels:
+      - "region=asia-pacific"
+      - "service=worker"
+
+# Note: For production, you would:
+# 1. Deploy each region to separate infrastructure (different VPS/hosts)
+# 2. Use environment variables to configure region-specific database/Redis/S3
+# 3. Set up DNS/routing (e.g., us-api.example.com, eu-api.example.com)
+# 4. Configure edge routing middleware to route requests to nearest region
+# 5. Enable edge routing: ENABLE_EDGE=true

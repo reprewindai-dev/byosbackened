@@ -75,8 +75,14 @@ services:
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
       LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-llama3.2:1b}
-      LLM_FALLBACK: "off"
+      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-qwen2.5:3b}
+      LLM_FALLBACK: ${LLM_FALLBACK:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      CIRCUIT_BREAKER_FAILURE_THRESHOLD: ${CIRCUIT_BREAKER_FAILURE_THRESHOLD:-3}
+      CIRCUIT_BREAKER_COOLDOWN_SECONDS: ${CIRCUIT_BREAKER_COOLDOWN_SECONDS:-60}
+      MEMORY_TTL_SECONDS: ${MEMORY_TTL_SECONDS:-86400}
+      MEMORY_MAX_MESSAGES: ${MEMORY_MAX_MESSAGES:-20}
     ports:
       - "8000:8000"
     depends_on:
@@ -112,8 +118,12 @@ services:
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
       LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-llama3.2:1b}
-      LLM_FALLBACK: "off"
+      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-qwen2.5:3b}
+      LLM_FALLBACK: ${LLM_FALLBACK:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      MEMORY_TTL_SECONDS: ${MEMORY_TTL_SECONDS:-86400}
+      MEMORY_MAX_MESSAGES: ${MEMORY_MAX_MESSAGES:-20}
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,8 +148,10 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
       LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-llama3.2:1b}
-      LLM_FALLBACK: "off"
+      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-qwen2.5:3b}
+      LLM_FALLBACK: ${LLM_FALLBACK:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BYOS AI — Sovereign AI Infrastructure</title>
+  <meta name="description" content="Private, self-hosted AI backend with local inference, multi-tenant isolation, age verification, content moderation, and zero data leakage. Built for industries where privacy is non-negotiable." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #08090c;
+      --surface:  #101218;
+      --border:   #1e2130;
+      --accent:   #6c63ff;
+      --accent2:  #00d4aa;
+      --danger:   #ff4d6d;
+      --text:     #e8eaf0;
+      --muted:    #6b7280;
+      --pill-bg:  #1a1d2e;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── NAV ────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 60px;
+      background: rgba(8,9,12,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 2rem; }
+    .nav-links a { color: var(--muted); font-size: 0.875rem; transition: color .2s; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-cta {
+      background: var(--accent); color: #fff !important;
+      padding: 0.4rem 1.1rem; border-radius: 6px; font-size: 0.875rem;
+      font-weight: 600; transition: opacity .2s;
+    }
+    .nav-cta:hover { opacity: 0.85; text-decoration: none !important; }
+
+    /* ── HERO ───────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 7rem 1.5rem 5rem;
+      max-width: 860px; margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: var(--pill-bg); border: 1px solid var(--border);
+      padding: 0.3rem 0.9rem; border-radius: 99px;
+      font-size: 0.78rem; color: var(--accent2); letter-spacing: 0.05em;
+      text-transform: uppercase; font-weight: 600; margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero p {
+      font-size: 1.15rem; color: var(--muted); max-width: 640px;
+      margin: 0 auto 2.5rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      padding: 0.75rem 1.75rem; border-radius: 8px;
+      font-weight: 700; font-size: 0.95rem; transition: opacity .2s;
+      border: none; cursor: pointer;
+    }
+    .btn-primary:hover { opacity: 0.85; text-decoration: none; }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      padding: 0.75rem 1.75rem; border-radius: 8px;
+      font-weight: 600; font-size: 0.95rem;
+      border: 1px solid var(--border); transition: border-color .2s;
+      cursor: pointer;
+    }
+    .btn-outline:hover { border-color: var(--accent); text-decoration: none; }
+
+    /* ── STATUS BAR ─────────────────────────────── */
+    .status-bar {
+      display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;
+      padding: 1rem; margin: 0 auto 2rem;
+      max-width: 600px;
+    }
+    .status-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.green { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+    .dot.amber { background: #f59e0b; }
+
+    /* ── SECTION COMMON ─────────────────────────── */
+    section { padding: 5rem 1.5rem; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 800;
+      letter-spacing: -0.025em; margin-bottom: 1rem;
+    }
+    .section-sub { color: var(--muted); font-size: 1rem; max-width: 560px; }
+
+    /* ── FEATURE GRID ───────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem; margin-top: 3rem;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.75rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .feature-icon {
+      font-size: 1.75rem; margin-bottom: 1rem;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feature-card p { font-size: 0.875rem; color: var(--muted); }
+
+    /* ── WHO IS THIS FOR ────────────────────────── */
+    .industries {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .industry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem; margin-top: 2.5rem;
+    }
+    .industry-card {
+      background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .industry-card .tag {
+      display: inline-block; background: var(--pill-bg);
+      border: 1px solid var(--border); padding: 0.2rem 0.6rem;
+      border-radius: 4px; font-size: 0.7rem; color: var(--accent2);
+      letter-spacing: 0.05em; text-transform: uppercase;
+      font-weight: 600; margin-bottom: 0.75rem;
+    }
+    .industry-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .industry-card p { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── HOW IT WORKS ───────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2rem; margin-top: 3rem; counter-reset: step;
+    }
+    .step { position: relative; }
+    .step-num {
+      font-size: 3rem; font-weight: 900;
+      color: var(--border); line-height: 1; margin-bottom: 0.75rem;
+    }
+    .step h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .step p { font-size: 0.85rem; color: var(--muted); }
+
+    /* ── INTEGRATIONS ───────────────────────────── */
+    .integrations-row {
+      display: flex; flex-wrap: wrap; gap: 0.75rem;
+      margin-top: 2rem;
+    }
+    .integration-pill {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.6rem 1rem;
+      font-size: 0.8rem; color: var(--text); font-weight: 500;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    /* ── PRICING ────────────────────────────────── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem; margin-top: 3rem; align-items: start;
+    }
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 2rem; position: relative;
+    }
+    .pricing-card.featured {
+      border-color: var(--accent);
+    }
+    .featured-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--accent); color: #fff;
+      padding: 0.2rem 0.9rem; border-radius: 99px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    .pricing-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .pricing-tier-desc { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.25rem; }
+    .price { font-size: 2.5rem; font-weight: 900; letter-spacing: -0.04em; }
+    .price span { font-size: 1rem; font-weight: 400; color: var(--muted); }
+    .pricing-features {
+      list-style: none; margin: 1.25rem 0 1.75rem;
+    }
+    .pricing-features li {
+      font-size: 0.85rem; color: var(--muted);
+      padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .pricing-features li::before { content: "✓"; color: var(--accent2); font-weight: 700; }
+    .pricing-features li.no::before { content: "–"; color: var(--border); }
+
+    /* ── API PREVIEW ────────────────────────────── */
+    .code-block {
+      background: #0d0f17; border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.5rem;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.82rem; line-height: 1.7; overflow-x: auto;
+      margin-top: 2rem;
+    }
+    .code-block .k  { color: #c792ea; } /* keyword */
+    .code-block .s  { color: #c3e88d; } /* string */
+    .code-block .n  { color: #82aaff; } /* name */
+    .code-block .c  { color: var(--muted); } /* comment */
+    .code-block .v  { color: #f78c6c; } /* value */
+
+    /* ── FOOTER ─────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 1.5rem;
+      text-align: center;
+    }
+    footer p { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+    .footer-links {
+      display: flex; justify-content: center; gap: 1.5rem;
+      flex-wrap: wrap; margin-bottom: 1.5rem;
+    }
+    .footer-links a { font-size: 0.8rem; color: var(--muted); }
+    .footer-links a:hover { color: var(--text); }
+
+    /* ── RESPONSIVE ─────────────────────────────── */
+    @media (max-width: 640px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 5rem 1rem 3rem; }
+      section { padding: 3.5rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">BYOS<span>.</span>AI</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#industries">Who It's For</a>
+    <a href="#how">How It Works</a>
+    <a href="#integrations">Integrations</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/api/v1/docs">API Docs</a>
+  </div>
+  <a class="nav-links nav-cta" href="#pricing">Get Started</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">🔒 Your Infrastructure. Your Data. Zero Leakage.</div>
+  <h1>The AI Backend Built for <em>Industries</em> That Can't Compromise</h1>
+  <p>
+    Local LLM inference. Multi-tenant isolation. Age verification. Content moderation.
+    Self-healing circuit breaker. On-premise—no data ever leaves your server.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="#pricing">Start Free</a>
+    <a class="btn-outline" href="/api/v1/docs">Explore the API →</a>
+  </div>
+</div>
+
+<!-- LIVE STATUS -->
+<div class="status-bar" id="status-bar">
+  <div class="status-item"><div class="dot green"></div> API Online</div>
+  <div class="status-item"><div class="dot green"></div> Local LLM Ready</div>
+  <div class="status-item"><div class="dot green"></div> Groq Fallback Armed</div>
+  <div class="status-item"><div class="dot green"></div> All Systems Nominal</div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">Core Platform</div>
+    <h2 class="section-title">Everything You Need. Nothing You Don't.</h2>
+    <p class="section-sub">
+      Production-grade AI infrastructure purpose-built for high-compliance, high-privacy operations.
+    </p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <h3>Local LLM Inference</h3>
+        <p>Runs on your hardware via Ollama. <strong>qwen2.5:3b</strong> default — optimised for CPU-only servers. Prompts never leave your machine.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Self-Healing Circuit Breaker</h3>
+        <p>Ollama goes down? Circuit opens automatically and routes to Groq fallback. Recovers silently when Ollama comes back — zero manual intervention.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💬</div>
+        <h3>Persistent Conversation Memory</h3>
+        <p>Redis-backed per-tenant context. Pass <code>conversation_id</code> and the backend maintains 20-message history with 24h TTL — stateful AI, zero setup.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏢</div>
+        <h3>Multi-Tenant Isolation</h3>
+        <p>Postgres Row-Level Security enforced on every query. Each workspace is cryptographically isolated — one breach cannot access another tenant's data.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔑</div>
+        <h3>API Key + JWT Auth</h3>
+        <p>Scoped API keys with SHA-256 hashing, expiry, rate limiting. Full MFA support, session management, and RBAC out of the box.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Content Safety + Age Verification</h3>
+        <p>Built-in content filter pipeline, NSFW scanning, and age gate flow. Critical for adult platforms — compliant by default.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Full Observability Stack</h3>
+        <p>Prometheus metrics, Grafana dashboards, Loki log aggregation. Every AI call logged with tenant, tokens, latency, cost, and provider.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💳</div>
+        <h3>Stripe Billing Built-In</h3>
+        <p>Starter / Pro / Enterprise tiers. Checkout sessions, webhook handling, customer portal, usage gates — monetise immediately.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Zero-Trust Security Layer</h3>
+        <p>Every request authenticated and validated before it reaches a route. Threat event logging, anomaly detection, and security dashboards included.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO IS THIS FOR -->
+<section class="industries" id="industries">
+  <div class="container">
+    <div class="section-label">Target Markets</div>
+    <h2 class="section-title">Built for Who It Actually Matters To</h2>
+    <p class="section-sub">
+      This isn't a generic API wrapper. These are the verticals where local AI sovereignty, content controls, and privacy compliance aren't optional.
+    </p>
+    <div class="industry-grid">
+      <div class="industry-card">
+        <div class="tag">Adult Platforms</div>
+        <h4>Content &amp; Creator Networks</h4>
+        <p>Age verification, NSFW classification, performer data isolation. Run AI features Stripe and OpenAI won't touch — on your own infrastructure.</p>
+      </div>
+      <div class="industry-card">
+        <div class="tag">Legal &amp; Compliance</div>
+        <h4>Law Firms &amp; LegalTech</h4>
+        <p>Privileged communications never leave your server. Summarise contracts, draft briefs, and analyse case law with full attorney-client confidentiality.</p>
+      </div>
+      <div class="industry-card">
+        <div class="tag">Healthcare</div>
+        <h4>Medical &amp; Telehealth</h4>
+        <p>HIPAA-adjacent local inference. Patient data stays on-premise. AI-assisted notes, triage, and diagnostics with zero PHI exposure to cloud providers.</p>
+      </div>
+      <div class="industry-card">
+        <div class="tag">Finance</div>
+        <h4>Trading &amp; Fintech</h4>
+        <p>Proprietary trading logic and client financial data processed locally. No SEC/FCA concerns about AI data handling practices.</p>
+      </div>
+      <div class="industry-card">
+        <div class="tag">Agencies</div>
+        <h4>Creative &amp; Marketing</h4>
+        <p>White-label AI infrastructure for your clients. Multi-tenant from day one — each client isolated, billed, and rate-limited independently.</p>
+      </div>
+      <div class="industry-card">
+        <div class="tag">Enterprise</div>
+        <h4>Any Data-Sensitive Operation</h4>
+        <p>IP-sensitive R&amp;D, HR data, internal comms — if a data breach would be catastrophic, your AI needs to stay on-site.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container">
+    <div class="section-label">Architecture</div>
+    <h2 class="section-title">How It Works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Deploy Locally</h3>
+        <p>Run <code>.\start.ps1</code> — brings up Postgres, Redis, MinIO, and the API. Ollama runs natively on Windows with your GPU or CPU.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>Authenticate via API Key</h3>
+        <p>Seed a <code>byos_</code> key, attach it as <code>X-API-Key</code>. Every request is tenant-resolved and RLS-enforced automatically.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>Call <code>POST /v1/exec</code></h3>
+        <p>Send a prompt with optional <code>conversation_id</code>. The backend injects history, calls Ollama, and falls back to Groq if the circuit opens.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <h3>Everything Logged</h3>
+        <p>Every execution stored in <code>execution_logs</code> with tenant, model, tokens, latency, and provider. Query it, export it, bill from it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTEGRATIONS -->
+<section id="integrations">
+  <div class="container">
+    <div class="section-label">Integrations &amp; Plugins</div>
+    <h2 class="section-title">Connect to Everything</h2>
+    <p class="section-sub">
+      Drop-in compatible with any stack. OpenAI-compatible endpoint means existing integrations work with a single base URL change.
+    </p>
+    <div class="integrations-row">
+      <div class="integration-pill">🦙 Ollama (local)</div>
+      <div class="integration-pill">⚡ Groq Fallback</div>
+      <div class="integration-pill">🐘 PostgreSQL + RLS</div>
+      <div class="integration-pill">🔴 Redis Memory</div>
+      <div class="integration-pill">💳 Stripe Billing</div>
+      <div class="integration-pill">📦 MinIO / S3</div>
+      <div class="integration-pill">📊 Prometheus + Grafana</div>
+      <div class="integration-pill">🪵 Loki Logging</div>
+      <div class="integration-pill">🐳 Docker Compose</div>
+      <div class="integration-pill">🌐 Node.js SDK</div>
+      <div class="integration-pill">🐍 Python SDK</div>
+      <div class="integration-pill">🔐 MFA / TOTP</div>
+      <div class="integration-pill">🛡️ Content Moderation</div>
+      <div class="integration-pill">🔞 Age Verification</div>
+      <div class="integration-pill">✉️ Webhook Support</div>
+    </div>
+
+    <!-- API Preview -->
+    <div class="code-block">
+<span class="c"># Basic inference call — conversation memory + Groq auto-fallback</span>
+<span class="k">curl</span> -X POST http://localhost:8000/v1/exec \
+  -H <span class="s">"X-API-Key: byos_your_key_here"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "prompt": "Summarise the key legal risks in this contract.",
+    "conversation_id": "matter-2024-001",
+    "model": "qwen2.5:3b"
+  }'</span>
+
+<span class="c"># Response</span>
+{
+  <span class="n">"response"</span>: <span class="s">"The key legal risks are..."</span>,
+  <span class="n">"provider"</span>: <span class="s">"ollama"</span>,       <span class="c">// "groq" if circuit tripped</span>
+  <span class="n">"model"</span>: <span class="s">"qwen2.5:3b"</span>,
+  <span class="n">"conversation_id"</span>: <span class="s">"matter-2024-001"</span>,  <span class="c">// context persisted</span>
+  <span class="n">"total_tokens"</span>: <span class="v">312</span>,
+  <span class="n">"latency_ms"</span>: <span class="v">1840</span>
+}
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="section-label">Pricing</div>
+    <h2 class="section-title">Simple, Scalable Pricing</h2>
+    <p class="section-sub">All plans include local inference, multi-tenant isolation, and the full security suite.</p>
+    <div class="pricing-grid">
+
+      <div class="pricing-card">
+        <h3>Starter</h3>
+        <div class="pricing-tier-desc">Solo operators &amp; small teams</div>
+        <div class="price">$29<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>10,000 API calls / month</li>
+          <li>1 workspace, 3 users</li>
+          <li>Local Ollama inference</li>
+          <li>Groq self-healing fallback</li>
+          <li>Conversation memory</li>
+          <li>API key auth + JWT</li>
+          <li>Security audit logs</li>
+          <li class="no">Content filtering</li>
+          <li class="no">Age verification</li>
+        </ul>
+        <a class="btn-outline" href="#" style="display:block;text-align:center;padding:.65rem">Get Started</a>
+      </div>
+
+      <div class="pricing-card featured">
+        <div class="featured-badge">Most Popular</div>
+        <h3>Pro</h3>
+        <div class="pricing-tier-desc">Agencies &amp; privacy-sensitive businesses</div>
+        <div class="price">$79<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>100,000 API calls / month</li>
+          <li>5 workspaces, 15 users</li>
+          <li>Local Ollama inference</li>
+          <li>Groq self-healing fallback</li>
+          <li>Conversation memory</li>
+          <li>Full security suite</li>
+          <li>Content filtering + NSFW scan</li>
+          <li>Compliance reports</li>
+          <li class="no">Age verification</li>
+        </ul>
+        <a class="btn-primary" href="#" style="display:block;text-align:center;padding:.65rem">Start Pro</a>
+      </div>
+
+      <div class="pricing-card">
+        <h3>Enterprise</h3>
+        <div class="pricing-tier-desc">Adult platforms, legal, medical &amp; regulated industries</div>
+        <div class="price">$299<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>Unlimited API calls</li>
+          <li>Unlimited workspaces &amp; users</li>
+          <li>Local Ollama inference</li>
+          <li>Groq self-healing fallback</li>
+          <li>Conversation memory</li>
+          <li>Full security suite</li>
+          <li>Content filtering + NSFW scan</li>
+          <li>Age verification flow</li>
+          <li>Dedicated Slack support + 99.9% SLA</li>
+        </ul>
+        <a class="btn-outline" href="#" style="display:block;text-align:center;padding:.65rem">Contact Sales</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="nav-logo" style="font-size:1.2rem;margin-bottom:1.25rem">BYOS<span style="color:var(--accent)">.</span>AI</div>
+  <div class="footer-links">
+    <a href="/api/v1/docs">API Docs</a>
+    <a href="/status">System Status</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#industries">Industries</a>
+  </div>
+  <p>Sovereign AI infrastructure for industries where privacy is non-negotiable.</p>
+  <p style="margin-top:.5rem">© 2026 BYOS.AI — All inference stays on your hardware.</p>
+</footer>
+
+<script>
+  // Live status fetch from /status
+  (async () => {
+    try {
+      const res = await fetch('/status');
+      if (!res.ok) return;
+      const d = await res.json();
+      const bar = document.getElementById('status-bar');
+      const items = [
+        { label: 'API Online',         ok: true },
+        { label: `LLM: ${d.llm_model || 'Ollama'}`, ok: d.llm_ok },
+        { label: `Groq Fallback`,       ok: d.groq_fallback_enabled },
+        { label: `DB + Redis`,          ok: d.db_ok && d.redis_ok },
+      ];
+      bar.innerHTML = items.map(i => `
+        <div class="status-item">
+          <div class="dot ${i.ok ? 'green' : 'amber'}"></div>
+          ${i.label}
+        </div>`).join('');
+    } catch {}
+  })();
+</script>
+
+</body>
+</html>

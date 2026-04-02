@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYOS AI Backend - Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .switch-toggle {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .switch-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #10b981;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .category-card {
+            transition: all 0.3s ease;
+        }
+        .category-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-gray-900 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">🔧 Admin Dashboard</h1>
+                    <p class="text-gray-400 text-sm">BYOS AI Backend Control Panel</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="server-status" class="px-3 py-1 bg-green-600 rounded-full text-sm">🟢 Online</span>
+                    <button onclick="refreshDashboard()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- System Overview -->
+        <section class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">System Status</p>
+                            <p id="system-status-text" class="text-2xl font-bold text-green-600">Operational</p>
+                        </div>
+                        <div class="text-3xl">🖥️</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Active Features</p>
+                            <p id="active-features" class="text-2xl font-bold text-blue-600">0/0</p>
+                        </div>
+                        <div class="text-3xl">⚡</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">AI Requests Today</p>
+                            <p id="ai-requests" class="text-2xl font-bold text-purple-600">0</p>
+                        </div>
+                        <div class="text-3xl">🤖</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">System Load</p>
+                            <p id="system-load" class="text-2xl font-bold text-orange-600">0%</p>
+                        </div>
+                        <div class="text-3xl">📊</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Control Categories -->
+        <section class="mb-8">
+            <h2 class="text-xl font-bold mb-6">🎛️ System Controls</h2>
+            <div id="categories-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Categories will be populated here -->
+            </div>
+        </section>
+
+        <!-- Bulk Actions -->
+        <section class="mb-8">
+            <h2 class="text-xl font-bold mb-6">⚡ Bulk Actions</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex flex-wrap gap-4">
+                    <button onclick="enableAllFeatures()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition">
+                        ✅ Enable All Features
+                    </button>
+                    <button onclick="disableAllFeatures()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition">
+                        ❌ Disable All Features
+                    </button>
+                    <button onclick="enableCriticalOnly()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg transition">
+                        ⚠️ Enable Critical Only
+                    </button>
+                    <button onclick="toggleMaintenanceMode()" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition">
+                        🔧 Toggle Maintenance Mode
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Logs -->
+        <section>
+            <h2 class="text-xl font-bold mb-6">📋 Recent Activity</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div id="activity-log" class="space-y-2 max-h-64 overflow-y-auto">
+                    <!-- Activity will be populated here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let dashboardData = null;
+        let authToken = null;
+
+        // Login function
+        async function login() {
+            try {
+                const response = await axios.post(API_BASE + '/auth/login', {
+                    username: 'admin',
+                    password: 'admin123'
+                });
+                authToken = response.data.access_token;
+                console.log('Login successful');
+                return true;
+            } catch (error) {
+                console.error('Login failed:', error);
+                return false;
+            }
+        }
+
+        // Initialize dashboard
+        async function initDashboard() {
+            console.log('Initializing dashboard...');
+            
+            // First try to login
+            const loginSuccess = await login();
+            if (!loginSuccess) {
+                showError('Failed to authenticate with admin dashboard');
+                return;
+            }
+            
+            try {
+                const response = await axios.get(API_BASE + '/admin/dashboard/config', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                dashboardData = response.data;
+                console.log('Dashboard data loaded:', dashboardData);
+                renderDashboard();
+                addActivity('Dashboard loaded successfully', 'success');
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+                addActivity('Failed to load dashboard: ' + error.message, 'error');
+                showError('Failed to load admin dashboard. Check if server is running.');
+            }
+        }
+
+        function renderDashboard() {
+            if (!dashboardData) return;
+
+            // Update overview stats
+            updateOverviewStats();
+
+            // Render switches by category
+            renderCategories();
+        }
+
+        function updateOverviewStats() {
+            const switches = dashboardData.switches;
+            const enabledCount = switches.filter(s => s.enabled).length;
+            
+            document.getElementById('active-features').textContent = enabledCount + '/' + switches.length;
+            document.getElementById('ai-requests').textContent = dashboardData.metrics.ai_requests_today || '0';
+            document.getElementById('system-load').textContent = (dashboardData.metrics.system_load || 0) + '%';
+            
+            const status = dashboardData.system_status.server_status;
+            const statusElement = document.getElementById('server-status');
+            const statusText = document.getElementById('system-status-text');
+            
+            if (status === 'running') {
+                statusElement.className = 'px-3 py-1 bg-green-600 rounded-full text-sm';
+                statusElement.textContent = '🟢 Online';
+                statusText.textContent = 'Operational';
+                statusText.className = 'text-2xl font-bold text-green-600';
+            } else {
+                statusElement.className = 'px-3 py-1 bg-red-600 rounded-full text-sm';
+                statusElement.textContent = '🔴 Offline';
+                statusText.textContent = 'Issues Detected';
+                statusText.className = 'text-2xl font-bold text-red-600';
+            }
+        }
+
+        function renderCategories() {
+            const categories = {};
+            
+            // Group switches by category
+            dashboardData.switches.forEach(switch => {
+                if (!categories[switch.category]) {
+                    categories[switch.category] = [];
+                }
+                categories[switch.category].push(switch);
+            });
+
+            const container = document.getElementById('categories-container');
+            container.innerHTML = '';
+
+            Object.entries(categories).forEach(([category, switches]) => {
+                const categoryCard = createCategoryCard(category, switches);
+                container.appendChild(categoryCard);
+            });
+        }
+
+        function createCategoryCard(category, switches) {
+            const card = document.createElement('div');
+            card.className = 'category-card bg-white rounded-lg shadow p-6';
+            
+            const enabledCount = switches.filter(s => s.enabled).length;
+            const categoryIcons = {
+                'AI System': '🤖',
+                'Providers': '🔌',
+                'Billing': '💳',
+                'Security': '🔒',
+                'Features': '⚡',
+                'Monitoring': '📊',
+                'Advanced': '🔧'
+            };
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">${categoryIcons[category] || '📁'} ${category}</h3>
+                    <span class="text-sm text-gray-500">${enabledCount}/${switches.length} enabled</span>
+                </div>
+                <div class="space-y-3">
+                    ${switches.map(switch => createSwitchHTML(switch)).join('')}
+                </div>
+            `;
+
+            return card;
+        }
+
+        function createSwitchHTML(switch) {
+            return `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-sm">${switch.display_name}</h4>
+                        <p class="text-xs text-gray-500">${switch.description}</p>
+                        ${switch.last_modified ? `<p class="text-xs text-gray-400">Modified: ${new Date(switch.last_modified).toLocaleString()}</p>` : ''}
+                    </div>
+                    <label class="switch-toggle">
+                        <input type="checkbox" ${switch.enabled ? 'checked' : ''} 
+                               onchange="toggleSwitch('${switch.name}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            `;
+        }
+
+        async function toggleSwitch(switchName, enabled) {
+            try {
+                await axios.put(API_BASE + '/admin/dashboard/switches/' + switchName, 
+                    { enabled: enabled },
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                
+                addActivity((enabled ? 'Enabled' : 'Disabled') + ' ' + switchName, 'info');
+                await refreshDashboard();
+            } catch (error) {
+                console.error('Failed to toggle switch:', error);
+                addActivity('Failed to toggle ' + switchName + ': ' + error.message, 'error');
+            }
+        }
+
+        async function refreshDashboard() {
+            await initDashboard();
+        }
+
+        async function enableAllFeatures() {
+            const switches = dashboardData.switches;
+            const updates = {};
+            switches.forEach(switch => {
+                updates[switch.name] = true;
+            });
+            
+            try {
+                await axios.post(API_BASE + '/admin/dashboard/switches/bulk-update', 
+                    updates,
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                addActivity('Enabled all features', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                addActivity('Failed to enable all features: ' + error.message, 'error');
+            }
+        }
+
+        async function disableAllFeatures() {
+            const switches = dashboardData.switches;
+            const updates = {};
+            switches.forEach(switch => {
+                updates[switch.name] = false;
+            });
+            
+            try {
+                await axios.post(API_BASE + '/admin/dashboard/switches/bulk-update', 
+                    updates,
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                addActivity('Disabled all features', 'warning');
+                await refreshDashboard();
+            } catch (error) {
+                addActivity('Failed to disable all features: ' + error.message, 'error');
+            }
+        }
+
+        async function enableCriticalOnly() {
+            const criticalSwitches = [
+                'ai_execution_enabled',
+                'stripe_billing_enabled',
+                'authentication_required',
+                'audit_logging_enabled'
+            ];
+            
+            const switches = dashboardData.switches;
+            const updates = {};
+            switches.forEach(switch => {
+                updates[switch.name] = criticalSwitches.includes(switch.name);
+            });
+            
+            try {
+                await axios.post(API_BASE + '/admin/dashboard/switches/bulk-update', 
+                    updates,
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                addActivity('Enabled critical features only', 'info');
+                await refreshDashboard();
+            } catch (error) {
+                addActivity('Failed to enable critical features: ' + error.message, 'error');
+            }
+        }
+
+        async function toggleMaintenanceMode() {
+            const currentMode = dashboardData.switches.find(s => s.name === 'maintenance_mode_enabled');
+            const newState = !currentMode.enabled;
+            
+            try {
+                await axios.put(API_BASE + '/admin/dashboard/switches/maintenance_mode_enabled', 
+                    { enabled: newState },
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                addActivity((newState ? 'Enabled' : 'Disabled') + ' maintenance mode', newState ? 'warning' : 'success');
+                await refreshDashboard();
+            } catch (error) {
+                addActivity('Failed to toggle maintenance mode: ' + error.message, 'error');
+            }
+        }
+
+        function addActivity(message, type) {
+            const logContainer = document.getElementById('activity-log');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const icons = {
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️',
+                'info': 'ℹ️'
+            };
+            
+            const colors = {
+                'success': 'text-green-600',
+                'error': 'text-red-600',
+                'warning': 'text-yellow-600',
+                'info': 'text-blue-600'
+            };
+            
+            const activityItem = document.createElement('div');
+            activityItem.className = 'flex items-center space-x-2 p-2 bg-gray-50 rounded ' + colors[type];
+            activityItem.innerHTML = `
+                <span>${icons[type]}</span>
+                <span class="text-sm">${message}</span>
+                <span class="text-xs text-gray-500">${timestamp}</span>
+            `;
+            
+            logContainer.insertBefore(activityItem, logContainer.firstChild);
+            
+            // Keep only last 20 items
+            while (logContainer.children.length > 20) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        function showError(message) {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = `
+                <div class="col-span-full bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                    <div class="text-red-800">
+                        <p class="text-xl mb-2">❌ Dashboard Connection Error</p>
+                        <p>${message}</p>
+                        <p class="text-sm mt-2">Make sure the server is running at http://localhost:8000</p>
+                        <button onclick="location.reload()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg">
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshDashboard, 30000);
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>

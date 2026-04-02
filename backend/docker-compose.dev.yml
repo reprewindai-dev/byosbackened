@@ -79,8 +79,10 @@ services:
       S3_BUCKET_NAME: byos-ai
       # ── Ollama — Windows host ──────────────────────────────────────────────
       LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: llama3.2:1b
+      LLM_MODEL_DEFAULT: qwen2.5:3b
       LLM_FALLBACK: "off"
+      # ── Groq fallback (set to enable self-healing Ollama→Groq circuit) ─────
+      GROQ_API_KEY: ""
       # ── Dev security (do NOT use in prod) ────────────────────────────────
       SECRET_KEY: dev-secret-key-change-in-production-32chars
       DEBUG: "true"

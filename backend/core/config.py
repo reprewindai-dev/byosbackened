@@ -35,10 +35,23 @@ class Settings(BaseSettings):
 
     # ── LLM — Local Ollama (primary, no external fallback) ──────────────────────
     llm_base_url: str = "http://host.docker.internal:11434"
-    llm_model_default: str = "llama3.2:1b"
-    llm_fallback: str = "off"   # "off" = hard fail; never route to external providers
+    llm_model_default: str = "qwen2.5:3b"
+    llm_fallback: str = "groq"  # "off" | "groq" — groq enables self-healing fallback
     llm_timeout_seconds: int = 60
     llm_max_tokens: int = 2048
+
+    # ── Groq fallback (self-healing circuit breaker) ─────────────────────────
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.1-8b-instant"  # fast model for fallback
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+
+    # Circuit breaker — opens after N failures, resets after cooldown_seconds
+    circuit_breaker_failure_threshold: int = 3
+    circuit_breaker_cooldown_seconds: int = 60
+
+    # ── Conversation memory ───────────────────────────────────────────────────
+    memory_ttl_seconds: int = 86400    # 24h default per conversation
+    memory_max_messages: int = 20      # max messages kept in context window
 
     # SERP API (optional, non-AI)
     serpapi_key: str = ""

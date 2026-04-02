@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYOS AI Backend - Enterprise Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #1a202c;
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-online {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+        
+        .status-offline {
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+        
+        .status-warning {
+            background: #f59e0b;
+            box-shadow: 0 0 10px #f59e0b;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 56px;
+            height: 28px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #475569;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #10b981;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(28px);
+        }
+        
+        .metric-card {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .connection-item {
+            transition: all 0.3s ease;
+        }
+        
+        .connection-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen p-6">
+        <!-- Header -->
+        <header class="glass-morphism text-white mb-6">
+            <div class="container mx-auto">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold flex items-center gap-3">
+                            <i class="fas fa-server"></i>
+                            BYOS AI Backend - Enterprise Control Center
+                        </h1>
+                        <p class="text-blue-200 text-sm">Full System Visibility & Control</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <p class="text-sm text-blue-200">System Status</p>
+                            <div class="flex items-center gap-2">
+                                <span class="status-indicator status-online"></span>
+                                <span class="font-semibold">OPERATIONAL</span>
+                            </div>
+                        </div>
+                        <button onclick="refreshAll()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="container mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main System Overview -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- System Metrics -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-chart-line"></i>
+                        System Metrics
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="metric-card glass-morphism p-4 text-center">
+                            <div class="text-3xl font-bold text-green-400" id="active-features">0/0</div>
+                            <div class="text-sm text-gray-300">Active Features</div>
+                        </div>
+                        <div class="metric-card glass-morphism p-4 text-center">
+                            <div class="text-3xl font-bold text-blue-400" id="ai-requests">0</div>
+                            <div class="text-sm text-gray-300">AI Requests</div>
+                        </div>
+                        <div class="metric-card glass-morphism p-4 text-center">
+                            <div class="text-3xl font-bold text-purple-400" id="active-users">0</div>
+                            <div class="text-sm text-gray-300">Active Users</div>
+                        </div>
+                        <div class="metric-card glass-morphism p-4 text-center">
+                            <div class="text-3xl font-bold text-orange-400" id="system-load">0%</div>
+                            <div class="text-sm text-gray-300">System Load</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Connections -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-network-wired"></i>
+                        Live Connections
+                        <span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full" id="connection-count">0</span>
+                    </h2>
+                    <div class="space-y-2 max-h-64 overflow-y-auto scrollbar-hide" id="connections-list">
+                        <!-- Connections will be populated here -->
+                    </div>
+                </div>
+
+                <!-- System Controls -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-sliders-h"></i>
+                        System Controls
+                    </h2>
+                    <div class="space-y-6" id="controls-container">
+                        <!-- Controls will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Real-time Activity -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-stream"></i>
+                        Real-time Activity
+                    </h2>
+                    <div class="space-y-2 max-h-64 overflow-y-auto scrollbar-hide" id="activity-log">
+                        <!-- Activity will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="space-y-6">
+                <!-- System Health -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-heartbeat"></i>
+                        System Health
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span>Server</span>
+                            <span class="status-indicator status-online"></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Database</span>
+                            <span class="status-indicator status-online"></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Redis</span>
+                            <span class="status-indicator status-online"></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>AI Pipeline</span>
+                            <span class="status-indicator status-online"></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Billing</span>
+                            <span class="status-indicator status-online"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Chart -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-chart-area"></i>
+                        Performance
+                    </h2>
+                    <canvas id="performanceChart" width="300" height="200"></canvas>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-bolt"></i>
+                        Quick Actions
+                    </h2>
+                    <div class="space-y-3">
+                        <button onclick="enableAllFeatures()" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-power-off mr-2"></i>Enable All
+                        </button>
+                        <button onclick="disableAllFeatures()" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-power-off mr-2"></i>Disable All
+                        </button>
+                        <button onclick="emergencyShutdown()" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Emergency
+                        </button>
+                        <button onclick="restartSystem()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-redo mr-2"></i>Restart
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="glass-morphism text-white p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-info-circle"></i>
+                        System Information
+                    </h2>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-300">Version:</span>
+                            <span id="system-version">0.1.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-300">Uptime:</span>
+                            <span id="system-uptime">0m</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-300">Memory:</span>
+                            <span id="memory-usage">0%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-300">Disk:</span>
+                            <span id="disk-usage">0%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-300">Last Update:</span>
+                            <span id="last-update">Just now</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let authToken = null;
+        let performanceChart = null;
+        let connectionInterval = null;
+        let metricsInterval = null;
+
+        // Initialize dashboard
+        async function initDashboard() {
+            console.log('🚀 Initializing Enterprise Dashboard...');
+            
+            // Login
+            const loginSuccess = await login();
+            if (!loginSuccess) {
+                showError('Failed to authenticate. Check if server is running.');
+                return;
+            }
+
+            // Initialize components
+            await loadSystemData();
+            startRealTimeUpdates();
+            initializePerformanceChart();
+            addActivity('🚀 Enterprise Dashboard initialized', 'success');
+        }
+
+        async function login() {
+            try {
+                const response = await axios.post(API_BASE + '/auth/login', {
+                    username: 'admin',
+                    'password': 'admin123'
+                });
+                authToken = response.data.access_token;
+                console.log('✅ Login successful');
+                return true;
+            } catch (error) {
+                console.error('❌ Login failed:', error);
+                return false;
+            }
+        }
+
+        async function loadSystemData() {
+            try {
+                const response = await axios.get(API_BASE + '/admin/dashboard/config', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = response.data;
+                
+                updateMetrics(data);
+                renderControls(data.switches);
+                updateSystemInfo(data);
+                
+                console.log('✅ System data loaded');
+                addActivity('📊 System metrics updated', 'info');
+            } catch (error) {
+                console.error('❌ Failed to load system data:', error);
+                addActivity('❌ Failed to load system data', 'error');
+            }
+        }
+
+        function updateMetrics(data) {
+            document.getElementById('active-features').textContent = 
+                data.switches.filter(s => s.enabled).length + '/' + data.switches.length;
+            document.getElementById('ai-requests').textContent = data.metrics.ai_requests_today || 0;
+            document.getElementById('system-load').textContent = (data.metrics.system_load || 0) + '%';
+            document.getElementById('active-users').textContent = data.metrics.active_users || 0;
+        }
+
+        function renderControls(switches) {
+            const container = document.getElementById('controls-container');
+            const categories = {};
+            
+            switches.forEach(switch => {
+                if (!categories[switch.category]) {
+                    categories[switch.category] = [];
+                }
+                categories[switch.category].push(switch);
+            });
+
+            let html = '';
+            Object.entries(categories).forEach(([category, categorySwitches]) => {
+                const icons = {
+                    'AI System': '🤖',
+                    'Providers': '🔌',
+                    'Billing': '💳',
+                    'Security': '🔒',
+                    'Features': '⚡',
+                    'Monitoring': '📊',
+                    'Advanced': '🔧'
+                };
+
+                const enabledCount = categorySwitches.filter(s => s.enabled).length;
+                
+                html += `
+                    <div class="border-b border-white/20 pb-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-semibold flex items-center gap-2">
+                                <span>${icons[category] || '📁'}</span>
+                                ${category}
+                            </h3>
+                            <span class="text-xs bg-white/20 px-2 py-1 rounded-full">
+                                ${enabledCount}/${categorySwitches.length}
+                            </span>
+                        </div>
+                        <div class="space-y-2">
+                            ${categorySwitches.map(switch => `
+                                <div class="connection-item flex justify-between items-center p-3 rounded-lg">
+                                    <div class="flex-1">
+                                        <div class="font-medium">${switch.display_name}</div>
+                                        <div class="text-sm text-gray-300">${switch.description}</div>
+                                        ${switch.last_modified ? 
+                                            `<div class="text-xs text-gray-400">Modified: ${new Date(switch.last_modified).toLocaleTimeString()}</div>` : ''}
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" ${switch.enabled ? 'checked' : ''} 
+                                               onchange="toggleSwitch('${switch.name}', this.checked)">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function updateSystemInfo(data) {
+            document.getElementById('system-version').textContent = data.system_status.version || '0.1.0';
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        }
+
+        function startRealTimeUpdates() {
+            // Update connections every 5 seconds
+            connectionInterval = setInterval(updateConnections, 5000);
+            
+            // Update metrics every 10 seconds
+            metricsInterval = setInterval(() => {
+                loadSystemData();
+            }, 10000);
+            
+            // Update uptime every minute
+            setInterval(updateUptime, 60000);
+            
+            // Update performance chart every 30 seconds
+            setInterval(updatePerformanceChart, 30000);
+        }
+
+        function updateConnections() {
+            // Simulate connections (in real app, this would come from actual connection tracking)
+            const mockConnections = [
+                { id: 'conn_1', type: 'API Client', user: 'Admin Dashboard', status: 'online', lastSeen: new Date(), ip: '192.168.1.100' },
+                { id: 'conn_2', type: 'User Dashboard', user: 'user@example.com', status: 'online', lastSeen: new Date(), ip: '192.168.1.101' },
+                { id: 'conn_3', type: 'API Request', user: 'mobile_app', status: 'online', lastSeen: new Date(), ip: '192.168.1.102' },
+                { id: 'conn_4', type: 'AI Pipeline', user: 'system', status: 'online', lastSeen: new Date(), ip: 'localhost' },
+                { id: 'conn_5', type: 'Billing Service', user: 'stripe_webhook', status: 'online', lastSeen: new Date(), ip: 'stripe.com' }
+            ];
+
+            const container = document.getElementById('connections-list');
+            const count = document.getElementById('connection-count');
+            
+            let html = '';
+            mockConnections.forEach(conn => {
+                const statusColor = conn.status === 'online' ? 'text-green-400' : 'text-red-400';
+                const statusIcon = conn.status === 'online' ? '🟢' : '🔴';
+                
+                html += `
+                    <div class="connection-item flex justify-between items-center p-3 rounded-lg">
+                        <div class="flex-1">
+                            <div class="font-medium">${conn.type}</div>
+                            <div class="text-sm text-gray-300">${conn.user}</div>
+                            <div class="text-xs text-gray-400">${conn.ip} • ${new Date(conn.lastSeen).toLocaleTimeString()}</div>
+                        </div>
+                        <div class="${statusColor}">
+                            ${statusIcon} ${conn.status}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            count.textContent = mockConnections.length;
+        }
+
+        function initializePerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'AI Requests',
+                        data: [],
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'System Load',
+                        data: [],
+                        borderColor: 'rgb(251, 146, 60)',
+                        backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Simulate initial data
+            const now = new Date();
+            for (let i = 0; i < 10; i++) {
+                const time = new Date(now.getTime() - (9 - i) * 60000);
+                performanceChart.data.labels.push(time.toLocaleTimeString());
+                performanceChart.data.datasets[0].data.push(Math.floor(Math.random() * 50));
+                performanceChart.data.datasets[1].data.push(Math.floor(Math.random() * 30));
+            }
+            performanceChart.update();
+        }
+
+        function updatePerformanceChart() {
+            // Add new data point
+            const now = new Date();
+            performanceChart.data.labels.push(now.toLocaleTimeString());
+            performanceChart.data.datasets[0].data.push(Math.floor(Math.random() * 50));
+            performanceChart.data.datasets[1].data.push(Math.floor(Math.random() * 30));
+            
+            // Keep only last 20 points
+            if (performanceChart.data.labels.length > 20) {
+                performanceChart.data.labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+                performanceChart.data.datasets[1].data.shift();
+            }
+            
+            performanceChart.update();
+        }
+
+        function updateUptime() {
+            // This would calculate actual uptime
+            const uptime = Math.floor(Math.random() * 1440); // Random minutes for demo
+            const hours = Math.floor(uptime / 60);
+            const minutes = uptime % 60;
+            document.getElementById('system-uptime').textContent = `${hours}h ${minutes}m`;
+        }
+
+        async function toggleSwitch(name, enabled) {
+            try {
+                await axios.put(API_BASE + '/admin/dashboard/switches/' + name, 
+                    { enabled: enabled },
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                
+                addActivity(`${enabled ? '✅ Enabled' : '❌ Disabled'} ${name}`, enabled ? 'success' : 'warning');
+                await loadSystemData();
+            } catch (error) {
+                addActivity(`❌ Failed to toggle ${name}: ${error.message}`, 'error');
+            }
+        }
+
+        async function enableAllFeatures() {
+            try {
+                const response = await axios.get(API_BASE + '/admin/dashboard/config', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const switches = response.data.switches;
+                const updates = {};
+                switches.forEach(switch => {
+                    updates[switch.name] = true;
+                });
+                
+                await axios.post(API_BASE + '/admin/dashboard/switches/bulk-update', 
+                    updates,
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                
+                addActivity('🚀 Enabled all system features', 'success');
+                await loadSystemData();
+            } catch (error) {
+                addActivity('❌ Failed to enable all features', 'error');
+            }
+        }
+
+        async function disableAllFeatures() {
+            try {
+                const response = await axios.get(API_BASE + '/admin/dashboard/config', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const switches = response.data.switches;
+                const updates = {};
+                switches.forEach(switch => {
+                    updates[switch.name] = false;
+                });
+                
+                await axios.post(API_BASE + '/admin/dashboard/switches/bulk-update', 
+                    updates,
+                    { headers: { 'Authorization': 'Bearer ' + + authToken } }
+                );
+                
+                addActivity('⚠️ Disabled all system features', 'warning');
+                await loadSystemData();
+            } catch (error) {
+                addActivity('❌ Failed to disable all features', 'error');
+            }
+        }
+
+        function emergencyShutdown() {
+            if (confirm('⚠️ EMERGENCY SHUTDOWN\n\nThis will disable all non-critical features and put the system in maintenance mode.\n\nContinue?')) {
+                disableAllFeatures();
+                addActivity('🚨 Emergency shutdown initiated', 'error');
+            }
+        }
+
+        function restartSystem() {
+            if (confirm('🔄 RESTART SYSTEM\n\nThis will restart all services and clear temporary data.\n\nContinue?')) {
+                addActivity('🔄 System restart initiated', 'warning');
+                // In a real system, this would trigger a restart
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            }
+        }
+
+        function refreshAll() {
+            addActivity('🔄 Refreshing dashboard...', 'info');
+            loadSystemData();
+            updateConnections();
+            updateUptime();
+        }
+
+        function addActivity(message, type = 'info') {
+            const log = document.getElementById('activity-log');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const icons = {
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️',
+                'info': 'ℹ️'
+            };
+            
+            const colors = {
+                'success': 'text-green-400',
+                'error': 'text-red-400',
+                'warning': 'text-yellow-400',
+                'info': 'text-blue-400'
+            };
+            
+            const activity = document.createElement('div');
+            activity.className = 'flex items-start gap-2 p-2 rounded-lg bg-white/10';
+            activity.innerHTML = `
+                <span class="${colors[type]}">${icons[type]}</span>
+                <div class="flex-1">
+                    <div class="text-sm">${message}</div>
+                    <div class="text-xs text-gray-400">${timestamp}</div>
+                </div>
+            `;
+            
+            log.insertBefore(activity, log.firstChild);
+            
+            // Keep only last 20 items
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function showError(message) {
+            document.querySelector('.container').innerHTML = `
+                <div class="text-center text-white p-12">
+                    <div class="text-6xl mb-4">❌</div>
+                    <h2 class="text-2xl font-bold mb-4">Connection Error</h2>
+                    <p class="mb-6">${message}</p>
+                    <button onclick="location.reload()" class="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg">
+                        <i class="fas fa-redo mr-2"></i>Retry
+                    </button>
+                </div>
+            `;
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>

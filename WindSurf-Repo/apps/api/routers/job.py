@@ -1,0 +1,44 @@
+"""Job router."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from db.session import get_db
+from apps.api.deps import get_current_workspace_id
+from apps.api.schemas.job import JobResponse
+from db.models import Job
+
+router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.get("/{job_id}", response_model=JobResponse)
+async def get_job(
+    job_id: str,
+    workspace_id: str = Depends(get_current_workspace_id),
+    db: Session = Depends(get_db),
+):
+    """Get job status."""
+    job = (
+        db.query(Job)
+        .filter(
+            Job.id == job_id,
+            Job.workspace_id == workspace_id,
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
+    return JobResponse(
+        id=job.id,
+        job_type=job.job_type,
+        status=job.status,
+        input_data=job.input_data,
+        output_data=job.output_data,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )

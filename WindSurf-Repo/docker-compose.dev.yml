@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sovereign-postgres
+    environment:
+      POSTGRES_DB: sovereign_production
+      POSTGRES_USER: sovereign_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - sovereign-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovereign_user -d sovereign_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: sovereign-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - sovereign-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # SOVEREIGN AI Backend (Local Development)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: sovereign-api
+    environment:
+      # Database
+      DATABASE_URL: postgresql://sovereign_user:${POSTGRES_PASSWORD}@postgres:5432/sovereign_production
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      
+      # Application
+      APP_NAME: "SOVEREIGN AI SAAS STACK"
+      DEBUG: true
+      SECRET_KEY: ${SECRET_KEY}
+      AI_CITIZENSHIP_SECRET: ${AI_CITIZENSHIP_SECRET}
+      
+      # URLs
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_URL: ${API_URL}
+      
+      # AI Providers
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # Billing
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      
+      # LLM Configuration (CPU-only for local)
+      MODEL_CACHE_DIR: /app/models
+      MAX_CONCURRENT_REQUESTS: 2
+      MODEL_MAX_LENGTH: 2048
+      
+      # Security
+      ENABLE_MFA: false
+      PASSWORD_MIN_LENGTH: 8
+      MAX_FAILED_LOGIN_ATTEMPTS: 10
+      ACCOUNT_LOCKOUT_DURATION_MINUTES: 30
+      
+      # Performance
+      SQLALCHEMY_ENGINE_OPTIONS: pool_size=10,max_overflow=20,pool_timeout=30,pool_recycle=3600
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./static:/app/static
+      - ./models:/app/models
+    ports:
+      - "8001:8000"
+    networks:
+      - sovereign-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: sovereign-worker
+    command: celery -A worker worker --loglevel=info --concurrency=2
+    environment:
+      # Same environment as API
+      DATABASE_URL: postgresql://sovereign_user:${POSTGRES_PASSWORD}@postgres:5432/sovereign_production
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MODEL_CACHE_DIR: /app/models
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./models:/app/models
+    networks:
+      - sovereign-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  sovereign-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYOS AI Backend - User Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-online { background-color: #10b981; }
+        .status-offline { background-color: #ef4444; }
+        .status-warning { background-color: #f59e0b; }
+        .feature-card {
+            transition: all 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .announcement {
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">👤 User Dashboard</h1>
+                    <p class="text-blue-100 text-sm">BYOS AI Backend - System Overview</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="server-status" class="flex items-center space-x-2">
+                        <span class="status-indicator status-online"></span>
+                        <span class="text-sm">System Online</span>
+                    </span>
+                    <button onclick="refreshDashboard()" class="bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg transition">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Announcements -->
+        <section id="announcements-section" class="mb-8">
+            <!-- Announcements will be populated here -->
+        </section>
+
+        <!-- System Overview -->
+        <section class="mb-8">
+            <h2 class="text-xl font-bold mb-6">📊 System Overview</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">System Status</p>
+                            <p id="system-status-text" class="text-2xl font-bold text-green-600">Operational</p>
+                        </div>
+                        <div class="text-3xl">🖥️</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Available Features</p>
+                            <p id="available-features" class="text-2xl font-bold text-blue-600">0/0</p>
+                        </div>
+                        <div class="text-3xl">⚡</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Availability</p>
+                            <p id="availability-percentage" class="text-2xl font-bold text-purple-600">0%</p>
+                        </div>
+                        <div class="text-3xl">📈</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Last Updated</p>
+                            <p id="last-updated" class="text-lg font-bold text-gray-600">--</p>
+                        </div>
+                        <div class="text-3xl">🕐</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feature Categories -->
+        <section class="mb-8">
+            <h2 class="text-xl font-bold mb-6">🎛️ Available Features</h2>
+            <div id="features-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Features will be populated here -->
+            </div>
+        </section>
+
+        <!-- Key Features Status -->
+        <section class="mb-8">
+            <h2 class="text-xl font-bold mb-6">🔑 Key Services</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div id="ai-system-status" class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <div class="text-4xl mb-2">🤖</div>
+                        <h3 class="font-semibold mb-2">AI System</h3>
+                        <p id="ai-system-text" class="text-sm text-gray-600">Checking...</p>
+                    </div>
+                </div>
+                <div id="billing-status" class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <div class="text-4xl mb-2">💳</div>
+                        <h3 class="font-semibold mb-2">Billing</h3>
+                        <p id="billing-text" class="text-sm text-gray-600">Checking...</p>
+                    </div>
+                </div>
+                <div id="security-status" class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <div class="text-4xl mb-2">🔒</div>
+                        <h3 class="font-semibold mb-2">Security</h3>
+                        <p id="security-text" class="text-sm text-gray-600">Checking...</p>
+                    </div>
+                </div>
+                <div id="monitoring-status" class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <div class="text-4xl mb-2">📊</div>
+                        <h3 class="font-semibold mb-2">Monitoring</h3>
+                        <p id="monitoring-text" class="text-sm text-gray-600">Checking...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Help Section -->
+        <section class="mb-8">
+            <h2 class="text-xl font-bold mb-6">❓ Help & Support</h2>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div id="help-content">
+                    <!-- Help content will be populated here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-400">© 2026 BYOS AI Backend - User Dashboard</p>
+            <p class="text-gray-500 text-sm mt-2">Read-only view • Contact admin for changes</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let dashboardData = null;
+        let authToken = 'Bearer your-user-token'; // Replace with actual auth
+
+        // Initialize dashboard
+        async function initDashboard() {
+            try {
+                const response = await axios.get(`${API_BASE}/user/dashboard/view`, {
+                    headers: { 'Authorization': authToken }
+                });
+                dashboardData = response.data;
+                renderDashboard();
+            } catch (error) {
+                console.error('Failed to load user dashboard:', error);
+                showError('Failed to load dashboard. Please check your connection.');
+            }
+        }
+
+        function renderDashboard() {
+            if (!dashboardData) return;
+
+            // Update overview stats
+            updateOverviewStats();
+
+            // Render features
+            renderFeatures();
+
+            // Update key services
+            updateKeyServices();
+
+            // Load help content
+            loadHelpContent();
+        }
+
+        function updateOverviewStats() {
+            const summary = dashboardData.feature_summary.overall_availability;
+            
+            document.getElementById('available-features').textContent = 
+                `${summary.available_features}/${summary.total_features}`;
+            document.getElementById('availability-percentage').textContent = 
+                `${summary.availability_percentage.toFixed(1)}%`;
+            document.getElementById('last-updated').textContent = 
+                new Date(dashboardData.last_updated).toLocaleString();
+            
+            const status = dashboardData.system_status.server_status;
+            updateServerStatus(status);
+        }
+
+        function updateServerStatus(status) {
+            const statusElement = document.getElementById('server-status');
+            const statusText = document.getElementById('system-status-text');
+            
+            if (status === 'running') {
+                statusElement.innerHTML = '<span class="status-indicator status-online"></span><span class="text-sm">System Online</span>';
+                statusText.textContent = 'Operational';
+                statusText.className = 'text-2xl font-bold text-green-600';
+            } else {
+                statusElement.innerHTML = '<span class="status-indicator status-offline"></span><span class="text-sm">System Offline</span>';
+                statusText.textContent = 'Issues Detected';
+                statusText.className = 'text-2xl font-bold text-red-600';
+            }
+        }
+
+        function renderFeatures() {
+            const container = document.getElementById('features-container');
+            container.innerHTML = '';
+
+            const categories = dashboardData.feature_summary.by_category;
+
+            Object.entries(categories).forEach(([category, data]) => {
+                const categoryCard = createFeatureCategoryCard(category, data);
+                container.appendChild(categoryCard);
+            });
+        }
+
+        function createFeatureCategoryCard(category, data) {
+            const card = document.createElement('div');
+            card.className = 'feature-card bg-white rounded-lg shadow p-6';
+            
+            const categoryIcons = {
+                'AI System': '🤖',
+                'Providers': '🔌',
+                'Billing': '💳',
+                'Security': '🔒',
+                'Features': '⚡',
+                'Monitoring': '📊',
+                'Advanced': '🔧'
+            };
+
+            const availability = (data.enabled / data.total) * 100;
+            const statusColor = availability === 100 ? 'text-green-600' : 
+                              availability >= 50 ? 'text-yellow-600' : 'text-red-600';
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">${categoryIcons[category] || '📁'} ${category}</h3>
+                    <span class="text-sm ${statusColor}">${data.enabled}/${data.total} available</span>
+                </div>
+                <div class="mb-3">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500" 
+                             style="width: ${availability}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">${availability.toFixed(1)}% available</p>
+                </div>
+                <div class="space-y-2">
+                    ${data.available_features.slice(0, 3).map(feature => 
+                        `<div class="flex items-center space-x-2">
+                            <span class="text-green-500">✅</span>
+                            <span class="text-sm">${feature}</span>
+                        </div>`
+                    ).join('')}
+                    ${data.available_features.length > 3 ? 
+                        `<p class="text-xs text-gray-500">+${data.available_features.length - 3} more...</p>` : ''}
+                </div>
+            `;
+
+            return card;
+        }
+
+        function updateKeyServices() {
+            const keyFeatures = dashboardData.feature_summary.key_features_status;
+            
+            updateServiceStatus('ai-system', keyFeatures.ai_system, 'AI execution and governance');
+            updateServiceStatus('billing', keyFeatures.billing, 'Payment processing and subscriptions');
+            updateServiceStatus('security', keyFeatures.security, 'Authentication and audit logging');
+            updateServiceStatus('monitoring', keyFeatures.monitoring, 'Health checks and metrics');
+        }
+
+        function updateServiceStatus(serviceId, isEnabled, description) {
+            const element = document.getElementById(`${serviceId}-status`);
+            const textElement = document.getElementById(`${serviceId}-text`);
+            
+            if (isEnabled) {
+                element.className = 'bg-white rounded-lg shadow p-6 border-2 border-green-200';
+                textElement.textContent = '✅ Available';
+                textElement.className = 'text-sm text-green-600';
+            } else {
+                element.className = 'bg-white rounded-lg shadow p-6 border-2 border-red-200';
+                textElement.textContent = '❌ Unavailable';
+                textElement.className = 'text-sm text-red-600';
+            }
+        }
+
+        async function loadHelpContent() {
+            try {
+                const response = await axios.get(`${API_BASE}/user/dashboard/help`, {
+                    headers: { 'Authorization': authToken }
+                });
+                const helpData = response.data;
+                renderHelpContent(helpData);
+            } catch (error) {
+                console.error('Failed to load help content:', error);
+            }
+        }
+
+        function renderHelpContent(helpData) {
+            const container = document.getElementById('help-content');
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+            
+            Object.entries(helpData.help_sections).forEach(([sectionKey, section]) => {
+                const availability = section.available ? 'text-green-600' : 'text-red-600';
+                const icon = section.available ? '✅' : '❌';
+                
+                html += `
+                    <div class="border rounded-lg p-4 ${section.available ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}">
+                        <h3 class="font-semibold mb-2 ${availability}">${icon} ${section.title}</h3>
+                        <p class="text-sm text-gray-600 mb-3">${section.description}</p>
+                        <div class="space-y-2">
+                            ${section.items.map(item => `
+                                <div class="flex items-center space-x-2">
+                                    <span class="${item.available ? 'text-green-500' : 'text-red-500'}">
+                                        ${item.available ? '✅' : '❌'}
+                                    </span>
+                                    <span class="text-sm">${item.feature}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            html += `
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <div class="flex flex-wrap gap-4 text-sm">
+                        <span><strong>Support:</strong> ${helpData.contact_support}</span>
+                        <span><strong>Documentation:</strong> <a href="${helpData.documentation_url}" target="_blank" class="text-blue-600 hover:underline">${helpData.documentation_url}</a></span>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function loadAnnouncements() {
+            try {
+                const response = await axios.get(`${API_BASE}/user/dashboard/announcements`, {
+                    headers: { 'Authorization': authToken }
+                });
+                const announcements = response.data.announcements;
+                renderAnnouncements(announcements);
+            } catch (error) {
+                console.error('Failed to load announcements:', error);
+            }
+        }
+
+        function renderAnnouncements(announcements) {
+            const container = document.getElementById('announcements-section');
+            
+            if (announcements.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div class="space-y-4">';
+            
+            announcements.forEach(announcement => {
+                const bgColors = {
+                    'warning': 'bg-yellow-50 border-yellow-200',
+                    'info': 'bg-blue-50 border-blue-200',
+                    'error': 'bg-red-50 border-red-200'
+                };
+                
+                const textColors = {
+                    'warning': 'text-yellow-800',
+                    'info': 'text-blue-800',
+                    'error': 'text-red-800'
+                };
+                
+                const icons = {
+                    'warning': '⚠️',
+                    'info': 'ℹ️',
+                    'error': '❌'
+                };
+                
+                html += `
+                    <div class="announcement border rounded-lg p-4 ${bgColors[announcement.type]} ${textColors[announcement.type]}">
+                        <div class="flex items-start space-x-3">
+                            <span class="text-xl">${icons[announcement.type]}</span>
+                            <div class="flex-1">
+                                <h4 class="font-semibold">${announcement.title}</h4>
+                                <p class="text-sm mt-1">${announcement.message}</p>
+                                <p class="text-xs opacity-75 mt-2">
+                                    ${new Date(announcement.timestamp).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function refreshDashboard() {
+            await initDashboard();
+            await loadAnnouncements();
+        }
+
+        function showError(message) {
+            const container = document.getElementById('features-container');
+            container.innerHTML = `
+                <div class="col-span-full bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                    <div class="text-red-800">
+                        <p class="text-xl mb-2">❌ Unable to Load Dashboard</p>
+                        <p>${message}</p>
+                        <button onclick="location.reload()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg">
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Auto-refresh every 60 seconds
+        setInterval(refreshDashboard, 60000);
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initDashboard();
+            await loadAnnouncements();
+        });
+    </script>
+</body>
+</html>

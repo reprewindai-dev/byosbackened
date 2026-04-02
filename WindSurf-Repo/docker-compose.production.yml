@@ -1,0 +1,264 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sovereign-postgres
+    environment:
+      POSTGRES_DB: sovereign_production
+      POSTGRES_USER: sovereign_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - sovereign-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovereign_user -d sovereign_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: sovereign-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+      - ./infra/docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    networks:
+      - sovereign-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # SOVEREIGN AI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      args:
+        BUILD_DATE: ${BUILD_DATE}
+        VCS_REF: ${VCS_REF}
+        VERSION: ${VERSION}
+    container_name: sovereign-api
+    environment:
+      # Database
+      DATABASE_URL: postgresql://sovereign_user:${POSTGRES_PASSWORD}@postgres:5432/sovereign_production
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      
+      # Application
+      APP_NAME: "SOVEREIGN AI SAAS STACK"
+      APP_VERSION: ${VERSION}
+      DEBUG: false
+      SECRET_KEY: ${SECRET_KEY}
+      AI_CITIZENSHIP_SECRET: ${AI_CITIZENSHIP_SECRET}
+      
+      # URLs
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_URL: ${API_URL}
+      
+      # AI Providers
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # Billing
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      
+      # Security
+      ENABLE_MFA: true
+      PASSWORD_MIN_LENGTH: 12
+      MAX_FAILED_LOGIN_ATTEMPTS: 5
+      ACCOUNT_LOCKOUT_DURATION_MINUTES: 30
+      
+      # Performance
+      SQLALCHEMY_ENGINE_OPTIONS: pool_size=20,max_overflow=30,pool_timeout=30,pool_recycle=3600
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./static:/app/static
+    ports:
+      - "8000:8000"
+    networks:
+      - sovereign-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      args:
+        BUILD_DATE: ${BUILD_DATE}
+        VCS_REF: ${VCS_REF}
+        VERSION: ${VERSION}
+    container_name: sovereign-worker
+    command: celery -A worker worker --loglevel=info --concurrency=4
+    environment:
+      # Same environment as API
+      DATABASE_URL: postgresql://sovereign_user:${POSTGRES_PASSWORD}@postgres:5432/sovereign_production
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - sovereign-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: sovereign-nginx
+    volumes:
+      - ./infra/docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infra/docker/nginx/ssl:/etc/nginx/ssl
+      - ./static:/var/www/static
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - sovereign-network
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sovereign-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - sovereign-network
+    restart: unless-stopped
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sovereign-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    networks:
+      - sovereign-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Log Aggregation - ELK Stack (Optional)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: sovereign-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - sovereign-network
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.8.0
+    container_name: sovereign-logstash
+    volumes:
+      - ./infra/docker/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logs:/app/logs
+    ports:
+      - "5044:5044"
+    networks:
+      - sovereign-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: sovereign-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - sovereign-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  sovereign-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

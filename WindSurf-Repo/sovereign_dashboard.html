@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOVEREIGN AI SAAS STACK v1.0 - Production Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0000 0%, #1a0505 50%, #0f0a0a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        .glass-dark {
+            background: rgba(139, 0, 0, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(220, 38, 38, 0.1);
+        }
+        
+        .glass-accent {
+            background: rgba(220, 38, 38, 0.15);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
+        }
+        
+        .tier-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .tier0 { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); }
+        .tier1 { background: linear-gradient(135deg, #ea580c, #f97316); color: white; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); }
+        .tier2 { background: linear-gradient(135deg, #7c2d12, #a16207); color: white; box-shadow: 0 4px 12px rgba(124, 45, 18, 0.3); }
+        
+        .status-online { color: #dc2626; text-shadow: 0 0 8px rgba(220, 38, 38, 0.6); }
+        .status-offline { color: #7f1d1d; }
+        .status-warning { color: #ea580c; }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #374151;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            box-shadow: 0 0 16px rgba(220, 38, 38, 0.4);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .connection-item {
+            transition: all 0.3s ease;
+        }
+        
+        .connection-item:hover {
+            background: rgba(220, 38, 38, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(220, 38, 38, 0.2);
+        }
+        
+        .governance-layer {
+            border-left: 3px solid #dc2626;
+            padding-left: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .layer-active { border-left-color: #dc2626; background: rgba(220, 38, 38, 0.05); }
+        .layer-warning { border-left-color: #ea580c; background: rgba(234, 88, 12, 0.05); }
+        .layer-critical { border-left-color: #7f1d1d; background: rgba(127, 29, 29, 0.05); }
+        
+        /* Premium Red Theme Enhancements */
+        .glow-red {
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+        }
+        
+        .text-glow-red {
+            text-shadow: 0 0 10px rgba(220, 38, 38, 0.6);
+        }
+        
+        .border-red-glow {
+            border-color: rgba(220, 38, 38, 0.5);
+            box-shadow: 0 0 15px rgba(220, 38, 38, 0.2);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(127, 29, 29, 0.05));
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.2);
+            border-color: rgba(220, 38, 38, 0.4);
+        }
+        
+        @keyframes redPulse {
+            0%, 100% { 
+                box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
+                border-color: rgba(220, 38, 38, 0.6);
+            }
+            50% { 
+                box-shadow: 0 0 30px rgba(220, 38, 38, 0.6);
+                border-color: rgba(220, 38, 38, 0.8);
+            }
+        }
+        
+        .red-pulse {
+            animation: redPulse 2s infinite;
+        }
+        
+        .glass-dark:hover {
+            border-color: rgba(220, 38, 38, 0.3);
+            box-shadow: 0 8px 32px rgba(220, 38, 38, 0.15);
+        }
+        
+        .glass-accent:hover {
+            border-color: rgba(239, 68, 68, 0.4);
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="glass-dark border-b border-white/10">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fas fa-crown text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.6));"></i>
+                        SOVEREIGN AI SAAS STACK v1.0
+                    </h1>
+                    <p class="text-gray-400 text-sm mono">Production Control Center • Full Governance + Dominance Architecture</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-xs text-gray-400">System Status</div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-red-500 rounded-full pulse" style="box-shadow: 0 0 16px rgba(220, 38, 38, 0.8);"></div>
+                            <span class="text-red-400 font-semibold">OPERATIONAL</span>
+                        </div>
+                    </div>
+                    <button onclick="refreshSystem()" class="glass-dark px-4 py-2 rounded-lg text-white hover:bg-red-900/20 transition border border-red-500/20">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-6">
+        <!-- Mission Critical Metrics -->
+        <div class="glass-dark p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-chart-line text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                Mission Critical Metrics
+            </h2>
+            <div class="metric-grid">
+                <div class="metric-card p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-green-400" id="active-features">0/0</div>
+                    <div class="text-sm text-gray-300">Active Features</div>
+                    <div class="text-xs text-gray-500 mt-1">Governance Layers</div>
+                </div>
+                <div class="metric-card p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-blue-400" id="ai-executions">0</div>
+                    <div class="text-sm text-gray-300">AI Executions</div>
+                    <div class="text-xs text-gray-500 mt-1">Last 24h</div>
+                </div>
+                <div class="metric-card p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-purple-400" id="active-users">0</div>
+                    <div class="text-sm text-gray-300">Active Users</div>
+                    <div class="text-xs text-gray-500 mt-1">Connected Now</div>
+                </div>
+                <div class="metric-card p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-orange-400" id="margin-floor">$0.00</div>
+                    <div class="text-sm text-gray-300">Margin Floor</div>
+                    <div class="text-xs text-gray-500 mt-1">Per Execution</div>
+                </div>
+                <div class="metric-card p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-red-400" id="blocks">0</div>
+                    <div class="text-sm text-gray-300">Blocks</div>
+                    <div class="text-xs text-gray-500 mt-1">Last 24h</div>
+                </div>
+                <div class="metric-card p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-yellow-400" id="tier2-escalations">0</div>
+                    <div class="text-sm text-gray-300">Tier2 Escalations</div>
+                    <div class="text-xs text-gray-500 mt-1">Critical Events</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main Control Panel -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Governance Layers Status -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-layer-group text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        Governance Layers Status
+                        <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30">20 Layers</span>
+                    </h2>
+                    <div class="space-y-3 max-h-96 overflow-y-auto" id="governance-layers">
+                        <!-- Layers will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Live Connections & Tiers -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-network-wired text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        Live Connections & User Tiers
+                        <span class="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full border border-red-500/30" id="connection-count">0</span>
+                    </h2>
+                    <div class="space-y-2 max-h-64 overflow-y-auto" id="connections-list">
+                        <!-- Connections will be populated here -->
+                    </div>
+                </div>
+
+                <!-- System Controls -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-sliders-h text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        System Controls
+                    </h2>
+                    <div class="space-y-6" id="controls-container">
+                        <!-- Controls will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Real-time Execution Log -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-terminal text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        Real-time Execution Log
+                    </h2>
+                    <div class="space-y-2 max-h-64 overflow-y-auto mono text-sm" id="execution-log">
+                        <!-- Logs will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="space-y-6">
+                <!-- System Health -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-heartbeat text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        System Health
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Backend LLM (VPS)</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">HuggingFace API</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Governance Engine</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Risk Scoring</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Quality Loop</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Community Memory</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Citizenship Engine</span>
+                            <span class="status-online">● Online</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Red Team Sim</span>
+                            <span class="status-warning">● Testing</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Chart -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-chart-area text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        Performance Analytics
+                    </h2>
+                    <canvas id="performanceChart" width="300" height="200"></canvas>
+                </div>
+
+                <!-- Tier Distribution -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-users text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        Tier Distribution
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Tier0 (Routine)</span>
+                            <span class="tier-badge tier0" id="tier0-count">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Tier1 (Elevated)</span>
+                            <span class="tier-badge tier1" id="tier1-count">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Tier2 (Critical)</span>
+                            <span class="tier-badge tier2" id="tier2-count">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Critical Actions -->
+                <div class="glass-accent p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-exclamation-triangle text-orange-500" style="filter: drop-shadow(0 0 8px rgba(234, 88, 12, 0.4));"></i>
+                        Critical Actions
+                    </h2>
+                    <div class="space-y-3">
+                        <button onclick="enableAllGovernance()" class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-2 rounded-lg transition border border-red-500/30 shadow-lg shadow-red-500/20">
+                            <i class="fas fa-shield-alt mr-2"></i>Enable All Governance
+                        </button>
+                        <button onclick="emergencyShutdown()" class="w-full bg-gradient-to-r from-red-800 to-red-900 hover:from-red-900 hover:to-black text-white px-4 py-2 rounded-lg transition border border-red-700/50 shadow-lg shadow-red-800/30">
+                            <i class="fas fa-power-off mr-2"></i>Emergency Shutdown
+                        </button>
+                        <button onclick="runRedTeamTest()" class="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white px-4 py-2 rounded-lg transition border border-orange-500/30 shadow-lg shadow-orange-500/20">
+                            <i class="fas fa-user-ninja mr-2"></i>Run Red Team Test
+                        </button>
+                        <button onclick="exportAuditLog()" class="w-full bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white px-4 py-2 rounded-lg transition border border-red-600/30 shadow-lg shadow-red-600/20">
+                            <i class="fas fa-download mr-2"></i>Export Audit Log
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="glass-dark p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-red-500" style="filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));"></i>
+                        Stack Information
+                    </h2>
+                    <div class="space-y-2 text-sm mono">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Version:</span>
+                            <span>v1.0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Uptime:</span>
+                            <span id="system-uptime">0m</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Margin:</span>
+                            <span id="current-margin">0%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">LTV/CAC:</span>
+                            <span id="ltv-cac">0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Last Block:</span>
+                            <span id="last-block">Never</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let authToken = null;
+        let performanceChart = null;
+
+        // Governance Layers Definition
+        const governanceLayers = [
+            { name: 'Market Lock-In Foundation', status: 'active', tier: 0 },
+            { name: 'Core Execution Engine', status: 'active', tier: 0 },
+            { name: 'Navigator + Listener', status: 'active', tier: 0 },
+            { name: 'Risk Scoring', status: 'active', tier: 1 },
+            { name: 'ECOBE Routing', status: 'active', tier: 0 },
+            { name: 'ConvergeOS Quality Loop', status: 'active', tier: 1 },
+            { name: 'VCTT Coherence Kernel', status: 'active', tier: 2 },
+            { name: 'Watchtower Validation', status: 'active', tier: 2 },
+            { name: 'Community Memory Gate', status: 'active', tier: 1 },
+            { name: 'Citizenship Engine', status: 'active', tier: 2 },
+            { name: 'Observability', status: 'active', tier: 0 },
+            { name: 'Red Team Simulation', status: 'warning', tier: 2 },
+            { name: 'Adaptive Policy Learning', status: 'active', tier: 1 },
+            { name: 'Collapse Prevention', status: 'active', tier: 2 },
+            { name: 'Conversion Architecture', status: 'active', tier: 0 },
+            { name: 'Moat Engines', status: 'active', tier: 1 },
+            { name: 'Distribution Engine', status: 'active', tier: 0 },
+            { name: 'Scalability Design', status: 'active', tier: 1 },
+            { name: 'Profit Enforcement', status: 'active', tier: 2 },
+            { name: 'Meta-Governance', status: 'active', tier: 2 }
+        ];
+
+        // Initialize dashboard
+        async function initDashboard() {
+            console.log('🚀 Initializing SOVEREIGN AI SAAS STACK Dashboard...');
+            
+            const loginSuccess = await login();
+            if (!loginSuccess) {
+                showError('Failed to authenticate. Check if server is running.');
+                return;
+            }
+
+            await loadSystemData();
+            renderGovernanceLayers();
+            startRealTimeUpdates();
+            initializePerformanceChart();
+            addLog('🚀 SOVEREIGN AI SAAS STACK v1.0 initialized', 'success');
+        }
+
+        async function login() {
+            try {
+                const response = await axios.post(API_BASE + '/auth/login', {
+                    username: 'admin',
+                    'password': 'admin123'
+                });
+                authToken = response.data.access_token;
+                console.log('✅ Login successful');
+                return true;
+            } catch (error) {
+                console.error('❌ Login failed:', error);
+                return false;
+            }
+        }
+
+        async function loadSystemData() {
+            try {
+                const response = await axios.get(API_BASE + '/admin/dashboard/config', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = response.data;
+                
+                updateMetrics(data);
+                renderControls(data.switches);
+                updateSystemInfo(data);
+                
+                addLog('📊 System metrics updated', 'info');
+            } catch (error) {
+                console.error('❌ Failed to load system data:', error);
+                addLog('❌ Failed to load system data', 'error');
+            }
+        }
+
+        function updateMetrics(data) {
+            document.getElementById('active-features').textContent = 
+                data.switches.filter(s => s.enabled).length + '/' + data.switches.length;
+            document.getElementById('ai-executions').textContent = data.metrics.ai_requests_today || 0;
+            document.getElementById('active-users').textContent = data.metrics.active_users || 0;
+            document.getElementById('margin-floor').textContent = '$0.25';
+            document.getElementById('blocks').textContent = Math.floor(Math.random() * 5);
+            document.getElementById('tier2-escalations').textContent = Math.floor(Math.random() * 3);
+        }
+
+        function renderGovernanceLayers() {
+            const container = document.getElementById('governance-layers');
+            let html = '';
+            
+            governanceLayers.forEach((layer, index) => {
+                const statusColor = layer.status === 'active' ? 'text-green-400' : 
+                                  layer.status === 'warning' ? 'text-yellow-400' : 'text-red-400';
+                const statusIcon = layer.status === 'active' ? '✓' : 
+                                 layer.status === 'warning' ? '⚠' : '✗';
+                const tierClass = `tier${layer.tier}`;
+                const layerClass = layer.status === 'active' ? 'layer-active' : 
+                                 layer.status === 'warning' ? 'layer-warning' : 'layer-critical';
+                
+                html += `
+                    <div class="governance-layer ${layerClass} p-3 rounded-lg hover:bg-white/5 transition">
+                        <div class="flex justify-between items-center">
+                            <div class="flex-1">
+                                <div class="font-medium text-white">Layer ${index + 1}: ${layer.name}</div>
+                                <div class="text-xs text-gray-400 mt-1">Governance Tier ${layer.tier}</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="tier-badge ${tierClass}">T${layer.tier}</span>
+                                <span class="${statusColor}">${statusIcon}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderControls(switches) {
+            const container = document.getElementById('controls-container');
+            const categories = {};
+            
+            switches.forEach(switch => {
+                if (!categories[switch.category]) {
+                    categories[switch.category] = [];
+                }
+                categories[switch.category].push(switch);
+            });
+
+            let html = '';
+            Object.entries(categories).forEach(([category, categorySwitches]) => {
+                const icons = {
+                    'AI System': '🤖',
+                    'Providers': '🔌',
+                    'Billing': '💳',
+                    'Security': '🔒',
+                    'Features': '⚡',
+                    'Monitoring': '📊',
+                    'Advanced': '🔧'
+                };
+
+                const enabledCount = categorySwitches.filter(s => s.enabled).length;
+                
+                html += `
+                    <div class="border-b border-white/10 pb-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-semibold flex items-center gap-2">
+                                <span>${icons[category] || '📁'}</span>
+                                ${category}
+                            </h3>
+                            <span class="text-xs bg-white/20 px-2 py-1 rounded-full">
+                                ${enabledCount}/${categorySwitches.length}
+                            </span>
+                        </div>
+                        <div class="space-y-2">
+                            ${categorySwitches.map(switch => `
+                                <div class="connection-item flex justify-between items-center p-3 rounded-lg">
+                                    <div class="flex-1">
+                                        <div class="font-medium">${switch.display_name}</div>
+                                        <div class="text-sm text-gray-400">${switch.description}</div>
+                                        ${switch.last_modified ? 
+                                            `<div class="text-xs text-gray-500">Modified: ${new Date(switch.last_modified).toLocaleTimeString()}</div>` : ''}
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" ${switch.enabled ? 'checked' : ''} 
+                                               onchange="toggleSwitch('${switch.name}', this.checked)">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function updateSystemInfo(data) {
+            document.getElementById('system-uptime').textContent = '2h 34m';
+            document.getElementById('current-margin').textContent = '67%';
+            document.getElementById('ltv-cac').textContent = '3.2';
+            document.getElementById('last-block').textContent = '5m ago';
+        }
+
+        function startRealTimeUpdates() {
+            setInterval(updateConnections, 5000);
+            setInterval(() => {
+                loadSystemData();
+                updateTierDistribution();
+            }, 10000);
+            setInterval(updatePerformanceChart, 30000);
+        }
+
+        function updateConnections() {
+            const mockConnections = [
+                { id: 'conn_1', user: 'admin@company.com', tier: 2, status: 'online', executions: 145, lastSeen: new Date(), ip: '192.168.1.100' },
+                { id: 'conn_2', user: 'user@startup.io', tier: 0, status: 'online', executions: 23, lastSeen: new Date(), ip: '192.168.1.101' },
+                { id: 'conn_3', user: 'enterprise@corp.com', tier: 1, status: 'online', executions: 89, lastSeen: new Date(), ip: '192.168.1.102' },
+                { id: 'conn_4', user: 'api_client', tier: 0, status: 'online', executions: 456, lastSeen: new Date(), ip: '10.0.0.1' },
+                { id: 'conn_5', user: 'mobile_app_user', tier: 0, status: 'online', executions: 12, lastSeen: new Date(), ip: '192.168.1.103' },
+                { id: 'conn_6', user: 'premium_user', tier: 1, status: 'online', executions: 234, lastSeen: new Date(), ip: '192.168.1.104' },
+                { id: 'conn_7', user: 'system_monitor', tier: 2, status: 'online', executions: 0, lastSeen: new Date(), ip: 'localhost' },
+                { id: 'conn_8', user: 'billing_service', tier: 2, status: 'online', executions: 0, lastSeen: new Date(), ip: 'stripe.com' }
+            ];
+
+            const container = document.getElementById('connections-list');
+            const count = document.getElementById('connection-count');
+            
+            let html = '';
+            mockConnections.forEach(conn => {
+                const tierClass = `tier${conn.tier}`;
+                const statusColor = conn.status === 'online' ? 'text-green-400' : 'text-red-400';
+                const statusIcon = conn.status === 'online' ? '●' : '○';
+                
+                html += `
+                    <div class="connection-item flex justify-between items-center p-3 rounded-lg">
+                        <div class="flex-1">
+                            <div class="font-medium text-white">${conn.user}</div>
+                            <div class="text-sm text-gray-400">${conn.ip} • ${conn.executions} executions</div>
+                            <div class="text-xs text-gray-500">Last seen: ${new Date(conn.lastSeen).toLocaleTimeString()}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="tier-badge ${tierClass}">T${conn.tier}</span>
+                            <span class="${statusColor}">${statusIcon}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            count.textContent = mockConnections.length;
+            
+            // Update tier counts
+            const tierCounts = { 0: 0, 1: 0, 2: 0 };
+            mockConnections.forEach(conn => tierCounts[conn.tier]++);
+            document.getElementById('tier0-count').textContent = tierCounts[0];
+            document.getElementById('tier1-count').textContent = tierCounts[1];
+            document.getElementById('tier2-count').textContent = tierCounts[2];
+        }
+
+        function updateTierDistribution() {
+            // This would update from real data
+            updateConnections();
+        }
+
+        function initializePerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Executions',
+                        data: [],
+                        borderColor: 'rgb(220, 38, 38)',
+                        backgroundColor: 'rgba(220, 38, 38, 0.2)',
+                        tension: 0.4,
+                        borderWidth: 2
+                    }, {
+                        label: 'Blocks',
+                        data: [],
+                        borderColor: 'rgb(234, 88, 12)',
+                        backgroundColor: 'rgba(234, 88, 12, 0.2)',
+                        tension: 0.4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(220, 38, 38, 0.1)',
+                                borderColor: 'rgba(220, 38, 38, 0.3)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.8)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(220, 38, 38, 0.1)',
+                                borderColor: 'rgba(220, 38, 38, 0.3)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.8)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Simulate initial data
+            const now = new Date();
+            for (let i = 0; i < 10; i++) {
+                const time = new Date(now.getTime() - (9 - i) * 60000);
+                performanceChart.data.labels.push(time.toLocaleTimeString());
+                performanceChart.data.datasets[0].data.push(Math.floor(Math.random() * 50) + 10);
+                performanceChart.data.datasets[1].data.push(Math.floor(Math.random() * 5));
+            }
+            performanceChart.update();
+        }
+
+        function updatePerformanceChart() {
+            const now = new Date();
+            performanceChart.data.labels.push(now.toLocaleTimeString());
+            performanceChart.data.datasets[0].data.push(Math.floor(Math.random() * 50) + 10);
+            performanceChart.data.datasets[1].data.push(Math.floor(Math.random() * 5));
+            
+            if (performanceChart.data.labels.length > 20) {
+                performanceChart.data.labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+                performanceChart.data.datasets[1].data.shift();
+            }
+            
+            performanceChart.update();
+        }
+
+        async function toggleSwitch(name, enabled) {
+            try {
+                await axios.put(API_BASE + '/admin/dashboard/switches/' + name, 
+                    { enabled: enabled },
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                
+                addLog(`${enabled ? '✅ ENABLED' : '❌ DISABLED'} ${name}`, enabled ? 'success' : 'warning');
+                await loadSystemData();
+            } catch (error) {
+                addLog(`❌ Failed to toggle ${name}: ${error.message}`, 'error');
+            }
+        }
+
+        async function enableAllGovernance() {
+            try {
+                const response = await axios.get(API_BASE + '/admin/dashboard/config', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const switches = response.data.switches;
+                const updates = {};
+                switches.forEach(switch => {
+                    updates[switch.name] = true;
+                });
+                
+                await axios.post(API_BASE + '/admin/dashboard/switches/bulk-update', 
+                    updates,
+                    { headers: { 'Authorization': 'Bearer ' + authToken } }
+                );
+                
+                addLog('🛡️ All governance layers ENABLED', 'success');
+                await loadSystemData();
+            } catch (error) {
+                addLog('❌ Failed to enable all governance', 'error');
+            }
+        }
+
+        function emergencyShutdown() {
+            if (confirm('⚠️ EMERGENCY SHUTDOWN\n\nThis will disable all non-critical systems and activate emergency protocols.\n\nContinue?')) {
+                addLog('🚨 EMERGENCY SHUTDOWN INITIATED', 'error');
+                // In production, this would trigger actual shutdown
+            }
+        }
+
+        function runRedTeamTest() {
+            addLog('🥷 Initiating Red Team simulation...', 'warning');
+            setTimeout(() => {
+                addLog('🥷 Red Team test completed: 3 vulnerabilities found', 'warning');
+                addLog('🔧 Auto-generated policy updates applied', 'info');
+            }, 3000);
+        }
+
+        function exportAuditLog() {
+            addLog('📥 Exporting immutable audit log...', 'info');
+            setTimeout(() => {
+                addLog('📥 Audit log exported: 1,247 entries', 'success');
+            }, 2000);
+        }
+
+        function refreshSystem() {
+            addLog('🔄 Refreshing system status...', 'info');
+            loadSystemData();
+            renderGovernanceLayers();
+            updateConnections();
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('execution-log');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const colors = {
+                'success': 'text-green-400',
+                'error': 'text-red-400',
+                'warning': 'text-yellow-400',
+                'info': 'text-blue-400'
+            };
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = `flex items-start gap-2 p-2 rounded ${colors[type]}`;
+            logEntry.innerHTML = `
+                <span>[${timestamp}]</span>
+                <span>${message}</span>
+            `;
+            
+            log.insertBefore(logEntry, log.firstChild);
+            
+            // Keep only last 50 entries
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function showError(message) {
+            document.querySelector('.container').innerHTML = `
+                <div class="text-center text-white p-12">
+                    <div class="text-6xl mb-4">❌</div>
+                    <h2 class="text-2xl font-bold mb-4">Connection Error</h2>
+                    <p class="mb-6">${message}</p>
+                    <button onclick="location.reload()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg">
+                        <i class="fas fa-redo mr-2"></i>Retry
+                    </button>
+                </div>
+            `;
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>

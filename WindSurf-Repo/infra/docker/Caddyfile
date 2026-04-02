@@ -1,0 +1,42 @@
+{
+    email your-email@example.com
+    # Replace with your actual email for Let's Encrypt
+}
+
+# HTTP to HTTPS redirect
+:80 {
+    redir https://{host}{uri} permanent
+}
+
+# HTTPS API
+:443 {
+    tls {
+        # Caddy will automatically obtain certificates via Let's Encrypt
+        # For local dev, use: tls internal
+    }
+
+    # API reverse proxy
+    handle /api/* {
+        reverse_proxy api:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    # Health check (no auth)
+    handle /health {
+        reverse_proxy api:8000
+    }
+
+    # Root
+    handle / {
+        respond "BYOS AI Backend - See /api/v1/docs for API documentation"
+    }
+}
+
+# Local development (no TLS)
+localhost {
+    reverse_proxy /api/* api:8000
+    reverse_proxy /health api:8000
+    respond / "BYOS AI Backend - See /api/v1/docs for API documentation"
+}

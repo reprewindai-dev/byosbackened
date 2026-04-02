@@ -1,6 +1,9 @@
 """FastAPI application — BYOS AI + Security Suite."""
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from core.config import get_settings
 from core.logging import setup_logging
 from core.security.zero_trust import ZeroTrustMiddleware
@@ -128,24 +131,15 @@ async def health():
     return {"status": "ok", "version": settings.app_version, "service": settings.app_name}
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root():
-    """Root endpoint."""
+    """Landing page — serves public/index.html."""
+    html_path = os.path.join(os.path.dirname(__file__), "..", "..", "public", "index.html")
+    html_path = os.path.normpath(html_path)
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html")
     return {
         "name": settings.app_name,
         "version": settings.app_version,
         "docs": f"{settings.api_prefix}/docs",
-        "features": [
-            "Authentication & MFA",
-            "API Key Management",
-            "Cost Intelligence & Intelligent Routing",
-            "GDPR-Compliant Cryptographic Audit Trails",
-            "Privacy-by-Design & PII Detection",
-            "Security Suite: Threat Detection & Zero-Trust",
-            "Monitoring: Real-time Health & Metrics",
-            "Content Safety & Age Verification",
-            "Stripe Subscription Management",
-            "Plugin System",
-            "Multi-Tenant Workspaces",
-        ],
     }

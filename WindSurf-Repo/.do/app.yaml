@@ -1,0 +1,95 @@
+# Digital Ocean App Platform Configuration
+# Optimized for LLM VPS deployment
+
+name: sovereign-ai-saas
+services:
+- name: api
+  source_dir: /
+  github:
+    repo: your-username/sovereign-ai-saas
+    branch: main
+  run_command: uvicorn apps.api.main:app --host 0.0.0.0 --port $PORT
+  environment_slug: python-3.11
+  instance_count: 1
+  instance_size_slug: professional-xs
+  envs:
+  - key: PORT
+    value: "8000"
+  - key: PYTHON_VERSION
+    value: "3.11"
+  - key: DATABASE_URL
+    value: ${db.DATABASE_URL}
+  - key: REDIS_URL
+    value: ${redis.REDIS_URL}
+  - key: SECRET_KEY
+    type: SECRET
+    value: your-super-secure-secret-key
+  - key: HUGGINGFACE_API_KEY
+    type: SECRET
+    value: your-huggingface-api-key
+  - key: OPENAI_API_KEY
+    type: SECRET
+    value: your-openai-api-key
+  - key: STRIPE_SECRET_KEY
+    type: SECRET
+    value: your-stripe-secret-key
+  - key: STRIPE_PUBLISHABLE_KEY
+    type: SECRET
+    value: your-stripe-publishable-key
+  - key: ENVIRONMENT
+    value: production
+  - key: DEBUG
+    value: false
+  http_port: 8000
+  routes:
+  - path: /api
+databases:
+- name: db
+  engine: PG
+  version: "15"
+  size: db-s-dev-database
+- name: redis
+  engine: REDIS
+  version: "7"
+  size: db-s-dev-database
+
+workers:
+- name: celery-worker
+  source_dir: /
+  github:
+    repo: your-username/sovereign-ai-saas
+    branch: main
+  run_command: celery -A worker worker --loglevel=info
+  environment_slug: python-3.11
+  instance_count: 1
+  instance_size_slug: professional-xs
+  envs:
+  - key: DATABASE_URL
+    value: ${db.DATABASE_URL}
+  - key: REDIS_URL
+    value: ${redis.REDIS_URL}
+  - key: CELERY_BROKER_URL
+    value: ${redis.REDIS_URL}
+  - key: CELERY_RESULT_BACKEND
+    value: ${redis.REDIS_URL}
+  - key: SECRET_KEY
+    type: SECRET
+    value: your-super-secure-secret-key
+  - key: HUGGINGFACE_API_KEY
+    type: SECRET
+    value: your-huggingface-api-key
+  - key: OPENAI_API_KEY
+    type: SECRET
+    value: your-openai-api-key
+  - key: STRIPE_SECRET_KEY
+    type: SECRET
+    value: your-stripe-secret-key
+
+static_sites:
+- name: frontend
+  source_dir: /static
+  output_dir: /
+  index_document: index.html
+  error_document: index.html
+  routes:
+  - path: /

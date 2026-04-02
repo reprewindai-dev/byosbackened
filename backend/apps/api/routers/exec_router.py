@@ -143,7 +143,7 @@ def _log_execution(
 
 
 @router.post("/v1/exec", response_model=ExecResponse)
-async def exec_llm(
+def exec_llm(
     body: ExecRequest,
     x_api_key: str = Header(..., alias="X-API-Key"),
     db: Session = Depends(get_db),
@@ -231,7 +231,7 @@ async def exec_llm(
 
 
 @router.get("/status", response_model=StatusResponse)
-async def system_status(
+def system_status(
     db: Session = Depends(get_db),
     ollama: OllamaClient = Depends(get_ollama_client),
 ):

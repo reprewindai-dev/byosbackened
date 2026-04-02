@@ -1,0 +1,194 @@
+version: '3.8'
+
+services:
+  # Core Infrastructure Services (always run)
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: byos_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: byos_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - byos_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: byos_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - byos_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: byos_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - byos_network
+
+  # Application Services
+  
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: byos_api
+    profiles:
+      - api
+      - all
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/byos_ai}
+      # Redis
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      # S3/MinIO
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-minioadmin}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-minioadmin}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-byos-ai}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_USE_SSL=${S3_USE_SSL:-false}
+      # App Configuration
+      - APP_NAME=${APP_NAME:-BYOS AI Backend}
+      - APP_VERSION=${APP_VERSION:-0.1.0}
+      - DEBUG=${DEBUG:-false}
+      - API_PREFIX=${API_PREFIX:-/api/v1}
+      # Security
+      # SECRET_KEY is required - if not set, will use placeholder that causes startup failure
+      - SECRET_KEY=${SECRET_KEY:-REQUIRED_SECRET_KEY_NOT_SET_PLEASE_SET_IN_ENV}
+      # ENCRYPTION_KEY is optional - if not set, application will use SECRET_KEY as fallback
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      # AI Providers
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - HUGGINGFACE_MODEL_CHAT=${HUGGINGFACE_MODEL_CHAT:-mistralai/Mistral-7B-Instruct-v0.1}
+      - HUGGINGFACE_MODEL_EMBED=${HUGGINGFACE_MODEL_EMBED:-sentence-transformers/all-MiniLM-L6-v2}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_CHAT=${OPENAI_MODEL_CHAT:-gpt-4o-mini}
+      - OPENAI_MODEL_WHISPER=${OPENAI_MODEL_WHISPER:-whisper-1}
+      - LOCAL_WHISPER_URL=${LOCAL_WHISPER_URL}
+      - LOCAL_LLM_URL=${LOCAL_LLM_URL}
+      # Worker
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-["*"]}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-true}
+      # Observability
+      - SENTRY_DSN=${SENTRY_DSN}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - METRICS_ENABLED=${METRICS_ENABLED:-true}
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - byos_network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: byos_worker
+    profiles:
+      - worker
+      - all
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/byos_ai}
+      # Redis
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      # S3/MinIO
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-minioadmin}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-minioadmin}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-byos-ai}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_USE_SSL=${S3_USE_SSL:-false}
+      # App Configuration
+      - APP_NAME=${APP_NAME:-BYOS AI Backend}
+      - APP_VERSION=${APP_VERSION:-0.1.0}
+      - DEBUG=${DEBUG:-false}
+      # Security
+      # SECRET_KEY is required - if not set, will use placeholder that causes startup failure
+      - SECRET_KEY=${SECRET_KEY:-REQUIRED_SECRET_KEY_NOT_SET_PLEASE_SET_IN_ENV}
+      # ENCRYPTION_KEY is optional - if not set, application will use SECRET_KEY as fallback
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      # AI Providers
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - HUGGINGFACE_MODEL_CHAT=${HUGGINGFACE_MODEL_CHAT:-mistralai/Mistral-7B-Instruct-v0.1}
+      - HUGGINGFACE_MODEL_EMBED=${HUGGINGFACE_MODEL_EMBED:-sentence-transformers/all-MiniLM-L6-v2}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_CHAT=${OPENAI_MODEL_CHAT:-gpt-4o-mini}
+      - OPENAI_MODEL_WHISPER=${OPENAI_MODEL_WHISPER:-whisper-1}
+      - LOCAL_WHISPER_URL=${LOCAL_WHISPER_URL}
+      - LOCAL_LLM_URL=${LOCAL_LLM_URL}
+      # Worker
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      # Observability
+      - SENTRY_DSN=${SENTRY_DSN}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - METRICS_ENABLED=${METRICS_ENABLED:-true}
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - byos_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  byos_network:
+    driver: bridge

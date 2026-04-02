@@ -37,7 +37,7 @@ async def transcribe(
         input_data=json.dumps({
             "asset_id": request.asset_id,
             "language": request.language,
-            "provider": request.provider or "huggingface",
+            "provider": request.provider or "local_whisper",
         }),
     )
     db.add(job)

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from apps.api.deps import get_current_workspace_id
 from apps.api.schemas.extract import ExtractRequest, ExtractResponse
-from apps.ai.providers import HuggingFaceProvider, LocalLLMProvider, OpenAIOptionalProvider
+from apps.ai.providers import HuggingFaceProvider, LocalLLMProvider, OpenAIOptionalProvider  # noqa: F401
 from apps.ai.contracts import ChatMessage
 from db.models import Asset, Transcript
 from typing import Dict, Any
@@ -13,13 +13,13 @@ router = APIRouter(prefix="/extract", tags=["extract"])
 
 
 def get_llm_provider(provider_name: str):
-    """Get LLM provider instance."""
+    """Get LLM provider instance. Default: LocalLLMProvider (Ollama)."""
     if provider_name == "openai":
         return OpenAIOptionalProvider()
-    elif provider_name == "local_llm":
-        return LocalLLMProvider()
+    elif provider_name == "huggingface":
+        return HuggingFaceProvider()
     else:
-        return HuggingFaceProvider()  # Default
+        return LocalLLMProvider()  # Default: Ollama
 
 
 @router.post("", response_model=ExtractResponse)
@@ -64,7 +64,7 @@ async def extract(
         )
 
     # Get provider
-    provider_name = request.provider or "huggingface"
+    provider_name = request.provider or "ollama"
     provider = get_llm_provider(provider_name)
 
     # Build prompt based on task

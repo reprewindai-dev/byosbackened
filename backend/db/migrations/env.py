@@ -10,7 +10,7 @@ from core.config import get_settings
 from db.models import (
     Workspace, User, Job, Asset, Transcript, Export,
     RoutingStrategy, TrafficPattern, Anomaly, SavingsReport,
-    MLModel, RoutingDecision, CostPrediction,
+    MLModel, Deployment, DeploymentStatus, RoutingDecision, CostPrediction,
     AIAuditLog, Budget, SecurityAuditLog,
     AbuseLog, IncidentLog, RoutingPolicy, CostAllocation,
     SecurityEvent, UserSession, APIKey,

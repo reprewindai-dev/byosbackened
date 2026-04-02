@@ -5,15 +5,11 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from db.models import RoutingDecision
 from core.autonomous.learning.bandit import MultiArmedBandit
-from core.tracing.tracer import get_tracer
-from core.autonomous.feature_flags import get_feature_flags
 from core.config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-tracer = get_tracer()
-feature_flags = get_feature_flags()
 
 
 class RoutingOptimizerML:
@@ -51,47 +47,29 @@ class RoutingOptimizerML:
         
         # Validate constraints
         validated_constraints = self._validate_constraints(constraints)
-        
-            try:
-                # Select provider using bandit with constraints
-                with tracer.span(
-                    name="ml.bandit_selection",
-                    trace_id=trace_id,
-                    parent_span_id=span.span_id,
-                ) as bandit_span:
-                    selected = bandit.select_arm(
-                        available_providers,
-                        operation_type,
-                        constraints=validated_constraints,
-                    )
-                    bandit_span.set_attribute("selected_provider", selected)
-                    span.set_attribute("selected_provider", selected)
-                
-                # Verify selection meets constraints (safety check)
-                if not self._meets_constraints(selected, validated_constraints):
-                    # Fallback to safest provider
-                    fallback = bandit._get_fallback_provider(available_providers)
-                    span.set_attribute("fallback_used", True)
-                    span.set_attribute("fallback_reason", "constraints_not_met")
-                    span.add_event("fallback", {"reason": "constraints_not_met", "fallback_provider": fallback})
-                    logger.warning(
-                        f"Selected provider {selected} doesn't meet constraints, "
-                        f"using fallback: {fallback}"
-                    )
-                    return fallback
-                
-                span.add_event("provider_selected", {"provider": selected})
-                return selected
-                
-            except Exception as e:
-                # Fallback if ML selection fails
-                span.set_status("error", str(e))
-                span.set_attribute("fallback_used", True)
-                span.set_attribute("fallback_reason", "ml_selection_failed")
-                logger.error(f"ML routing failed for {bandit_key}: {e}, using fallback")
+
+        try:
+            selected = bandit.select_arm(
+                available_providers,
+                operation_type,
+                constraints=validated_constraints,
+            )
+
+            # Safety check: verify selection still meets constraints
+            if not self._meets_constraints(selected, validated_constraints):
                 fallback = bandit._get_fallback_provider(available_providers)
-                span.add_event("fallback", {"reason": "ml_selection_failed", "fallback_provider": fallback})
+                logger.warning(
+                    f"Selected provider {selected} doesn't meet constraints for "
+                    f"{bandit_key}, using fallback: {fallback}"
+                )
                 return fallback
+
+            logger.debug(f"ML routing selected {selected} for {bandit_key}")
+            return selected
+
+        except Exception as e:
+            logger.error(f"ML routing failed for {bandit_key}: {e}, using fallback")
+            return bandit._get_fallback_provider(available_providers)
     
     def _validate_constraints(self, constraints: Dict) -> Dict:
         """Validate and normalize constraints."""

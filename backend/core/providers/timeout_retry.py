@@ -128,6 +128,8 @@ class ProviderTimeoutRetry:
         "openai": 30.0,
         "huggingface": 60.0,  # Longer timeout for free tier
         "local": 120.0,  # Local models can be slower
+        "ollama": 120.0,  # CPU inference can be slow (qwen2.5:3b ~10-15 tok/s)
+        "groq": 15.0,  # Groq cloud is fast
         "serpapi": 10.0,
     }
     
@@ -136,6 +138,8 @@ class ProviderTimeoutRetry:
         "openai": 3,
         "huggingface": 2,
         "local": 1,  # Local failures are usually permanent
+        "ollama": 1,  # Local failures are usually permanent (circuit breaker handles recovery)
+        "groq": 3,  # Cloud retries are cheap and fast
         "serpapi": 2,
     }
     

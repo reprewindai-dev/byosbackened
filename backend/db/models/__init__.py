@@ -27,6 +27,7 @@ from db.models.subscription import Subscription, PlanTier, SubscriptionStatus
 from db.models.content_filter import ContentFilterLog, AgeVerification, ContentCategory, AgeVerificationStatus
 from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
+from db.models.execution_log import ExecutionLog
 
 __all__ = [
     "Workspace",
@@ -57,4 +58,5 @@ __all__ = [
     "ContentFilterLog", "AgeVerification", "ContentCategory", "AgeVerificationStatus",
     "SystemMetrics",
     "Alert", "AlertSeverity",
+    "ExecutionLog",
 ]

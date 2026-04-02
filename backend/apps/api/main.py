@@ -36,6 +36,7 @@ from apps.api.routers.monitoring_suite import router as monitoring_router
 from apps.api.routers.admin import router as admin_router
 from apps.api.routers.subscriptions import router as subscriptions_router
 from apps.api.routers.content_safety import router as content_safety_router
+from apps.api.routers.exec_router import router as exec_router
 import logging
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,9 @@ app.include_router(monitoring_router, prefix=settings.api_prefix)
 app.include_router(admin_router, prefix=settings.api_prefix)
 app.include_router(subscriptions_router, prefix=settings.api_prefix)
 app.include_router(content_safety_router, prefix=settings.api_prefix)
+
+# ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
+app.include_router(exec_router)
 
 
 @app.get("/health")

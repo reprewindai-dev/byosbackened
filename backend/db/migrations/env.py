@@ -15,7 +15,7 @@ from db.models import (
     AbuseLog, IncidentLog, RoutingPolicy, CostAllocation,
     SecurityEvent, UserSession, APIKey,
     Subscription, ContentFilterLog, AgeVerification,
-    SystemMetrics, Alert,
+    SystemMetrics, Alert, ExecutionLog,
 )
 
 settings = get_settings()

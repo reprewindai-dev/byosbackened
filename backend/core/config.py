@@ -33,23 +33,15 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     encryption_key: str = ""  # For field encryption, defaults to secret_key if not set
 
-    # AI Providers
-    # Hugging Face
-    huggingface_api_key: str = ""
-    huggingface_model_chat: str = "mistralai/Mistral-7B-Instruct-v0.1"
-    huggingface_model_embed: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # ── LLM — Local Ollama (primary, no external fallback) ──────────────────────
+    llm_base_url: str = "http://host.docker.internal:11434"
+    llm_model_default: str = "llama3.2:1b"
+    llm_fallback: str = "off"   # "off" = hard fail; never route to external providers
+    llm_timeout_seconds: int = 60
+    llm_max_tokens: int = 2048
 
-    # SERP API
+    # SERP API (optional, non-AI)
     serpapi_key: str = ""
-
-    # OpenAI (optional, only when valuable)
-    openai_api_key: str = ""
-    openai_model_chat: str = "gpt-4o-mini"
-    openai_model_whisper: str = "whisper-1"
-
-    # Local AI (self-hosted)
-    local_whisper_url: str = ""  # e.g., "http://whisper:8000"
-    local_llm_url: str = ""  # e.g., "http://llm:8000"
 
     # Worker
     celery_broker_url: str = "redis://redis:6379/0"

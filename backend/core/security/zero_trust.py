@@ -15,6 +15,8 @@ _PUBLIC_PATHS = {
     "/health",
     "/",
     "/metrics",
+    "/status",      # system health — no auth required
+    "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
     f"{settings.api_prefix}/auth/register",
     f"{settings.api_prefix}/auth/login",
     f"{settings.api_prefix}/auth/refresh",

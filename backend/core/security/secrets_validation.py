@@ -23,10 +23,10 @@ def validate_secrets_on_startup():
     if settings.secret_key == "change-me-in-production-use-env-var":
         errors.append("SECRET_KEY must be changed from default value")
     
-    # Optional but recommended
-    if not settings.huggingface_api_key:
-        warnings.append("HUGGINGFACE_API_KEY not set (some features may not work)")
-    
+    # Ollama — warn if base URL is default (not a failure, just informational)
+    if "host.docker.internal" not in settings.llm_base_url and "127.0.0.1" not in settings.llm_base_url:
+        warnings.append(f"LLM_BASE_URL is set to '{settings.llm_base_url}' — ensure Ollama is reachable")
+
     if not settings.serpapi_key:
         warnings.append("SERPAPI_KEY not set (search features will not work)")
     

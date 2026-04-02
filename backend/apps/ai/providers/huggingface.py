@@ -18,10 +18,10 @@ class HuggingFaceProvider(STTProvider, LLMProvider):
     """Hugging Face inference provider."""
 
     def __init__(self):
-        self.api_key = settings.huggingface_api_key
+        self.api_key = getattr(settings, "huggingface_api_key", "")
         self.base_url = "https://api-inference.huggingface.co"
-        self.chat_model = settings.huggingface_model_chat
-        self.embed_model = settings.huggingface_model_embed
+        self.chat_model = getattr(settings, "huggingface_model_chat", "mistralai/Mistral-7B-Instruct-v0.1")
+        self.embed_model = getattr(settings, "huggingface_model_embed", "sentence-transformers/all-MiniLM-L6-v2")
         self.headers = {}
         if self.api_key:
             self.headers["Authorization"] = f"Bearer {self.api_key}"

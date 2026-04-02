@@ -20,10 +20,10 @@ class OpenAIOptionalProvider(STTProvider, LLMProvider):
     """
 
     def __init__(self):
-        self.api_key = settings.openai_api_key
+        self.api_key = getattr(settings, "openai_api_key", "")
         self.base_url = "https://api.openai.com/v1"
-        self.chat_model = settings.openai_model_chat
-        self.whisper_model = settings.openai_model_whisper
+        self.chat_model = getattr(settings, "openai_model_chat", "gpt-4o-mini")
+        self.whisper_model = getattr(settings, "openai_model_whisper", "whisper-1")
         self.headers = {}
         if self.api_key:
             self.headers["Authorization"] = f"Bearer {self.api_key}"

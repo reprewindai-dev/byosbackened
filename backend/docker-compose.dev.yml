@@ -1,0 +1,114 @@
+version: '3.9'
+
+# BYOS AI — Local Windows Development Stack
+# No nginx, no certbot, no grafana, no monitoring.
+# Ollama runs on the Windows host — Docker reaches it via host.docker.internal.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml logs -f api
+#   docker compose -f docker-compose.dev.yml down
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: byos_dev_postgres
+    environment:
+      POSTGRES_USER: byos
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: byos_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U byos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: byos_dev_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - dev_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: byos_dev_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - dev_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: byos_dev_api
+    environment:
+      DATABASE_URL: postgresql://byos:devpassword@postgres:5432/byos_ai
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET_NAME: byos-ai
+      # ── Ollama — Windows host ──────────────────────────────────────────────
+      LLM_BASE_URL: http://host.docker.internal:11434
+      LLM_MODEL_DEFAULT: llama3.2:1b
+      LLM_FALLBACK: "off"
+      # ── Dev security (do NOT use in prod) ────────────────────────────────
+      SECRET_KEY: dev-secret-key-change-in-production-32chars
+      DEBUG: "true"
+      NODE_ENV: development
+      # ── Content safety (relaxed for dev) ─────────────────────────────────
+      CONTENT_FILTERING_ENABLED: "false"
+      AGE_VERIFICATION_REQUIRED: "false"
+      # ── Observability ─────────────────────────────────────────────────────
+      LOG_FORMAT: text
+      METRICS_ENABLED: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./:/app          # live code reload
+      - dev_logs:/app/logs
+    # Override command for hot-reload in dev
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+volumes:
+  dev_postgres_data:
+  dev_redis_data:
+  dev_minio_data:
+  dev_logs:

@@ -11,7 +11,7 @@ class LocalWhisperProvider(STTProvider):
     """Self-hosted Whisper provider."""
 
     def __init__(self):
-        self.base_url = settings.local_whisper_url or "http://whisper:8000"
+        self.base_url = getattr(settings, "local_whisper_url", "") or "http://whisper:8000"
 
     async def transcribe(
         self, audio_url: str, language: Optional[str] = None

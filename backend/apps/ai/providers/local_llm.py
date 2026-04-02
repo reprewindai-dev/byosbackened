@@ -11,7 +11,8 @@ class LocalLLMProvider(LLMProvider):
     """Self-hosted LLM provider (Ollama/vLLM compatible)."""
 
     def __init__(self):
-        self.base_url = settings.local_llm_url or "http://llm:8000"
+        self.base_url = settings.llm_base_url  # Ollama: http://host.docker.internal:11434
+        self.model = settings.llm_model_default
 
     async def chat(
         self, messages: List[ChatMessage], temperature: float = 0.7, max_tokens: Optional[int] = None
@@ -20,20 +21,24 @@ class LocalLLMProvider(LLMProvider):
         async with httpx.AsyncClient(timeout=120.0) as client:
             # Stub: implement actual local LLM API call
             # Example: POST to {base_url}/v1/chat/completions (OpenAI-compatible)
+            payload: dict = {
+                "model": self.model,
+                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "temperature": temperature,
+                "stream": False,
+            }
+            if max_tokens:
+                payload["max_tokens"] = max_tokens
             response = await client.post(
                 f"{self.base_url}/v1/chat/completions",
-                json={
-                    "messages": [{"role": m.role, "content": m.content} for m in messages],
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                },
+                json=payload,
             )
             response.raise_for_status()
             data = response.json()
             return ChatResult(
                 content=data["choices"][0]["message"]["content"],
-                model=data.get("model", "local_llm"),
-                provider="local_llm",
+                model=data.get("model", self.model),
+                provider="ollama",
             )
 
     async def embed(self, text: str) -> EmbeddingResult:

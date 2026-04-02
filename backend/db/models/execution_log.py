@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Float, Text, DateTime, Boolean, Index
-from db.base import Base
+from db.session import Base
 
 
 class ExecutionLog(Base):

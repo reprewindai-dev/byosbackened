@@ -1,12 +1,15 @@
 """
 Ollama LLM Client — BYOS AI Backend
+Uses the official `ollama` Python library (pip install ollama).
 Single provider: local Ollama only. LLM_FALLBACK=off enforced.
 All calls blocked if Ollama is unreachable — no silent degradation.
 """
 import time
 import logging
-import httpx
 from typing import Optional
+
+from ollama import Client as _OllamaSDK, ResponseError as _ResponseError
+
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -19,8 +22,8 @@ class OllamaError(Exception):
 
 class OllamaClient:
     """
-    HTTP client for local Ollama inference.
-    Endpoint: POST {LLM_BASE_URL}/api/generate
+    Wrapper around the official `ollama` Python SDK.
+    Keeps the same dict-returning interface so exec_router.py needs no changes.
     """
 
     def __init__(
@@ -32,8 +35,7 @@ class OllamaClient:
         self.base_url = (base_url or settings.llm_base_url).rstrip("/")
         self.model = model or settings.llm_model_default
         self.timeout = timeout or settings.llm_timeout_seconds
-        self._generate_url = f"{self.base_url}/api/generate"
-        self._tags_url = f"{self.base_url}/api/tags"
+        self._client = _OllamaSDK(host=self.base_url, timeout=self.timeout)
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -45,88 +47,73 @@ class OllamaClient:
         options: Optional[dict] = None,
     ) -> dict:
         """
-        Call Ollama /api/generate.
-        Returns: { "response": str, "model": str, "tokens": int, "latency_ms": int }
+        Call Ollama generate via official SDK.
+        Returns: { response, model, prompt_tokens, completion_tokens, total_tokens, latency_ms, done }
         Raises OllamaError on any failure — no fallback.
         """
         if settings.llm_fallback != "off":
-            logger.warning("LLM_FALLBACK is not 'off' — enforcing local-only anyway")
+            logger.warning("[Ollama] LLM_FALLBACK is not 'off' — enforcing local-only anyway")
 
-        payload = {
-            "model": model or self.model,
-            "prompt": prompt,
-            "stream": stream,
-        }
-        if options:
-            payload["options"] = options
-
+        target_model = model or self.model
         start = time.monotonic()
+
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                response = client.post(self._generate_url, json=payload)
-                response.raise_for_status()
-        except httpx.ConnectError as e:
-            raise OllamaError(
-                f"Cannot reach Ollama at {self.base_url}. "
-                "Ensure Ollama is running and LLM_BASE_URL is correct."
-            ) from e
-        except httpx.TimeoutException as e:
-            raise OllamaError(
-                f"Ollama request timed out after {self.timeout}s for model '{payload['model']}'"
-            ) from e
-        except httpx.HTTPStatusError as e:
-            raise OllamaError(
-                f"Ollama returned HTTP {e.response.status_code}: {e.response.text[:300]}"
-            ) from e
+            resp = self._client.generate(
+                model=target_model,
+                prompt=prompt,
+                stream=stream,
+                options=options or {},
+            )
+        except _ResponseError as e:
+            raise OllamaError(f"Ollama API error ({e.status_code}): {e.error}") from e
+        except Exception as e:
+            # Covers httpx.ConnectError, TimeoutException, etc.
+            msg = str(e)
+            if "connect" in msg.lower() or "connection" in msg.lower():
+                raise OllamaError(
+                    f"Cannot reach Ollama at {self.base_url}. "
+                    "Ensure Ollama is running and LLM_BASE_URL is correct."
+                ) from e
+            raise OllamaError(f"Ollama request failed: {msg}") from e
 
         latency_ms = int((time.monotonic() - start) * 1000)
-        data = response.json()
-
-        text = data.get("response", "")
-        tokens_eval = data.get("eval_count", 0)
-        tokens_prompt = data.get("prompt_eval_count", 0)
+        tokens_prompt = resp.prompt_eval_count or 0
+        tokens_eval = resp.eval_count or 0
 
         logger.debug(
-            f"[Ollama] model={data.get('model')} "
-            f"tokens={tokens_prompt}+{tokens_eval} latency={latency_ms}ms"
+            "[Ollama] model=%s tokens=%d+%d latency=%dms",
+            resp.model, tokens_prompt, tokens_eval, latency_ms,
         )
 
         return {
-            "response": text,
-            "model": data.get("model", payload["model"]),
+            "response": resp.response,
+            "model": resp.model,
             "prompt_tokens": tokens_prompt,
             "completion_tokens": tokens_eval,
             "total_tokens": tokens_prompt + tokens_eval,
             "latency_ms": latency_ms,
-            "done": data.get("done", True),
+            "done": resp.done,
         }
 
     def health_check(self) -> bool:
         """
         Returns True if Ollama is reachable and has at least one model loaded.
-        Used by GET /status.
         """
         try:
-            with httpx.Client(timeout=5) as client:
-                r = client.get(self._tags_url)
-                r.raise_for_status()
-                models = r.json().get("models", [])
-                return len(models) > 0
+            models = self._client.list()
+            return len(models.models) > 0
         except Exception as e:
-            logger.warning(f"[Ollama] health_check failed: {e}")
+            logger.warning("[Ollama] health_check failed: %s", e)
             return False
 
     def list_models(self) -> list[str]:
         """Return list of model names available in local Ollama."""
         try:
-            with httpx.Client(timeout=5) as client:
-                r = client.get(self._tags_url)
-                r.raise_for_status()
-                return [m["name"] for m in r.json().get("models", [])]
+            return [m.model for m in self._client.list().models]
         except Exception:
             return []
 
 
 def get_ollama_client() -> OllamaClient:
-    """FastAPI dependency — returns singleton-like OllamaClient."""
+    """FastAPI dependency — returns a fresh OllamaClient per request."""
     return OllamaClient()

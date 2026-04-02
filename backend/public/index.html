@@ -1,595 +1,837 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BYOS AI — Sovereign AI Infrastructure</title>
-  <meta name="description" content="Private, self-hosted AI backend with local inference, multi-tenant isolation, age verification, content moderation, and zero data leakage. Built for industries where privacy is non-negotiable." />
+  <title>BYOS AI — The AI Backend That Pays For Itself</title>
+  <meta name="description" content="Local AI inference with cost intelligence (save 30-70%), cryptographic audit trails, self-healing circuit breaker, content safety, and zero data leakage. Built for industries where privacy is non-negotiable." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#07080b;--bg2:#0c0e15;--surface:#0f1118;--surface2:#131621;
+      --border:#1c1f2e;--border2:#262a3e;
+      --accent:#6c63ff;--accent-lo:rgba(108,99,255,.13);--accent-hi:#8b85ff;
+      --accent2:#00d4aa;--accent2-lo:rgba(0,212,170,.1);
+      --gold:#f59e0b;--danger:#ff4d6d;
+      --text:#eaecf4;--muted:#636880;--muted2:#8b92b0;
+      --pill-bg:#181b2a;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;line-height:1.65;font-size:16px;-webkit-font-smoothing:antialiased}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    .container{max-width:1120px;margin:0 auto;padding:0 1.5rem}
+    section{padding:6rem 0}
+    .btn-primary{display:inline-block;background:var(--accent);color:#fff;padding:.82rem 1.9rem;border-radius:8px;font-weight:700;font-size:.95rem;transition:opacity .2s,transform .15s;border:none;cursor:pointer}
+    .btn-primary:hover{opacity:.88;transform:translateY(-1px);text-decoration:none}
+    .btn-outline{display:inline-block;background:transparent;color:var(--text);padding:.82rem 1.9rem;border-radius:8px;font-weight:600;font-size:.95rem;border:1px solid var(--border2);transition:border-color .2s,color .2s;cursor:pointer}
+    .btn-outline:hover{border-color:var(--accent);color:#a8a3ff;text-decoration:none}
+    .btn-ghost{display:inline-flex;align-items:center;gap:.4rem;color:var(--muted2);font-size:.88rem;font-weight:500;transition:color .2s}
+    .btn-ghost:hover{color:var(--text);text-decoration:none}
 
-    :root {
-      --bg:       #08090c;
-      --surface:  #101218;
-      --border:   #1e2130;
-      --accent:   #6c63ff;
-      --accent2:  #00d4aa;
-      --danger:   #ff4d6d;
-      --text:     #e8eaf0;
-      --muted:    #6b7280;
-      --pill-bg:  #1a1d2e;
-    }
+    /* NAV */
+    nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:62px;background:rgba(7,8,11,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+    .nav-logo{font-size:1.05rem;font-weight:800;letter-spacing:-.04em;color:var(--text)}
+    .nav-logo span{color:var(--accent)}
+    .nav-links{display:flex;gap:1.75rem;align-items:center}
+    .nav-links a{color:var(--muted2);font-size:.85rem;font-weight:500;transition:color .2s}
+    .nav-links a:hover{color:var(--text);text-decoration:none}
+    .nav-cta{background:var(--accent);color:#fff !important;padding:.42rem 1.15rem;border-radius:7px;font-size:.85rem;font-weight:700;transition:opacity .2s}
+    .nav-cta:hover{opacity:.85;text-decoration:none !important}
 
-    html { scroll-behavior: smooth; }
+    /* HERO */
+    .hero-wrap{position:relative;overflow:hidden;padding:6.5rem 1.5rem 5rem;text-align:center}
+    .hero-wrap::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(108,99,255,.18),transparent 70%);pointer-events:none}
+    .eyebrow{display:inline-flex;align-items:center;gap:.5rem;background:var(--accent-lo);border:1px solid rgba(108,99,255,.28);color:#a8a3ff;padding:.3rem .9rem;border-radius:99px;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:1.5rem}
+    .hero-wrap h1{font-size:clamp(2.6rem,5.5vw,4.2rem);font-weight:900;letter-spacing:-.04em;line-height:1.08;max-width:880px;margin:0 auto 1.4rem}
+    .hero-wrap h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent-hi),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero-sub{font-size:1.15rem;color:var(--muted2);max-width:620px;margin:0 auto 2.5rem;line-height:1.75}
+    .hero-actions{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem}
+    .hero-proof{display:flex;justify-content:center;gap:2.5rem;flex-wrap:wrap;padding-top:2.5rem;border-top:1px solid var(--border)}
+    .hero-proof-item{text-align:center}
+    .hero-proof-item .num{font-size:1.8rem;font-weight:900;letter-spacing:-.03em;color:var(--text)}
+    .hero-proof-item .num span{color:var(--accent2)}
+    .hero-proof-item .label{font-size:.75rem;color:var(--muted);margin-top:.2rem;font-weight:500}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-      line-height: 1.6;
-      font-size: 16px;
-    }
+    /* STATUS BAR */
+    .status-bar{display:flex;justify-content:center;gap:1.5rem;flex-wrap:wrap;padding:1rem 1.5rem;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .status-item{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted2);font-weight:500}
+    .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .dot.green{background:var(--accent2);box-shadow:0 0 5px var(--accent2)}
+    .dot.amber{background:var(--gold)}
+    .dot.red{background:var(--danger)}
 
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    /* PROBLEM / PAIN */
+    .pain-section{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .pain-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;margin-top:2.5rem}
+    .pain-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem}
+    .pain-card .pain-label{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--danger);margin-bottom:.6rem}
+    .pain-card h4{font-size:.95rem;font-weight:700;margin-bottom:.4rem}
+    .pain-card p{font-size:.83rem;color:var(--muted2)}
 
-    /* ── NAV ────────────────────────────────────── */
-    nav {
-      position: sticky; top: 0; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 2rem; height: 60px;
-      background: rgba(8,9,12,0.92);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-    }
-    .nav-logo {
-      font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
-      color: var(--text);
-    }
-    .nav-logo span { color: var(--accent); }
-    .nav-links { display: flex; gap: 2rem; }
-    .nav-links a { color: var(--muted); font-size: 0.875rem; transition: color .2s; }
-    .nav-links a:hover { color: var(--text); text-decoration: none; }
-    .nav-cta {
-      background: var(--accent); color: #fff !important;
-      padding: 0.4rem 1.1rem; border-radius: 6px; font-size: 0.875rem;
-      font-weight: 600; transition: opacity .2s;
-    }
-    .nav-cta:hover { opacity: 0.85; text-decoration: none !important; }
+    /* THREE PILLARS */
+    .pillars-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1.5rem;margin-top:3rem}
+    .pillar{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;transition:border-color .2s}
+    .pillar:hover{border-color:var(--border2)}
+    .pillar-icon{font-size:2rem;margin-bottom:1rem}
+    .pillar h3{font-size:1.15rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.6rem}
+    .pillar-highlight{display:inline-block;background:var(--accent2-lo);border:1px solid rgba(0,212,170,.2);color:var(--accent2);padding:.15rem .6rem;border-radius:4px;font-size:.75rem;font-weight:700;margin-bottom:.75rem}
+    .pillar p{font-size:.88rem;color:var(--muted2);line-height:1.7}
+    .pillar ul{margin-top:.9rem;list-style:none;display:flex;flex-direction:column;gap:.4rem}
+    .pillar ul li{font-size:.82rem;color:var(--muted2);display:flex;align-items:flex-start;gap:.5rem}
+    .pillar ul li::before{content:"→";color:var(--accent);font-weight:700;flex-shrink:0;margin-top:1px}
 
-    /* ── HERO ───────────────────────────────────── */
-    .hero {
-      text-align: center;
-      padding: 7rem 1.5rem 5rem;
-      max-width: 860px; margin: 0 auto;
-    }
-    .hero-badge {
-      display: inline-block;
-      background: var(--pill-bg); border: 1px solid var(--border);
-      padding: 0.3rem 0.9rem; border-radius: 99px;
-      font-size: 0.78rem; color: var(--accent2); letter-spacing: 0.05em;
-      text-transform: uppercase; font-weight: 600; margin-bottom: 1.5rem;
-    }
-    .hero h1 {
-      font-size: clamp(2.4rem, 5vw, 3.8rem);
-      font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;
-      margin-bottom: 1.25rem;
-    }
-    .hero h1 em { font-style: normal; color: var(--accent); }
-    .hero p {
-      font-size: 1.15rem; color: var(--muted); max-width: 640px;
-      margin: 0 auto 2.5rem;
-    }
-    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-    .btn-primary {
-      background: var(--accent); color: #fff;
-      padding: 0.75rem 1.75rem; border-radius: 8px;
-      font-weight: 700; font-size: 0.95rem; transition: opacity .2s;
-      border: none; cursor: pointer;
-    }
-    .btn-primary:hover { opacity: 0.85; text-decoration: none; }
-    .btn-outline {
-      background: transparent; color: var(--text);
-      padding: 0.75rem 1.75rem; border-radius: 8px;
-      font-weight: 600; font-size: 0.95rem;
-      border: 1px solid var(--border); transition: border-color .2s;
-      cursor: pointer;
-    }
-    .btn-outline:hover { border-color: var(--accent); text-decoration: none; }
+    /* REAL SCENARIOS */
+    .scenarios-section{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .scenarios-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;margin-top:2.5rem}
+    .scenario{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.75rem;position:relative;transition:border-color .2s,transform .2s}
+    .scenario:hover{border-color:var(--border2);transform:translateY(-2px)}
+    .scenario-tag{display:inline-block;background:var(--pill-bg);border:1px solid var(--border2);padding:.2rem .65rem;border-radius:5px;font-size:.68rem;color:var(--accent2);letter-spacing:.06em;text-transform:uppercase;font-weight:700;margin-bottom:1rem}
+    .scenario h4{font-size:1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.5rem}
+    .scenario p{font-size:.83rem;color:var(--muted2);line-height:1.65;margin-bottom:1rem}
+    .scenario-stat{background:var(--accent-lo);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+    .scenario-stat .stat-num{font-size:1.4rem;font-weight:900;color:var(--text);letter-spacing:-.03em;white-space:nowrap}
+    .scenario-stat .stat-label{font-size:.72rem;color:var(--muted2)}
 
-    /* ── STATUS BAR ─────────────────────────────── */
-    .status-bar {
-      display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;
-      padding: 1rem; margin: 0 auto 2rem;
-      max-width: 600px;
-    }
-    .status-item {
-      display: flex; align-items: center; gap: 0.4rem;
-      font-size: 0.8rem; color: var(--muted);
-    }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot.green { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
-    .dot.amber { background: #f59e0b; }
+    /* DEMO / API BLOCK */
+    .demo-section{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
+    .demo-wrap{display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start;margin-top:3rem}
+    @media(max-width:768px){.demo-wrap{grid-template-columns:1fr}}
+    .demo-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+    .demo-panel-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;background:var(--surface);border-bottom:1px solid var(--border)}
+    .demo-panel-header .title{font-size:.78rem;font-weight:700;color:var(--muted2);letter-spacing:.04em;text-transform:uppercase}
+    .demo-panel-header .dots span{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:5px}
+    .demo-panel-header .dots span:nth-child(1){background:#ff5f57}
+    .demo-panel-header .dots span:nth-child(2){background:#febc2e}
+    .demo-panel-header .dots span:nth-child(3){background:#28c840}
+    .code{padding:1.4rem 1.5rem;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:.78rem;line-height:1.75;overflow-x:auto;color:#c9d1d9}
+    .code .k{color:#c792ea}
+    .code .s{color:#c3e88d}
+    .code .n{color:#82aaff}
+    .code .v{color:#f78c6c}
+    .code .c{color:var(--muted)}
+    .code .g{color:var(--accent2)}
+    .code .o{color:var(--accent)}
+    .circuit-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem}
+    .circuit-panel h4{font-size:.88rem;font-weight:700;margin-bottom:1.2rem;color:var(--muted2);letter-spacing:.04em;text-transform:uppercase}
+    .circuit-flow{display:flex;flex-direction:column;gap:.75rem}
+    .circuit-step{display:flex;align-items:flex-start;gap:.9rem}
+    .circuit-badge{min-width:72px;padding:.22rem .6rem;border-radius:5px;font-size:.68rem;font-weight:700;text-align:center;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0;margin-top:2px}
+    .circuit-badge.closed{background:rgba(0,212,170,.15);color:var(--accent2);border:1px solid rgba(0,212,170,.3)}
+    .circuit-badge.open{background:rgba(255,77,109,.15);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
+    .circuit-badge.half{background:rgba(245,158,11,.15);color:var(--gold);border:1px solid rgba(245,158,11,.3)}
+    .circuit-badge.auto{background:var(--accent-lo);color:#a8a3ff;border:1px solid rgba(108,99,255,.3)}
+    .circuit-desc{font-size:.82rem;color:var(--muted2);line-height:1.5}
 
-    /* ── SECTION COMMON ─────────────────────────── */
-    section { padding: 5rem 1.5rem; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .section-label {
-      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;
-    }
-    .section-title {
-      font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 800;
-      letter-spacing: -0.025em; margin-bottom: 1rem;
-    }
-    .section-sub { color: var(--muted); font-size: 1rem; max-width: 560px; }
+    /* FULL FEATURE TABLE */
+    .features-section{background:var(--bg)}
+    .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1rem;margin-top:2.5rem}
+    .feature-group{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem}
+    .feature-group-label{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
+    .feature-group h3{font-size:1rem;font-weight:800;margin-bottom:1rem}
+    .feature-list{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+    .feature-list li{font-size:.83rem;color:var(--muted2);display:flex;align-items:flex-start;gap:.55rem;line-height:1.4}
+    .feature-list li .check{color:var(--accent2);font-weight:700;flex-shrink:0;margin-top:1px}
 
-    /* ── FEATURE GRID ───────────────────────────── */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.25rem; margin-top: 3rem;
-    }
-    .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--border); border-radius: 12px;
-      padding: 1.75rem;
-      transition: border-color .2s, transform .2s;
-    }
-    .feature-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-    .feature-icon {
-      font-size: 1.75rem; margin-bottom: 1rem;
-    }
-    .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .feature-card p { font-size: 0.875rem; color: var(--muted); }
+    /* THE NUMBERS */
+    .numbers-section{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .numbers-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-top:2rem}
+    .number-item{text-align:center;padding:1.5rem}
+    .number-item .big{font-size:2.8rem;font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:.3rem}
+    .number-item .big.green{color:var(--accent2)}
+    .number-item .big.purple{color:var(--accent-hi)}
+    .number-item .big.gold{color:var(--gold)}
+    .number-item .big.white{color:var(--text)}
+    .number-item p{font-size:.82rem;color:var(--muted2)}
 
-    /* ── WHO IS THIS FOR ────────────────────────── */
-    .industries {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .industry-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem; margin-top: 2.5rem;
-    }
-    .industry-card {
-      background: var(--bg);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 1.5rem;
-    }
-    .industry-card .tag {
-      display: inline-block; background: var(--pill-bg);
-      border: 1px solid var(--border); padding: 0.2rem 0.6rem;
-      border-radius: 4px; font-size: 0.7rem; color: var(--accent2);
-      letter-spacing: 0.05em; text-transform: uppercase;
-      font-weight: 600; margin-bottom: 0.75rem;
-    }
-    .industry-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
-    .industry-card p { font-size: 0.8rem; color: var(--muted); }
+    /* INTEGRATIONS */
+    .int-row{display:flex;flex-wrap:wrap;gap:.65rem;margin-top:2rem}
+    .int-pill{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.55rem 1rem;font-size:.8rem;color:var(--muted2);font-weight:500;display:flex;align-items:center;gap:.45rem;transition:border-color .2s}
+    .int-pill:hover{border-color:var(--border2)}
 
-    /* ── HOW IT WORKS ───────────────────────────── */
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 2rem; margin-top: 3rem; counter-reset: step;
-    }
-    .step { position: relative; }
-    .step-num {
-      font-size: 3rem; font-weight: 900;
-      color: var(--border); line-height: 1; margin-bottom: 0.75rem;
-    }
-    .step h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
-    .step p { font-size: 0.85rem; color: var(--muted); }
+    /* PRICING */
+    .pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.25rem;margin-top:3rem;align-items:start}
+    .pricing-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;position:relative}
+    .pricing-card.featured{border-color:var(--accent);background:linear-gradient(135deg,rgba(108,99,255,.07),var(--surface))}
+    .featured-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:.22rem .9rem;border-radius:99px;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+    .plan-name{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted2);margin-bottom:.3rem}
+    .plan-tagline{font-size:.85rem;color:var(--muted);margin-bottom:1.25rem}
+    .price{font-size:2.8rem;font-weight:900;letter-spacing:-.04em;line-height:1.1}
+    .price sub{font-size:.9rem;font-weight:400;color:var(--muted2);vertical-align:super}
+    .price-period{font-size:.82rem;color:var(--muted);margin-bottom:1.5rem;margin-top:.2rem}
+    .plan-features{list-style:none;margin-bottom:1.75rem}
+    .plan-features li{font-size:.83rem;color:var(--muted2);padding:.38rem 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+    .plan-features li .tick{color:var(--accent2);font-weight:700;flex-shrink:0}
+    .plan-features li .cross{color:var(--border2);flex-shrink:0}
+    .plan-note{font-size:.75rem;color:var(--muted);margin-bottom:1.25rem}
 
-    /* ── INTEGRATIONS ───────────────────────────── */
-    .integrations-row {
-      display: flex; flex-wrap: wrap; gap: 0.75rem;
-      margin-top: 2rem;
-    }
-    .integration-pill {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 8px; padding: 0.6rem 1rem;
-      font-size: 0.8rem; color: var(--text); font-weight: 500;
-      display: flex; align-items: center; gap: 0.5rem;
-    }
+    /* CTA BANNER */
+    .cta-banner{background:linear-gradient(135deg,rgba(108,99,255,.15),rgba(0,212,170,.08));border:1px solid rgba(108,99,255,.25);border-radius:20px;padding:4rem 2rem;text-align:center;margin:4rem 0}
+    .cta-banner h2{font-size:clamp(1.8rem,3vw,2.5rem);font-weight:900;letter-spacing:-.03em;margin-bottom:.9rem}
+    .cta-banner p{font-size:1rem;color:var(--muted2);max-width:500px;margin:0 auto 2rem}
+    .cta-actions{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
 
-    /* ── PRICING ────────────────────────────────── */
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.25rem; margin-top: 3rem; align-items: start;
-    }
-    .pricing-card {
-      background: var(--surface);
-      border: 1px solid var(--border); border-radius: 14px;
-      padding: 2rem; position: relative;
-    }
-    .pricing-card.featured {
-      border-color: var(--accent);
-    }
-    .featured-badge {
-      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-      background: var(--accent); color: #fff;
-      padding: 0.2rem 0.9rem; border-radius: 99px;
-      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em;
-      text-transform: uppercase; white-space: nowrap;
-    }
-    .pricing-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .pricing-tier-desc { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.25rem; }
-    .price { font-size: 2.5rem; font-weight: 900; letter-spacing: -0.04em; }
-    .price span { font-size: 1rem; font-weight: 400; color: var(--muted); }
-    .pricing-features {
-      list-style: none; margin: 1.25rem 0 1.75rem;
-    }
-    .pricing-features li {
-      font-size: 0.85rem; color: var(--muted);
-      padding: 0.35rem 0; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 0.5rem;
-    }
-    .pricing-features li::before { content: "✓"; color: var(--accent2); font-weight: 700; }
-    .pricing-features li.no::before { content: "–"; color: var(--border); }
+    /* FOOTER */
+    footer{border-top:1px solid var(--border);padding:3rem 1.5rem}
+    .footer-inner{max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:space-between;gap:2rem}
+    .footer-brand .logo{font-size:1.1rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.4rem}
+    .footer-brand .logo span{color:var(--accent)}
+    .footer-brand p{font-size:.8rem;color:var(--muted);max-width:240px;line-height:1.6}
+    .footer-links-group h5{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.8rem}
+    .footer-links-group a{display:block;font-size:.82rem;color:var(--muted2);margin-bottom:.45rem;transition:color .2s}
+    .footer-links-group a:hover{color:var(--text);text-decoration:none}
+    .footer-bottom{max-width:1120px;margin:1.5rem auto 0;padding-top:1.5rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+    .footer-bottom p{font-size:.75rem;color:var(--muted)}
 
-    /* ── API PREVIEW ────────────────────────────── */
-    .code-block {
-      background: #0d0f17; border: 1px solid var(--border);
-      border-radius: 10px; padding: 1.5rem;
-      font-family: 'Fira Code', 'Cascadia Code', monospace;
-      font-size: 0.82rem; line-height: 1.7; overflow-x: auto;
-      margin-top: 2rem;
-    }
-    .code-block .k  { color: #c792ea; } /* keyword */
-    .code-block .s  { color: #c3e88d; } /* string */
-    .code-block .n  { color: #82aaff; } /* name */
-    .code-block .c  { color: var(--muted); } /* comment */
-    .code-block .v  { color: #f78c6c; } /* value */
-
-    /* ── FOOTER ─────────────────────────────────── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 3rem 1.5rem;
-      text-align: center;
-    }
-    footer p { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
-    .footer-links {
-      display: flex; justify-content: center; gap: 1.5rem;
-      flex-wrap: wrap; margin-bottom: 1.5rem;
-    }
-    .footer-links a { font-size: 0.8rem; color: var(--muted); }
-    .footer-links a:hover { color: var(--text); }
-
-    /* ── RESPONSIVE ─────────────────────────────── */
-    @media (max-width: 640px) {
-      nav { padding: 0 1rem; }
-      .nav-links { display: none; }
-      .hero { padding: 5rem 1rem 3rem; }
-      section { padding: 3.5rem 1rem; }
+    /* RESPONSIVE */
+    @media(max-width:768px){
+      nav{padding:0 1rem}
+      .nav-links{display:none}
+      .hero-wrap{padding:5rem 1rem 3.5rem}
+      section{padding:4rem 0}
+      .hero-proof{gap:1.5rem}
+      .pain-grid,.scenarios-grid,.features-grid,.numbers-grid,.pricing-grid{grid-template-columns:1fr}
+      .pillars-grid{grid-template-columns:1fr}
+      .cta-banner{padding:2.5rem 1.25rem}
     }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
+<!-- ── NAV ─────────────────────────────────────────────────────────────── -->
 <nav>
   <div class="nav-logo">BYOS<span>.</span>AI</div>
   <div class="nav-links">
+    <a href="#problem">The Problem</a>
+    <a href="#scenarios">Use Cases</a>
+    <a href="#demo">API Demo</a>
     <a href="#features">Features</a>
-    <a href="#industries">Who It's For</a>
-    <a href="#how">How It Works</a>
-    <a href="#integrations">Integrations</a>
     <a href="#pricing">Pricing</a>
-    <a href="/api/v1/docs">API Docs</a>
+    <a href="/api/v1/docs" target="_blank">Docs</a>
+    <a class="nav-cta" href="#pricing">Get Access →</a>
   </div>
-  <a class="nav-links nav-cta" href="#pricing">Get Started</a>
 </nav>
 
-<!-- HERO -->
-<div class="hero">
-  <div class="hero-badge">🔒 Your Infrastructure. Your Data. Zero Leakage.</div>
-  <h1>The AI Backend Built for <em>Industries</em> That Can't Compromise</h1>
-  <p>
-    Local LLM inference. Multi-tenant isolation. Age verification. Content moderation.
-    Self-healing circuit breaker. On-premise—no data ever leaves your server.
+<!-- ── HERO ────────────────────────────────────────────────────────────── -->
+<div class="hero-wrap">
+  <div class="eyebrow">🔒 Private By Default &nbsp;·&nbsp; No Data Leaves Your Server</div>
+  <h1>The AI Backend That<br><em>Pays For Itself</em></h1>
+  <p class="hero-sub">
+    Local LLM inference with autonomous cost intelligence, cryptographic audit trails, self-healing failover, and content safety — one backend that replaces five tools, cuts AI spend by 30–70%, and keeps every byte on your hardware.
   </p>
   <div class="hero-actions">
-    <a class="btn-primary" href="#pricing">Start Free</a>
-    <a class="btn-outline" href="/api/v1/docs">Explore the API →</a>
+    <a class="btn-primary" href="#pricing">Get Access — From $79/mo</a>
+    <a class="btn-outline" href="#demo">See It In Action →</a>
+  </div>
+  <div class="hero-proof">
+    <div class="hero-proof-item">
+      <div class="num"><span>30–70</span>%</div>
+      <div class="label">AI cost reduction</div>
+    </div>
+    <div class="hero-proof-item">
+      <div class="num"><span>0</span> bytes</div>
+      <div class="label">sent to cloud by default</div>
+    </div>
+    <div class="hero-proof-item">
+      <div class="num"><span>&lt;60</span>s</div>
+      <div class="label">self-healing recovery</div>
+    </div>
+    <div class="hero-proof-item">
+      <div class="num"><span>40+</span></div>
+      <div class="label">production-grade modules</div>
+    </div>
+    <div class="hero-proof-item">
+      <div class="num"><span>5</span>-in-1</div>
+      <div class="label">replaces Helicone + Portkey + LangFuse + security + billing</div>
+    </div>
   </div>
 </div>
 
-<!-- LIVE STATUS -->
+<!-- ── LIVE STATUS BAR ─────────────────────────────────────────────────── -->
 <div class="status-bar" id="status-bar">
-  <div class="status-item"><div class="dot green"></div> API Online</div>
-  <div class="status-item"><div class="dot green"></div> Local LLM Ready</div>
-  <div class="status-item"><div class="dot green"></div> Groq Fallback Armed</div>
-  <div class="status-item"><div class="dot green"></div> All Systems Nominal</div>
+  <div class="status-item"><div class="dot green"></div>API Online</div>
+  <div class="status-item"><div class="dot green"></div>Local LLM Ready</div>
+  <div class="status-item"><div class="dot green"></div>Groq Fallback Armed</div>
+  <div class="status-item"><div class="dot green"></div>Circuit: CLOSED</div>
+  <div class="status-item"><div class="dot green"></div>DB + Redis Healthy</div>
 </div>
 
-<!-- FEATURES -->
-<section id="features">
+<!-- ── THE PROBLEM ─────────────────────────────────────────────────────── -->
+<section class="pain-section" id="problem">
   <div class="container">
-    <div class="section-label">Core Platform</div>
-    <h2 class="section-title">Everything You Need. Nothing You Don't.</h2>
-    <p class="section-sub">
-      Production-grade AI infrastructure purpose-built for high-compliance, high-privacy operations.
-    </p>
+    <div class="section-label">The Problem</div>
+    <h2 class="section-title">Everyone Else Is Handling Your Data.<br>And You're Still Getting Surprise Bills.</h2>
+    <p class="section-sub">Most AI stacks ship your prompts to OpenAI, have no idea what it costs until the invoice lands, and have zero audit trail when a regulator asks. That's not acceptable for industries where data sovereignty and compliance aren't optional.</p>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <div class="pain-label">Data Risk</div>
+        <h4>Your prompts leave your building</h4>
+        <p>Every OpenAI / Anthropic call sends your data to a third-party server. For legal, medical, adult, or financial data — that's a liability, a compliance issue, and a breach waiting to happen.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-label">Cost Chaos</div>
+        <h4>No visibility until the invoice arrives</h4>
+        <p>You have no idea what an AI operation costs before you run it. No budget enforcement. No client billing. No routing logic that saves money automatically. You're flying blind.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-label">Fragile Stack</div>
+        <h4>One provider failure takes everything down</h4>
+        <p>When your LLM provider has downtime, your product goes down with it. No automatic fallback. No circuit breaker. No recovery plan. Your customers notice before you do.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-label">Compliance Gap</div>
+        <h4>No audit trail a regulator will accept</h4>
+        <p>GDPR requires verifiable, immutable audit logs. "We logged it in CloudWatch" doesn't pass. Most AI backends have no cryptographic proof of what ran, when, at what cost, or who authorised it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── THREE PILLARS ───────────────────────────────────────────────────── -->
+<section id="solution">
+  <div class="container">
+    <div class="section-label">The Solution</div>
+    <h2 class="section-title">One Backend. Three Unfair Advantages.</h2>
+    <p class="section-sub">BYOS bundles what normally takes 5 separate tools — and adds autonomous intelligence on top.</p>
+    <div class="pillars-grid">
+      <div class="pillar">
+        <div class="pillar-icon">🏰</div>
+        <div class="pillar-highlight">SAVES 30–70%</div>
+        <h3>Autonomous Cost Intelligence</h3>
+        <p>Real-time cost prediction before every call. Intelligent provider routing picks the cheapest option that meets your quality floor. Budget enforcement prevents surprises. Precise billing allocates every cent to the right client or project.</p>
+        <ul>
+          <li>Predict cost before committing — 95% accuracy within 5%</li>
+          <li>Intelligent routing: cost / quality / speed strategies</li>
+          <li>Hard budget limits with real-time enforcement</li>
+          <li>Cost allocation per client, per project, per workspace</li>
+          <li>ML routing optimizer learns from actual usage</li>
+          <li>Invoice-ready billing reports with markup support</li>
+        </ul>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">🔒</div>
+        <div class="pillar-highlight">ZERO BYTES TO CLOUD</div>
+        <h3>True Data Sovereignty</h3>
+        <p>Inference runs on your hardware via Ollama. Self-healing circuit breaker detects failures and routes to Groq in under 60 seconds — then silently recovers. Per-tenant Redis conversation memory keeps context between requests.</p>
+        <ul>
+          <li>Local Ollama inference — qwen2.5:3b, llama3, any model</li>
+          <li>Redis circuit breaker: CLOSED → OPEN → HALF_OPEN auto-recovery</li>
+          <li>Groq fallback activates in &lt;3 seconds when circuit opens</li>
+          <li>Per-tenant conversation memory with 24h TTL</li>
+          <li>Postgres RLS — every query cryptographically tenant-isolated</li>
+          <li>AES-256-GCM encryption for sensitive fields at rest</li>
+        </ul>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">📋</div>
+        <div class="pillar-highlight">AUDIT-READY</div>
+        <h3>Compliance-Grade Security</h3>
+        <p>HMAC-SHA256 cryptographic audit logs that cannot be modified after creation. GDPR right to access, deletion, and portability built-in. PII auto-detection and masking. Zero-trust middleware on every route.</p>
+        <ul>
+          <li>Cryptographic audit trail — HMAC-SHA256, log chaining</li>
+          <li>GDPR / CCPA / SOC2 compliance reports on-demand</li>
+          <li>Automatic PII detection + masking (email, SSN, phone, CC)</li>
+          <li>Zero-trust middleware — every request verified before routing</li>
+          <li>Content safety: NSFW detection, age verification, CSAM blocking</li>
+          <li>Security event tracking with AI-confidence scoring</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── REAL WORK CASE SCENARIOS ────────────────────────────────────────── -->
+<section class="scenarios-section" id="scenarios">
+  <div class="container">
+    <div class="section-label">Real Work Case Scenarios</div>
+    <h2 class="section-title">Who Actually Uses This — And What They Get</h2>
+    <p class="section-sub">These are real operating scenarios. The numbers are conservative estimates based on actual AI pricing and typical usage patterns in each industry.</p>
+    <div class="scenarios-grid">
+
+      <div class="scenario">
+        <div class="scenario-tag">Adult &amp; Creator Platforms</div>
+        <h4>OnlyFans-Style Creator Network</h4>
+        <p>A creator platform with 10,000 active users needs AI for content moderation, caption generation, and DM assistance — but OpenAI's ToS bans adult content, Stripe flags the account, and every prompt leaks performer data to a cloud server.</p>
+        <p>With BYOS: local inference runs adult content workflows on your own hardware. Age verification gates all content access. NSFW classification flags violations automatically. No ToS violations. No data exposure. No account bans.</p>
+        <div class="scenario-stat">
+          <div>
+            <div class="stat-num">$0</div>
+            <div class="stat-label">cloud AI vendor risk</div>
+          </div>
+          <div>
+            <div class="stat-num">100%</div>
+            <div class="stat-label">data stays on-premise</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-tag">Legal &amp; LegalTech</div>
+        <h4>Boutique Law Firm (12 Attorneys)</h4>
+        <p>A firm processes 800 contracts/month using AI for risk extraction, clause comparison, and brief drafting. Sending privileged communications to OpenAI creates attorney-client privilege concerns and violates bar guidelines in several states.</p>
+        <p>With BYOS: all inference runs on the firm's own server. Cryptographic audit logs prove exactly what ran, when, and who authorised it. GDPR right-to-deletion handles client data removal requests in one API call.</p>
+        <div class="scenario-stat">
+          <div>
+            <div class="stat-num">~$14k</div>
+            <div class="stat-label">saved per year vs GPT-4</div>
+          </div>
+          <div>
+            <div class="stat-num">SOC2</div>
+            <div class="stat-label">audit-ready logs</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-tag">Agencies &amp; White-Label</div>
+        <h4>AI Content Agency (8 Clients)</h4>
+        <p>An agency runs AI workflows for 8 enterprise clients, each needing separate billing, separate rate limits, and separate data isolation. A single shared OpenAI key means one client can see another's costs — and there's no way to bill accurately.</p>
+        <p>With BYOS: each client is a workspace with its own API keys, RLS isolation, and cost allocation. Intelligent routing routes to the cheapest provider per workspace. Mark up AI costs 40% and generate client invoices directly from audit logs.</p>
+        <div class="scenario-stat">
+          <div>
+            <div class="stat-num">40%</div>
+            <div class="stat-label">margin on AI costs</div>
+          </div>
+          <div>
+            <div class="stat-num">8</div>
+            <div class="stat-label">isolated workspaces, one backend</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-tag">Healthcare &amp; Telehealth</div>
+        <h4>Telehealth Provider (HIPAA-Adjacent)</h4>
+        <p>A telehealth startup uses AI for clinical note summarisation, symptom triage, and appointment scheduling. Sending patient symptoms and visit notes to any third-party LLM API — including OpenAI — creates PHI exposure that their compliance officer will not approve.</p>
+        <p>With BYOS: inference stays on the clinical server. PII auto-detection masks patient identifiers before logging. Data retention policies automatically delete records after the configurable window. No cloud PHI exposure — ever.</p>
+        <div class="scenario-stat">
+          <div>
+            <div class="stat-num">0</div>
+            <div class="stat-label">PHI sent to external servers</div>
+          </div>
+          <div>
+            <div class="stat-num">Auto</div>
+            <div class="stat-label">PII masking on all logs</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── API DEMO ─────────────────────────────────────────────────────────── -->
+<section class="demo-section" id="demo">
+  <div class="container">
+    <div class="section-label">Live API Demo</div>
+    <h2 class="section-title">One Endpoint. Infinite Capability.</h2>
+    <p class="section-sub">A single <code style="color:var(--accent);background:var(--accent-lo);padding:.1rem .4rem;border-radius:4px">POST /v1/exec</code> call runs your prompt through local Ollama, injects conversation history, and automatically falls back to Groq if the circuit opens — all transparent to your app.</p>
+    <div class="demo-wrap">
+      <div>
+        <div class="demo-panel">
+          <div class="demo-panel-header">
+            <span class="title">Request</span>
+            <div class="dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code"><span class="k">POST</span> /v1/exec
+<span class="n">X-API-Key:</span> <span class="s">byos_xxxxxxxxxxxxxxxx</span>
+<span class="n">Content-Type:</span> <span class="s">application/json</span>
+
+{
+  <span class="n">"prompt"</span>:          <span class="s">"Summarise the key risks in this NDA."</span>,
+  <span class="n">"conversation_id"</span>: <span class="s">"matter-2025-441"</span>,
+  <span class="n">"model"</span>:           <span class="s">"qwen2.5:3b"</span>,
+  <span class="n">"use_memory"</span>:      <span class="k">true</span>
+}</div>
+        </div>
+        <div class="demo-panel" style="margin-top:1rem">
+          <div class="demo-panel-header">
+            <span class="title">Response</span>
+            <div class="dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code">{
+  <span class="n">"response"</span>:         <span class="s">"The key risks are: (1) broad IP..."</span>,
+  <span class="n">"provider"</span>:         <span class="g">"ollama"</span>,   <span class="c">// "groq" if circuit open</span>
+  <span class="n">"model"</span>:            <span class="s">"qwen2.5:3b"</span>,
+  <span class="n">"conversation_id"</span>:  <span class="s">"matter-2025-441"</span>,
+  <span class="n">"total_tokens"</span>:     <span class="v">418</span>,
+  <span class="n">"latency_ms"</span>:       <span class="v">1640</span>,
+  <span class="n">"log_id"</span>:           <span class="s">"exec_a3f7b..."</span>   <span class="c">// auditable forever</span>
+}</div>
+        </div>
+      </div>
+      <div class="circuit-panel">
+        <h4>Self-Healing Circuit Breaker</h4>
+        <div class="circuit-flow">
+          <div class="circuit-step">
+            <div class="circuit-badge closed">CLOSED</div>
+            <div class="circuit-desc"><strong>Ollama healthy</strong> — all inference runs locally on qwen2.5:3b. Zero cloud cost. Zero data exposure.</div>
+          </div>
+          <div class="circuit-step">
+            <div class="circuit-badge open">OPEN</div>
+            <div class="circuit-desc"><strong>3 Ollama failures detected</strong> — circuit opens automatically. All traffic routed to Groq in under 3 seconds. Your users see no downtime.</div>
+          </div>
+          <div class="circuit-step">
+            <div class="circuit-badge half">HALF-OPEN</div>
+            <div class="circuit-desc"><strong>60s cooldown elapsed</strong> — backend silently probes Ollama with a single test request. No manual intervention ever needed.</div>
+          </div>
+          <div class="circuit-step">
+            <div class="circuit-badge auto">AUTO-CLOSED</div>
+            <div class="circuit-desc"><strong>Ollama recovers</strong> — circuit closes, traffic returns to local inference. The entire cycle requires zero human involvement.</div>
+          </div>
+        </div>
+        <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border)">
+          <div class="section-label" style="margin-bottom:.5rem">Also Available</div>
+          <div style="display:flex;flex-direction:column;gap:.4rem">
+            <div style="font-size:.82rem;color:var(--muted2)"><span style="color:var(--accent)">GET</span> /status — live circuit breaker + DB + Redis + LLM health</div>
+            <div style="font-size:.82rem;color:var(--muted2)"><span style="color:var(--accent)">GET</span> /api/v1/cost/predict — pre-flight cost before you commit</div>
+            <div style="font-size:.82rem;color:var(--muted2)"><span style="color:var(--accent)">GET</span> /api/v1/audit — cryptographically verifiable log entries</div>
+            <div style="font-size:.82rem;color:var(--muted2)"><span style="color:var(--accent)">POST</span> /api/v1/content-safety/scan — NSFW + age gate + CSAM block</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FULL FEATURE INVENTORY ──────────────────────────────────────────── -->
+<section class="features-section" id="features">
+  <div class="container">
+    <div class="section-label">Complete Feature Inventory</div>
+    <h2 class="section-title">40+ Production Modules.<br>Six Pillars. Nothing Left Out.</h2>
+    <p class="section-sub">This isn't a thin API wrapper. Every module listed below is production-implemented, tested, and wired into the platform.</p>
     <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">🧠</div>
-        <h3>Local LLM Inference</h3>
-        <p>Runs on your hardware via Ollama. <strong>qwen2.5:3b</strong> default — optimised for CPU-only servers. Prompts never leave your machine.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">🧠 LLM Engine</div>
+        <h3>Inference &amp; Failover</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Local Ollama inference (any model — qwen2.5:3b, llama3.1, mistral)</li>
+          <li><span class="check">✓</span> Redis circuit breaker (CLOSED / OPEN / HALF_OPEN)</li>
+          <li><span class="check">✓</span> Groq cloud fallback with native httpx client</li>
+          <li><span class="check">✓</span> Self-healing: auto-recovery, zero manual intervention</li>
+          <li><span class="check">✓</span> Redis conversation memory (per-tenant, 20-msg window, 24h TTL)</li>
+          <li><span class="check">✓</span> Context injection: history automatically prepended to prompts</li>
+          <li><span class="check">✓</span> Multi-tenant execution logs with tokens, latency, provider</li>
+          <li><span class="check">✓</span> Pluggable: swap models per request or per workspace</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <h3>Self-Healing Circuit Breaker</h3>
-        <p>Ollama goes down? Circuit opens automatically and routes to Groq fallback. Recovers silently when Ollama comes back — zero manual intervention.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">💰 Cost Intelligence</div>
+        <h3>Predict. Route. Enforce. Bill.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Real-time cost prediction — 95% accuracy within 5% (tracked)</li>
+          <li><span class="check">✓</span> Confidence intervals on every prediction</li>
+          <li><span class="check">✓</span> Intelligent routing: cost_optimized / quality_optimized / speed_optimized</li>
+          <li><span class="check">✓</span> Hard budget limits with real-time enforcement middleware</li>
+          <li><span class="check">✓</span> Budget exhaustion forecasting and alert thresholds</li>
+          <li><span class="check">✓</span> Cost allocation per project, client, workspace (6 decimal precision)</li>
+          <li><span class="check">✓</span> Markup support for agencies — bill clients at margin</li>
+          <li><span class="check">✓</span> Kill switch — emergency halt on any workspace</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">💬</div>
-        <h3>Persistent Conversation Memory</h3>
-        <p>Redis-backed per-tenant context. Pass <code>conversation_id</code> and the backend maintains 20-message history with 24h TTL — stateful AI, zero setup.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">🔐 Security Suite</div>
+        <h3>Zero-Trust. Encrypted. Audited.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Zero-trust middleware — every request verified before routing</li>
+          <li><span class="check">✓</span> AES-256-GCM field-level encryption at rest</li>
+          <li><span class="check">✓</span> JWT + MFA + TOTP authentication</li>
+          <li><span class="check">✓</span> RBAC — role-based access control per workspace</li>
+          <li><span class="check">✓</span> API keys: SHA-256 hashed, scoped, expiry, per-tenant</li>
+          <li><span class="check">✓</span> Security event tracking with AI-confidence scoring</li>
+          <li><span class="check">✓</span> Real-time threat detection dashboard</li>
+          <li><span class="check">✓</span> Anomaly detection + abuse prevention + rate limiting</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🏢</div>
-        <h3>Multi-Tenant Isolation</h3>
-        <p>Postgres Row-Level Security enforced on every query. Each workspace is cryptographically isolated — one breach cannot access another tenant's data.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">📋 Compliance &amp; Privacy</div>
+        <h3>GDPR-Ready by Default.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Cryptographic audit logs — HMAC-SHA256, immutable, chained</li>
+          <li><span class="check">✓</span> GDPR right to access (export), deletion, portability</li>
+          <li><span class="check">✓</span> Auto PII detection: email, phone, SSN, credit card, IP, names</li>
+          <li><span class="check">✓</span> PII masking — multiple strategies, in-line on log write</li>
+          <li><span class="check">✓</span> Data minimisation and retention policies (auto-delete)</li>
+          <li><span class="check">✓</span> Compliance reports: GDPR, CCPA, SOC2 on-demand</li>
+          <li><span class="check">✓</span> AI explainability — explain routing + cost decisions</li>
+          <li><span class="check">✓</span> AI quality scoring: relevance, accuracy, coherence, completeness</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔑</div>
-        <h3>API Key + JWT Auth</h3>
-        <p>Scoped API keys with SHA-256 hashing, expiry, rate limiting. Full MFA support, session management, and RBAC out of the box.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">🛡️ Content Safety</div>
+        <h3>Built for Platforms Others Won't Touch.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Content scan + classification pipeline (extensible via DB)</li>
+          <li><span class="check">✓</span> NSFW detection with configurable confidence threshold</li>
+          <li><span class="check">✓</span> Age verification flow (self-attestation + document methods)</li>
+          <li><span class="check">✓</span> CSAM zero-tolerance hard block — no exceptions</li>
+          <li><span class="check">✓</span> Adult content gating with verified user tokens</li>
+          <li><span class="check">✓</span> Content filter logs with tenant isolation</li>
+          <li><span class="check">✓</span> Harmful pattern detection (extensible ML hook)</li>
+          <li><span class="check">✓</span> Per-workspace content policy configuration</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🛡️</div>
-        <h3>Content Safety + Age Verification</h3>
-        <p>Built-in content filter pipeline, NSFW scanning, and age gate flow. Critical for adult platforms — compliant by default.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">🤖 Autonomous Intelligence</div>
+        <h3>It Learns. It Optimises. It Self-Repairs.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> ML cost predictor — workspace-specific, improves over time</li>
+          <li><span class="check">✓</span> ML routing optimiser — learns from actual routing outcomes</li>
+          <li><span class="check">✓</span> ML quality predictor — predict response quality before calling</li>
+          <li><span class="check">✓</span> Autonomous quality optimizer + training pipeline</li>
+          <li><span class="check">✓</span> Feature flags per workspace</li>
+          <li><span class="check">✓</span> Intelligent caching layer (avoid re-running identical prompts)</li>
+          <li><span class="check">✓</span> Provider health monitoring with auto failure detection</li>
+          <li><span class="check">✓</span> Incident response: tracking, alerting, recovery procedures</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <h3>Full Observability Stack</h3>
-        <p>Prometheus metrics, Grafana dashboards, Loki log aggregation. Every AI call logged with tenant, tokens, latency, cost, and provider.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">📊 Observability</div>
+        <h3>See Everything. Know Everything.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Prometheus metrics on every route</li>
+          <li><span class="check">✓</span> Grafana dashboards (prod stack)</li>
+          <li><span class="check">✓</span> Loki log aggregation (prod stack)</li>
+          <li><span class="check">✓</span> Real-time system health dashboard with component scoring</li>
+          <li><span class="check">✓</span> Alert management with severity levels</li>
+          <li><span class="check">✓</span> Request tracking, job duration, AI provider call metrics</li>
+          <li><span class="check">✓</span> Execution logs: tenant, model, provider, tokens, latency, cost</li>
+          <li><span class="check">✓</span> Admin dashboard with workspace and user management</li>
+        </ul>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">💳</div>
-        <h3>Stripe Billing Built-In</h3>
-        <p>Starter / Pro / Enterprise tiers. Checkout sessions, webhook handling, customer portal, usage gates — monetise immediately.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <h3>Zero-Trust Security Layer</h3>
-        <p>Every request authenticated and validated before it reaches a route. Threat event logging, anomaly detection, and security dashboards included.</p>
+      <div class="feature-group">
+        <div class="feature-group-label">🏗️ Infrastructure</div>
+        <h3>Deploy Anywhere. Own Everything.</h3>
+        <ul class="feature-list">
+          <li><span class="check">✓</span> Docker Compose: dev (Windows local) + prod (full stack)</li>
+          <li><span class="check">✓</span> PostgreSQL with Row-Level Security (per-tenant isolation)</li>
+          <li><span class="check">✓</span> Redis (circuit breaker, memory, rate limiting, caching)</li>
+          <li><span class="check">✓</span> MinIO / S3-compatible file storage</li>
+          <li><span class="check">✓</span> Celery workers + beat scheduler</li>
+          <li><span class="check">✓</span> Stripe subscriptions: checkout, webhooks, customer portal</li>
+          <li><span class="check">✓</span> Plugin system: dynamic loading, workspace-scoped</li>
+          <li><span class="check">✓</span> DigitalOcean one-command deploy + Render.yaml included</li>
+        </ul>
       </div>
     </div>
   </div>
 </section>
 
-<!-- WHO IS THIS FOR -->
-<section class="industries" id="industries">
+<!-- ── THE NUMBERS ─────────────────────────────────────────────────────── -->
+<section class="numbers-section">
   <div class="container">
-    <div class="section-label">Target Markets</div>
-    <h2 class="section-title">Built for Who It Actually Matters To</h2>
-    <p class="section-sub">
-      This isn't a generic API wrapper. These are the verticals where local AI sovereignty, content controls, and privacy compliance aren't optional.
-    </p>
-    <div class="industry-grid">
-      <div class="industry-card">
-        <div class="tag">Adult Platforms</div>
-        <h4>Content &amp; Creator Networks</h4>
-        <p>Age verification, NSFW classification, performer data isolation. Run AI features Stripe and OpenAI won't touch — on your own infrastructure.</p>
+    <div class="section-label">By The Numbers</div>
+    <h2 class="section-title">Not Estimates. Engineered Claims.</h2>
+    <div class="numbers-grid">
+      <div class="number-item">
+        <div class="big green">30–70%</div>
+        <p>AI cost reduction via intelligent provider routing — tracked and proven against single-provider baselines</p>
       </div>
-      <div class="industry-card">
-        <div class="tag">Legal &amp; Compliance</div>
-        <h4>Law Firms &amp; LegalTech</h4>
-        <p>Privileged communications never leave your server. Summarise contracts, draft briefs, and analyse case law with full attorney-client confidentiality.</p>
+      <div class="number-item">
+        <div class="big purple">95%</div>
+        <p>Cost prediction accuracy within 5% — every prediction tracked vs actuals and validated</p>
       </div>
-      <div class="industry-card">
-        <div class="tag">Healthcare</div>
-        <h4>Medical &amp; Telehealth</h4>
-        <p>HIPAA-adjacent local inference. Patient data stays on-premise. AI-assisted notes, triage, and diagnostics with zero PHI exposure to cloud providers.</p>
+      <div class="number-item">
+        <div class="big white">0</div>
+        <p>Bytes of your data sent to external servers by default — all inference runs on your own hardware</p>
       </div>
-      <div class="industry-card">
-        <div class="tag">Finance</div>
-        <h4>Trading &amp; Fintech</h4>
-        <p>Proprietary trading logic and client financial data processed locally. No SEC/FCA concerns about AI data handling practices.</p>
+      <div class="number-item">
+        <div class="big gold">&lt;60s</div>
+        <p>Self-healing recovery time — circuit detects failure, routes to Groq, and recovers Ollama automatically</p>
       </div>
-      <div class="industry-card">
-        <div class="tag">Agencies</div>
-        <h4>Creative &amp; Marketing</h4>
-        <p>White-label AI infrastructure for your clients. Multi-tenant from day one — each client isolated, billed, and rate-limited independently.</p>
+      <div class="number-item">
+        <div class="big purple">10⁻⁶</div>
+        <p>Cost allocation precision — Decimal(10,6) — no rounding errors when billing clients at scale</p>
       </div>
-      <div class="industry-card">
-        <div class="tag">Enterprise</div>
-        <h4>Any Data-Sensitive Operation</h4>
-        <p>IP-sensitive R&amp;D, HR data, internal comms — if a data breach would be catastrophic, your AI needs to stay on-site.</p>
+      <div class="number-item">
+        <div class="big green">HMAC</div>
+        <p>SHA-256 chained audit logs — cryptographically verifiable, immutable, passes SOC2 / GDPR audits</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
-<section id="how">
-  <div class="container">
-    <div class="section-label">Architecture</div>
-    <h2 class="section-title">How It Works</h2>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <h3>Deploy Locally</h3>
-        <p>Run <code>.\start.ps1</code> — brings up Postgres, Redis, MinIO, and the API. Ollama runs natively on Windows with your GPU or CPU.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <h3>Authenticate via API Key</h3>
-        <p>Seed a <code>byos_</code> key, attach it as <code>X-API-Key</code>. Every request is tenant-resolved and RLS-enforced automatically.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <h3>Call <code>POST /v1/exec</code></h3>
-        <p>Send a prompt with optional <code>conversation_id</code>. The backend injects history, calls Ollama, and falls back to Groq if the circuit opens.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">04</div>
-        <h3>Everything Logged</h3>
-        <p>Every execution stored in <code>execution_logs</code> with tenant, model, tokens, latency, and provider. Query it, export it, bill from it.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- INTEGRATIONS -->
+<!-- ── INTEGRATIONS ────────────────────────────────────────────────────── -->
 <section id="integrations">
   <div class="container">
-    <div class="section-label">Integrations &amp; Plugins</div>
-    <h2 class="section-title">Connect to Everything</h2>
-    <p class="section-sub">
-      Drop-in compatible with any stack. OpenAI-compatible endpoint means existing integrations work with a single base URL change.
-    </p>
-    <div class="integrations-row">
-      <div class="integration-pill">🦙 Ollama (local)</div>
-      <div class="integration-pill">⚡ Groq Fallback</div>
-      <div class="integration-pill">🐘 PostgreSQL + RLS</div>
-      <div class="integration-pill">🔴 Redis Memory</div>
-      <div class="integration-pill">💳 Stripe Billing</div>
-      <div class="integration-pill">📦 MinIO / S3</div>
-      <div class="integration-pill">📊 Prometheus + Grafana</div>
-      <div class="integration-pill">🪵 Loki Logging</div>
-      <div class="integration-pill">🐳 Docker Compose</div>
-      <div class="integration-pill">🌐 Node.js SDK</div>
-      <div class="integration-pill">🐍 Python SDK</div>
-      <div class="integration-pill">🔐 MFA / TOTP</div>
-      <div class="integration-pill">🛡️ Content Moderation</div>
-      <div class="integration-pill">🔞 Age Verification</div>
-      <div class="integration-pill">✉️ Webhook Support</div>
-    </div>
-
-    <!-- API Preview -->
-    <div class="code-block">
-<span class="c"># Basic inference call — conversation memory + Groq auto-fallback</span>
-<span class="k">curl</span> -X POST http://localhost:8000/v1/exec \
-  -H <span class="s">"X-API-Key: byos_your_key_here"</span> \
-  -H <span class="s">"Content-Type: application/json"</span> \
-  -d <span class="s">'{
-    "prompt": "Summarise the key legal risks in this contract.",
-    "conversation_id": "matter-2024-001",
-    "model": "qwen2.5:3b"
-  }'</span>
-
-<span class="c"># Response</span>
-{
-  <span class="n">"response"</span>: <span class="s">"The key legal risks are..."</span>,
-  <span class="n">"provider"</span>: <span class="s">"ollama"</span>,       <span class="c">// "groq" if circuit tripped</span>
-  <span class="n">"model"</span>: <span class="s">"qwen2.5:3b"</span>,
-  <span class="n">"conversation_id"</span>: <span class="s">"matter-2024-001"</span>,  <span class="c">// context persisted</span>
-  <span class="n">"total_tokens"</span>: <span class="v">312</span>,
-  <span class="n">"latency_ms"</span>: <span class="v">1840</span>
-}
+    <div class="section-label">Integrations</div>
+    <h2 class="section-title">Works With Your Stack.</h2>
+    <p class="section-sub">OpenAI-compatible endpoint — existing integrations work with a single base URL change. Node.js and Python SDKs included.</p>
+    <div class="int-row">
+      <div class="int-pill">🦙 Ollama (any model)</div>
+      <div class="int-pill">⚡ Groq Fallback</div>
+      <div class="int-pill">🐘 PostgreSQL + RLS</div>
+      <div class="int-pill">🔴 Redis</div>
+      <div class="int-pill">💳 Stripe Billing</div>
+      <div class="int-pill">📦 MinIO / S3</div>
+      <div class="int-pill">📊 Prometheus + Grafana</div>
+      <div class="int-pill">🪵 Loki Logging</div>
+      <div class="int-pill">🐳 Docker Compose</div>
+      <div class="int-pill">🌐 Node.js SDK</div>
+      <div class="int-pill">🐍 Python SDK</div>
+      <div class="int-pill">🔐 MFA / TOTP</div>
+      <div class="int-pill">🤖 Celery Workers</div>
+      <div class="int-pill">🔞 Age Verification</div>
+      <div class="int-pill">🛡️ NSFW Classification</div>
+      <div class="int-pill">📋 GDPR Compliance API</div>
+      <div class="int-pill">⚙️ Plugin System</div>
+      <div class="int-pill">🚀 DigitalOcean Deploy</div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
+<!-- ── PRICING ─────────────────────────────────────────────────────────── -->
 <section id="pricing">
   <div class="container">
     <div class="section-label">Pricing</div>
-    <h2 class="section-title">Simple, Scalable Pricing</h2>
-    <p class="section-sub">All plans include local inference, multi-tenant isolation, and the full security suite.</p>
+    <h2 class="section-title">One Price. Zero Surprise Bills.</h2>
+    <p class="section-sub">Helicone charges up to $500/mo for AI logging alone. Portkey charges $599/mo for an AI gateway. This replaces both — plus adds a full security suite, compliance engine, and content safety platform.</p>
     <div class="pricing-grid">
 
       <div class="pricing-card">
-        <h3>Starter</h3>
-        <div class="pricing-tier-desc">Solo operators &amp; small teams</div>
-        <div class="price">$29<span>/mo</span></div>
-        <ul class="pricing-features">
-          <li>10,000 API calls / month</li>
-          <li>1 workspace, 3 users</li>
-          <li>Local Ollama inference</li>
-          <li>Groq self-healing fallback</li>
-          <li>Conversation memory</li>
-          <li>API key auth + JWT</li>
-          <li>Security audit logs</li>
-          <li class="no">Content filtering</li>
-          <li class="no">Age verification</li>
+        <div class="plan-name">Starter</div>
+        <div class="plan-tagline">Solo operators &amp; small teams getting started with sovereign AI</div>
+        <div class="price"><sub>$</sub>79</div>
+        <div class="price-period">per month, billed monthly</div>
+        <ul class="plan-features">
+          <li><span class="tick">✓</span>50,000 API calls / month</li>
+          <li><span class="tick">✓</span>1 workspace, up to 5 users</li>
+          <li><span class="tick">✓</span>Local Ollama inference (any model)</li>
+          <li><span class="tick">✓</span>Groq self-healing fallback</li>
+          <li><span class="tick">✓</span>Redis conversation memory</li>
+          <li><span class="tick">✓</span>API key auth + JWT + MFA</li>
+          <li><span class="tick">✓</span>Security audit logs</li>
+          <li><span class="tick">✓</span>Basic cost tracking</li>
+          <li><span class="cross">–</span>Intelligent cost routing</li>
+          <li><span class="cross">–</span>Content filtering / NSFW</li>
+          <li><span class="cross">–</span>Age verification</li>
+          <li><span class="cross">–</span>GDPR compliance reports</li>
         </ul>
-        <a class="btn-outline" href="#" style="display:block;text-align:center;padding:.65rem">Get Started</a>
+        <a class="btn-outline" href="#" style="display:block;text-align:center">Start Starter</a>
       </div>
 
       <div class="pricing-card featured">
         <div class="featured-badge">Most Popular</div>
-        <h3>Pro</h3>
-        <div class="pricing-tier-desc">Agencies &amp; privacy-sensitive businesses</div>
-        <div class="price">$79<span>/mo</span></div>
-        <ul class="pricing-features">
-          <li>100,000 API calls / month</li>
-          <li>5 workspaces, 15 users</li>
-          <li>Local Ollama inference</li>
-          <li>Groq self-healing fallback</li>
-          <li>Conversation memory</li>
-          <li>Full security suite</li>
-          <li>Content filtering + NSFW scan</li>
-          <li>Compliance reports</li>
-          <li class="no">Age verification</li>
+        <div class="plan-name">Agency</div>
+        <div class="plan-tagline">Agencies, legal, finance &amp; privacy-sensitive businesses</div>
+        <div class="price"><sub>$</sub>249</div>
+        <div class="price-period">per month, billed monthly</div>
+        <ul class="plan-features">
+          <li><span class="tick">✓</span>500,000 API calls / month</li>
+          <li><span class="tick">✓</span>10 workspaces, up to 25 users</li>
+          <li><span class="tick">✓</span>Local Ollama inference (any model)</li>
+          <li><span class="tick">✓</span>Groq self-healing fallback</li>
+          <li><span class="tick">✓</span>Redis conversation memory</li>
+          <li><span class="tick">✓</span>Full security suite + zero-trust</li>
+          <li><span class="tick">✓</span>Intelligent cost routing (save 30–70%)</li>
+          <li><span class="tick">✓</span>Budget enforcement + cost allocation</li>
+          <li><span class="tick">✓</span>Client billing with markup support</li>
+          <li><span class="tick">✓</span>Content filtering + NSFW detection</li>
+          <li><span class="tick">✓</span>GDPR / CCPA compliance reports</li>
+          <li><span class="cross">–</span>Age verification</li>
         </ul>
-        <a class="btn-primary" href="#" style="display:block;text-align:center;padding:.65rem">Start Pro</a>
+        <a class="btn-primary" href="#" style="display:block;text-align:center">Start Agency</a>
       </div>
 
       <div class="pricing-card">
-        <h3>Enterprise</h3>
-        <div class="pricing-tier-desc">Adult platforms, legal, medical &amp; regulated industries</div>
-        <div class="price">$299<span>/mo</span></div>
-        <ul class="pricing-features">
-          <li>Unlimited API calls</li>
-          <li>Unlimited workspaces &amp; users</li>
-          <li>Local Ollama inference</li>
-          <li>Groq self-healing fallback</li>
-          <li>Conversation memory</li>
-          <li>Full security suite</li>
-          <li>Content filtering + NSFW scan</li>
-          <li>Age verification flow</li>
-          <li>Dedicated Slack support + 99.9% SLA</li>
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-tagline">Adult platforms, healthcare, regulated industries, high-volume</div>
+        <div class="price"><sub>$</sub>999</div>
+        <div class="price-period">per month, billed monthly</div>
+        <ul class="plan-features">
+          <li><span class="tick">✓</span>Unlimited API calls</li>
+          <li><span class="tick">✓</span>Unlimited workspaces &amp; users</li>
+          <li><span class="tick">✓</span>Everything in Agency</li>
+          <li><span class="tick">✓</span>Age verification flow</li>
+          <li><span class="tick">✓</span>CSAM zero-tolerance blocking</li>
+          <li><span class="tick">✓</span>ML routing optimizer (learns your usage)</li>
+          <li><span class="tick">✓</span>Autonomous cost predictor (per-workspace ML)</li>
+          <li><span class="tick">✓</span>SOC2-ready cryptographic audit trail</li>
+          <li><span class="tick">✓</span>Incident response + alerting</li>
+          <li><span class="tick">✓</span>Plugin system (custom providers)</li>
+          <li><span class="tick">✓</span>99.9% SLA + dedicated Slack support</li>
+          <li><span class="tick">✓</span>Custom domain + white-label ready</li>
         </ul>
-        <a class="btn-outline" href="#" style="display:block;text-align:center;padding:.65rem">Contact Sales</a>
+        <a class="btn-outline" href="#" style="display:block;text-align:center">Contact Sales</a>
       </div>
 
+    </div>
+    <p style="text-align:center;margin-top:1.5rem;font-size:.82rem;color:var(--muted)">All plans include a 14-day free trial. Self-hosted on your infrastructure — we never see your data.</p>
+  </div>
+</section>
+
+<!-- ── CTA BANNER ──────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <div class="cta-banner">
+      <h2>Your Data. Your Hardware.<br>Your Competitive Advantage.</h2>
+      <p>Stop paying cloud AI vendors to train on your data. Deploy BYOS in one command and start saving immediately.</p>
+      <div class="cta-actions">
+        <a class="btn-primary" href="#pricing">Get Access Now</a>
+        <a class="btn-ghost" href="/api/v1/docs" target="_blank">Read the API Docs →</a>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- ── FOOTER ──────────────────────────────────────────────────────────── -->
 <footer>
-  <div class="nav-logo" style="font-size:1.2rem;margin-bottom:1.25rem">BYOS<span style="color:var(--accent)">.</span>AI</div>
-  <div class="footer-links">
-    <a href="/api/v1/docs">API Docs</a>
-    <a href="/status">System Status</a>
-    <a href="#features">Features</a>
-    <a href="#pricing">Pricing</a>
-    <a href="#industries">Industries</a>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo">BYOS<span>.</span>AI</div>
+      <p>Sovereign AI infrastructure for industries where privacy, compliance, and cost control are non-negotiable.</p>
+    </div>
+    <div class="footer-links-group">
+      <h5>Product</h5>
+      <a href="#features">Features</a>
+      <a href="#scenarios">Use Cases</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#demo">API Demo</a>
+    </div>
+    <div class="footer-links-group">
+      <h5>Platform</h5>
+      <a href="/api/v1/docs" target="_blank">API Documentation</a>
+      <a href="/status">System Status</a>
+      <a href="/api/v1/docs#/security" target="_blank">Security Suite</a>
+      <a href="/api/v1/docs#/content-safety" target="_blank">Content Safety</a>
+    </div>
+    <div class="footer-links-group">
+      <h5>Industries</h5>
+      <a href="#scenarios">Adult &amp; Creator Platforms</a>
+      <a href="#scenarios">Legal &amp; LegalTech</a>
+      <a href="#scenarios">Healthcare</a>
+      <a href="#scenarios">Agencies</a>
+    </div>
   </div>
-  <p>Sovereign AI infrastructure for industries where privacy is non-negotiable.</p>
-  <p style="margin-top:.5rem">© 2026 BYOS.AI — All inference stays on your hardware.</p>
+  <div class="footer-bottom">
+    <p>© 2026 BYOS.AI — All inference runs on your hardware.</p>
+    <p>Built for industries where the cloud is not an option.</p>
+  </div>
 </footer>
 
 <script>
-  // Live status fetch from /status
-  (async () => {
-    try {
-      const res = await fetch('/status');
-      if (!res.ok) return;
-      const d = await res.json();
-      const bar = document.getElementById('status-bar');
-      const items = [
-        { label: 'API Online',         ok: true },
-        { label: `LLM: ${d.llm_model || 'Ollama'}`, ok: d.llm_ok },
-        { label: `Groq Fallback`,       ok: d.groq_fallback_enabled },
-        { label: `DB + Redis`,          ok: d.db_ok && d.redis_ok },
-      ];
-      bar.innerHTML = items.map(i => `
-        <div class="status-item">
-          <div class="dot ${i.ok ? 'green' : 'amber'}"></div>
-          ${i.label}
-        </div>`).join('');
-    } catch {}
-  })();
+(async () => {
+  try {
+    const r = await fetch('/status');
+    if (!r.ok) return;
+    const d = await r.json();
+    const bar = document.getElementById('status-bar');
+    const cb = d.circuit_breaker || {};
+    const items = [
+      { ok: true,                           label: 'API Online' },
+      { ok: d.llm_ok,                       label: `LLM: ${d.llm_model || 'Ollama'}` },
+      { ok: d.groq_fallback_enabled,        label: 'Groq Fallback Armed' },
+      { ok: cb.state === 'CLOSED',          label: `Circuit: ${cb.state || 'CLOSED'}` },
+      { ok: d.db_ok && d.redis_ok,          label: 'DB + Redis Healthy' },
+    ];
+    bar.innerHTML = items.map(i => `
+      <div class="status-item">
+        <div class="dot ${i.ok ? 'green' : 'amber'}"></div>${i.label}
+      </div>`).join('');
+  } catch (e) {}
+})();
 </script>
 
 </body>

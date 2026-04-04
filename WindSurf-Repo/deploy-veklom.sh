@@ -8,7 +8,8 @@
 set -euo pipefail
 
 REPO_URL="${1:-}"
-APP_DIR="/opt/goonvault"
+REPO_DIR="/opt/goonvault"
+APP_DIR="/opt/goonvault/WindSurf-Repo"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[✓]${NC} $*"; }
@@ -53,12 +54,12 @@ ufw allow 443/tcp
 ufw --force enable
 
 # ── 4. Clone repo ─────────────────────────────────────────────────────────────
-info "Cloning repository to $APP_DIR..."
-if [[ -d "$APP_DIR" ]]; then
+info "Cloning repository to $REPO_DIR..."
+if [[ -d "$REPO_DIR" ]]; then
     warn "Directory exists — pulling latest..."
-    git -C "$APP_DIR" pull
+    git -C "$REPO_DIR" pull
 else
-    git clone "$REPO_URL" "$APP_DIR"
+    git clone "$REPO_URL" "$REPO_DIR"
 fi
 
 cd "$APP_DIR"
@@ -88,7 +89,7 @@ chmod 755 "$APP_DIR/data" "$APP_DIR/logs"
 # ── 7. Build and launch ───────────────────────────────────────────────────────
 info "Building and starting GoonVault..."
 cd "$APP_DIR"
-docker compose -f docker-compose.veklom.yml pull --quiet
+docker compose -f docker-compose.veklom.yml pull --quiet 2>/dev/null || true
 docker compose -f docker-compose.veklom.yml up -d --build
 
 # ── 8. Run DB migrations ──────────────────────────────────────────────────────
@@ -110,7 +111,7 @@ info "────────────────────────�
 info "GoonVault is LIVE at https://veklom.dev"
 info ""
 info "Container status:"
-docker compose -f docker-compose.veklom.yml ps
+docker compose -f /opt/goonvault/WindSurf-Repo/docker-compose.veklom.yml ps
 info ""
-info "View logs: docker compose -f docker-compose.veklom.yml logs -f api"
+info "View logs: docker compose -f /opt/goonvault/WindSurf-Repo/docker-compose.veklom.yml logs -f api"
 info "────────────────────────────────────────────────────────"

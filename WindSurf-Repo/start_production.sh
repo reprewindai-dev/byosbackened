@@ -36,7 +36,6 @@ check_env_vars() {
         "DATABASE_URL"
         "REDIS_URL"
         "SECRET_KEY"
-        "STRIPE_SECRET_KEY"
     )
     
     missing_vars=()
@@ -201,7 +200,7 @@ create_directories() {
     
     for dir in "${directories[@]}"; do
         mkdir -p "$dir"
-        chmod 755 "$dir"
+        chmod 755 "$dir" 2>/dev/null || true
     done
     
     log_success "Directories created"
@@ -212,10 +211,10 @@ set_permissions() {
     log "Setting proper permissions..."
     
     # Ensure log directory is writable
-    chmod 755 /app/logs
+    chmod 755 /app/logs 2>/dev/null || true
     
     # Ensure data directory is writable
-    chmod 755 /app/data
+    chmod 755 /app/data 2>/dev/null || true
     
     log_success "Permissions set"
 }
@@ -241,17 +240,13 @@ start_application() {
     export PYTHONUNBUFFERED=1
     export PYTHONDONTWRITEBYTECODE=1
     
-    # Start with uvicorn
-    exec uvicorn api.main:app \
+    # Start with uvicorn (SSL terminated by Caddy)
+    exec uvicorn apps.api.main:app \
         --host 0.0.0.0 \
         --port 8000 \
-        --workers 4 \
-        --worker-class uvicorn.workers.UvicornWorker \
+        --workers 2 \
         --access-log \
-        --log-level info \
-        --log-config /app/infra/docker/logging/production.ini \
-        --ssl-keyfile /app/infra/docker/ssl/key.pem \
-        --ssl-certfile /app/infra/docker/ssl/cert.pem
+        --log-level info
 }
 
 # Main execution

@@ -99,6 +99,7 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
             or path.startswith("/openapi.json")
             or path.startswith("/api/v1/game/public")
             or path.startswith("/api/v1/public/")   # public platform API
+            or path.startswith("/api/v1/ads/")       # ExoClick NeverBlock proxy (public)
             or path.startswith("/legal/")            # legal pages
         ):  # Public leaderboard
             return await call_next(request)

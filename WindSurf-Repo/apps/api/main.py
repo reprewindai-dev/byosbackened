@@ -68,6 +68,7 @@ from apps.api.routers.multi_tenant_llm import router as multi_tenant_llm_router
 from apps.api.routers.ollama_services import router as ollama_services_router
 from apps.api.routers.admin_research import router as admin_research_router
 from apps.api.routers.public_content import router as public_content_router
+from apps.api.routers.ads_proxy import router as ads_proxy_router
 from apps.api.routers.trapmaster_pro import (
     projects as trapmaster_projects,
     tracks as trapmaster_tracks,
@@ -260,6 +261,9 @@ app.include_router(admin_research_router, prefix=settings.api_prefix)
 
 # Public platform: browse, search, trending, DMCA, subscription tiers
 app.include_router(public_content_router, prefix=settings.api_prefix)
+
+# ExoClick NeverBlock server-side ad proxy (adblock bypass)
+app.include_router(ads_proxy_router, prefix=settings.api_prefix)
 
 # Static files for game
 static_dir = Path(__file__).parent.parent.parent / "static"

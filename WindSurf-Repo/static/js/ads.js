@@ -48,6 +48,41 @@ window.GV_ADS = {
   },
 };
 
+// ── NeverBlock server-side proxy renderer ─────────────────────────────────────
+async function _renderExoclickProxy(zone, container) {
+  try {
+    const resp = await fetch(`/api/v1/ads/exoclick?zones=${zone.id}`);
+    if (!resp.ok) { container.style.display = 'none'; return; }
+    const data = await resp.json();
+    const zoneData = (data.zones || [])[0];
+    if (!zoneData || !zoneData.data) { container.style.display = 'none'; return; }
+
+    const ad = zoneData.data;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = `display:flex;justify-content:center;align-items:center;width:${zone.width}px;height:${zone.height}px;margin:0 auto`;
+
+    if (ad.image && ad.url) {
+      const a = document.createElement('a');
+      a.href = ad.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      const img = document.createElement('img');
+      img.src = ad.image;
+      img.width = zone.width;
+      img.height = zone.height;
+      img.alt = '';
+      img.style.display = 'block';
+      a.appendChild(img);
+      wrap.appendChild(a);
+    }
+    container.innerHTML = '';
+    container.appendChild(wrap);
+    container.style.display = 'flex';
+  } catch (e) {
+    container.style.display = 'none';
+  }
+}
+
 // ── Ad renderer — call this from any page ────────────────────────────────────
 window.GV_renderAd = function(slotType, containerId) {
   const container = document.getElementById(containerId);
@@ -62,11 +97,8 @@ window.GV_renderAd = function(slotType, containerId) {
     if (!zone || !zone.id || zone.id.startsWith('PASTE')) continue;
 
     if (net === 'exoclick') {
-      container.innerHTML = `
-        <div style="display:flex;justify-content:center;align-items:center;width:${zone.width}px;height:${zone.height}px;margin:0 auto">
-          <script async src="//ads.exoclick.com/ads.js?zoneid=${zone.id}"><\/script>
-          <ins class="adsbyexoclick" data-ad-zone-id="${zone.id}"></ins>
-        </div>`;
+      // Use NeverBlock server-side proxy to bypass adblockers
+      _renderExoclickProxy(zone, container);
     } else if (net === 'trafficjunky') {
       container.innerHTML = `
         <div id="tj-${zone.id}" style="width:${zone.width}px;height:${zone.height}px;margin:0 auto"></div>

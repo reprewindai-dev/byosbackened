@@ -1,7 +1,7 @@
 """Tenant model for multi-tenant architecture."""
 
 from datetime import datetime, date
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, Text
+from sqlalchemy import Column, String, Boolean, Integer, DateTime, Date, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid

@@ -165,3 +165,26 @@ async def get_approval_stats(
         "total_uploads": total_uploads,
         "approval_rate": round((approved / total_uploads * 100) if total_uploads > 0 else 0, 2),
     }
+
+
+class CreatorApplicationRequest(BaseModel):
+    name: str
+    email: str
+    niche: str
+    bio: Optional[str] = None
+
+
+@router.post("/creator-apply", tags=["creators"], summary="Submit creator application (public)")
+async def submit_creator_application(req: CreatorApplicationRequest):
+    """
+    Public endpoint — receives creator applications from the /creators page.
+    Logged for admin review. No auth required.
+    """
+    logger.info(
+        f"[creator-apply] name={req.name!r} email={req.email!r} niche={req.niche!r}"
+    )
+    return {
+        "status": "received",
+        "message": "Your application has been received. We review within 24 hours.",
+        "reference": f"APP-{hash(req.email) % 999999:06d}",
+    }

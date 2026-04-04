@@ -77,6 +77,16 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
             "/api/v1/content/categories/list",  # Public categories
             "/api/v1/subscription/pricing",  # Public pricing
             "/api/v1/bitcoin/webhook",  # Bitcoin webhook (called by Coinbase)
+            "/api/v1/ai/status",        # Ollama health check (public)
+            "/api/v1/admin/approval/creator-apply",  # Creator sign-up (public form)
+            # Public platform — no auth required for browsing
+            "/browse",
+            "/video",
+            "/creators",
+            "/admin/research",
+            "/legal/terms",
+            "/legal/privacy",
+            "/legal/2257",
         ]
 
         # Also skip if path starts with /static or /docs or public game endpoints
@@ -88,6 +98,8 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
             or path.startswith("/redoc")
             or path.startswith("/openapi.json")
             or path.startswith("/api/v1/game/public")
+            or path.startswith("/api/v1/public/")   # public platform API
+            or path.startswith("/legal/")            # legal pages
         ):  # Public leaderboard
             return await call_next(request)
 

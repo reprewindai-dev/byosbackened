@@ -18,6 +18,7 @@ from apps.api.middleware.intelligent_routing import IntelligentRoutingMiddleware
 from apps.api.middleware.edge_routing import EdgeRoutingMiddleware
 from apps.api.middleware.budget_check import BudgetCheckMiddleware
 from apps.api.middleware.demo_gate import DemoGateMiddleware
+from apps.api.middleware.locker_security import LockerSecurityMiddleware
 from apps.api.routers import (
     apps,
     workspaces,
@@ -64,6 +65,9 @@ from apps.api.routers import security
 from apps.api.routers import auth, admin, bitcoin_webhook, ai_recommendations
 from apps.api.routers import user_uploads, admin_approval, live_streaming, leaderboard
 from apps.api.routers.multi_tenant_llm import router as multi_tenant_llm_router
+from apps.api.routers.ollama_services import router as ollama_services_router
+from apps.api.routers.admin_research import router as admin_research_router
+from apps.api.routers.public_content import router as public_content_router
 from apps.api.routers.trapmaster_pro import (
     projects as trapmaster_projects,
     tracks as trapmaster_tracks,
@@ -151,6 +155,9 @@ app.add_middleware(EdgeRoutingMiddleware)
 
 # Budget check middleware
 app.add_middleware(BudgetCheckMiddleware)
+
+# LockerPhycer security: rate limiting, IDS, security headers, anomaly tracking
+app.add_middleware(LockerSecurityMiddleware, debug=settings.debug)
 
 # Demo gate middleware (after budget check, before CORS)
 app.add_middleware(DemoGateMiddleware)
@@ -245,6 +252,15 @@ app.include_router(leaderboard.router, prefix=settings.api_prefix)
 # Multi-tenant LLM execution endpoints
 app.include_router(multi_tenant_llm_router, prefix="/api")
 
+# Ollama AI services: tag, recommend, chat, analytics
+app.include_router(ollama_services_router, prefix=settings.api_prefix)
+
+# Admin research dashboard
+app.include_router(admin_research_router, prefix=settings.api_prefix)
+
+# Public platform: browse, search, trending, DMCA, subscription tiers
+app.include_router(public_content_router, prefix=settings.api_prefix)
+
 # Static files for game
 static_dir = Path(__file__).parent.parent.parent / "static"
 logger.info(f"Static directory: {static_dir}, exists: {static_dir.exists()}")
@@ -260,6 +276,45 @@ if static_dir.exists():
         if game_file.exists():
             return FileResponse(game_file)
         return {"error": f"Game file not found at {game_file}"}
+
+    @app.get("/admin/research")
+    async def admin_research_page():
+        """Admin-only research dashboard."""
+        f = static_dir / "admin" / "research.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
+    @app.get("/browse")
+    async def browse_page():
+        """Public content browse page."""
+        f = static_dir / "browse.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
+    @app.get("/video")
+    async def video_page():
+        """Public video player page."""
+        f = static_dir / "video.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
+    @app.get("/creators")
+    async def creators_page():
+        """Creator profile page."""
+        f = static_dir / "creator.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
+    @app.get("/legal/terms")
+    async def terms_page():
+        f = static_dir / "legal" / "terms.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
+    @app.get("/legal/privacy")
+    async def privacy_page():
+        f = static_dir / "legal" / "privacy.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
+    @app.get("/legal/2257")
+    async def compliance_2257_page():
+        f = static_dir / "legal" / "2257.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
 
 else:
     logger.warning(f"Static directory not found: {static_dir}")

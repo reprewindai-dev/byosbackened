@@ -316,6 +316,12 @@ if static_dir.exists():
         f = static_dir / "legal" / "2257.html"
         return FileResponse(f) if f.exists() else {"error": "Not found"}
 
+    @app.get("/6db10b2d354ff6b00f60cb308e2ae8bd.html")
+    async def exoclick_verification():
+        """ExoClick site ownership verification."""
+        f = static_dir / "6db10b2d354ff6b00f60cb308e2ae8bd.html"
+        return FileResponse(f) if f.exists() else {"error": "Not found"}
+
 else:
     logger.warning(f"Static directory not found: {static_dir}")
 

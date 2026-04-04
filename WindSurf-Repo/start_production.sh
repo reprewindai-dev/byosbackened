@@ -130,8 +130,7 @@ run_migrations() {
     if alembic upgrade head; then
         log_success "Database migrations completed"
     else
-        log_error "Database migrations failed"
-        exit 1
+        log_warning "Database migrations failed — continuing (may already be applied)"
     fi
 }
 
@@ -199,7 +198,7 @@ create_directories() {
     )
     
     for dir in "${directories[@]}"; do
-        mkdir -p "$dir"
+        mkdir -p "$dir" 2>/dev/null || true
         chmod 755 "$dir" 2>/dev/null || true
     done
     

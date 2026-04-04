@@ -119,8 +119,8 @@ except Exception as e:
         ((attempt++))
     done
     
-    log_error "Redis connection failed after $max_attempts attempts"
-    exit 1
+    log_warning "Redis connection failed after $max_attempts attempts — continuing without Redis"
+    return 0
 }
 
 # Run database migrations

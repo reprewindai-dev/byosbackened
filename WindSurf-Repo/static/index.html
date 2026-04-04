@@ -122,6 +122,11 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:32px
   </div>
 </section>
 
+<!-- Ad: Leaderboard below hero -->
+<div style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px 0;text-align:center">
+  <div id="ad-hero-banner"></div>
+</div>
+
 <!-- Niches -->
 <section class="niches">
   <div class="section-title">Browse by Niche</div>
@@ -155,6 +160,11 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:32px
     </div>
   </div>
 </section>
+
+<!-- Ad: Rectangle between features and pricing -->
+<div style="text-align:center;padding:20px 0">
+  <div id="ad-mid-rect" style="display:inline-block"></div>
+</div>
 
 <!-- Pricing -->
 <section class="pricing" id="pricing">
@@ -235,6 +245,13 @@ function subscribe(tier) {
 const params = new URLSearchParams(location.search);
 const cat = params.get('cat');
 if (cat) window.location = `/browse?cat=${encodeURIComponent(cat)}`;
+</script>
+<script src="/static/js/ads.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  GV_renderAd('leaderboard', 'ad-hero-banner');
+  GV_renderAd('rectangle', 'ad-mid-rect');
+});
 </script>
 </body>
 </html>

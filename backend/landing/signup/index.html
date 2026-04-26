@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Create your Veklom workspace</title>
+<meta name="description" content="Create a Veklom workspace and start evaluating self-hosted AI operations in minutes." />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+<main class="app-shell">
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
+  <div class="app-card">
+    <h1 class="app-h1">Create your workspace</h1>
+    <p class="app-sub">Evaluation account. No card required to register. Self-hosted deployment kit and architecture review unlock after subscription.</p>
+    <div id="alert"></div>
+    <form id="form">
+      <div class="field">
+        <label for="workspace_name">Organization name</label>
+        <input id="workspace_name" name="workspace_name" required autocomplete="organization" placeholder="Acme Health Systems" />
+      </div>
+      <div class="field">
+        <label for="full_name">Your name</label>
+        <input id="full_name" name="full_name" required autocomplete="name" placeholder="Jane Engineer" />
+      </div>
+      <div class="field">
+        <label for="email">Work email</label>
+        <input id="email" name="email" type="email" required autocomplete="email" placeholder="jane@acme.com" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="new-password" minlength="12" placeholder="12+ characters" />
+      </div>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">Create workspace</button>
+    </form>
+    <p class="foot">Already have a workspace? <a href="/login/">Sign in</a></p>
+  </div>
+  <p class="foot">By creating an account you accept the <a href="/legal/terms/">Terms of Service</a> and <a href="/legal/privacy/">Privacy Policy</a>.</p>
+</main>
+<script src="/app/auth.js"></script>
+<script>
+const $alert = document.getElementById("alert");
+const $form  = document.getElementById("form");
+const $btn   = document.getElementById("submit");
+
+function showError(msg) {
+  $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+}
+
+if (VK.isLoggedIn()) {
+  window.location.href = "/dashboard/";
+}
+
+const params = new URLSearchParams(window.location.search);
+const wantedPlan = params.get("plan");
+
+$form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $alert.innerHTML = "";
+  $btn.disabled = true;
+  $btn.innerHTML = '<span class="spinner"></span> Creating...';
+  const data = {
+    email: document.getElementById("email").value.trim().toLowerCase(),
+    password: document.getElementById("password").value,
+    full_name: document.getElementById("full_name").value.trim(),
+    workspace_name: document.getElementById("workspace_name").value.trim()
+  };
+  try {
+    await VK.register(data);
+    if (wantedPlan && ["starter","pro","enterprise"].includes(wantedPlan)) {
+      window.location.href = "/dashboard/?plan=" + wantedPlan;
+    } else {
+      window.location.href = "/dashboard/?welcome=1";
+    }
+  } catch (err) {
+    showError(err.message || "Registration failed");
+    $btn.disabled = false;
+    $btn.innerHTML = "Create workspace";
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard — Veklom</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+<main class="app-shell wide">
+  <div class="app-topnav">
+    <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
+    <div class="links">
+      <span id="user_email" class="muted"></span>
+      <a href="#" id="signout">Sign out</a>
+    </div>
+  </div>
+
+  <div id="alert"></div>
+
+  <h1 class="app-h1" style="margin-bottom:32px;">Workspace</h1>
+
+  <div class="dash-grid">
+
+    <div class="app-card">
+      <div class="section-h">Identity</div>
+      <div id="identity"><span class="spinner"></span> loading…</div>
+    </div>
+
+    <div class="app-card">
+      <div class="section-h">Subscription</div>
+      <div id="subscription"><span class="spinner"></span> loading…</div>
+      <div style="margin-top:16px;">
+        <button class="btn btn-primary" id="btn_upgrade" style="display:none;">Upgrade plan</button>
+      </div>
+    </div>
+
+    <div class="app-card full">
+      <div class="section-h">API keys</div>
+      <p class="muted" style="margin-bottom:16px;">Use your API key to authenticate requests to <code>https://api.veklom.com/api/v1/*</code>. Treat it like a password — Veklom only displays the full key once at creation.</p>
+      <div id="apikeys"><span class="spinner"></span> loading…</div>
+      <div style="margin-top:18px;">
+        <button class="btn btn-secondary" id="btn_new_key">Generate new API key</button>
+      </div>
+    </div>
+
+    <div class="app-card full" id="upgrade_panel" style="display:none;">
+      <div class="section-h">Choose a plan</div>
+      <p class="muted" style="margin-bottom:24px;">All plans include the source-available deployment kit, multi-LLM gateway, audit log, and the security middleware stack. Upgrade unlocks SLA, support channel, and compliance documentation.</p>
+      <div class="dash-grid" id="plans"></div>
+    </div>
+
+    <div class="app-card full">
+      <div class="section-h">Quickstart</div>
+      <ol style="padding-left:18px; line-height:1.9; color:var(--bone-2); font-size:14px;">
+        <li>Generate an API key above.</li>
+        <li>Hit the live API — the snippet uses your real workspace once you click "show":</li>
+      </ol>
+      <pre id="snippet" style="margin-top:14px; background:var(--ink); border:1px solid var(--rule); border-radius:3px; padding:16px; font-family:var(--mono); font-size:12px; color:var(--bone-2); overflow-x:auto;">
+curl -X POST https://api.veklom.com/v1/exec \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"summarise this audit log entry","use_memory":false}'
+      </pre>
+      <p class="muted" style="margin-top:12px;">For self-hosted deployment, see the <a href="/blog/">field notes</a> or contact <a href="mailto:hello@veklom.com">hello@veklom.com</a>.</p>
+    </div>
+  </div>
+
+  <p class="foot">Need help? <a href="mailto:hello@veklom.com">hello@veklom.com</a> · <a href="/legal/">Legal</a></p>
+</main>
+
+<script src="/app/auth.js"></script>
+<script>
+if (!VK.isLoggedIn()) { window.location.href = "/login/"; }
+
+const $alert = document.getElementById("alert");
+function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }
+function showOk(msg)    { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
+
+document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
+
+(async function init() {
+  // banner messages
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("welcome") === "1") showOk("Workspace created. Generate an API key to start hitting the API.");
+  if (params.get("checkout") === "success") showOk("Subscription activated. Welcome aboard.");
+  if (params.get("checkout") === "cancel") showError("Checkout cancelled — no charge was made.");
+
+  let me;
+  try {
+    me = await VK.me();
+  } catch (err) {
+    if (err.status === 401) { VK.clearTokens(); window.location.href = "/login/"; return; }
+    showError(err.message);
+    return;
+  }
+  document.getElementById("user_email").textContent = me.email || "";
+  document.getElementById("identity").innerHTML =
+    '<div class="kv"><span class="k">Email</span><span class="v">' + (me.email || "") + '</span></div>' +
+    '<div class="kv"><span class="k">Role</span><span class="v">' + (me.role || "owner") + '</span></div>' +
+    '<div class="kv"><span class="k">Workspace</span><span class="v">' + (me.workspace_name || me.workspace_id || "—") + '</span></div>';
+
+  // subscription
+  try {
+    const sub = await VK.getCurrentSubscription();
+    const isActive = sub.status === "active" || sub.status === "trialing";
+    const planName = (sub.plan || "starter");
+    const dollars = sub.amount_cents ? "$" + (sub.amount_cents/100).toLocaleString() + "/" + (sub.billing_cycle === "yearly" ? "yr" : "mo") : "—";
+    document.getElementById("subscription").innerHTML =
+      '<div class="kv"><span class="k">Plan</span><span class="v">' + planName.toUpperCase() + ' <span class="tag ' + (isActive ? "live" : "") + '">' + sub.status + '</span></span></div>' +
+      '<div class="kv"><span class="k">Billing</span><span class="v">' + (sub.billing_cycle || "—") + '</span></div>' +
+      '<div class="kv"><span class="k">Amount</span><span class="v">' + dollars + '</span></div>' +
+      '<div class="kv"><span class="k">Renews</span><span class="v">' + (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "—") + '</span></div>';
+    document.getElementById("btn_upgrade").style.display = "inline-flex";
+  } catch (err) {
+    document.getElementById("subscription").innerHTML = '<p class="muted">Unable to load subscription: ' + err.message + '</p>';
+  }
+
+  // api keys
+  await refreshKeys();
+
+  // upgrade flow
+  document.getElementById("btn_upgrade").addEventListener("click", () => {
+    document.getElementById("upgrade_panel").style.display = "block";
+    renderPlans();
+    document.getElementById("upgrade_panel").scrollIntoView({ behavior: "smooth" });
+  });
+
+  // ?plan=starter from signup → auto-open
+  const wantedPlan = params.get("plan");
+  if (wantedPlan && ["starter","pro","enterprise"].includes(wantedPlan)) {
+    document.getElementById("upgrade_panel").style.display = "block";
+    renderPlans(wantedPlan);
+  }
+})();
+
+async function refreshKeys() {
+  try {
+    const keys = await VK.listApiKeys();
+    if (!keys || keys.length === 0) {
+      document.getElementById("apikeys").innerHTML = '<p class="muted">No API keys yet. Generate one to start.</p>';
+    } else {
+      document.getElementById("apikeys").innerHTML = keys.map(k =>
+        '<div class="kv">' +
+          '<span class="k">' + (k.name || "key") + ' <span class="tag ' + (k.is_active ? "live" : "") + '">' + (k.is_active ? "active" : "revoked") + '</span></span>' +
+          '<span class="v">' +
+            '<code style="font-family:var(--mono); font-size:12px; color:var(--bone-2);">' + (k.prefix || k.id) + '...</code> ' +
+            (k.is_active ? '<button class="btn btn-danger" data-id="' + k.id + '" style="padding:6px 12px; font-size:10px;">Revoke</button>' : '') +
+          '</span>' +
+        '</div>'
+      ).join("");
+      document.querySelectorAll("button[data-id]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Revoke this API key? Any system using it will stop working.")) return;
+          try { await VK.revokeApiKey(btn.dataset.id); await refreshKeys(); }
+          catch (err) { showError(err.message); }
+        });
+      });
+    }
+  } catch (err) {
+    document.getElementById("apikeys").innerHTML = '<p class="muted">Unable to load keys: ' + err.message + '</p>';
+  }
+}
+
+document.getElementById("btn_new_key").addEventListener("click", async () => {
+  const name = prompt("Name this key (e.g. 'staging' or 'prod-server-1'):", "default");
+  if (!name) return;
+  try {
+    const k = await VK.createApiKey({ name });
+    const raw = k.raw_key || k.api_key || k.key;
+    if (raw) {
+      $alert.innerHTML =
+        '<div class="alert alert-ok"><strong>Save this key now — it will not be shown again.</strong>' +
+        '<div class="code-box" style="margin-top:8px;">' +
+          '<span style="flex:1;">' + raw + '</span>' +
+          '<button class="copy" onclick="navigator.clipboard.writeText(\'' + raw + '\').then(() => this.textContent=\'copied\')">copy</button>' +
+        '</div></div>';
+      // patch quickstart snippet
+      document.getElementById("snippet").textContent = document.getElementById("snippet").textContent.replace("YOUR_API_KEY", raw);
+    } else {
+      showOk("Key created.");
+    }
+    await refreshKeys();
+  } catch (err) { showError(err.message); }
+});
+
+function renderPlans(autoSelect) {
+  const plans = [
+    { id: "starter", name: "Sovereign · Standard", price: "$7,500/mo", features: ["Self-host (VPC or on-prem)", "Source access", "14-business-day SLA", "Quarterly version updates", "Private async support"] },
+    { id: "pro", name: "Sovereign · Pro", price: "$18,000/mo", features: ["Everything in Standard", "5-business-day SLA", "Monthly version updates", "Direct email support, 24h first response", "White-label rights", "Annual architecture review"] },
+    { id: "enterprise", name: "Sovereign · Enterprise", price: "$45,000/mo", features: ["Everything in Pro", "24h SLA", "Priority engineering channel", "Compliance documentation pack", "Pen test report", "Procurement-friendly MSA", "Quarterly custom feature commitments"] }
+  ];
+  document.getElementById("plans").innerHTML = plans.map(p =>
+    '<div class="plan-card">' +
+      '<h3>' + p.name + '</h3>' +
+      '<div class="price">' + p.price + '</div>' +
+      '<ul>' + p.features.map(f => '<li>' + f + '</li>').join('') + '</ul>' +
+      '<button class="btn btn-primary btn-block" data-plan="' + p.id + '">Subscribe</button>' +
+    '</div>'
+  ).join("");
+  document.querySelectorAll("button[data-plan]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Redirecting…';
+      try {
+        const out = await VK.createCheckout({ plan: btn.dataset.plan });
+        window.location.href = out.checkout_url;
+      } catch (err) {
+        showError(err.message);
+        btn.disabled = false;
+        btn.textContent = "Subscribe";
+      }
+    });
+  });
+  if (autoSelect) {
+    const tgt = document.querySelector('button[data-plan="' + autoSelect + '"]');
+    if (tgt) tgt.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+</script>
+</body>
+</html>

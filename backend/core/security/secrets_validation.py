@@ -20,8 +20,28 @@ def validate_secrets_on_startup():
     warnings = []
     
     # Critical secrets (must be set)
-    if settings.secret_key == "change-me-in-production-use-env-var":
-        errors.append("SECRET_KEY must be changed from default value")
+    secret_key_defaults = [
+        "change-me-in-production-use-env-var",
+        "GENERATE_WITH_openssl_rand_hex_32",
+        "your-secret-key-here",
+        "changeme",
+        "",
+    ]
+    if settings.secret_key in secret_key_defaults or len(settings.secret_key) < 32:
+        errors.append("SECRET_KEY must be set to a strong random value (32+ chars)")
+    
+    # ENCRYPTION_KEY validation
+    encryption_key_defaults = [
+        "GENERATE_WITH_openssl_rand_hex_32",
+        "your-encryption-key-here",
+        "changeme",
+        "",
+    ]
+    if settings.encryption_key in encryption_key_defaults or len(settings.encryption_key) < 32:
+        if settings.debug:
+            warnings.append("ENCRYPTION_KEY should be set to a strong random value for production")
+        else:
+            errors.append("ENCRYPTION_KEY must be set to a strong random value (32+ chars)")
     
     # Ollama — warn if base URL is default (not a failure, just informational)
     if "host.docker.internal" not in settings.llm_base_url and "127.0.0.1" not in settings.llm_base_url:

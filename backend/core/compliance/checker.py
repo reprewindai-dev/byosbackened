@@ -1,5 +1,5 @@
 """Automated compliance checking."""
-from typing import Dict, List
+from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from db.models import AIAuditLog, SecurityAuditLog
 from core.compliance.regulations import RegulationManager, get_regulation_manager
@@ -20,7 +20,7 @@ class ComplianceChecker:
         db: Session,
         workspace_id: str,
         regulation_id: str,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Check compliance for workspace.
         

@@ -13,7 +13,7 @@ class PluginLoader:
 
     def __init__(self, plugin_dir: str = "apps/plugins"):
         self.plugin_dir = Path(plugin_dir)
-        self.loaded_plugins: Dict[str, any] = {}
+        self.loaded_plugins: Dict[str, Any] = {}
 
     def discover_plugins(self) -> List[str]:
         """Discover plugins in plugin directory."""

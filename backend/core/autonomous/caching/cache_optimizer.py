@@ -1,7 +1,7 @@
 """Autonomous cache optimization - learns patterns per workspace."""
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime, timedelta
-import redis
+from core.redis_pool import get_redis
 from core.config import get_settings
 import logging
 
@@ -18,7 +18,7 @@ class CacheOptimizer:
     """
 
     def __init__(self):
-        self.redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+        self.redis_client = get_redis()
         # workspace_id -> {cache_key_pattern: {hit_rate, avg_ttl, access_pattern}}
         self.cache_stats: Dict[str, Dict[str, Dict]] = {}
 

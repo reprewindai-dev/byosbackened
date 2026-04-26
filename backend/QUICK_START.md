@@ -37,6 +37,13 @@ REDIS_PASSWORD=choose_a_strong_password
 GROQ_API_KEY=gsk_...   # free at https://console.groq.com
 ```
 
+**Optional external AI providers:**
+```env
+OPENAI_API_KEY=sk_...      # for GPT-4/Whisper when selected
+HUGGINGFACE_API_KEY=hf_... # for HF models (free tier available)
+SERPAPI_KEY=...            # for search functionality
+```
+
 Leave everything else as the defaults for local dev.
 
 ---
@@ -163,6 +170,43 @@ Now if Ollama goes down or is unresponsive, the circuit breaker:
 - Closes the circuit and returns to local inference automatically
 
 The `provider` field in every response tells you whether `"ollama"` or `"groq"` served it.
+
+---
+
+## Connecting Your Applications
+
+BYOS accepts connections from anywhere — CORS is open by default for local dev.
+
+**Connection options:**
+
+| Method | Header | Best For |
+|---|---|---|
+| API Key | `Authorization: Bearer byos_...` | Server-to-server, scripts, automation |
+| JWT Token | `Authorization: Bearer <jwt>` | User sessions, web apps |
+
+**From JavaScript/browser:**
+```javascript
+const response = await fetch('http://localhost:8000/v1/exec', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer byos_your_key_here'
+  },
+  body: JSON.stringify({ prompt: "Hello world" })
+});
+```
+
+**From Python:**
+```python
+import requests
+response = requests.post(
+    "http://localhost:8000/v1/exec",
+    headers={"Authorization": "Bearer byos_your_key_here"},
+    json={"prompt": "Hello world"}
+)
+```
+
+**Production CORS:** For production, set `CORS_ORIGINS=["https://yourdomain.com"]` in `.env`.
 
 ---
 

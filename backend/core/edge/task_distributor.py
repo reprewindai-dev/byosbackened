@@ -43,7 +43,7 @@ class TaskDistributor:
         operation_type: str,
         input_size_bytes: int,
         region: Optional[str] = None,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Decide if task should run at edge or central.
         
@@ -103,7 +103,7 @@ class TaskDistributor:
         input_data: Any,
         metadata: Optional[Dict] = None,
         region: Optional[str] = None,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Distribute task to edge or central.
         
@@ -151,7 +151,7 @@ class TaskDistributor:
     def get_distribution_stats(
         self,
         workspace_id: str,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Get task distribution statistics for workspace."""
         # This would track edge vs central execution counts
         # For now, return placeholder

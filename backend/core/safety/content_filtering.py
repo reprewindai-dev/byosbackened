@@ -1,5 +1,5 @@
 """Content filtering."""
-from typing import List, Dict
+from typing import List, Dict, Any
 import re
 import logging
 
@@ -17,7 +17,7 @@ class ContentFilter:
         re.compile(r'\b(buy now|click here|limited time)\b', re.IGNORECASE),
     ]
 
-    def filter_content(self, text: str) -> Dict[str, any]:
+    def filter_content(self, text: str) -> Dict[str, Any]:
         """
         Filter harmful content.
         

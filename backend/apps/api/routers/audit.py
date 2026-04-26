@@ -1,5 +1,5 @@
 """Audit trail endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from db.session import get_db
 from apps.api.deps import get_current_workspace_id
@@ -104,13 +104,14 @@ async def generate_compliance_report(
     request: ComplianceReportRequest,
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
+    limit: int = Query(50000, ge=1, le=100000, description="Max audit logs to analyze"),
 ):
-    """Generate compliance report."""
+    """Generate compliance report - with limits to prevent OOM."""
     logs = db.query(AIAuditLog).filter(
         AIAuditLog.workspace_id == workspace_id,
         AIAuditLog.created_at >= request.start_date,
         AIAuditLog.created_at <= request.end_date,
-    ).all()
+    ).order_by(AIAuditLog.created_at.desc()).limit(limit).all()
     
     # Generate report based on type
     if request.report_type == "gdpr":

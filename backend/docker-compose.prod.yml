@@ -26,6 +26,24 @@ services:
     networks:
       - byos_net
     restart: unless-stopped
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Postgres needs write access for data
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   redis:
     image: redis:7-alpine
@@ -41,6 +59,16 @@ services:
     networks:
       - byos_net
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
 
   minio:
     image: minio/minio:latest
@@ -59,6 +87,14 @@ services:
     networks:
       - byos_net
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # MinIO needs write access
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
 
   # ── Application Services ─────────────────────────────────────────────────────
 
@@ -101,8 +137,19 @@ services:
     networks:
       - byos_net
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # API needs write access for logs
     volumes:
       - app_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   worker:
     build:
@@ -132,8 +179,19 @@ services:
     networks:
       - byos_net
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Worker needs write access for logs
     volumes:
       - app_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   beat:
     build:
@@ -160,6 +218,14 @@ services:
     networks:
       - byos_net
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   # ── Reverse Proxy ────────────────────────────────────────────────────────────
 

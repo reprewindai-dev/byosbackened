@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     memory_ttl_seconds: int = 86400    # 24h default per conversation
     memory_max_messages: int = 20      # max messages kept in context window
 
+    # ── External AI Providers (optional, for routing diversity) ─────────────
+    openai_api_key: str = ""  # OpenAI API key - used when OpenAI provider selected
+    openai_model_chat: str = "gpt-4o-mini"  # Default chat model
+    openai_model_whisper: str = "whisper-1"  # Default STT model
+    
+    huggingface_api_key: str = ""  # HuggingFace API key - free tier available
+    huggingface_model_chat: str = "mistralai/Mistral-7B-Instruct-v0.1"
+    huggingface_model_embed: str = "sentence-transformers/all-MiniLM-L6-v2"
+    
     # SERP API (optional, non-AI)
     serpapi_key: str = ""
 

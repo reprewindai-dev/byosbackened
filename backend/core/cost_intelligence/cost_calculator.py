@@ -1,6 +1,6 @@
 """Cost calculator - precise cost prediction."""
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from datetime import datetime
 from pydantic import BaseModel
 from core.config import get_settings
@@ -20,7 +20,7 @@ class CostPrediction(BaseModel):
     confidence_lower: Decimal
     confidence_upper: Decimal
     accuracy_score: float  # Historical accuracy (0-1)
-    alternative_providers: List[Dict[str, any]]
+    alternative_providers: List[Dict[str, Any]]
     input_tokens: int
     estimated_output_tokens: int
 

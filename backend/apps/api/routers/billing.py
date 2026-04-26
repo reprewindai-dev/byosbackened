@@ -1,5 +1,5 @@
 """Billing and cost allocation endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from db.session import get_db
 from apps.api.deps import get_current_workspace_id
@@ -98,8 +98,9 @@ async def generate_billing_report(
     client_id: Optional[str] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    limit: int = Query(10000, ge=1, le=50000, description="Max records"),
 ):
-    """Generate billing report."""
+    """Generate billing report - with limits to prevent OOM."""
     query = db.query(CostAllocation).filter(CostAllocation.workspace_id == workspace_id)
     
     if project_id:
@@ -111,7 +112,7 @@ async def generate_billing_report(
     if end_date:
         query = query.filter(CostAllocation.created_at <= end_date)
     
-    allocations = query.all()
+    allocations = query.order_by(CostAllocation.created_at.desc()).limit(limit).all()
     
     # Calculate totals
     total_base_cost = sum(a.base_cost for a in allocations)
@@ -161,12 +162,20 @@ async def generate_billing_report(
 async def get_cost_breakdown(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
-    group_by: str = "project",  # "project", "client", "operation_type", "provider"
+    group_by: str = "project",  # "project", "client"
+    limit: int = Query(10000, ge=1, le=50000, description="Max records"),
 ):
-    """Get cost breakdown."""
-    allocations = db.query(CostAllocation).filter(
+    """Get cost breakdown - optimized with single query and limits."""
+    from sqlalchemy.orm import joinedload
+    
+    # Use joined load to avoid N+1 - single query with join
+    query = db.query(CostAllocation).options(
+        joinedload(CostAllocation.audit_log)
+    ).filter(
         CostAllocation.workspace_id == workspace_id
-    ).all()
+    ).order_by(CostAllocation.created_at.desc()).limit(limit)
+    
+    allocations = query.all()
     
     breakdown = {}
     for a in allocations:
@@ -175,20 +184,16 @@ async def get_cost_breakdown(
         elif group_by == "client":
             key = a.client_id or "unallocated"
         elif group_by == "operation_type":
-            # Need to join with audit log
-            audit_log = db.query(AIAuditLog).filter(
-                AIAuditLog.id == a.operation_id
-            ).first()
-            key = audit_log.operation_type if audit_log else "unknown"
+            # Use pre-loaded relationship
+            key = a.audit_log.operation_type if a.audit_log else "unknown"
         else:  # provider
-            audit_log = db.query(AIAuditLog).filter(
-                AIAuditLog.id == a.operation_id
-            ).first()
-            key = audit_log.provider if audit_log else "unknown"
+            key = a.audit_log.provider if a.audit_log else "unknown"
         
         breakdown[key] = breakdown.get(key, Decimal("0")) + a.final_cost
     
     return {
         "group_by": group_by,
         "breakdown": {k: str(v) for k, v in breakdown.items()},
+        "record_count": len(allocations),
+        "truncated": len(allocations) >= limit,
     }

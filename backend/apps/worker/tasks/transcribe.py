@@ -60,26 +60,40 @@ def transcribe_task(self, job_id: str):
         # Get asset
         asset = db.query(Asset).filter(Asset.id == asset_id).first()
         if not asset:
-        job.status = JobStatus.FAILED
-        job.error_message = str(e)
-        job.completed_at = datetime.utcnow()
-        db.commit()
-        
-        # Retry on transient errors
-        if self and self.request.retries < self.max_retries:
-            raise self.retry(exc=e)
-        
-        logger.error(f"Job {job_id} failed after {self.max_retries if self else 0} retries: {e}")
+            job.status = JobStatus.FAILED
+            job.error_message = f"Asset {asset_id} not found"
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            logger.error(f"Asset {asset_id} not found for job {job_id}")
+            return
 
         # Get provider and transcribe
         provider = get_stt_provider(provider_name)
+        
         # Build audio URL from S3
         audio_url = f"{settings.s3_endpoint_url}/{asset.s3_bucket}/{asset.s3_key}"
 
-        # Stub: actual async transcription
-        # result = await provider.transcribe(audio_url, language)
-        # For now, create placeholder transcript
-        result_text = "Transcription placeholder - implement actual audio processing"
+        # Perform transcription
+        try:
+            import asyncio
+            # Run async transcription in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(provider.transcribe(audio_url, language))
+            result_text = result.text
+            detected_language = result.language or language or "en"
+            provider_name = result.provider
+        except Exception as e:
+            logger.error(f"Transcription failed for job {job_id}: {e}", exc_info=True)
+            job.status = JobStatus.FAILED
+            job.error_message = f"Transcription failed: {str(e)}"
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            
+            # Retry on transient errors
+            if self and self.request.retries < self.max_retries:
+                raise self.retry(exc=e)
+            return
 
         # Save transcript
         transcript = Transcript(

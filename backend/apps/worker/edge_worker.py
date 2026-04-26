@@ -1,4 +1,5 @@
 """Edge-specific worker implementation."""
+from typing import Any
 from celery import Celery
 from core.config import get_settings
 from core.edge.task_distributor import get_task_distributor
@@ -28,7 +29,7 @@ class EdgeWorker:
         self,
         workspace_id: str,
         operation_type: str,
-        input_data: any,
+        input_data: Any,
         metadata: dict = None,
     ):
         """

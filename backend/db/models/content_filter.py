@@ -37,7 +37,7 @@ class ContentFilterLog(Base):
     confidence = Column(Float, nullable=True)
 
     flags = Column(JSON, default=list, nullable=False)
-    metadata = Column(JSON, default=dict, nullable=False)
+    filter_metadata = Column(JSON, default=dict, nullable=False)  # Renamed from metadata (SQLAlchemy reserved)
 
     action_taken = Column(String, nullable=False, default="allow")
     blocked_reason = Column(Text, nullable=True)

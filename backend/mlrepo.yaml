@@ -1,0 +1,99 @@
+# TrueFoundry ML Repo Configuration for BYOS AI Backend
+# Deploys: API service + Worker + Postgres + Redis
+
+name: byos-ai-backend
+type: mlrepo
+
+components:
+  # PostgreSQL Database
+  - name: byos-postgres
+    type: postgres
+    postgres:
+      version: "15"
+      storage: 10Gi
+      cpu: 0.5
+      memory: 1Gi
+
+  # Redis for Celery
+  - name: byos-redis
+    type: redis
+    redis:
+      version: "7"
+      storage: 5Gi
+      cpu: 0.25
+      memory: 512Mi
+
+  # API Service
+  - name: byos-api
+    type: service
+    image:
+      type: build
+      build_source:
+        type: local
+      dockerfile_path: infra/docker/Dockerfile.api
+    ports:
+      - port: 8000
+        expose: true
+    env:
+      APP_NAME: BYOS AI Backend
+      APP_VERSION: 1.0.0
+      DEBUG: false
+      API_PREFIX: /api/v1
+      DATABASE_URL: "postgresql://{{byos-postgres.user}}:{{byos-postgres.password}}@{{byos-postgres.host}}:{{byos-postgres.port}}/{{byos-postgres.database}}"
+      REDIS_URL: "redis://{{byos-redis.host}}:{{byos-redis.port}}/0"
+      CELERY_BROKER_URL: "redis://{{byos-redis.host}}:{{byos-redis.port}}/0"
+      CELERY_RESULT_BACKEND: "redis://{{byos-redis.host}}:{{byos-redis.port}}/0"
+      S3_BUCKET_NAME: byos-ai
+      S3_REGION: us-east-1
+      S3_USE_SSL: true
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      LOG_FORMAT: json
+      METRICS_ENABLED: true
+    resources:
+      cpu: 1
+      memory: 2Gi
+      replicas: 2
+    health_check:
+      http:
+        path: /health
+        port: 8000
+
+  # Celery Worker
+  - name: byos-worker
+    type: job
+    image:
+      type: build
+      build_source:
+        type: local
+      dockerfile_path: infra/docker/Dockerfile.worker
+    env:
+      APP_NAME: BYOS AI Backend Worker
+      APP_VERSION: 1.0.0
+      DEBUG: false
+      DATABASE_URL: "postgresql://{{byos-postgres.user}}:{{byos-postgres.password}}@{{byos-postgres.host}}:{{byos-postgres.port}}/{{byos-postgres.database}}"
+      REDIS_URL: "redis://{{byos-redis.host}}:{{byos-redis.port}}/0"
+      CELERY_BROKER_URL: "redis://{{byos-redis.host}}:{{byos-redis.port}}/0"
+      CELERY_RESULT_BACKEND: "redis://{{byos-redis.host}}:{{byos-redis.port}}/0"
+      S3_BUCKET_NAME: byos-ai
+      S3_REGION: us-east-1
+      S3_USE_SSL: true
+      LOG_FORMAT: json
+    resources:
+      cpu: 0.5
+      memory: 1Gi
+
+secrets:
+  # Add these in TrueFoundry dashboard after first deploy
+  - name: secret-key
+    key: SECRET_KEY
+  - name: encryption-key
+    key: ENCRYPTION_KEY
+  - name: s3-endpoint
+    key: S3_ENDPOINT_URL
+  - name: s3-access-key
+    key: S3_ACCESS_KEY_ID
+  - name: s3-secret-key
+    key: S3_SECRET_ACCESS_KEY
+  - name: groq-api-key
+    key: GROQ_API_KEY

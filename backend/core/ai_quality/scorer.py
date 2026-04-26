@@ -1,5 +1,5 @@
 """AI quality scoring."""
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from pydantic import BaseModel
 from datetime import datetime
 import logging
@@ -15,7 +15,7 @@ class QualityScore(BaseModel):
     accuracy: float  # 0-1
     coherence: float  # 0-1
     completeness: float  # 0-1
-    metadata: Dict[str, any]
+    metadata: Dict[str, Any]
 
 
 class QualityScorer:

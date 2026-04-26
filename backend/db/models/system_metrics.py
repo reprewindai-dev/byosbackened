@@ -21,6 +21,6 @@ class SystemMetrics(Base):
     region = Column(String, nullable=True)
 
     tags = Column(JSON, default=dict, nullable=False)
-    metadata = Column(JSON, default=dict, nullable=False)
+    extra_data = Column(JSON, default=dict, nullable=False)  # Renamed from metadata (SQLAlchemy reserved)
 
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

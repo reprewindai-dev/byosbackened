@@ -1,10 +1,17 @@
 """FastAPI dependencies."""
 import hashlib
+import hmac
+import secrets
 from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from db.session import get_db
 from core.security import decode_access_token
 from typing import Optional
+
+
+def _secure_compare(val1: str, val2: str) -> bool:
+    """Timing-safe string comparison to prevent timing attacks."""
+    return hmac.compare_digest(val1.encode(), val2.encode())
 
 
 async def get_current_workspace_id(
@@ -32,7 +39,7 @@ async def get_current_workspace_id(
 
     # API key path (prefix: byos_)
     if token.startswith("byos_"):
-        from db.models import APIKey
+        from db.models import APIKey, User
         from datetime import datetime
         key_hash = hashlib.sha256(token.encode()).hexdigest()
         api_key = db.query(APIKey).filter(
@@ -40,9 +47,18 @@ async def get_current_workspace_id(
             APIKey.is_active == True,
         ).first()
         if not api_key:
+            # Use constant-time comparison to prevent timing attacks on key enumeration
+            _secure_compare("dummy_hash_for_timing", hashlib.sha256(b"dummy").hexdigest())
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
         if api_key.expires_at and datetime.utcnow() > api_key.expires_at:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired")
+        # Verify workspace owner is active
+        workspace_owner = db.query(User).filter(
+            User.workspace_id == api_key.workspace_id,
+            User.is_active == True
+        ).first()
+        if not workspace_owner:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Workspace inactive")
         api_key.last_used_at = datetime.utcnow()
         db.commit()
         return api_key.workspace_id
@@ -61,6 +77,17 @@ async def get_current_workspace_id(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Workspace ID missing in token",
         )
+    
+    # Verify user is still active (token could be valid but user suspended)
+    user_id = payload.get("user_id")
+    if user_id:
+        from db.models import User
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account inactive or deleted",
+            )
 
     return workspace_id
 

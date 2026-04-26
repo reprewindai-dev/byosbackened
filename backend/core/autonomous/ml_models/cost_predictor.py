@@ -31,7 +31,7 @@ class CostPredictorML:
     """
 
     def __init__(self):
-        self.models: Dict[str, any] = {}  # workspace_id -> model
+        self.models: Dict[str, Any] = {}  # workspace_id -> model
         self.s3_client = boto3.client(
             's3',
             endpoint_url=settings.s3_endpoint_url,
@@ -58,12 +58,12 @@ class CostPredictorML:
         """
         import random
         
-            # Load models for workspace
-            model_key = f"{workspace_id}:cost_predictor"
-            
-            # Check for canary model if db provided
-            use_canary = False
-            if db:
+        # Load models for workspace
+        model_key = f"{workspace_id}:cost_predictor"
+        
+        # Check for canary model if db provided
+        use_canary = False
+        if db:
             from db.models import MLModel
             from sqlalchemy import and_
             

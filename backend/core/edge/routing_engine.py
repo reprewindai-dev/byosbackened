@@ -1,5 +1,5 @@
 """Edge routing engine - decide which region to use."""
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from decimal import Decimal
 from core.edge.region_manager import RegionManager
 from core.edge.latency_monitor import get_latency_monitor
@@ -42,7 +42,7 @@ class EdgeRoutingEngine:
         prioritize_cost: bool = False,
         trace_id: Optional[str] = None,
         parent_span_id: Optional[str] = None,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Select optimal region for operation.
         

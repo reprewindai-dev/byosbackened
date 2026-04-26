@@ -22,7 +22,7 @@ class TrafficPredictor:
     """
 
     def __init__(self):
-        self.models: Dict[str, any] = {}  # workspace_id -> model
+        self.models: Dict[str, Any] = {}  # workspace_id -> model
 
     def predict_traffic(
         self,

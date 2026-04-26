@@ -1,5 +1,5 @@
 """AutoML training pipeline - retrains models automatically."""
-from typing import List, Dict
+from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
@@ -30,7 +30,7 @@ class TrainingPipeline:
     def train_all_workspaces(
         self,
         min_samples: int = 100,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Train models for all workspaces with enough data.
         
@@ -121,7 +121,7 @@ class TrainingPipeline:
         self,
         workspace_id: str,
         min_samples: int = 100,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Train models for specific workspace."""
         db = SessionLocal()
         results = {}

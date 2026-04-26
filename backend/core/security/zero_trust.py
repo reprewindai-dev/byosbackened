@@ -2,6 +2,7 @@
 import hashlib
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 from typing import Optional
 from core.security.auth_utils import decode_access_token
 from core.config import get_settings
@@ -44,28 +45,31 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
 
         authorization = request.headers.get("Authorization")
         if not authorization:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authorization header required",
+                content={"detail": "Authorization header required"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
         try:
             scheme, token = authorization.split(" ", 1)
             if scheme.lower() != "bearer":
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authentication scheme",
+                    content={"detail": "Invalid authentication scheme"},
                 )
         except ValueError:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authorization header format",
+                content={"detail": "Invalid authorization header format"},
             )
 
         # API key path (byos_ prefix) — resolve workspace from DB
         if token.startswith("byos_"):
-            workspace_id = await self._resolve_api_key(request, token)
+            try:
+                workspace_id = await self._resolve_api_key(request, token)
+            except HTTPException as e:
+                return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
             request.state.workspace_id = workspace_id
             request.state.user_id = None
             request.state.is_superuser = False
@@ -74,16 +78,16 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
         # JWT path
         payload = decode_access_token(token)
         if not payload:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
+                content={"detail": "Invalid or expired token"},
             )
 
         workspace_id = payload.get("workspace_id")
         if not workspace_id:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Workspace ID missing in token",
+                content={"detail": "Workspace ID missing in token"},
             )
 
         request.state.workspace_id = workspace_id

@@ -157,3 +157,8 @@ def log_ai_operation(
         routing_decision_id=routing_decision_id,
         routing_reasoning=routing_reasoning,
     )
+
+
+def verify_log(audit_log: AIAuditLog) -> bool:
+    """Verify audit log integrity."""
+    return _audit_logger.verify_log(audit_log)

@@ -43,7 +43,7 @@ class SLOAlerts:
         self,
         workspace_id: str,
         db: Optional[Session] = None,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Check all SLOs for workspace and alert if breached.
         
@@ -103,7 +103,7 @@ class SLOAlerts:
         self,
         workspace_id: str,
         db: Session,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Check latency p95 SLO."""
         # Get last hour of operations
         cutoff = datetime.utcnow() - timedelta(hours=1)
@@ -145,7 +145,7 @@ class SLOAlerts:
         self,
         workspace_id: str,
         db: Session,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Check cost savings SLO."""
         from core.autonomous.reporting.savings_calculator import get_savings_calculator
         
@@ -179,7 +179,7 @@ class SLOAlerts:
         self,
         workspace_id: str,
         db: Session,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Check error rate SLO."""
         # Get last hour of operations
         cutoff = datetime.utcnow() - timedelta(hours=1)
@@ -223,7 +223,7 @@ class SLOAlerts:
         self,
         workspace_id: str,
         db: Session,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Check remediation success rate SLO."""
         from db.models.anomaly import AnomalyStatus
         

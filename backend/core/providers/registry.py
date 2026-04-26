@@ -1,5 +1,5 @@
 """Provider registry - dynamic provider management."""
-from typing import Dict, List, Optional, Type, Callable, TypeVar
+from typing import Dict, List, Optional, Type, Callable, TypeVar, Any
 from apps.ai.contracts import STTProvider, LLMProvider, SearchProvider
 from core.providers.circuit_breaker import get_circuit_breaker_manager, CircuitBreakerOpenError
 from core.providers.timeout_retry import get_timeout_retry
@@ -18,7 +18,7 @@ class ProviderRegistry:
         self.stt_providers: Dict[str, Type[STTProvider]] = {}
         self.llm_providers: Dict[str, Type[LLMProvider]] = {}
         self.search_providers: Dict[str, Type[SearchProvider]] = {}
-        self.provider_instances: Dict[str, any] = {}
+        self.provider_instances: Dict[str, Any] = {}
         self._cb_manager = get_circuit_breaker_manager()
         self._timeout_retry = get_timeout_retry()
 

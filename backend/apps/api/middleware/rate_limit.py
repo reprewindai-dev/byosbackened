@@ -3,17 +3,24 @@ import time
 import logging
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 from core.config import get_settings
+from core.redis_pool import get_redis
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_SKIP_PATHS = {"/health", "/", "/metrics", "/api/v1/auth/register", "/api/v1/auth/login"}
+_SKIP_PATHS = {
+    "/health", "/", "/metrics", "/status",
+    "/api/v1/auth/register", "/api/v1/auth/login",
+    "/api/v1/docs", "/api/v1/redoc", "/api/v1/openapi.json",
+}
 
-# Default limits (requests per minute)
-_DEFAULT_WS_LIMIT = 300
-_DEFAULT_IP_LIMIT = 120
-_AUTH_BURST_LIMIT = 10  # tighter limit on auth endpoints
+# Default limits (requests per minute) — tuned for production scale.
+# In prod each user has unique IP; reverse-proxy should set X-Forwarded-For.
+_DEFAULT_WS_LIMIT = 18000   # 300 req/sec per workspace
+_DEFAULT_IP_LIMIT = 6000    # 100 req/sec per IP
+_AUTH_BURST_LIMIT = 20      # tighter limit on auth endpoints (brute-force)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -29,10 +36,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._redis = None
 
     def _get_redis(self):
+        """Get Redis from shared connection pool."""
         if self._redis is None:
             try:
-                import redis
-                self._redis = redis.from_url(settings.redis_url, decode_responses=True)
+                self._redis = get_redis()
             except Exception as e:
                 logger.warning(f"Rate limiter: Redis unavailable — {e}")
         return self._redis
@@ -69,9 +76,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ip_key = f"rl:ip:{client_ip}:{path if is_auth_path else 'global'}"
         if not self._check_limit(ip_key, ip_limit):
             logger.warning(f"Rate limit exceeded: IP={client_ip} path={path}")
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many requests. Please slow down.",
+                content={"detail": "Too many requests. Please slow down."},
                 headers={"Retry-After": "60"},
             )
 
@@ -81,9 +88,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             ws_key = f"rl:ws:{workspace_id}"
             if not self._check_limit(ws_key, _DEFAULT_WS_LIMIT):
                 logger.warning(f"Rate limit exceeded: workspace={workspace_id}")
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Workspace rate limit exceeded.",
+                    content={"detail": "Workspace rate limit exceeded."},
                     headers={"Retry-After": "60"},
                 )
 

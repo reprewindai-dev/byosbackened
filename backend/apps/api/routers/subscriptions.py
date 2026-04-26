@@ -17,88 +17,84 @@ settings = get_settings()
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 # ─── Plan catalog ─────────────────────────────────────────────────────────────
+# IMPORTANT: These prices MUST stay in sync with the public landing page
+# (landing/index.html — pricing section). Any change here without updating
+# the page constitutes a billing-disclosure mismatch. See PRICING_TRUTH.md.
+#
+# Pricing model: monthly OR annual. Annual = monthly × 10 (two months free,
+# matches public-page disclaimer language).
+#
+# Internal enum keys (`starter` / `pro` / `enterprise`) are kept stable to
+# avoid a database migration on the PlanTier enum. Display names follow the
+# public page: Sovereign · Standard / Pro / Enterprise.
 
 PLANS = {
     "starter": {
-        "name": "Starter",
+        "name": "Sovereign · Standard",
         "tier": "starter",
-        "price_monthly_cents": 7900,
-        "price_yearly_cents": 75000,
+        "price_monthly_cents":   750_000,   # $7,500.00 / month
+        "price_yearly_cents":  7_500_000,   # $75,000.00 / year (2 months free)
         "features": {
-            "api_calls_per_month": 50000,
-            "storage_gb": 10,
-            "workspaces": 1,
-            "users": 5,
-            "ai_providers": ["ollama"],
-            "security_suite": True,
-            "audit_logs": True,
-            "groq_fallback": True,
-            "conversation_memory": True,
-            "intelligent_routing": False,
-            "content_filtering": False,
-            "age_verification": False,
-            "compliance_reports": False,
-            "support": "email",
+            "deployment": "self_host_vpc_or_onprem",
+            "source_access": "perpetual",
+            "sla_bug_fix_business_days": 14,
+            "version_update_cadence": "quarterly",
+            "support_channel": "private_discord_async",
+            "support": "written_first",
+            "compliance_docs": False,
+            "pen_test_report": False,
+            "white_label_rights": False,
+            "custom_feature_commitments": False,
+            "priority_engineering_channel": False,
         },
     },
-    "agency": {
-        "name": "Agency",
-        "tier": "agency",
-        "price_monthly_cents": 24900,
-        "price_yearly_cents": 239000,
+    "pro": {
+        "name": "Sovereign · Pro",
+        "tier": "pro",
+        "price_monthly_cents":  1_800_000,  # $18,000.00 / month
+        "price_yearly_cents":  18_000_000,  # $180,000.00 / year (2 months free)
         "features": {
-            "api_calls_per_month": 500000,
-            "storage_gb": 100,
-            "workspaces": 10,
-            "users": 25,
-            "ai_providers": ["ollama", "groq", "local"],
-            "security_suite": True,
-            "audit_logs": True,
-            "groq_fallback": True,
-            "conversation_memory": True,
-            "intelligent_routing": True,
-            "budget_enforcement": True,
-            "cost_allocation": True,
-            "markup_support": True,
-            "content_filtering": True,
-            "compliance_reports": True,
-            "age_verification": False,
-            "support": "priority_email",
+            "deployment": "self_host_vpc_or_onprem",
+            "source_access": "perpetual",
+            "sla_bug_fix_business_days": 5,
+            "version_update_cadence": "monthly",
+            "support_channel": "direct_email",
+            "support": "24h_first_response",
+            "annual_architecture_review": True,
+            "white_label_rights": True,
+            "compliance_docs": False,
+            "pen_test_report": False,
+            "custom_feature_commitments": False,
+            "priority_engineering_channel": False,
         },
     },
     "enterprise": {
-        "name": "Enterprise",
+        "name": "Sovereign · Enterprise",
         "tier": "enterprise",
-        "price_monthly_cents": 99900,
-        "price_yearly_cents": 959000,
+        "price_monthly_cents":  4_500_000,  # $45,000.00 / month
+        "price_yearly_cents":  45_000_000,  # $450,000.00 / year (2 months free)
         "features": {
-            "api_calls_per_month": -1,
-            "storage_gb": -1,
-            "workspaces": -1,
-            "users": -1,
-            "ai_providers": ["ollama", "groq", "local", "custom"],
-            "security_suite": True,
-            "audit_logs": True,
-            "groq_fallback": True,
-            "conversation_memory": True,
-            "intelligent_routing": True,
-            "budget_enforcement": True,
-            "cost_allocation": True,
-            "markup_support": True,
-            "content_filtering": True,
-            "age_verification": True,
-            "csam_blocking": True,
-            "compliance_reports": True,
-            "ml_routing_optimizer": True,
-            "autonomous_cost_predictor": True,
-            "plugin_system": True,
-            "incident_response": True,
-            "sla": "99.9%",
-            "support": "dedicated_slack",
-            "custom_domain": True,
+            "deployment": "self_host_vpc_or_onprem",
+            "source_access": "perpetual",
+            "sla_bug_fix_hours": 24,
+            "version_update_cadence": "monthly",
+            "support_channel": "priority_engineering",
+            "support": "priority_engineering",
+            "annual_architecture_review": True,
+            "white_label_rights": True,
+            "custom_feature_commitments_per_quarter": True,
+            "compliance_docs": True,
+            "pen_test_report": True,
+            "pen_test_retest_on_request": True,
+            "procurement_friendly_msa": True,
+            "priority_engineering_channel": True,
         },
     },
 }
+
+# Acquisition is intentionally NOT a subscription plan. It is a one-time deal
+# negotiated outside the self-serve checkout flow ($750,000 IP transfer).
+# See landing page section "vii. Engagement" → "Acquisition" tier.
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -151,7 +147,7 @@ async def current_subscription(
             plan="starter",
             status="trialing",
             billing_cycle="monthly",
-            amount_cents=2900,
+            amount_cents=0,  # No implicit free tier — checkout sets the real amount
             currency="usd",
             current_period_end=None,
             trial_end=None,
@@ -220,7 +216,10 @@ async def create_checkout(
         line_items=[{
             "price_data": {
                 "currency": "usd",
-                "product_data": {"name": f"BYOS AI Backend - {plan_info['name']}"},
+                "product_data": {
+                    "name": plan_info["name"],  # e.g. "Sovereign · Pro"
+                    "description": f"Veklom AI operations platform — {plan_info['tier']} tier",
+                },
                 "unit_amount": amount,
                 "recurring": {
                     "interval": "year" if payload.billing_cycle == "yearly" else "month"

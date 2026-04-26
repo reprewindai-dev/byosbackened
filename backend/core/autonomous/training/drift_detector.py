@@ -1,5 +1,5 @@
 """Drift detection - detect data drift and concept drift."""
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
@@ -28,7 +28,7 @@ class DriftDetector:
         workspace_id: str,
         model_type: str,  # "cost_predictor", "quality_predictor"
         db: Optional[Session] = None,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Detect both data drift and concept drift.
         
@@ -97,7 +97,7 @@ class DriftDetector:
         workspace_id: str,
         model_type: str,
         production_model: MLModel,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Detect data drift by comparing feature distributions.
         
@@ -209,7 +209,7 @@ class DriftDetector:
         workspace_id: str,
         model_type: str,
         production_model: MLModel,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Detect concept drift by monitoring prediction accuracy degradation.
         

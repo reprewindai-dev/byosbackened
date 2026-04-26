@@ -78,20 +78,131 @@ def apply_retention_policy(
     return deleted_counts
 
 
+def get_workspace_retention_days(db: Session, workspace_id: str) -> int:
+    """Get retention days from workspace settings or return default."""
+    from db.models import Workspace
+    
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if workspace and hasattr(workspace, 'settings') and workspace.settings:
+        # Try to get retention from workspace settings JSON
+        import json
+        try:
+            settings = json.loads(workspace.settings) if isinstance(workspace.settings, str) else workspace.settings
+            retention = settings.get('data_retention_days')
+            if retention and isinstance(retention, int) and retention > 0:
+                return retention
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    
+    # Return default from global settings
+    return getattr(settings, 'data_retention_days', 90)
+
+
+def apply_autonomous_data_retention(
+    db: Session,
+    workspace_id: Optional[str] = None,
+    retention_days: int = 90,
+    dry_run: bool = False
+) -> Dict[str, int]:
+    """
+    Apply retention to autonomous AI data (traffic patterns, anomalies, savings reports).
+    
+    Returns count of records deleted per table.
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+    deleted_counts = {}
+    
+    # Delete old traffic patterns
+    if workspace_id:
+        old_patterns = db.query(TrafficPattern).filter(
+            TrafficPattern.workspace_id == workspace_id,
+            TrafficPattern.created_at < cutoff_date
+        ).all()
+    else:
+        old_patterns = db.query(TrafficPattern).filter(
+            TrafficPattern.created_at < cutoff_date
+        ).all()
+    
+    deleted_counts["traffic_patterns"] = len(old_patterns)
+    if not dry_run:
+        for pattern in old_patterns:
+            db.delete(pattern)
+    
+    # Delete old resolved anomalies (keep unresolved for investigation)
+    if workspace_id:
+        old_anomalies = db.query(Anomaly).filter(
+            Anomaly.workspace_id == workspace_id,
+            Anomaly.status == AnomalyStatus.RESOLVED,
+            Anomaly.detected_at < cutoff_date
+        ).all()
+    else:
+        old_anomalies = db.query(Anomaly).filter(
+            Anomaly.status == AnomalyStatus.RESOLVED,
+            Anomaly.detected_at < cutoff_date
+        ).all()
+    
+    deleted_counts["resolved_anomalies"] = len(old_anomalies)
+    if not dry_run:
+        for anomaly in old_anomalies:
+            db.delete(anomaly)
+    
+    # Delete old savings reports
+    if workspace_id:
+        old_reports = db.query(SavingsReport).filter(
+            SavingsReport.workspace_id == workspace_id,
+            SavingsReport.period_end < cutoff_date
+        ).all()
+    else:
+        old_reports = db.query(SavingsReport).filter(
+            SavingsReport.period_end < cutoff_date
+        ).all()
+    
+    deleted_counts["old_savings_reports"] = len(old_reports)
+    if not dry_run:
+        for report in old_reports:
+            db.delete(report)
+    
+    # Delete old routing strategies that are inactive
+    if workspace_id:
+        old_strategies = db.query(RoutingStrategy).filter(
+            RoutingStrategy.workspace_id == workspace_id,
+            RoutingStrategy.is_active == False,
+            RoutingStrategy.created_at < cutoff_date
+        ).all()
+    else:
+        old_strategies = db.query(RoutingStrategy).filter(
+            RoutingStrategy.is_active == False,
+            RoutingStrategy.created_at < cutoff_date
+        ).all()
+    
+    deleted_counts["inactive_routing_strategies"] = len(old_strategies)
+    if not dry_run:
+        for strategy in old_strategies:
+            db.delete(strategy)
+    
+    if not dry_run:
+        db.commit()
+        logger.info(f"Autonomous data retention applied: workspace={workspace_id}, deleted={deleted_counts}")
+    else:
+        logger.info(f"Autonomous data retention dry run: workspace={workspace_id}, would delete={deleted_counts}")
+    
+    return deleted_counts
+
+
 def delete_expired_data(db: Session, workspace_id: Optional[str] = None):
     """Delete expired data for all workspaces or specific workspace."""
-    # Get retention policy from workspace settings (default: 90 days)
-    retention_days = 90  # TODO: Get from workspace settings
-    
     if workspace_id:
+        # Get retention from workspace settings
+        retention_days = get_workspace_retention_days(db, workspace_id)
         apply_retention_policy(db, workspace_id, retention_days)
-        apply_autonomous_data_retention(db, workspace_id=workspace_id)
+        apply_autonomous_data_retention(db, workspace_id=workspace_id, retention_days=retention_days)
     else:
-        # Apply to all workspaces
+        # Apply to all workspaces with individual retention settings
         from db.models import Workspace
         workspaces = db.query(Workspace).all()
         for workspace in workspaces:
+            retention_days = get_workspace_retention_days(db, workspace.id)
             apply_retention_policy(db, workspace.id, retention_days)
         
-        # Apply autonomous data retention for all workspaces
+        # Apply autonomous data retention for all workspaces (uses default)
         apply_autonomous_data_retention(db, workspace_id=None)

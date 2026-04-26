@@ -24,10 +24,11 @@ Before deploying to Render.com, ensure you have:
 
 - ✅ **Render.com account** (sign up at [render.com](https://render.com))
 - ✅ **GitHub/GitLab/Bitbucket repository** with your code
-- ✅ **API Keys** ready:
-  - Hugging Face API key
-  - SERP API key (optional)
-  - OpenAI API key (optional)
+- ✅ **API Keys** ready (optional):
+  - Groq API key (for cloud fallback)
+  - SERP API key (for search)
+  - OpenAI API key (for external provider)
+  - HuggingFace API key (for external provider)
 - ✅ **S3-compatible storage** account (AWS S3, Backblaze B2, DigitalOcean Spaces, etc.)
 - ✅ **Domain name** (optional, Render provides free subdomain)
 
@@ -152,11 +153,13 @@ S3_ACCESS_KEY_ID=<your-access-key-id>
 S3_SECRET_ACCESS_KEY=<your-secret-access-key>
 ```
 
-#### AI Providers (At least one required)
+#### AI Providers (Optional)
+Local inference via Ollama works without any API keys. Set these only if you want external providers:
 ```
-HUGGINGFACE_API_KEY=<your-huggingface-token>
-SERPAPI_KEY=<your-serpapi-key>  # Optional
-OPENAI_API_KEY=<your-openai-key>  # Optional
+GROQ_API_KEY=<your-groq-key>  # For fallback when Ollama fails
+OPENAI_API_KEY=<your-openai-key>  # For GPT-4/Whisper provider
+HUGGINGFACE_API_KEY=<your-hf-token>  # For HF inference provider
+SERPAPI_KEY=<your-serpapi-key>  # For search functionality
 ```
 
 #### CORS (Update for production)
@@ -178,9 +181,10 @@ SENTRY_DSN=<your-sentry-dsn>  # Optional, for error tracking
    - `S3_ENDPOINT_URL`
    - `S3_ACCESS_KEY_ID`
    - `S3_SECRET_ACCESS_KEY`
-   - `HUGGINGFACE_API_KEY`
-   - `SERPAPI_KEY` (if using)
-   - `OPENAI_API_KEY` (if using)
+   - `GROQ_API_KEY` (recommended for fallback)
+   - `HUGGINGFACE_API_KEY` (if using HF)
+   - `OPENAI_API_KEY` (if using OpenAI)
+   - `SERPAPI_KEY` (if using search)
 
 **Important**: Both services need identical environment variables for consistency.
 
@@ -696,7 +700,7 @@ Use this checklist for each deployment:
 ### Pre-Deployment
 - [ ] All environment variables prepared
 - [ ] S3 storage configured and tested
-- [ ] API keys obtained (Hugging Face, SERP, OpenAI)
+- [ ] Optional API keys obtained (Groq, HuggingFace, OpenAI, SERP)
 - [ ] `SECRET_KEY` generated
 - [ ] Repository pushed to Git
 

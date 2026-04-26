@@ -32,7 +32,7 @@ class QualityPredictorML:
     """
 
     def __init__(self):
-        self.models: Dict[str, any] = {}  # workspace_id -> model
+        self.models: Dict[str, Any] = {}  # workspace_id -> model
         self.s3_client = boto3.client(
             's3',
             endpoint_url=settings.s3_endpoint_url,

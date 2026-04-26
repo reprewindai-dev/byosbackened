@@ -93,12 +93,69 @@ def export_task(self, job_id: str):
             export_content = json.dumps(export_data, indent=2).encode("utf-8")
             content_type = "application/json"
         elif format_type == "csv":
-            # Stub: implement CSV generation
-            export_content = b"CSV placeholder"
+            # Generate CSV from export data
+            import csv
+            import io
+            
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            
+            # Write header
+            writer.writerow(["Type", "ID", "Field", "Value"])
+            
+            # Write assets
+            for asset in export_data.get("assets", []):
+                writer.writerow(["Asset", asset.get("id"), "filename", asset.get("filename", "")])
+                writer.writerow(["Asset", asset.get("id"), "content_type", asset.get("content_type", "")])
+                writer.writerow(["Asset", asset.get("id"), "file_size", asset.get("file_size", "")])
+            
+            # Write transcripts
+            for transcript in export_data.get("transcripts", []):
+                writer.writerow(["Transcript", transcript.get("id"), "language", transcript.get("language", "")])
+                writer.writerow(["Transcript", transcript.get("id"), "provider", transcript.get("provider", "")])
+                text = transcript.get("text", "")[:200] + "..." if len(transcript.get("text", "")) > 200 else transcript.get("text", "")
+                writer.writerow(["Transcript", transcript.get("id"), "text_preview", text])
+            
+            export_content = csv_buffer.getvalue().encode("utf-8")
             content_type = "text/csv"
         else:
-            # ZIP stub
-            export_content = b"ZIP placeholder"
+            # Generate ZIP with JSON and CSV
+            import zipfile
+            import io as bio
+            
+            zip_buffer = bio.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # Add JSON file
+                json_content = json.dumps(export_data, indent=2)
+                zip_file.writestr('export.json', json_content)
+                
+                # Add CSV file
+                import csv
+                csv_buffer = bio.StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(["Type", "ID", "Field", "Value"])
+                
+                for asset in export_data.get("assets", []):
+                    writer.writerow(["Asset", asset.get("id"), "filename", asset.get("filename", "")])
+                for transcript in export_data.get("transcripts", []):
+                    writer.writerow(["Transcript", transcript.get("id"), "language", transcript.get("language", "")])
+                
+                zip_file.writestr('export.csv', csv_buffer.getvalue())
+                
+                # Add README
+                readme = f"""BYOS Export Archive
+Generated: {datetime.utcnow().isoformat()}
+Workspace: {job.workspace_id}
+Assets: {len(export_data.get('assets', []))}
+Transcripts: {len(export_data.get('transcripts', []))}
+
+Files:
+- export.json: Full data in JSON format
+- export.csv: Data summary in CSV format
+"""
+                zip_file.writestr('README.txt', readme)
+            
+            export_content = zip_buffer.getvalue()
             content_type = "application/zip"
 
         # Upload to S3

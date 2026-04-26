@@ -22,7 +22,7 @@ class AnomalyDetector:
     """
 
     def __init__(self):
-        self.models: Dict[str, any] = {}  # workspace_id -> model
+        self.models: Dict[str, Any] = {}  # workspace_id -> model
         self.normal_patterns: Dict[str, Dict] = {}  # workspace_id -> {avg_cost, avg_requests_per_hour, etc.}
 
     def detect_anomalies(

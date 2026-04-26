@@ -105,6 +105,19 @@ Version: 1.0 | Stack: Python 3.11 · FastAPI · PostgreSQL · Redis · Ollama ·
 | `LLM_TIMEOUT_SECONDS` | `60` | Max wait per Ollama call |
 | `LLM_MAX_TOKENS` | `2048` | Default max output tokens |
 
+### External AI Providers (Optional)
+
+Used when routing strategy selects external providers. Ollama (local) is always primary.
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | — | OpenAI API key (sk-...) - enables GPT-4, Whisper |
+| `OPENAI_MODEL_CHAT` | `gpt-4o-mini` | Default chat model for OpenAI provider |
+| `OPENAI_MODEL_WHISPER` | `whisper-1` | Default STT model for OpenAI provider |
+| `HUGGINGFACE_API_KEY` | — | HuggingFace API key (hf_...) - free tier available |
+| `HUGGINGFACE_MODEL_CHAT` | `mistralai/Mistral-7B-Instruct-v0.1` | Default chat model for HF provider |
+| `HUGGINGFACE_MODEL_EMBED` | `sentence-transformers/all-MiniLM-L6-v2` | Default embedding model for HF |
+
 ### Circuit Breaker
 
 | Variable | Default | Description |
@@ -1259,7 +1272,7 @@ LLM Engine (Migration 003)
 2. Set `DATA_RETENTION_DAYS=90` per HIPAA retention guidance
 3. Use `POST /api/v1/privacy/detect-pii` before logging any input text
 4. All inference runs locally — zero PHI to external servers
-5. Use `DELETE /api/v1/privacy/delete-account` for patient data deletion requests
+5. Use `POST /api/v1/privacy/delete` for patient data deletion requests
 
 ---
 

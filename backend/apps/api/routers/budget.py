@@ -1,5 +1,5 @@
 """Budget management endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from db.session import get_db
 from apps.api.deps import get_current_workspace_id
@@ -90,13 +90,14 @@ async def get_budget_status(
     workspace_id: str = Depends(get_current_workspace_id),
     budget_type: Optional[str] = None,
     db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=1000, description="Max budgets to return"),
 ):
     """Get budget status."""
     query = db.query(Budget).filter(Budget.workspace_id == workspace_id)
     if budget_type:
         query = query.filter(Budget.budget_type == budget_type)
     
-    budgets = query.all()
+    budgets = query.limit(limit).all()
     
     return [
         {

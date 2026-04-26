@@ -1,5 +1,5 @@
 """Optimization suggestions - generate proactive suggestions."""
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
@@ -29,7 +29,7 @@ class OptimizationSuggestions:
         self,
         workspace_id: str,
         db: Optional[Session] = None,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """
         Generate optimization suggestions for workspace.
         
@@ -72,7 +72,7 @@ class OptimizationSuggestions:
         self,
         workspace_id: str,
         db: Session,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """Suggest provider switches that save money."""
         suggestions = []
         
@@ -127,7 +127,7 @@ class OptimizationSuggestions:
     def _suggest_auto_scaling(
         self,
         workspace_id: str,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """Suggest auto-scaling optimizations."""
         suggestions = []
         
@@ -158,7 +158,7 @@ class OptimizationSuggestions:
         self,
         workspace_id: str,
         db: Session,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """Suggest edge routing optimizations."""
         suggestions = []
         
@@ -193,7 +193,7 @@ class OptimizationSuggestions:
         self,
         workspace_id: str,
         db: Session,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """Suggest cache optimization."""
         suggestions = []
         

@@ -1,5 +1,5 @@
 """Abuse detection."""
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from db.models import SecurityAuditLog
@@ -23,7 +23,7 @@ class AbuseDetector:
         user_id: Optional[str],
         ip_address: Optional[str],
         operation_type: str,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Detect abuse patterns.
         

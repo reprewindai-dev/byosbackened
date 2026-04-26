@@ -23,7 +23,7 @@ BYOS AI implements a zero-trust security model. Every request is authenticated a
 - Seeded dev key generated automatically by `start.ps1`
 
 ### MFA (TOTP)
-- Setup: `POST /api/v1/auth/mfa/enable` → returns QR code URL + secret
+- Setup: `POST /api/v1/auth/mfa/setup` → returns QR code URL + secret
 - Works with any TOTP app (Google Authenticator, Authy, 1Password)
 - Once enabled, `mfa_code` is required on every login
 - Verify setup: `POST /api/v1/auth/mfa/verify` with a valid 6-digit code

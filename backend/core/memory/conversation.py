@@ -16,15 +16,16 @@ import json
 import logging
 from typing import Optional
 
-import redis as redis_lib
+from core.redis_pool import get_redis
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def _redis() -> redis_lib.Redis:
-    return redis_lib.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=2)
+def _redis():
+    """Get Redis from shared connection pool."""
+    return get_redis()
 
 
 class ConversationMemory:

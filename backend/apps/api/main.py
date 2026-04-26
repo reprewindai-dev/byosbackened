@@ -12,6 +12,10 @@ from apps.api.middleware.intelligent_routing import IntelligentRoutingMiddleware
 from apps.api.middleware.edge_routing import EdgeRoutingMiddleware
 from apps.api.middleware.budget_check import BudgetCheckMiddleware
 from apps.api.middleware.rate_limit import RateLimitMiddleware
+from apps.api.middleware.locker_security_integration import LockerSecurityMiddleware
+from apps.api.middleware.request_security import RequestSecurityMiddleware
+from apps.api.middleware.performance import PerformanceMiddleware, GzipMiddleware
+from apps.api.middleware.fast_path import FastPathMiddleware
 from apps.api.routers import (
     upload,
     transcribe,
@@ -40,6 +44,10 @@ from apps.api.routers.admin import router as admin_router
 from apps.api.routers.subscriptions import router as subscriptions_router
 from apps.api.routers.content_safety import router as content_safety_router
 from apps.api.routers.exec_router import router as exec_router
+from apps.api.routers.locker_security import router as locker_security_router
+from apps.api.routers.locker_monitoring import router as locker_monitoring_router
+from apps.api.routers.locker_users import router as locker_users_router
+from apps.api.routers.kill_switch import router as kill_switch_router
 import logging
 
 logger = logging.getLogger(__name__)
@@ -78,7 +86,13 @@ async def startup_validation():
 
 
 # ── Middleware stack (outermost = first to run) ───────────────────────────────
+# 1. LockerPhycer Security (IDS, rate limiting, security headers) - First line of defense
+app.add_middleware(LockerSecurityMiddleware)
+# 2. Request security (request ID, IP blocking, brute force protection)
+app.add_middleware(RequestSecurityMiddleware)
+# 3. Rate limiting (Redis-backed)
 app.add_middleware(RateLimitMiddleware)
+# 4. Zero-trust authentication
 app.add_middleware(ZeroTrustMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(IntelligentRoutingMiddleware)
@@ -91,6 +105,14 @@ app.add_middleware(
     allow_methods=settings.cors_allow_methods,
     allow_headers=settings.cors_allow_headers,
 )
+# Performance optimization layer (for 777ms latency target)
+app.add_middleware(GzipMiddleware)  # Compress responses > 1KB
+app.add_middleware(PerformanceMiddleware)  # Caching + keep-alive
+
+# OUTERMOST: pure-ASGI fast path for hot public endpoints.
+# Bypasses the entire middleware chain for /health, /status, /, docs, openapi.json.
+# Last add_middleware call = first executed.
+app.add_middleware(FastPathMiddleware)
 
 # ── Core AI + Cost Intelligence routers ──────────────────────────────────────
 app.include_router(upload.router, prefix=settings.api_prefix)
@@ -120,6 +142,12 @@ app.include_router(monitoring_router, prefix=settings.api_prefix)
 app.include_router(admin_router, prefix=settings.api_prefix)
 app.include_router(subscriptions_router, prefix=settings.api_prefix)
 app.include_router(content_safety_router, prefix=settings.api_prefix)
+app.include_router(kill_switch_router, prefix=settings.api_prefix)
+
+# ── LockerPhycer Security Routers (now fully integrated into BYOS) ────────────
+app.include_router(locker_security_router, prefix=settings.api_prefix)
+app.include_router(locker_monitoring_router, prefix=settings.api_prefix)
+app.include_router(locker_users_router, prefix=settings.api_prefix)
 
 # ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
 app.include_router(exec_router)

@@ -6,7 +6,7 @@ from db.session import SessionLocal
 from db.models import AIAuditLog
 from core.autonomous.caching.cache_optimizer import get_cache_optimizer
 from core.config import get_settings
-import redis
+from core.redis_pool import get_redis
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class PredictiveCache:
     """
 
     def __init__(self):
-        self.redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+        self.redis_client = get_redis()
         # workspace_id -> {pattern: {next_likely_keys, access_frequency}}
         self.access_patterns: Dict[str, Dict[str, Dict]] = {}
 

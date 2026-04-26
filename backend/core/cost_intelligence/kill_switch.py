@@ -1,5 +1,5 @@
 """Cost kill switch - emergency budget caps and shutdown."""
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from decimal import Decimal
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -30,7 +30,7 @@ class CostKillSwitch:
         self._global_spend_today = Decimal("0")
         self._last_reset = datetime.utcnow().date()
     
-    def check_global_cap(self, db: Session, operation_cost: Decimal) -> Dict[str, any]:
+    def check_global_cap(self, db: Session, operation_cost: Decimal) -> Dict[str, Any]:
         """
         Check global daily cost cap.
         
@@ -75,7 +75,7 @@ class CostKillSwitch:
         db: Session,
         workspace_id: str,
         operation_cost: Decimal,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Check workspace daily cost cap.
         

@@ -32,7 +32,7 @@ class AutoRemediator:
         workspace_id: str,
         anomalies: List[Dict],
         db: Optional[Session] = None,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Auto-remediate detected anomalies.
         

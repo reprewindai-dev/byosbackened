@@ -1,50 +1,71 @@
-services:
-  # PostgreSQL Database
-  - type: pspg
-    name: byos-ai-db
+# =============================================================================
+# Render Blueprint — BYOS AI Backend
+# =============================================================================
+# Deploy: push this repo to GitHub, then on Render: New + Blueprint, point
+# at this repo. Render will provision Postgres + Redis + API + Worker.
+#
+# After first deploy, set the `sync: false` secrets manually in the Render
+# dashboard (SECRET_KEY, OPENAI_API_KEY, STRIPE_SECRET_KEY, etc.).
+# =============================================================================
+
+databases:
+  - name: byos-ai-db
     databaseName: byos_ai
     user: byos_user
-    plan: starter  # Change to standard-0, standard-1, etc. for production
+    plan: standard          # 1 GB RAM, 256 MB storage burst, 100 connections
+    postgresMajorVersion: "16"
+    ipAllowList: []         # empty = only Render private network can connect
 
-  # Redis for Celery broker and result backend
+services:
+  # ── Redis ──────────────────────────────────────────────────────────────────
   - type: redis
     name: byos-ai-redis
-    plan: starter  # Change to standard-0, standard-1, etc. for production
+    plan: starter           # bump to standard for >100MB cache
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []         # private-only
 
-  # API Web Service
+  # ── API web service ────────────────────────────────────────────────────────
   - type: web
     name: byos-ai-api
     runtime: docker
     dockerfilePath: ./infra/docker/Dockerfile.api
     dockerContext: .
-    plan: starter  # Change to standard-0, standard-1, etc. for production
+    plan: standard          # 2 CPU / 2 GB — 4 gunicorn workers, ~2k RPS realistic
+    region: oregon          # change if you have user concentration elsewhere
     healthCheckPath: /health
+    autoDeploy: true
+    numInstances: 1         # bump for HA / horizontal scale
     envVars:
-      # App Configuration
+      # ── Process tuning ────────────────────────────────────────────────────
+      - key: WEB_CONCURRENCY
+        value: "4"          # 2 CPU * 2 = 4 uvicorn workers
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_FORMAT
+        value: json
+
+      # ── App ───────────────────────────────────────────────────────────────
       - key: APP_NAME
         value: BYOS AI Backend
       - key: APP_VERSION
         value: 0.1.0
       - key: DEBUG
-        value: false
+        value: "false"
       - key: API_PREFIX
         value: /api/v1
 
-      # Database - Uses Render's internal database URL
+      # ── Database (auto-injected from byos-ai-db) ──────────────────────────
       - key: DATABASE_URL
         fromDatabase:
           name: byos-ai-db
           property: connectionString
 
-      # Redis - Uses Render's internal Redis URL
+      # ── Redis (auto-injected) ─────────────────────────────────────────────
       - key: REDIS_URL
         fromService:
           type: redis
           name: byos-ai-redis
           property: connectionString
-
-      # Celery Configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: redis
@@ -56,102 +77,106 @@ services:
           name: byos-ai-redis
           property: connectionString
 
-      # S3/MinIO Configuration
-      # For production, use AWS S3 or compatible service
+      # ── Secrets — set in Render dashboard after first deploy ──────────────
+      - key: SECRET_KEY
+        generateValue: true       # Render generates 32-byte hex automatically
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+
+      # ── CORS — UPDATE WITH YOUR REAL FRONTEND ORIGINS ─────────────────────
+      - key: CORS_ORIGINS
+        value: '["https://app.example.com"]'
+      - key: CORS_ALLOW_CREDENTIALS
+        value: "true"
+
+      # ── Object storage (set in dashboard) ─────────────────────────────────
       - key: S3_ENDPOINT_URL
-        sync: false  # Set manually in Render dashboard
+        sync: false
       - key: S3_ACCESS_KEY_ID
-        sync: false  # Set manually in Render dashboard
+        sync: false
       - key: S3_SECRET_ACCESS_KEY
-        sync: false  # Set manually in Render dashboard
+        sync: false
       - key: S3_BUCKET_NAME
         value: byos-ai
       - key: S3_REGION
         value: us-east-1
       - key: S3_USE_SSL
-        value: true
+        value: "true"
 
-      # Security - IMPORTANT: Generate and set these in Render dashboard
-      - key: SECRET_KEY
-        sync: false  # Generate with: openssl rand -hex 32
-      - key: ENCRYPTION_KEY
-        sync: false  # Optional, defaults to SECRET_KEY if not set
-      - key: ALGORITHM
-        value: HS256
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 30
-
-      # AI Providers - Set these in Render dashboard
+      # ── AI providers (set in dashboard) ───────────────────────────────────
       - key: HUGGINGFACE_API_KEY
         sync: false
       - key: HUGGINGFACE_MODEL_CHAT
         value: mistralai/Mistral-7B-Instruct-v0.1
       - key: HUGGINGFACE_MODEL_EMBED
         value: sentence-transformers/all-MiniLM-L6-v2
-
       - key: SERPAPI_KEY
         sync: false
-
-      # OpenAI (Optional)
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL_CHAT
         value: gpt-4o-mini
       - key: OPENAI_MODEL_WHISPER
         value: whisper-1
-
-      # Local AI (Optional - for self-hosted models)
       - key: LOCAL_WHISPER_URL
         sync: false
       - key: LOCAL_LLM_URL
         sync: false
 
-      # CORS
-      - key: CORS_ORIGINS
-        value: '["*"]'  # Update with your frontend domain(s) in production
-      - key: CORS_ALLOW_CREDENTIALS
-        value: true
+      # ── Stripe (set in dashboard) ─────────────────────────────────────────
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
 
-      # Observability
+      # ── Observability ─────────────────────────────────────────────────────
       - key: SENTRY_DSN
-        sync: false  # Optional
-      - key: LOG_FORMAT
-        value: json
+        sync: false
       - key: METRICS_ENABLED
-        value: true
+        value: "true"
       - key: PROMETHEUS_PORT
-        value: 9090
+        value: "9090"
 
-  # Celery Worker Background Service
+      # ── Cost kill-switch caps ─────────────────────────────────────────────
+      - key: GLOBAL_DAILY_COST_CAP_USD
+        value: "500"
+      - key: WORKSPACE_DAILY_COST_CAP_USD
+        value: "50"
+
+  # ── Celery worker (background jobs) ────────────────────────────────────────
   - type: worker
     name: byos-ai-worker
     runtime: docker
     dockerfilePath: ./infra/docker/Dockerfile.worker
     dockerContext: .
-    plan: starter  # Change to standard-0, standard-1, etc. for production
+    plan: starter           # bump if jobs queue up
+    region: oregon
+    autoDeploy: true
     envVars:
-      # App Configuration
       - key: APP_NAME
         value: BYOS AI Backend Worker
       - key: APP_VERSION
         value: 0.1.0
       - key: DEBUG
-        value: false
+        value: "false"
+      - key: LOG_FORMAT
+        value: json
 
-      # Database
       - key: DATABASE_URL
         fromDatabase:
           name: byos-ai-db
           property: connectionString
-
-      # Redis
       - key: REDIS_URL
         fromService:
           type: redis
           name: byos-ai-redis
           property: connectionString
-
-      # Celery Configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: redis
@@ -163,7 +188,20 @@ services:
           name: byos-ai-redis
           property: connectionString
 
-      # S3/MinIO Configuration
+      # Same secret keys as API service
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: byos-ai-api
+          envVarKey: SECRET_KEY
+      - key: ENCRYPTION_KEY
+        fromService:
+          type: web
+          name: byos-ai-api
+          envVarKey: ENCRYPTION_KEY
+      - key: ALGORITHM
+        value: HS256
+
       - key: S3_ENDPOINT_URL
         sync: false
       - key: S3_ACCESS_KEY_ID
@@ -175,41 +213,26 @@ services:
       - key: S3_REGION
         value: us-east-1
       - key: S3_USE_SSL
-        value: true
+        value: "true"
 
-      # Security
-      - key: SECRET_KEY
-        sync: false
-      - key: ENCRYPTION_KEY
-        sync: false
-      - key: ALGORITHM
-        value: HS256
-
-      # AI Providers
       - key: HUGGINGFACE_API_KEY
         sync: false
       - key: HUGGINGFACE_MODEL_CHAT
         value: mistralai/Mistral-7B-Instruct-v0.1
       - key: HUGGINGFACE_MODEL_EMBED
         value: sentence-transformers/all-MiniLM-L6-v2
-
       - key: SERPAPI_KEY
         sync: false
-
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL_CHAT
         value: gpt-4o-mini
       - key: OPENAI_MODEL_WHISPER
         value: whisper-1
-
       - key: LOCAL_WHISPER_URL
         sync: false
       - key: LOCAL_LLM_URL
         sync: false
 
-      # Observability
-      - key: LOG_FORMAT
-        value: json
       - key: METRICS_ENABLED
-        value: true
+        value: "true"

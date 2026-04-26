@@ -57,7 +57,7 @@ class Anomaly(Base):
     
     # Anomaly data
     description = Column(Text, nullable=False)
-    metadata = Column(JSON, nullable=True)  # Additional context data
+    anomaly_metadata = Column(JSON, nullable=True)  # Additional context data (renamed from metadata - SQLAlchemy reserved word)
     
     # Metrics
     baseline_value = Column(String, nullable=True)  # Normal value

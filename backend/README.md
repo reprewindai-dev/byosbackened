@@ -20,13 +20,13 @@ Built for industries where data sovereignty isn't optional: adult platforms, leg
 |---|---|
 | **[QUICK_START.md](QUICK_START.md)** | Get running in 5 minutes on Windows |
 | **[USER_MANUAL.md](USER_MANUAL.md)** | Complete reference — every feature, endpoint, config |
-| **[DEPLOYMENT.md](DEPLOYMENT.md)** | Production deploy to DigitalOcean or Render |
+| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Production deploy to DigitalOcean or Render |
 | **[docs/SECURITY.md](docs/SECURITY.md)** | Zero-trust, encryption, audit logging |
 | **[docs/COST_INTELLIGENCE.md](docs/COST_INTELLIGENCE.md)** | Cost prediction, routing, budgets, billing |
 | **[docs/PRIVACY.md](docs/PRIVACY.md)** | GDPR, PII detection, data retention |
 | **[docs/COMPLIANCE.md](docs/COMPLIANCE.md)** | SOC2, CCPA, compliance reports |
 | **[docs/PLUGIN_SYSTEM.md](docs/PLUGIN_SYSTEM.md)** | Adding custom providers and plugins |
-| **[COMPETITIVE_ADVANTAGE.md](COMPETITIVE_ADVANTAGE.md)** | Market positioning and differentiators |
+| **[docs/COMPETITIVE_ADVANTAGE.md](docs/COMPETITIVE_ADVANTAGE.md)** | Market positioning and differentiators |
 
 ---
 
@@ -117,7 +117,7 @@ cp .env.example .env
 ## Migration Chain
 
 ```
-001_initial → 002_security_suite → 003_ollama_exec_multitenant
+001_add_autonomous_ml_edge_models → 002_security_suite_integration → 003_ollama_exec_multitenant → 004_add_routing_policy_and_missing_tables
 ```
 
 Run: `docker exec -it byos_api alembic upgrade head`

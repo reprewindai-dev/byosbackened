@@ -1,10 +1,10 @@
 """Database models."""
 from db.models.workspace import Workspace
 from db.models.user import User, UserRole, UserStatus
-from db.models.job import Job
+from db.models.job import Job, JobType, JobStatus
 from db.models.asset import Asset
 from db.models.transcript import Transcript
-from db.models.export import Export
+from db.models.export import Export, ExportFormat
 from db.models.cost_prediction import CostPrediction
 from db.models.routing_decision import RoutingDecision
 from db.models.ai_audit import AIAuditLog
@@ -32,10 +32,10 @@ from db.models.execution_log import ExecutionLog
 __all__ = [
     "Workspace",
     "User", "UserRole", "UserStatus",
-    "Job",
+    "Job", "JobType", "JobStatus",
     "Asset",
     "Transcript",
-    "Export",
+    "Export", "ExportFormat",
     "CostPrediction",
     "RoutingDecision",
     "AIAuditLog",

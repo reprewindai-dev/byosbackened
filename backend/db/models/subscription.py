@@ -39,7 +39,11 @@ class Subscription(Base):
     status = Column(SAEnum(SubscriptionStatus), default=SubscriptionStatus.TRIALING, nullable=False, index=True)
 
     billing_cycle = Column(String, default="monthly", nullable=False)
-    amount_cents = Column(String, default="2900", nullable=False)
+    # Default 0 cents — no implicit free tier in the Veklom model. amount_cents
+    # is set when a checkout completes. Public pricing tiers: $7,500 / $18,000 /
+    # $45,000 per month. Keep PLANS dict in apps/api/routers/subscriptions.py
+    # as the source of truth.
+    amount_cents = Column(String, default="0", nullable=False)
     currency = Column(String, default="usd", nullable=False)
 
     trial_end = Column(DateTime, nullable=True)
@@ -48,7 +52,7 @@ class Subscription(Base):
     canceled_at = Column(DateTime, nullable=True)
 
     features = Column(JSON, default=dict, nullable=False)
-    metadata = Column(JSON, default=dict, nullable=False)
+    subscription_metadata = Column(JSON, default=dict, nullable=False)  # Renamed from metadata (SQLAlchemy reserved)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

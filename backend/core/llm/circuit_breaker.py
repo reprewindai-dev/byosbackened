@@ -16,7 +16,7 @@ import logging
 from enum import Enum
 from typing import Optional
 
-import redis as redis_lib
+from core.redis_pool import get_redis
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -37,20 +37,28 @@ class CircuitState(str, Enum):
     HALF_OPEN = "half_open"
 
 
-def _redis() -> redis_lib.Redis:
-    return redis_lib.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=2)
+def _redis():
+    """Get Redis from shared connection pool."""
+    return get_redis()
 
 
 def get_state() -> CircuitState:
     """Return the current circuit breaker state."""
     try:
         r = _redis()
-        state = r.get(_CB_STATE_KEY) or _STATE_CLOSED
+        pipe = r.pipeline()
+        pipe.get(_CB_STATE_KEY)
+        pipe.get(_CB_OPENED_AT_KEY)
+        results = pipe.execute()
+        
+        state = results[0] or _STATE_CLOSED
 
         if state == _STATE_OPEN:
-            opened_at = float(r.get(_CB_OPENED_AT_KEY) or 0)
+            opened_at = float(results[1] or 0)
             if time.time() - opened_at >= settings.circuit_breaker_cooldown_seconds:
-                r.set(_CB_STATE_KEY, _STATE_HALF_OPEN)
+                pipe = r.pipeline()
+                pipe.set(_CB_STATE_KEY, _STATE_HALF_OPEN)
+                pipe.execute()
                 logger.info("[CB] Circuit half-opened — probing Ollama")
                 return CircuitState.HALF_OPEN
 

@@ -16,3 +16,19 @@ stripe_setup_output.json
 
 .env.cloudflare
 .env.coolify.*
+
+# Local SQLite / dev databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Load test + stress artifacts (auto-generated)
+stress_test_*.json
+stress_results*.txt
+test*_baseline_*.csv
+test*_sustained_*.csv
+test*_heavy_*.csv
+
+# Setup logs
+setup_*.log
+hetzner_setup_*.json

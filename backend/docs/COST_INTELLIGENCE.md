@@ -143,14 +143,60 @@ GET /api/v1/budget?budget_type=monthly
 4. If `percent_used >= any threshold` → fires alert via `POST /api/v1/monitoring/alerts`
 
 ### Emergency Kill Switch
+
+Manual emergency stop for runaway usage or suspected abuse. When active, all AI operations return HTTP 402 for the workspace until deactivated or auto-restored.
+
+**Activate Kill Switch**
 ```
 POST /api/v1/cost/kill-switch
-{ "reason": "Investigating runaway usage" }
-# Immediately blocks all AI calls for workspace — returns 402 on every request
+Authorization: Bearer <admin_token>
+{
+  "reason": "Investigating runaway usage",
+  "duration_minutes": 60  // optional, auto-restore after 1-1440 minutes
+}
 
-DELETE /api/v1/cost/kill-switch
-# Re-enable normal operation
+→ {
+  "killed": true,
+  "reason": "Investigating runaway usage",
+  "activated_at": "2026-01-15T14:30:00Z",
+  "activated_by": "user_uuid",
+  "auto_restore_at": "2026-01-15T15:30:00Z"
+}
 ```
+
+**Check Status**
+```
+GET /api/v1/cost/kill-switch/status
+Authorization: Bearer <admin_token>
+
+→ {
+  "killed": true,
+  "reason": "Investigating runaway usage",
+  "activated_at": "2026-01-15T14:30:00Z",
+  "activated_by": "user_uuid",
+  "auto_restore_at": "2026-01-15T15:30:00Z"  // null if not set
+}
+```
+
+**Deactivate (Re-enable Operations)**
+```
+DELETE /api/v1/cost/kill-switch
+Authorization: Bearer <admin_token>
+
+→ {
+  "killed": false,
+  "reason": null,
+  "activated_at": null,
+  "activated_by": null,
+  "auto_restore_at": null
+}
+```
+
+**Notes:**
+- Requires admin role
+- State stored in Redis (multi-instance safe)
+- Auto-restore triggers automatically when duration expires
+- Kill switch blocks: `/v1/exec`, `/api/v1/transcribe/*`, `/api/v1/extract/*`, `/api/v1/ai/*`, `/api/v1/cost/predict`
 
 ---
 

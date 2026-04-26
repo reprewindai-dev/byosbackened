@@ -37,10 +37,46 @@ async def create_routing_policy(
     db: Session = Depends(get_db),
 ):
     """Create or update routing policy."""
-    # TODO: Store routing policy in database
-    # For now, return success
+    from db.models import RoutingPolicy
+    import json
+    
+    # Check if policy exists for workspace
+    existing_policy = db.query(RoutingPolicy).filter(
+        RoutingPolicy.workspace_id == workspace_id
+    ).first()
+    
+    if existing_policy:
+        # Update existing policy
+        existing_policy.strategy = request.strategy
+        existing_policy.constraints_json = json.dumps({
+            "max_cost": str(request.max_cost) if request.max_cost else None,
+            "min_quality": request.min_quality,
+            "max_latency_ms": request.max_latency_ms,
+        })
+        db.commit()
+        db.refresh(existing_policy)
+        policy_id = existing_policy.id
+        message = "Routing policy updated"
+    else:
+        # Create new policy
+        new_policy = RoutingPolicy(
+            workspace_id=workspace_id,
+            strategy=request.strategy,
+            constraints_json=json.dumps({
+                "max_cost": str(request.max_cost) if request.max_cost else None,
+                "min_quality": request.min_quality,
+                "max_latency_ms": request.max_latency_ms,
+            }),
+        )
+        db.add(new_policy)
+        db.commit()
+        db.refresh(new_policy)
+        policy_id = new_policy.id
+        message = "Routing policy created"
+    
     return {
-        "message": "Routing policy created",
+        "message": message,
+        "policy_id": policy_id,
         "workspace_id": workspace_id,
         "strategy": request.strategy,
         "constraints": {
@@ -54,13 +90,39 @@ async def create_routing_policy(
 @router.get("/policy")
 async def get_routing_policy(
     workspace_id: str = Depends(get_current_workspace_id),
+    db: Session = Depends(get_db),
 ):
     """Get routing policy."""
-    # TODO: Get from database
+    from db.models import RoutingPolicy
+    import json
+    
+    policy = db.query(RoutingPolicy).filter(
+        RoutingPolicy.workspace_id == workspace_id
+    ).first()
+    
+    if not policy:
+        # Return default policy
+        return {
+            "workspace_id": workspace_id,
+            "strategy": "cost_optimized",
+            "constraints": {},
+            "exists": False,
+        }
+    
+    # Parse constraints from JSON
+    try:
+        constraints = json.loads(policy.constraints_json) if policy.constraints_json else {}
+    except json.JSONDecodeError:
+        constraints = {}
+    
     return {
         "workspace_id": workspace_id,
-        "strategy": "cost_optimized",
-        "constraints": {},
+        "policy_id": policy.id,
+        "strategy": policy.strategy,
+        "constraints": constraints,
+        "exists": True,
+        "created_at": policy.created_at.isoformat() if policy.created_at else None,
+        "updated_at": policy.updated_at.isoformat() if policy.updated_at else None,
     }
 
 

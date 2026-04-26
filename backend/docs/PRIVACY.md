@@ -91,7 +91,7 @@ Authorization: Bearer <token>
 Permanently delete all data for a user and their workspace:
 
 ```
-DELETE /api/v1/privacy/delete-account
+POST /api/v1/privacy/delete
 { "confirmation": "DELETE MY ACCOUNT" }
 ```
 
@@ -136,7 +136,7 @@ A Celery beat job (`data_retention_cleanup`) runs daily at midnight and purges a
 The platform does not currently implement a consent management UI. For GDPR compliance, you should:
 1. Implement a consent banner in your frontend application
 2. Store consent records in your own database
-3. Use BYOS's `DELETE /api/v1/privacy/delete-account` when consent is withdrawn
+3. Use BYOS's `POST /api/v1/privacy/delete` when consent is withdrawn
 
 ---
 
@@ -169,7 +169,7 @@ With `GROQ_API_KEY` set and `LLM_FALLBACK=groq`:
 
 BYOS supports CCPA via the same endpoints as GDPR:
 - **Right to Know:** `GET /api/v1/privacy/export`
-- **Right to Delete:** `DELETE /api/v1/privacy/delete-account`
+- **Right to Delete:** `POST /api/v1/privacy/delete`
 - **Right to Opt-Out:** Disable GROQ fallback with `LLM_FALLBACK=off`
 
 Compliance reports: `POST /api/v1/compliance/report` with `"regulation": "ccpa"`

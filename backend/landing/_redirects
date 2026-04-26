@@ -1,0 +1,15 @@
+# Cloudflare Pages redirects
+# https://developers.cloudflare.com/pages/configuration/redirects/
+
+# Force apex (no www). Keeps SEO single-canonical, avoids duplicate-content.
+https://www.veklom.com/*  https://veklom.com/:splat  301
+
+# Common typos / alternate paths land on real sections
+/contact   /#contact   302
+/pricing   /#pricing   302
+/proof     /#proof     302
+/architecture  /#architecture  302
+/security  /#problem   302
+
+# Old workers.dev preview URL → canonical
+https://veklom.pages.dev/*  https://veklom.com/:splat  301

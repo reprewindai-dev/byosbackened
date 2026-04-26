@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Building HIPAA-Compliant AI Pipelines: An Engineering Reference | Veklom Field Notes</title>
+<meta name="description" content="A line-by-line walkthrough of the architecture you need for HIPAA-compliant AI: PHI handling, BAA scope, audit trail granularity, encryption boundaries, and the specific 45 CFR § 164 sub-parts your build will be measured against. With reference deployment." />
+<meta name="keywords" content="HIPAA AI pipeline, HIPAA compliant LLM, PHI handling AI, 45 CFR 164, BAA AI vendor, healthcare AI architecture, audit logging HIPAA, encryption at rest in transit, electronic protected health information, OCR audit AI" />
+<meta name="author" content="Veklom Engineering" />
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+<link rel="canonical" href="https://veklom.com/blog/hipaa-compliant-ai-pipelines/" />
+
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="Veklom" />
+<meta property="og:title" content="Building HIPAA-Compliant AI Pipelines: An Engineering Reference" />
+<meta property="og:description" content="The architecture you actually need: PHI handling, BAA scope, audit granularity, encryption boundaries, and the 45 CFR § 164 sub-parts you will be measured against." />
+<meta property="og:url" content="https://veklom.com/blog/hipaa-compliant-ai-pipelines/" />
+<meta property="og:image" content="https://veklom.com/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="article:published_time" content="2026-04-26T12:00:00-04:00" />
+<meta property="article:section" content="Engineering Reference" />
+<meta property="article:tag" content="HIPAA" />
+<meta property="article:tag" content="Healthcare AI" />
+<meta property="article:tag" content="Compliance Engineering" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Building HIPAA-Compliant AI Pipelines" />
+<meta name="twitter:description" content="The architecture you actually need, with reference code." />
+<meta name="twitter:image" content="https://veklom.com/og-image.png" />
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#0c0c0e" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="/blog/blog.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Building HIPAA-Compliant AI Pipelines: An Engineering Reference",
+  "description": "A reference architecture for HIPAA-compliant AI: PHI handling, audit granularity, encryption boundaries, with reference deployment.",
+  "image": "https://veklom.com/og-image.png",
+  "author": { "@type": "Organization", "name": "Veklom Engineering", "url": "https://veklom.com/" },
+  "publisher": { "@type": "Organization", "name": "Veklom", "logo": { "@type": "ImageObject", "url": "https://veklom.com/logo.svg" } },
+  "datePublished": "2026-04-26",
+  "dateModified": "2026-04-26",
+  "mainEntityOfPage": "https://veklom.com/blog/hipaa-compliant-ai-pipelines/",
+  "wordCount": 2200,
+  "proficiencyLevel": "Expert",
+  "keywords": "HIPAA AI, PHI handling, audit logging, encryption boundary"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://veklom.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Field Notes", "item": "https://veklom.com/blog/" },
+    { "@type": "ListItem", "position": 3, "name": "HIPAA-Compliant AI Pipelines", "item": "https://veklom.com/blog/hipaa-compliant-ai-pipelines/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<nav class="top">
+  <div class="container-wide top-row">
+    <a href="/" class="brand"><img src="/logo.svg" alt="Veklom"/><span>Veklom</span></a>
+    <div class="top-links">
+      <a href="/#problem">Problem</a>
+      <a href="/#architecture">Architecture</a>
+      <a href="/#capabilities">Capabilities</a>
+      <a href="/#pricing">Engagement</a>
+      <a href="/blog/">Field Notes</a>
+    </div>
+    <a href="/#contact" class="top-cta">Request access</a>
+  </div>
+</nav>
+
+<article class="post">
+  <div class="container">
+
+    <div class="breadcrumb">
+      <a href="/">Veklom</a> &nbsp;&middot;&nbsp; <a href="/blog/">Field Notes</a> &nbsp;&middot;&nbsp; Engineering Reference
+    </div>
+
+    <header class="title">
+      <h1>Building HIPAA-Compliant AI Pipelines: An Engineering Reference</h1>
+      <div class="meta">
+        <span class="cat">Engineering Reference</span>
+        <span>April 26, 2026</span>
+        <span>14 min read</span>
+        <span>By Veklom Engineering</span>
+      </div>
+      <p class="lede">This is the architecture you actually need. Not a checklist. Not a marketing white paper. The specific design decisions, the regulatory citations they answer to, and the code that implements them.</p>
+    </header>
+
+    <figure class="hero-figure">
+      <svg viewBox="0 0 1200 360" xmlns="http://www.w3.org/2000/svg" aria-label="HIPAA pipeline architecture">
+        <defs>
+          <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1c1c23"/>
+            <stop offset="100%" stop-color="#0c0c0e"/>
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="360" fill="url(#bg3)"/>
+        <text x="60" y="50" font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="3" fill="#c4925b">HIPAA-COMPLIANT AI PIPELINE &middot; REFERENCE TOPOLOGY</text>
+
+        <rect x="60" y="100" width="200" height="60" fill="none" stroke="#d6cfbe" stroke-width="1"/>
+        <text x="160" y="136" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" fill="#f5f1e8">EHR / Clinical App</text>
+
+        <line x1="260" y1="130" x2="320" y2="130" stroke="#c4925b" stroke-width="1.5"/>
+        <polygon points="316,126 324,130 316,134" fill="#c4925b"/>
+        <text x="290" y="120" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#c4925b">mTLS</text>
+
+        <rect x="320" y="100" width="200" height="60" fill="rgba(196,146,91,.08)" stroke="#c4925b" stroke-width="1.5"/>
+        <text x="420" y="128" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#f5f1e8">PHI Tokenizer</text>
+        <text x="420" y="148" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" letter-spacing="1.5" fill="#c4925b">Safe Harbor &sect;164.514</text>
+
+        <line x1="520" y1="130" x2="580" y2="130" stroke="#c4925b" stroke-width="1.5"/>
+        <polygon points="576,126 584,130 576,134" fill="#c4925b"/>
+
+        <rect x="580" y="100" width="200" height="60" fill="rgba(196,146,91,.08)" stroke="#c4925b" stroke-width="1.5"/>
+        <text x="680" y="128" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#f5f1e8">Veklom Gateway</text>
+        <text x="680" y="148" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" letter-spacing="1.5" fill="#c4925b">Policy + Audit</text>
+
+        <line x1="780" y1="130" x2="840" y2="130" stroke="#c4925b" stroke-width="1.5"/>
+        <polygon points="836,126 844,130 836,134" fill="#c4925b"/>
+
+        <rect x="840" y="100" width="280" height="60" fill="none" stroke="#d6cfbe" stroke-width="1"/>
+        <text x="980" y="128" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" fill="#f5f1e8">In-perimeter LLM</text>
+        <text x="980" y="148" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" letter-spacing="1.5" fill="#908a7c">Ollama &middot; vLLM &middot; SageMaker BAA</text>
+
+        <line x1="420" y1="160" x2="420" y2="240" stroke="#7a9c64" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <line x1="680" y1="160" x2="680" y2="240" stroke="#7a9c64" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <line x1="980" y1="160" x2="980" y2="240" stroke="#7a9c64" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+        <rect x="60" y="240" width="1080" height="60" fill="rgba(122,156,100,.08)" stroke="#7a9c64" stroke-width="1.2"/>
+        <text x="80" y="268" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#7a9c64">Tamper-Evident Audit Log (append-only, hash-chained)</text>
+        <text x="80" y="286" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.5" fill="#7a9c64">&sect;164.312(b) AUDIT CONTROLS &middot; &sect;164.308(a)(1)(ii)(D) INFORMATION SYSTEM ACTIVITY REVIEW</text>
+      </svg>
+    </figure>
+
+    <h2>The Regulation, Briefly</h2>
+
+    <p>HIPAA's enforcement target is not "AI" or "the cloud." It is electronic protected health information &mdash; ePHI &mdash; under 45 CFR &sect; 160.103. Anything that creates, receives, maintains, or transmits ePHI is subject to the Security Rule (&sect; 164.302&ndash;318) and the Privacy Rule (&sect; 164.500&ndash;534). An AI pipeline that touches ePHI is therefore subject to the same controls as a billing system, a chart-review tool, or an EHR integration.</p>
+
+    <p>The relevant Security Rule sub-parts for an AI pipeline are:</p>
+    <ul>
+      <li><strong>&sect; 164.308(a)(1)(ii)(D)</strong> &mdash; Information system activity review (your audit log)</li>
+      <li><strong>&sect; 164.312(a)(1)</strong> &mdash; Access control (your authn/authz)</li>
+      <li><strong>&sect; 164.312(b)</strong> &mdash; Audit controls (mechanism, not just policy)</li>
+      <li><strong>&sect; 164.312(c)(1)</strong> &mdash; Integrity (tamper-evidence)</li>
+      <li><strong>&sect; 164.312(d)</strong> &mdash; Authentication (the user is who they say they are)</li>
+      <li><strong>&sect; 164.312(e)(1)</strong> &mdash; Transmission security (encryption in transit)</li>
+      <li><strong>&sect; 164.514(a)&ndash;(c)</strong> &mdash; De-identification (Safe Harbor and Expert Determination)</li>
+    </ul>
+
+    <p>Every architectural decision below answers to one or more of these. The point of writing the code this way is so that when an OCR auditor walks in, the engineer can point at the line and the line of the regulation in the same sentence.</p>
+
+    <h2>Step 1: PHI Tokenization at the Boundary</h2>
+
+    <p>The single most consequential decision is whether the LLM ever sees raw PHI. If it does, every component the call traverses is in HIPAA scope and must be operated under a BAA. If the PHI is tokenized before the gateway and de-tokenized after, the LLM operates on synthetic data and is potentially out of scope &mdash; depending on your covered-entity determination and the strength of the de-identification.</p>
+
+    <p>The Safe Harbor method (&sect; 164.514(b)(2)) lists 18 identifiers that must be removed. Names, addresses (smaller than state), dates more granular than year, telephone numbers, fax, email, SSN, MRN, account numbers, certificate/license numbers, vehicle identifiers, device identifiers, URLs, IPs, biometric identifiers, full-face photos, and any other unique identifying number or code.</p>
+
+    <p>A reference Python implementation of the boundary tokenizer:</p>
+
+    <pre><code>from veklom.phi import Tokenizer, SafeHarborPolicy
+
+tok = Tokenizer(policy=SafeHarborPolicy())
+
+# At ingress: replace every identifier with a stable, opaque token
+tokenized, vault = tok.scrub(prompt)
+#  -&gt; "Pt_5af3 presented with chest pain at Loc_a91d on Date_38f2"
+#  -&gt; vault: { "Pt_5af3": "John Doe", "Loc_a91d": "...", ... }
+
+# Send tokenized text to LLM (out of HIPAA scope, by Safe Harbor)
+response = gateway.complete(tokenized, model="...")
+
+# At egress: rehydrate tokens for clinical display
+final = tok.rehydrate(response, vault)</code></pre>
+
+    <p>The vault is the only PHI-bearing artifact and lives in your encrypted store with workspace-scoped key access. The model never sees the names. The audit log records the token-set, not the identifiers.</p>
+
+    <h2>Step 2: The Audit Log is Not a Log File</h2>
+
+    <p>&sect; 164.312(b) requires "hardware, software, and/or procedural mechanisms that record and examine activity." The single biggest failure we see in healthcare AI pipelines is treating this as a request to write to <code>app.log</code>. That is not an audit control. That is a debug artifact.</p>
+
+    <p>The audit log under HIPAA must be:</p>
+    <ol>
+      <li><strong>Tamper-evident.</strong> Append-only, hash-chained, with a daily hash anchor written to a separate system. If a row is modified, the chain breaks visibly.</li>
+      <li><strong>Per-event addressable.</strong> Every prompt, every response, every model decision, every routing decision, every error &mdash; one row each, with a stable event ID.</li>
+      <li><strong>Tenant-scoped at storage.</strong> The audit table for Workspace A is logically separate from Workspace B at the row-security level. A bug in one application cannot expose the other's audit trail.</li>
+      <li><strong>Retained for six years.</strong> Per &sect; 164.316(b)(2)(i), the documentation retention requirement.</li>
+    </ol>
+
+    <p>The Veklom audit schema implements this with row-level security in Postgres and a per-day SHA-256 chain anchor written to S3 Object Lock with WORM retention.</p>
+
+    <div class="pullquote">
+      &ldquo;If your auditor cannot reconstruct exactly what the model saw, and exactly what was returned, six months after the call, you do not have an audit log. You have a debug stream.&rdquo;
+    </div>
+
+    <h2>Step 3: BAA Scope &amp; the Provider Stack</h2>
+
+    <p>Every component handling ePHI &mdash; database, object store, queue, container runtime, observability stack &mdash; needs to be covered by a Business Associate Agreement, either with you (if you operate it) or with a vendor who has signed a BAA with you.</p>
+
+    <p>Three tiers of provider posture, ordered by ease of compliance:</p>
+    <ol>
+      <li><strong>You operate everything inside your own perimeter.</strong> No BAA needed externally; your internal data-handling policies cover it. This is the Veklom default deployment posture.</li>
+      <li><strong>You operate inside a hyperscaler that signs a BAA for the listed services.</strong> AWS, Azure, GCP all have published HIPAA-eligible service lists. You stay inside the list. The BAA is a single document.</li>
+      <li><strong>You use third-party services that each require their own BAA.</strong> Logging, monitoring, error tracking, embeddings provider &mdash; each needs a signed BAA in place before any ePHI flows. Plan for procurement to take 6&ndash;12 weeks per vendor.</li>
+    </ol>
+
+    <p>The single most expensive mistake we see is teams beginning to flow ePHI before all three tiers of BAA are signed. Even a minor breach in this state escalates to a Notice of Privacy Practices violation and a corrective-action plan from OCR, regardless of whether any data was actually exposed.</p>
+
+    <h2>Step 4: Encryption Boundaries</h2>
+
+    <p>&sect; 164.312(a)(2)(iv) and &sect; 164.312(e)(2)(ii) require encryption "to a level commensurate with the risk." NIST SP 800-66r2 interprets this as AES-128 minimum for at-rest and TLS 1.2+ for in-transit. In practice we use AES-256-GCM at rest and TLS 1.3 in transit, with mTLS between every internal service.</p>
+
+    <p>The boundary diagram (Fig. 1, top of post) shows the three encryption transitions: client &rarr; gateway, gateway &rarr; model, gateway &rarr; storage. Each is a separately-managed key, each is rotated quarterly under &sect; 164.308(a)(5)(ii)(C), and each rotation event is itself an audit event.</p>
+
+    <h2>Step 5: Access Control &amp; Authentication</h2>
+
+    <p>&sect; 164.312(a)(1) and &sect; 164.312(d) require role-based access and verifiable authentication. The implementation pattern is:</p>
+    <ul>
+      <li><strong>OIDC-only authentication</strong> against the customer's identity provider. No vendor-managed user accounts. The covered entity owns the user lifecycle.</li>
+      <li><strong>RBAC with workspace scoping.</strong> Every request carries a JWT with workspace claims. Authorization is enforced at the gateway, the data layer, and the audit layer.</li>
+      <li><strong>Session timeout under &sect; 164.312(a)(2)(iii).</strong> Default 15 minutes idle; configurable to the covered entity's policy.</li>
+      <li><strong>Emergency access procedure under &sect; 164.312(a)(2)(ii).</strong> A documented break-glass workflow that grants temporary elevated access, generates a high-priority audit event, and notifies the covered entity's privacy officer.</li>
+    </ul>
+
+    <h2>Step 6: De-identification, Re-identification, &amp; Expert Determination</h2>
+
+    <p>Safe Harbor (Step 1) is the simpler path. Expert Determination (&sect; 164.514(b)(1)) is the more powerful one: a qualified statistician determines that the risk of re-identification is "very small" and documents the methodology. This permits retention of more clinically-useful data &mdash; including dates more granular than year &mdash; at the cost of a paid statistical review and an annual re-evaluation.</p>
+
+    <p>For most AI pipelines, Safe Harbor is sufficient. For research pipelines or longitudinal cohort analyses, Expert Determination unlocks workloads that Safe Harbor cannot support. The pipeline should support both modes and tag every PHI element with the de-identification method used so the audit trail is complete.</p>
+
+    <h2>The Reference Deployment</h2>
+
+    <p>The full reference deployment ships with Veklom under the Sovereign Pro tier. It includes:</p>
+    <ul>
+      <li>Boundary tokenizer with Safe Harbor and configurable Expert Determination policies</li>
+      <li>Tamper-evident audit table with row-level security and S3 Object Lock anchoring</li>
+      <li>Pre-configured RBAC policies for the eleven HIPAA control families</li>
+      <li>OIDC integration shims for the major identity providers</li>
+      <li>Quarterly key-rotation runbook with audit-event emission</li>
+      <li>Six-year retention policies as Postgres partitions with a documented archive flow</li>
+      <li>OCR-ready evidence packet generator (point-in-time export of policies, configurations, and a 30-day audit sample)</li>
+    </ul>
+
+    <p>The architecture is the same one we deploy for hospital systems and academic medical centers. The cost-engineering complement is in <a href="/blog/true-cost-of-llm-sprawl/">a separate piece</a>. The procurement-realities companion is <a href="/blog/why-saas-cannot-serve-regulated-buyers/">here</a>.</p>
+
+    <div class="cta-end">
+      <h3>Building this in-house?</h3>
+      <p>We have walked dozens of teams through the build/buy decision. If you decide to build, we will share what we learned. If you decide to buy, we are here. Either way, the conversation is technical, not commercial, on the first call.</p>
+      <a class="btn" href="/#contact">Talk to engineering &rarr;</a>
+    </div>
+
+  </div>
+</article>
+
+<footer class="foot">
+  <div class="container-wide">
+    <div class="foot-row">
+      <div class="col"><h4>Veklom</h4><a href="/">Home</a><a href="/#architecture">Architecture</a><a href="/#pricing">Engagement</a><a href="/blog/">Field Notes</a></div>
+      <div class="col"><h4>Legal</h4><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/sla.html">SLA</a></div>
+      <div class="col"><h4>Contact</h4><a href="mailto:hello@veklom.com">hello@veklom.com</a><a href="mailto:procurement@veklom.com">procurement@veklom.com</a></div>
+    </div>
+    <div class="foot-fine">
+      <span>&copy; MMXXVI Veklom &middot; Sovereign AI Operations</span>
+      <span>Self-Hosted by Design</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

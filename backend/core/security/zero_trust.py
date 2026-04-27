@@ -24,9 +24,9 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/subscriptions/plans",
     f"{settings.api_prefix}/subscriptions/webhook",
     # Docs now require auth + tokens (100 per view)
-    # f"{settings.api_prefix}/docs",      # LOCKED - requires auth
-    # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth
-    f"{settings.api_prefix}/openapi.json",  # Keep public for SDKs
+    # f"{settings.api_prefix}/docs",      # LOCKED - requires auth + 100 tokens
+    # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth + 100 tokens
+    # f"{settings.api_prefix}/openapi.json",  # LOCKED - requires auth
 }
 
 

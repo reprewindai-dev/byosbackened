@@ -73,7 +73,7 @@ app = FastAPI(
         "BYOS AI + Security Suite — Portable, secure, cost-intelligent AI backend. "
         "No lock-in. Swap hosts in a weekend. Built for agencies, enterprises, and privacy-first platforms."
     ),
-    openapi_url=f"{settings.api_prefix}/openapi.json",
+    openapi_url=None,  # Disabled - using protected custom route
     docs_url=None,  # Disabled - using protected custom route
     redoc_url=None,  # Disabled - using protected custom route
 )
@@ -267,3 +267,16 @@ async def protected_redoc(request: Request, workspace_id: str = Depends(get_curr
     response.headers["X-Tokens-Cost"] = "100"
     response.headers["X-Tokens-Remaining"] = str(balance)
     return response
+
+
+@app.get(f"{settings.api_prefix}/openapi.json", include_in_schema=False)
+async def protected_openapi(request: Request, workspace_id: str = Depends(get_current_workspace)):
+    """OpenAPI schema - requires authentication (free, no tokens)."""
+    from fastapi.openapi.utils import get_openapi
+    return get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        routes=app.routes,
+    )

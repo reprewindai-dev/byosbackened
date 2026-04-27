@@ -1,18 +1,36 @@
-# Veklom Marketplace Blueprint — Built Around BYOSBackend
+# Veklom Marketplace Blueprint — Built Around the Existing Backend
 
-## 0. Purpose
+## 0. Naming Correction
 
-This blueprint defines how to turn **BYOSBackend** into the commercial engine behind **Veklom Marketplace**.
+The repository is named `byosbackened`. That is the repo name only.
+
+Do **not** use `BYOSBackend`, `BYOSBackend Marketplace`, or any repo-name-derived wording as the public product name unless explicitly approved.
+
+Customer-facing names should be:
+
+- **Veklom**
+- **Veklom Marketplace**
+- **Veklom Backend**
+- **Veklom Control Layer**
+- **Veklom Runtime** if needed later
+
+The repo name should stay internal.
+
+---
+
+## 1. Purpose
+
+This blueprint defines how to turn the existing Veklom backend into the commercial engine behind **Veklom Marketplace**.
 
 The goal is not to build a generic hosting company. The goal is to sell access to Veklom’s existing backend capabilities — tokens, cost controls, routing, auditability, execution governance, marketplace listings, and premium control features — through a premium marketplace experience that matches Veklom’s positioning.
 
 **Core principle:**
 
-> Veklom does not start as a place where strangers upload huge backends. Veklom starts as the marketplace and control layer powered by BYOSBackend, with Veklom’s own backend as the first premium product.
+> Veklom does not start as a place where strangers upload huge backends. Veklom starts as a marketplace and control layer powered by its own backend, with Veklom’s backend as the first premium product.
 
 ---
 
-## 1. Product Thesis
+## 2. Product Thesis
 
 Regulated and AI-heavy teams do not only need “AI tools.” They need:
 
@@ -26,7 +44,7 @@ Regulated and AI-heavy teams do not only need “AI tools.” They need:
 - usage visibility
 - optional sovereign/self-hosted paths later
 
-BYOSBackend already contains many backend capabilities. The marketplace must package those capabilities into clear buyer-facing products and plans.
+The existing backend already contains many backend capabilities. The marketplace must package those capabilities into clear buyer-facing products and plans.
 
 The marketplace should answer:
 
@@ -34,17 +52,17 @@ The marketplace should answer:
 
 The answer is:
 
-> “Because this tier unlocks specific BYOSBackend capabilities that save money, reduce runaway AI costs, govern execution, and make usage easier to audit.”
+> “Because this tier unlocks specific Veklom backend capabilities that save money, reduce runaway AI costs, govern execution, and make usage easier to audit.”
 
 ---
 
-## 2. What Veklom Is Selling First
+## 3. What Veklom Is Selling First
 
-The first premium listing is **Veklom BYOSBackend**.
+The first premium listing is **Veklom Backend**.
 
 Positioning:
 
-> **The backend control layer for sovereign AI operations.**
+> **The backend control layer for AI operations, usage governance, and sovereign-ready execution.**
 
 Buyer-facing line:
 
@@ -54,9 +72,9 @@ Veklom is not just selling a dashboard. Veklom is selling governed access to bac
 
 ---
 
-## 3. Hosting Strategy: What We Host and What We Do Not Host
+## 4. Hosting Strategy: What We Host and What We Do Not Host
 
-### 3.1 Current infra reality
+### 4.1 Current infra reality
 
 The current production server should be treated as a **control node**, not a general hosting platform.
 
@@ -67,14 +85,14 @@ It should run:
 - listing database
 - subscription/payment state
 - token/credit ledger
-- BYOSBackend gateway/API control layer
+- Veklom backend gateway/API control layer
 - usage event ingestion
 - admin approvals
 - lightweight execution only when explicitly approved
 
 It should not run arbitrary customer infrastructure.
 
-### 3.2 What is allowed at launch
+### 4.2 What is allowed at launch
 
 Allowed:
 
@@ -88,7 +106,7 @@ Allowed:
 - download/self-host listings
 - buyer requests for access
 
-### 3.3 What is not allowed at launch
+### 4.3 What is not allowed at launch
 
 Not allowed:
 
@@ -101,7 +119,7 @@ Not allowed:
 - training jobs
 - uncontrolled container hosting
 
-### 3.4 Later expansion
+### 4.4 Later expansion
 
 If demand is proven, add:
 
@@ -114,11 +132,11 @@ If demand is proven, add:
 
 ---
 
-## 4. Marketplace Structure
+## 5. Marketplace Structure
 
 The marketplace has two sides:
 
-### 4.1 Sovereign Marketplace
+### 5.1 Sovereign Marketplace
 
 For regulated or serious buyers.
 
@@ -134,7 +152,7 @@ Requirements:
 
 This is the premium side.
 
-### 4.2 Essential Marketplace
+### 5.2 Essential Marketplace
 
 For useful tools that do not fully qualify as sovereign.
 
@@ -149,7 +167,7 @@ These may be:
 
 They still create value, but they do not get the premium sovereign badge until they meet the standard.
 
-### 4.3 Graduation path
+### 5.3 Graduation path
 
 Essential tools can graduate to Sovereign after they provide:
 
@@ -163,15 +181,15 @@ Essential tools can graduate to Sovereign after they provide:
 
 ---
 
-## 5. Listing Types
+## 6. Listing Types
 
-### 5.1 First-party Veklom listing
+### 6.1 First-party Veklom listing
 
 This is the main product.
 
 Includes:
 
-- BYOSBackend access
+- Veklom backend access
 - subscription tiers
 - token/credit usage
 - cost-control features
@@ -181,7 +199,7 @@ Includes:
 
 Revenue: Veklom keeps 100%.
 
-### 5.2 Vendor catalog listing
+### 6.2 Vendor catalog listing
 
 Vendor does not upload a giant backend to Veklom.
 
@@ -206,7 +224,7 @@ Buyer can:
 
 Revenue: Veklom can take 20–30% on transactions once payments are enabled.
 
-### 5.3 Lightweight Veklom-routed listing
+### 6.3 Lightweight Veklom-routed listing
 
 Later, selected vendors can submit small functions/jobs that run through Veklom with strict limits.
 
@@ -228,11 +246,11 @@ Not allowed:
 
 ---
 
-## 6. BYOSBackend Capability Mapping
+## 7. Existing Backend Capability Mapping
 
-Because BYOSBackend has many endpoints, we must map endpoints into buyer-facing modules.
+Because the backend has many endpoints, we must map endpoints into buyer-facing modules.
 
-### 6.1 Core modules
+### 7.1 Core modules
 
 #### Module A — Access & Identity
 
@@ -396,11 +414,11 @@ Plan placement:
 
 ---
 
-## 7. Pricing Model
+## 8. Pricing Model
 
 Pricing must reflect backend value, not random page access.
 
-### 7.1 Buyer plans
+### 8.1 Buyer plans
 
 #### Starter — $49–$99/month
 
@@ -413,7 +431,7 @@ Audience:
 Includes:
 
 - account access
-- limited BYOSBackend endpoints
+- limited Veklom backend endpoints
 - basic token wallet
 - monthly included credits
 - basic usage logs
@@ -461,7 +479,7 @@ Audience:
 
 Includes:
 
-- premium BYOSBackend endpoints
+- premium Veklom backend endpoints
 - hard budget caps
 - audit logs/export
 - policy enforcement
@@ -500,7 +518,7 @@ Value:
 - control and evidence
 - custom architecture
 
-### 7.2 Token/credit model
+### 8.2 Token/credit model
 
 Subscriptions give access. Tokens meter usage.
 
@@ -523,7 +541,7 @@ Token rules:
 
 This is one of the biggest competitive advantages.
 
-### 7.3 Vendor plans
+### 8.3 Vendor plans
 
 #### Free listing
 
@@ -556,9 +574,9 @@ Once Stripe marketplace transactions are enabled:
 
 ---
 
-## 8. Competitive Win Map
+## 9. Competitive Win Map
 
-### 8.1 Against Helicone
+### 9.1 Against Helicone
 
 Helicone-style weakness:
 
@@ -576,7 +594,7 @@ Sales line:
 
 > Stop runaway AI spend before it becomes an invoice.
 
-### 8.2 Against LangSmith
+### 9.2 Against LangSmith
 
 LangSmith-style weakness:
 
@@ -594,7 +612,7 @@ Sales line:
 
 > Observability is not enough. Regulated teams need controlled execution.
 
-### 8.3 Against Portkey
+### 9.3 Against Portkey
 
 Portkey-style weakness:
 
@@ -611,7 +629,7 @@ Sales line:
 
 > AI routing without sovereignty is still vendor risk.
 
-### 8.4 Against generic SaaS AI vendors
+### 9.4 Against generic SaaS AI vendors
 
 Weakness:
 
@@ -633,9 +651,9 @@ Sales line:
 
 ---
 
-## 9. Marketplace Pages Required
+## 10. Marketplace Pages Required
 
-### 9.1 Home
+### 10.1 Home
 
 Hero:
 
@@ -643,7 +661,7 @@ Hero:
 
 Sub:
 
-> Veklom Marketplace is powered by BYOSBackend — a control layer for AI usage, cost limits, endpoint access, and sovereign-ready execution.
+> Veklom Marketplace is powered by the Veklom backend — a control layer for AI usage, cost limits, endpoint access, and sovereign-ready execution.
 
 CTA:
 
@@ -651,7 +669,7 @@ CTA:
 - Explore Marketplace
 - Submit Tool
 
-### 9.2 Veklom BYOSBackend product page
+### 10.2 Veklom Backend product page
 
 Sections:
 
@@ -666,7 +684,7 @@ Sections:
 - Use cases
 - CTA: Start subscription / request access
 
-### 9.3 Pricing
+### 10.3 Pricing
 
 Must show:
 
@@ -677,7 +695,7 @@ Must show:
 - Token top-ups
 - vendor listing plans
 
-### 9.4 Marketplace catalog
+### 10.4 Marketplace catalog
 
 Filters:
 
@@ -698,7 +716,7 @@ Each listing card:
 - pricing model
 - CTA
 
-### 9.5 Vendor submission
+### 10.5 Vendor submission
 
 Fields:
 
@@ -712,7 +730,7 @@ Fields:
 - support contact
 - file/docs upload later
 
-### 9.6 Buyer dashboard
+### 10.6 Buyer dashboard
 
 Shows:
 
@@ -724,7 +742,7 @@ Shows:
 - API keys
 - purchased listings
 
-### 9.7 Admin dashboard
+### 10.7 Admin dashboard
 
 Shows:
 
@@ -738,9 +756,9 @@ Shows:
 
 ---
 
-## 10. Backend Implementation Blueprint
+## 11. Backend Implementation Blueprint
 
-### 10.1 Core tables
+### 11.1 Core tables
 
 Required tables:
 
@@ -761,9 +779,9 @@ Required tables:
 - invoices/payments
 - audit_logs
 
-### 10.2 Endpoint catalog
+### 11.2 Endpoint catalog
 
-Every BYOSBackend endpoint should be registered with:
+Every endpoint should be registered with:
 
 - endpoint path
 - method
@@ -778,7 +796,7 @@ Every BYOSBackend endpoint should be registered with:
 
 This turns 135+ endpoints into a product system.
 
-### 10.3 Entitlement check
+### 11.3 Entitlement check
 
 Every protected endpoint should enforce:
 
@@ -791,7 +809,7 @@ Every protected endpoint should enforce:
 7. usage event logged
 8. audit event stored if required
 
-### 10.4 Token flow
+### 11.4 Token flow
 
 When user calls tokenized endpoint:
 
@@ -805,7 +823,7 @@ When user calls tokenized endpoint:
 8. write usage event
 9. return response with remaining balance
 
-### 10.5 Stripe flow
+### 11.5 Stripe flow
 
 Subscriptions:
 
@@ -838,26 +856,23 @@ Webhook updates:
 
 ---
 
-## 11. Security Rules
+## 12. Security Rules
 
-### 11.1 Public repo safety
+### 12.1 Repo safety
 
-If this repo remains public:
+Backend repo should stay private.
 
-- no proprietary backend logic should be exposed beyond what is already public
-- no secrets
+No secrets should be committed:
+
 - no API keys
 - no Stripe keys
 - no database URLs
 - no provider tokens
 - no private endpoint docs that reveal attack paths
 
-Recommended:
+Keep public marketing/docs separate where possible.
 
-- make backend repo private
-- keep public marketing/docs separate
-
-### 11.2 Runtime safety
+### 12.2 Runtime safety
 
 - rate limit all API keys
 - protect admin endpoints
@@ -866,7 +881,7 @@ Recommended:
 - do not allow arbitrary code execution initially
 - isolate any future execution workers
 
-### 11.3 Vendor safety
+### 12.3 Vendor safety
 
 - vendors cannot upload arbitrary backend services
 - vendors submit listings only at launch
@@ -875,9 +890,9 @@ Recommended:
 
 ---
 
-## 12. Build Plan for Windsurf
+## 13. Build Plan for Windsurf
 
-### Phase 1 — Inventory BYOSBackend
+### Phase 1 — Inventory backend
 
 Task:
 
@@ -920,7 +935,7 @@ Output:
 
 Task:
 
-- add middleware around BYOSBackend endpoints
+- add middleware around existing endpoints
 - enforce plan access
 - enforce tokens
 - log usage
@@ -946,7 +961,7 @@ Output:
 
 Task:
 
-- Veklom BYOSBackend as first premium listing
+- Veklom Backend as first premium listing
 - Essential/Sovereign catalog live
 - Stripe live keys
 - production server env configured
@@ -958,7 +973,7 @@ Output:
 
 ---
 
-## 13. Final Positioning
+## 14. Final Positioning
 
 Use this everywhere:
 
@@ -974,12 +989,16 @@ Most important line:
 
 ---
 
-## 14. Immediate Windsurf Prompt
+## 15. Immediate Windsurf Prompt
 
 Paste this into Windsurf:
 
-```
-We are building Veklom Marketplace around the existing BYOSBackend codebase.
+```text
+We are building Veklom Marketplace around the existing Veklom backend in this repo.
+
+Important naming rule:
+- Do not use the repository name as the customer-facing product name.
+- Customer-facing names are Veklom, Veklom Marketplace, Veklom Backend, Veklom Control Layer.
 
 Do not build a generic hosting platform.
 Do not allow arbitrary third-party backend uploads.
@@ -992,7 +1011,7 @@ Then build the marketplace around the actual backend capabilities:
 - hard budget caps
 - usage event ledger
 - endpoint entitlement middleware
-- Veklom BYOSBackend as the first premium listing
+- Veklom Backend as the first premium listing
 - vendor submissions as catalog listings only at launch
 - two marketplace tiers: Sovereign and Essential
 
@@ -1001,7 +1020,7 @@ Use a premium Veklom aesthetic: dark background, gold accents, clean enterprise 
 Required pages:
 - home
 - marketplace catalog
-- Veklom BYOSBackend product page
+- Veklom Backend product page
 - pricing
 - vendor submission
 - buyer dashboard
@@ -1018,5 +1037,5 @@ Required backend work:
 - webhook handler
 - protected endpoint middleware
 
-The main product is controlled access to BYOSBackend, not third-party hosting.
+The main product is controlled access to Veklom backend capabilities, not third-party hosting.
 ```

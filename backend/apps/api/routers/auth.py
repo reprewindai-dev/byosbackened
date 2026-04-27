@@ -1,6 +1,7 @@
-"""Authentication endpoints: register, login, logout, refresh, /me, MFA, API keys."""
+"""Authentication endpoints: register, login, logout, refresh, /me, MFA, API keys, GitHub OAuth."""
 import hashlib
 import hmac
+import httpx
 import os
 import secrets
 import pyotp
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -109,6 +111,20 @@ def _create_tokens(user: User) -> dict:
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new workspace + owner user."""
+    # Password strength enforcement
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not any(c.isupper() for c in payload.password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not any(c.isdigit() for c in payload.password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+
+    # Workspace name validation
+    if not payload.workspace_name or len(payload.workspace_name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Workspace name must be at least 2 characters")
+    if len(payload.workspace_name) > 100:
+        raise HTTPException(status_code=400, detail="Workspace name too long (max 100 characters)")
+
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -147,6 +163,8 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
     credentials_error = HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user:
+        # Constant-time dummy check to prevent user enumeration via timing
+        verify_password("dummy_password", "$2b$12$LJ3m4ys3Gz8KBOhGivQn3O4IFCmsfGRDMIMKPGQp0Nv0CGJxFHEV6")
         raise credentials_error
 
     if user.status == UserStatus.LOCKED:
@@ -396,3 +414,167 @@ async def revoke_api_key(
         raise HTTPException(status_code=404, detail="API key not found")
     key.is_active = False
     db.commit()
+
+
+# ─── GitHub OAuth ─────────────────────────────────────────────────────────────
+
+GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
+GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
+GITHUB_USER_URL = "https://api.github.com/user"
+GITHUB_EMAILS_URL = "https://api.github.com/user/emails"
+
+
+@router.get("/github/login")
+async def github_login():
+    """Redirect user to GitHub OAuth consent screen."""
+    if not settings.github_client_id:
+        raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
+    state = secrets.token_urlsafe(32)
+    params = {
+        "client_id": settings.github_client_id,
+        "redirect_uri": settings.github_redirect_uri,
+        "scope": "user:email read:user",
+        "state": state,
+    }
+    url = f"{GITHUB_AUTH_URL}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+    return {"auth_url": url, "state": state}
+
+
+@router.post("/github/callback")
+async def github_callback(code: str, request: Request, db: Session = Depends(get_db)):
+    """Exchange GitHub auth code for tokens. Creates account if needed."""
+    if not settings.github_client_id or not settings.github_client_secret:
+        raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            GITHUB_TOKEN_URL,
+            data={
+                "client_id": settings.github_client_id,
+                "client_secret": settings.github_client_secret,
+                "code": code,
+                "redirect_uri": settings.github_redirect_uri,
+            },
+            headers={"Accept": "application/json"},
+        )
+        if token_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="GitHub token exchange failed")
+        token_data = token_resp.json()
+        gh_access_token = token_data.get("access_token")
+        if not gh_access_token:
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", "No access token"))
+
+        gh_headers = {"Authorization": f"Bearer {gh_access_token}", "Accept": "application/json"}
+        user_resp = await client.get(GITHUB_USER_URL, headers=gh_headers)
+        if user_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch GitHub profile")
+        gh_user = user_resp.json()
+
+        email = gh_user.get("email")
+        if not email:
+            emails_resp = await client.get(GITHUB_EMAILS_URL, headers=gh_headers)
+            if emails_resp.status_code == 200:
+                for em in emails_resp.json():
+                    if em.get("primary") and em.get("verified"):
+                        email = em["email"]
+                        break
+        if not email:
+            raise HTTPException(status_code=400, detail="No verified email found on GitHub account")
+
+    github_username = gh_user.get("login", "")
+    github_id = str(gh_user.get("id", ""))
+    full_name = gh_user.get("name") or github_username
+
+    user = db.query(User).filter(User.email == email).first()
+    is_new = False
+
+    if not user:
+        is_new = True
+        workspace = Workspace(
+            name=f"{github_username}",
+            slug=f"{github_username.lower()}-{secrets.token_hex(4)}",
+        )
+        db.add(workspace)
+        db.flush()
+
+        user = User(
+            email=email,
+            hashed_password=get_password_hash(secrets.token_urlsafe(32)),
+            full_name=full_name,
+            workspace_id=workspace.id,
+            role=UserRole.OWNER,
+            is_superuser=False,
+            github_id=github_id,
+            github_username=github_username,
+            github_access_token=gh_access_token,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        user.github_id = github_id
+        user.github_username = github_username
+        user.github_access_token = gh_access_token
+        user.last_login = datetime.utcnow()
+        user.last_activity = datetime.utcnow()
+        db.commit()
+
+    tokens = _create_tokens(user)
+
+    session = UserSession(
+        user_id=user.id,
+        session_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        expires_at=datetime.utcnow() + timedelta(seconds=tokens["expires_in"]),
+    )
+    db.add(session)
+    db.commit()
+
+    return {
+        **TokenResponse(
+            **tokens,
+            user_id=user.id,
+            workspace_id=user.workspace_id,
+            role=user.role.value,
+        ).dict(),
+        "is_new_user": is_new,
+        "github_username": github_username,
+    }
+
+
+@router.get("/github/repos")
+async def github_repos(current_user: User = Depends(get_current_user)):
+    """List authenticated user's GitHub repos (for vendor listing connection)."""
+    if not current_user.github_access_token:
+        raise HTTPException(status_code=400, detail="GitHub not connected. Sign in with GitHub first.")
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://api.github.com/user/repos",
+            headers={
+                "Authorization": f"Bearer {current_user.github_access_token}",
+                "Accept": "application/json",
+            },
+            params={"sort": "updated", "per_page": 50, "type": "owner"},
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch repos")
+        repos = resp.json()
+        return {
+            "repos": [
+                {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "full_name": r["full_name"],
+                    "description": r.get("description"),
+                    "html_url": r["html_url"],
+                    "stars": r["stargazers_count"],
+                    "language": r.get("language"),
+                    "updated_at": r["updated_at"],
+                    "private": r["private"],
+                    "topics": r.get("topics", []),
+                }
+                for r in repos
+            ]
+        }

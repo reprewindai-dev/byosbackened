@@ -56,6 +56,7 @@ from apps.api.routers.locker_monitoring import router as locker_monitoring_route
 from apps.api.routers.locker_users import router as locker_users_router
 from apps.api.routers.kill_switch import router as kill_switch_router
 from apps.api.routers.token_wallet import router as token_wallet_router
+from apps.api.routers.support_bot import router as support_bot_router
 import logging
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,8 @@ app = FastAPI(
     openapi_url=None,  # Disabled - using protected custom route
     docs_url=None,  # Disabled - using protected custom route
     redoc_url=None,  # Disabled - using protected custom route
+    # Security hardening
+    max_request_size=10 * 1024 * 1024,  # 10MB limit per request
 )
 
 
@@ -159,6 +162,9 @@ app.include_router(locker_security_router, prefix=settings.api_prefix)
 app.include_router(locker_monitoring_router, prefix=settings.api_prefix)
 app.include_router(locker_users_router, prefix=settings.api_prefix)
 app.include_router(token_wallet_router, prefix=settings.api_prefix)
+
+# ── AI Support Bot ────────────────────────────────────────────────────────────
+app.include_router(support_bot_router, prefix=settings.api_prefix)
 
 # ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
 app.include_router(exec_router)

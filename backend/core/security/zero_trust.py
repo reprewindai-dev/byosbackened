@@ -23,6 +23,9 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/auth/refresh",
     f"{settings.api_prefix}/subscriptions/plans",
     f"{settings.api_prefix}/subscriptions/webhook",
+    f"{settings.api_prefix}/auth/github/login",
+    f"{settings.api_prefix}/auth/github/callback",
+    f"{settings.api_prefix}/support/chat",
     # Docs now require auth + tokens (100 per view)
     # f"{settings.api_prefix}/docs",      # LOCKED - requires auth + 100 tokens
     # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth + 100 tokens
@@ -38,7 +41,14 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
-        path = request.url.path
+        path = request.url.path.rstrip("/")
+
+        # Block path traversal attempts
+        if ".." in path or "//" in path:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": "Invalid request path"},
+            )
 
         # Pass through public endpoints
         if path in _PUBLIC_PATHS:

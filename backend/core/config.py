@@ -69,16 +69,28 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://redis:6379/0"
     celery_result_backend: str = "redis://redis:6379/0"
 
-    # CORS
-    cors_origins: list[str] = ["*"]
+    # CORS — tighten in production via CORS_ORIGINS env var
+    cors_origins: list[str] = [
+        "https://marketplace.veklom.com",
+        "https://veklom.com",
+        "https://www.veklom.com",
+        "http://localhost:3000",
+        "http://localhost:3458",
+        "http://localhost:3459",
+    ]
     cors_allow_credentials: bool = True
-    cors_allow_methods: list[str] = ["*"]
-    cors_allow_headers: list[str] = ["*"]
+    cors_allow_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    cors_allow_headers: list[str] = ["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "stripe-signature"]
 
     # Stripe
     stripe_secret_key: str = ""
     stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
+
+    # GitHub OAuth
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_redirect_uri: str = "https://marketplace.veklom.com/auth/github/callback"
 
     # MFA / Auth security
     max_failed_login_attempts: int = 10

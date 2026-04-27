@@ -10,6 +10,7 @@ import enum
 class PlanTier(str, enum.Enum):
     STARTER = "starter"
     PRO = "pro"
+    SOVEREIGN = "sovereign"
     ENTERPRISE = "enterprise"
 
 
@@ -45,6 +46,7 @@ class Subscription(Base):
     # as the source of truth.
     amount_cents = Column(String, default="0", nullable=False)
     currency = Column(String, default="usd", nullable=False)
+    monthly_credits_included = Column(String, default="0", nullable=False)
 
     trial_end = Column(DateTime, nullable=True)
     current_period_start = Column(DateTime, nullable=True)

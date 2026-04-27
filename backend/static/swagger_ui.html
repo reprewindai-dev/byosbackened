@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+    <title>Veklom API Documentation</title>
+    <style>
+        body { margin: 0; padding: 0; }
+        .topbar { display: none; }
+        .info { margin: 20px 0; }
+        .token-notice {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            padding: 12px 20px;
+            margin: 0;
+            font-size: 14px;
+            color: #0369a1;
+        }
+    </style>
+</head>
+<body>
+    <div class="token-notice">
+        💰 This documentation view costs 100 tokens. Each API call has its own price.
+    </div>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        SwaggerUIBundle({
+            url: '/api/v1/openapi.json',
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.presets.standalone],
+            layout: "BaseLayout",
+            validatorUrl: null,
+            requestInterceptor: (req) => {
+                // Add auth header from localStorage if available
+                const token = localStorage.getItem('veklom_api_key');
+                if (token) {
+                    req.headers['X-API-Key'] = token;
+                }
+                return req;
+            }
+        });
+    </script>
+</body>
+</html>

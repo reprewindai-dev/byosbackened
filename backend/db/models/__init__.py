@@ -28,6 +28,7 @@ from db.models.content_filter import ContentFilterLog, AgeVerification, ContentC
 from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
 from db.models.execution_log import ExecutionLog
+from db.models.token_wallet import TokenWallet, TokenTransaction
 
 __all__ = [
     "Workspace",
@@ -59,4 +60,5 @@ __all__ = [
     "SystemMetrics",
     "Alert", "AlertSeverity",
     "ExecutionLog",
+    "TokenWallet", "TokenTransaction",
 ]

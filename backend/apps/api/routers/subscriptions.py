@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from apps.api.deps import get_current_user, require_admin
+from apps.api.deps import get_current_user, require_admin, get_current_workspace_id
 from core.config import get_settings
 from db.session import get_db
-from db.models import Subscription, PlanTier, SubscriptionStatus, Workspace, User
+from db.models import Subscription, PlanTier, SubscriptionStatus, Workspace, User, TokenWallet, TokenTransaction
 
 settings = get_settings()
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -30,64 +30,118 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 PLANS = {
     "starter": {
-        "name": "Sovereign · Standard",
+        "name": "Starter",
         "tier": "starter",
-        "price_monthly_cents":   750_000,   # $7,500.00 / month
-        "price_yearly_cents":  7_500_000,   # $75,000.00 / year (2 months free)
+        "price_monthly_cents": 9_900,      # $99.00 / month
+        "price_yearly_cents": 99_000,      # $990.00 / year (2 months free)
+        "monthly_credits_included": 10_000_000,  # 10M credits
         "features": {
-            "deployment": "self_host_vpc_or_onprem",
-            "source_access": "perpetual",
-            "sla_bug_fix_business_days": 14,
-            "version_update_cadence": "quarterly",
-            "support_channel": "private_discord_async",
-            "support": "written_first",
-            "compliance_docs": False,
-            "pen_test_report": False,
-            "white_label_rights": False,
-            "custom_feature_commitments": False,
-            "priority_engineering_channel": False,
+            "api_keys_max": 5,
+            "support_channel": "email",
+            "support_response_hours": 48,
+            "cost_prediction": "limited",
+            "execution": "limited",
+            "usage_summary": True,
+            "kill_switch": False,
+            "compliance_reports": False,
+            "audit_logs_retention_days": 7,
+            "advanced_routing": False,
+            "advanced_security": False,
+            "plugin_execution": False,
+            "enterprise_admin": False,
+            "sla_guarantee": None,
+            "white_label": False,
         },
     },
     "pro": {
-        "name": "Sovereign · Pro",
+        "name": "Pro",
         "tier": "pro",
-        "price_monthly_cents":  1_800_000,  # $18,000.00 / month
-        "price_yearly_cents":  18_000_000,  # $180,000.00 / year (2 months free)
+        "price_monthly_cents": 49_900,     # $499.00 / month
+        "price_yearly_cents": 499_000,     # $4,990.00 / year (2 months free)
+        "monthly_credits_included": 100_000_000,  # 100M credits
         "features": {
-            "deployment": "self_host_vpc_or_onprem",
-            "source_access": "perpetual",
-            "sla_bug_fix_business_days": 5,
-            "version_update_cadence": "monthly",
-            "support_channel": "direct_email",
-            "support": "24h_first_response",
-            "annual_architecture_review": True,
-            "white_label_rights": True,
-            "compliance_docs": False,
-            "pen_test_report": False,
-            "custom_feature_commitments": False,
-            "priority_engineering_channel": False,
+            "api_keys_max": 20,
+            "support_channel": "email",
+            "support_response_hours": 24,
+            "cost_prediction": True,
+            "routing_select": True,
+            "savings_insights": True,
+            "budget_management": True,
+            "performance_metrics": True,
+            "alerts": True,
+            "content_scan": "text",
+            "audit_logs_retention_days": 30,
+            "kill_switch": False,
+            "compliance_reports": False,
+            "advanced_security": False,
+            "plugin_execution": False,
+            "sla_guarantee": None,
+            "white_label": False,
+        },
+    },
+    "sovereign": {
+        "name": "Sovereign",
+        "tier": "sovereign",
+        "price_monthly_cents": 250_000,    # $2,500.00 / month
+        "price_yearly_cents": 2_500_000,   # $25,000.00 / year (2 months free)
+        "monthly_credits_included": 500_000_000,  # 500M credits
+        "features": {
+            "api_keys_max": 100,
+            "support_channel": "priority",
+            "support_response_hours": 8,
+            "kill_switch": True,
+            "audit_logs": True,
+            "audit_verification": True,
+            "compliance_checks": True,
+            "compliance_reports": True,
+            "privacy_workflows": True,
+            "explainability": True,
+            "detailed_health": True,
+            "threat_stats": True,
+            "security_controls": True,
+            "content_scan": "full",
+            "content_logs": True,
+            "governed_execution": True,
+            "audit_exports": True,
+            "plugin_execution": True,
+            "sla_guarantee": "99.9%",
+            "white_label": True,
         },
     },
     "enterprise": {
-        "name": "Sovereign · Enterprise",
+        "name": "Enterprise",
         "tier": "enterprise",
-        "price_monthly_cents":  4_500_000,  # $45,000.00 / month
-        "price_yearly_cents":  45_000_000,  # $450,000.00 / year (2 months free)
+        "price_monthly_cents": None,       # Custom pricing
+        "price_yearly_cents": None,        # Custom pricing
+        "monthly_credits_included": None,    # Custom
         "features": {
-            "deployment": "self_host_vpc_or_onprem",
-            "source_access": "perpetual",
-            "sla_bug_fix_hours": 24,
-            "version_update_cadence": "monthly",
-            "support_channel": "priority_engineering",
-            "support": "priority_engineering",
-            "annual_architecture_review": True,
-            "white_label_rights": True,
-            "custom_feature_commitments_per_quarter": True,
-            "compliance_docs": True,
-            "pen_test_report": True,
-            "pen_test_retest_on_request": True,
-            "procurement_friendly_msa": True,
-            "priority_engineering_channel": True,
+            "api_keys_max": None,            # Unlimited
+            "support_channel": "dedicated",
+            "support_response_hours": 4,
+            "kill_switch": True,
+            "audit_logs": True,
+            "audit_verification": True,
+            "compliance_checks": True,
+            "compliance_reports": True,
+            "privacy_workflows": True,
+            "explainability": True,
+            "detailed_health": True,
+            "threat_stats": True,
+            "security_controls": True,
+            "content_scan": "full",
+            "content_logs": True,
+            "governed_execution": True,
+            "audit_exports": True,
+            "plugin_execution": True,
+            "custom_endpoints": True,
+            "custom_training": True,
+            "workspace_admin": True,
+            "advanced_security": True,
+            "custom_routing": True,
+            "private_deployment": True,
+            "sla_guarantee": "99.99%",
+            "white_label": True,
+            "annual_review": True,
         },
     },
 }
@@ -359,4 +413,65 @@ async def stripe_webhook(
                 sub.canceled_at = datetime.utcnow()
                 db.commit()
 
+    elif event_type == "checkout.session.completed":
+        # Handle token pack purchases (one-time payments)
+        session = data
+        if session.get("mode") == "payment":
+            workspace_id = session.get("metadata", {}).get("workspace_id")
+            credits = session.get("metadata", {}).get("credits")
+            if workspace_id and credits:
+                _credit_token_wallet(
+                    db, workspace_id, int(credits),
+                    stripe_checkout_session_id=session.get("id"),
+                    stripe_payment_intent_id=session.get("payment_intent")
+                )
+
     return {"received": True}
+
+
+def _credit_token_wallet(
+    db: Session,
+    workspace_id: str,
+    credits: int,
+    stripe_checkout_session_id: str = None,
+    stripe_payment_intent_id: str = None,
+    description: str = "Token pack purchase"
+):
+    """Credit token wallet for a workspace."""
+    # Get or create wallet
+    wallet = db.query(TokenWallet).filter(
+        TokenWallet.workspace_id == workspace_id
+    ).first()
+    
+    if not wallet:
+        wallet = TokenWallet(
+            workspace_id=workspace_id,
+            balance=0
+        )
+        db.add(wallet)
+        db.flush()
+    
+    # Record transaction
+    balance_before = wallet.balance
+    balance_after = balance_before + credits
+    
+    transaction = TokenTransaction(
+        wallet_id=wallet.id,
+        workspace_id=workspace_id,
+        transaction_type="purchase",
+        amount=credits,
+        balance_before=balance_before,
+        balance_after=balance_after,
+        stripe_checkout_session_id=stripe_checkout_session_id,
+        stripe_payment_intent_id=stripe_payment_intent_id,
+        description=description
+    )
+    db.add(transaction)
+    
+    # Update wallet
+    wallet.balance = balance_after
+    wallet.total_credits_purchased = (wallet.total_credits_purchased or 0) + credits
+    wallet.updated_at = datetime.utcnow()
+    
+    db.commit()
+    return wallet

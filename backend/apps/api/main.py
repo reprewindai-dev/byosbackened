@@ -12,6 +12,8 @@ from apps.api.middleware.intelligent_routing import IntelligentRoutingMiddleware
 from apps.api.middleware.edge_routing import EdgeRoutingMiddleware
 from apps.api.middleware.budget_check import BudgetCheckMiddleware
 from apps.api.middleware.rate_limit import RateLimitMiddleware
+from apps.api.middleware.entitlement_check import EntitlementCheckMiddleware
+from apps.api.middleware.token_deduction import TokenDeductionMiddleware
 from apps.api.middleware.locker_security_integration import LockerSecurityMiddleware
 from apps.api.middleware.request_security import RequestSecurityMiddleware
 from apps.api.middleware.performance import PerformanceMiddleware, GzipMiddleware
@@ -48,6 +50,7 @@ from apps.api.routers.locker_security import router as locker_security_router
 from apps.api.routers.locker_monitoring import router as locker_monitoring_router
 from apps.api.routers.locker_users import router as locker_users_router
 from apps.api.routers.kill_switch import router as kill_switch_router
+from apps.api.routers.token_wallet import router as token_wallet_router
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,8 +69,8 @@ app = FastAPI(
         "No lock-in. Swap hosts in a weekend. Built for agencies, enterprises, and privacy-first platforms."
     ),
     openapi_url=f"{settings.api_prefix}/openapi.json",
-    docs_url=f"{settings.api_prefix}/docs",
-    redoc_url=f"{settings.api_prefix}/redoc",
+    docs_url=None,  # Disabled - using protected custom route
+    redoc_url=None,  # Disabled - using protected custom route
 )
 
 
@@ -94,6 +97,8 @@ app.add_middleware(RequestSecurityMiddleware)
 app.add_middleware(RateLimitMiddleware)
 # 4. Zero-trust authentication
 app.add_middleware(ZeroTrustMiddleware)
+app.add_middleware(EntitlementCheckMiddleware)
+app.add_middleware(TokenDeductionMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(IntelligentRoutingMiddleware)
 app.add_middleware(EdgeRoutingMiddleware)
@@ -148,6 +153,7 @@ app.include_router(kill_switch_router, prefix=settings.api_prefix)
 app.include_router(locker_security_router, prefix=settings.api_prefix)
 app.include_router(locker_monitoring_router, prefix=settings.api_prefix)
 app.include_router(locker_users_router, prefix=settings.api_prefix)
+app.include_router(token_wallet_router, prefix=settings.api_prefix)
 
 # ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
 app.include_router(exec_router)
@@ -171,3 +177,16 @@ async def root():
         "version": settings.app_version,
         "docs": f"{settings.api_prefix}/docs",
     }
+
+
+# Protected documentation routes - require auth + tokens (100 tokens per view)
+@app.get(f"{settings.api_prefix}/docs", include_in_schema=False)
+async def protected_docs(request):
+    """Swagger UI - requires authentication and 100 tokens per view."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
+
+
+@app.get(f"{settings.api_prefix}/redoc", include_in_schema=False)
+async def protected_redoc(request):
+    """ReDoc UI - requires authentication and 100 tokens per view."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))

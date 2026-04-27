@@ -18,7 +18,23 @@ The product is **not generic hosting**.
 
 The product is:
 
-> controlled backend access powered by BYOSBackend.
+> controlled backend access powered by VCB.
+
+---
+
+# Naming
+
+## Public naming
+
+- Marketplace brand: **Veklom Marketplace**
+- Public engine name: **VCB**
+- Full name: **Veklom Control Backend**
+- Hero badge: **Veklom Marketplace · Powered by VCB**
+- Product page name: **VCB Control Layer** or **Veklom Control Backend**
+
+## Internal naming rule
+
+Do not use the repo name as customer-facing language. The repo name is implementation-only.
 
 ---
 
@@ -58,7 +74,8 @@ Use concrete wording:
 - audit logs
 - control plane
 - marketplace listings
-- Veklom BYOSBackend
+- VCB
+- Veklom Control Backend
 
 ---
 
@@ -67,7 +84,7 @@ Use concrete wording:
 ## Hero
 
 ### Eyebrow
-Veklom Marketplace · Powered by BYOSBackend
+Veklom Marketplace · Powered by VCB
 
 ### Headline
 Control backend access before costs run away.
@@ -76,7 +93,7 @@ Control backend access before costs run away.
 Backend control for AI teams that need predictable usage.
 
 ### Subheadline
-Veklom gives teams subscription access, token wallets, hard budget caps, endpoint governance, and marketplace discovery around BYOSBackend — without turning your server into a generic hosting platform.
+Veklom gives teams subscription access, token wallets, hard budget caps, endpoint governance, and marketplace discovery around VCB — the Veklom Control Backend — without turning your server into a generic hosting platform.
 
 ### CTA buttons
 Start with Veklom
@@ -122,7 +139,7 @@ Regulated buyers need clearer proof, limits, and controls before they approve ne
 Not hosting. Controlled backend access.
 
 ### Copy
-Veklom does not start by letting vendors upload large applications, databases, or long-running services. Veklom starts as a control plane for BYOSBackend: subscriptions, tokens, endpoint entitlements, usage logs, and budget enforcement.
+Veklom does not start by letting vendors upload large applications, databases, or long-running services. Veklom starts as a control plane for VCB: subscriptions, tokens, endpoint entitlements, usage logs, and budget enforcement.
 
 ### Feature cards
 
@@ -143,7 +160,7 @@ Budgets stop usage when limits are reached, instead of sending alerts after the 
 ## Section 3 — Flagship Product
 
 ### Heading
-First premium listing: Veklom BYOSBackend.
+First premium listing: VCB.
 
 ### Copy
 The marketplace begins with Veklom’s own backend as the anchor product. Buyers are not just browsing a catalog — they are purchasing governed access to backend features that help control AI spend, execution, and usage.
@@ -159,7 +176,7 @@ The marketplace begins with Veklom’s own backend as the anchor product. Buyers
 - Marketplace listing layer for future tools
 
 ### CTA
-Explore Veklom BYOSBackend
+Explore VCB
 
 ---
 
@@ -308,11 +325,11 @@ The product is not cheap hosting. The product is control.
 Start as a control node. Scale into execution later.
 
 ### Copy
-Veklom’s launch infrastructure should run the marketplace, billing, BYOSBackend control layer, token ledger, and lightweight approved jobs only. It should not host arbitrary full applications, customer databases, or GPU-heavy workloads at launch.
+Veklom’s launch infrastructure should run the marketplace, billing, VCB control layer, token ledger, and lightweight approved jobs only. It should not host arbitrary full applications, customer databases, or GPU-heavy workloads at launch.
 
 ### Now
 - Marketplace
-- BYOSBackend access
+- VCB access
 - Subscriptions
 - Token wallet
 - Endpoint entitlements
@@ -333,7 +350,7 @@ Veklom’s launch infrastructure should run the marketplace, billing, BYOSBacken
 Control your backend before it controls your budget.
 
 ### Copy
-Start with Veklom BYOSBackend, then expand into marketplace listings, tokenized usage, and sovereign-ready deployment paths.
+Start with VCB, then expand into marketplace listings, tokenized usage, and sovereign-ready deployment paths.
 
 ### Buttons
 Start with Veklom
@@ -364,8 +381,8 @@ Do not copy competitor wording. Use the same style mechanics: clean hero, proof 
 
 Product truth:
 - Veklom is not generic hosting.
-- Veklom is controlled backend access powered by BYOSBackend.
-- Veklom BYOSBackend is the first premium marketplace listing.
+- Veklom Marketplace is powered by VCB, the Veklom Control Backend.
+- VCB is the first premium marketplace listing.
 - Subscriptions unlock access.
 - Tokens meter usage.
 - Budget caps prevent overruns.

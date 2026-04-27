@@ -1,10 +1,15 @@
 """FastAPI application — BYOS AI + Security Suite."""
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from core.config import get_settings
+from core.auth import get_current_workspace
+from db.session import SessionLocal
+from db.models import TokenWallet, TokenTransaction
+from datetime import datetime
+import uuid
 from core.logging import setup_logging
 from core.security.zero_trust import ZeroTrustMiddleware
 from apps.api.middleware.metrics import MetricsMiddleware
@@ -179,14 +184,86 @@ async def root():
     }
 
 
+def deduct_tokens_for_docs(workspace_id: str, endpoint: str):
+    """Deduct 100 tokens for docs access."""
+    db = SessionLocal()
+    try:
+        wallet = db.query(TokenWallet).filter(
+            TokenWallet.workspace_id == workspace_id
+        ).with_for_update().first()
+        
+        if not wallet:
+            wallet = TokenWallet(workspace_id=workspace_id, balance=0)
+            db.add(wallet)
+            db.flush()
+        
+        if wallet.balance < 100:
+            return False, wallet.balance
+        
+        # Record transaction
+        transaction = TokenTransaction(
+            wallet_id=wallet.id,
+            workspace_id=workspace_id,
+            transaction_type="usage",
+            amount=-100,
+            balance_before=wallet.balance,
+            balance_after=wallet.balance - 100,
+            endpoint_path=endpoint,
+            endpoint_method="GET",
+            request_id=str(uuid.uuid4()),
+            description=f"API documentation access: {endpoint}"
+        )
+        db.add(transaction)
+        
+        wallet.balance -= 100
+        wallet.updated_at = datetime.utcnow()
+        db.commit()
+        
+        return True, wallet.balance
+    finally:
+        db.close()
+
+
 # Protected documentation routes - require auth + tokens (100 tokens per view)
 @app.get(f"{settings.api_prefix}/docs", include_in_schema=False)
-async def protected_docs(request):
+async def protected_docs(request: Request, workspace_id: str = Depends(get_current_workspace)):
     """Swagger UI - requires authentication and 100 tokens per view."""
-    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
+    success, balance = deduct_tokens_for_docs(workspace_id, "/api/v1/docs")
+    if not success:
+        return JSONResponse(
+            status_code=402,
+            content={
+                "detail": "Insufficient tokens. Docs access requires 100 tokens.",
+                "required": 100,
+                "balance": balance,
+                "purchase_url": "/api/v1/wallet/topup"
+            },
+            headers={"X-Tokens-Required": "100", "X-Tokens-Balance": str(balance)}
+        )
+    
+    response = FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
+    response.headers["X-Tokens-Cost"] = "100"
+    response.headers["X-Tokens-Remaining"] = str(balance)
+    return response
 
 
 @app.get(f"{settings.api_prefix}/redoc", include_in_schema=False)
-async def protected_redoc(request):
+async def protected_redoc(request: Request, workspace_id: str = Depends(get_current_workspace)):
     """ReDoc UI - requires authentication and 100 tokens per view."""
-    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))
+    success, balance = deduct_tokens_for_docs(workspace_id, "/api/v1/redoc")
+    if not success:
+        return JSONResponse(
+            status_code=402,
+            content={
+                "detail": "Insufficient tokens. Docs access requires 100 tokens.",
+                "required": 100,
+                "balance": balance,
+                "purchase_url": "/api/v1/wallet/topup"
+            },
+            headers={"X-Tokens-Required": "100", "X-Tokens-Balance": str(balance)}
+        )
+    
+    response = FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))
+    response.headers["X-Tokens-Cost"] = "100"
+    response.headers["X-Tokens-Remaining"] = str(balance)
+    return response

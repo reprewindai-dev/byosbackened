@@ -23,9 +23,10 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/auth/refresh",
     f"{settings.api_prefix}/subscriptions/plans",
     f"{settings.api_prefix}/subscriptions/webhook",
-    f"{settings.api_prefix}/docs",
-    f"{settings.api_prefix}/redoc",
-    f"{settings.api_prefix}/openapi.json",
+    # Docs now require auth + tokens (100 per view)
+    # f"{settings.api_prefix}/docs",      # LOCKED - requires auth
+    # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth
+    f"{settings.api_prefix}/openapi.json",  # Keep public for SDKs
 }
 
 
@@ -40,7 +41,7 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Pass through public endpoints
-        if path in _PUBLIC_PATHS or path.startswith(f"{settings.api_prefix}/docs"):
+        if path in _PUBLIC_PATHS:
             return await call_next(request)
 
         authorization = request.headers.get("Authorization")

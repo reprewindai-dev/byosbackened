@@ -76,7 +76,7 @@ $form.addEventListener("submit", async (e) => {
   };
   try {
     await VK.register(data);
-    if (wantedPlan && ["starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
+    if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
       window.location.href = "/dashboard/?plan=" + wantedPlan;
     } else {
       window.location.href = "/dashboard/?welcome=1";

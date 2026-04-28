@@ -146,6 +146,32 @@ PLANS = {
     },
 }
 
+# Free tier is handled outside Stripe subscription checkout.
+FREE_PLAN = {
+    "name": "Free",
+    "tier": "free",
+    "price_monthly_cents": 0,
+    "price_yearly_cents": 0,
+    "self_serve_checkout": False,
+    "monthly_credits_included": 250_000,
+    "features": {
+        "view_marketplace": True,
+        "comment": True,
+        "ask_questions": True,
+        "api_keys_max": 1,
+        "download_free_tools": True,
+        "support_channel": "community",
+        "support_response_hours": None,
+        "kill_switch": False,
+        "compliance_reports": False,
+        "advanced_routing": False,
+        "advanced_security": False,
+        "plugin_execution": False,
+        "enterprise_admin": False,
+        "sla_guarantee": None,
+    },
+}
+
 # Strategic transfer transactions are intentionally NOT a subscription plan.
 # They are negotiated privately outside of self-serve checkout.
 
@@ -182,7 +208,7 @@ class SubscriptionResponse(BaseModel):
 async def list_plans():
     """Return all available plans (public endpoint)."""
     public_keys = ("starter", "pro", "sovereign", "enterprise")
-    return {"plans": [PLANS[k] for k in public_keys]}
+    return {"plans": [FREE_PLAN] + [PLANS[k] for k in public_keys]}
 
 
 @router.get("/current", response_model=SubscriptionResponse)
@@ -195,13 +221,13 @@ async def current_subscription(
         Subscription.workspace_id == current_user.workspace_id
     ).first()
     if not sub:
-        plan_info = PLANS["starter"]
+        plan_info = FREE_PLAN
         return SubscriptionResponse(
             workspace_id=current_user.workspace_id,
-            plan="starter",
-            status="trialing",
+            plan="free",
+            status="active",
             billing_cycle="monthly",
-            amount_cents=0,  # No implicit free tier — checkout sets the real amount
+            amount_cents=0,
             currency="usd",
             current_period_end=None,
             trial_end=None,

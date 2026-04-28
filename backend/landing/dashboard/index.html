@@ -138,7 +138,7 @@ document.getElementById("signout").addEventListener("click", (e) => { e.preventD
   });
 
   const wantedPlan = params.get("plan");
-  if (wantedPlan && ["starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
+  if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
     document.getElementById("upgrade_panel").style.display = "block";
     renderPlans(wantedPlan);
   }
@@ -196,6 +196,7 @@ document.getElementById("btn_new_key").addEventListener("click", async () => {
 
 function renderPlans(autoSelect) {
   const plans = [
+    { id: "free", name: "Free", price: "$0", cta: "Current base tier", selfServe: false, features: ["View marketplace listings", "Comment and ask questions", "Limited free tools access", "1 API key and light usage"] },
     { id: "starter", name: "Starter", price: "$99/mo", cta: "Subscribe", selfServe: true, features: ["10M monthly credits included", "Up to 5 API keys", "Basic cost controls", "Email support (48h)"] },
     { id: "pro", name: "Pro", price: "$499/mo", cta: "Subscribe", selfServe: true, features: ["100M monthly credits included", "Up to 20 API keys", "Routing + savings insights", "Priority support (24h)"] },
     { id: "sovereign", name: "Sovereign", price: "$2,500/mo", cta: "Subscribe", selfServe: true, features: ["500M monthly credits included", "Up to 100 API keys", "Kill switch + compliance reporting", "SLA-backed support"] },
@@ -215,6 +216,10 @@ function renderPlans(autoSelect) {
     btn.addEventListener("click", async () => {
       const plan = plans.find(p => p.id === btn.dataset.plan);
       if (!plan) return;
+      if (plan.id === "free") {
+        showOk("You are already on the free access tier.");
+        return;
+      }
       if (!plan.selfServe) {
         window.location.href = "mailto:sales@veklom.com?subject=Veklom%20Enterprise%20Plan%20Inquiry";
         return;

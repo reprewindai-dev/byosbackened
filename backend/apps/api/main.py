@@ -90,11 +90,16 @@ app = FastAPI(
 async def startup_validation():
     """Validate production configuration on startup."""
     from core.security.secrets_validation import validate_production_config
+    from db.session import Base, engine
+    import db.models  # noqa: F401 - ensure model metadata is registered before create_all
     try:
         result = validate_production_config()
         logger.info("✅ Production configuration validated successfully")
         if result.get("warnings"):
             logger.warning(f"Configuration warnings: {len(result['warnings'])}")
+        # Safety net: ensure core tables exist even if migrations were missed.
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database schema presence check completed")
     except ValueError as e:
         logger.critical(f"❌ PRODUCTION CONFIGURATION INVALID: {e}")
         raise

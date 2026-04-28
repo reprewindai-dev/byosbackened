@@ -40,10 +40,8 @@ class Subscription(Base):
     status = Column(SAEnum(SubscriptionStatus), default=SubscriptionStatus.TRIALING, nullable=False, index=True)
 
     billing_cycle = Column(String, default="monthly", nullable=False)
-    # Default 0 cents — no implicit free tier in the Veklom model. amount_cents
-    # is set when a checkout completes. Public pricing tiers: $7,500 / $18,000 /
-    # $45,000 per month. Keep PLANS dict in apps/api/routers/subscriptions.py
-    # as the source of truth.
+    # Default 0 cents — amount_cents is set from checkout/webhook lifecycle.
+    # Pricing source of truth lives in apps/api/routers/subscriptions.py.
     amount_cents = Column(String, default="0", nullable=False)
     currency = Column(String, default="usd", nullable=False)
     monthly_credits_included = Column(String, default="0", nullable=False)

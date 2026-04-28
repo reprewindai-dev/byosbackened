@@ -74,6 +74,33 @@ const VK = {
     return t;
   },
 
+  async getGithubAuthUrl() {
+    return this.request("/auth/github/login", { method: "GET" });
+  },
+
+  async startGithubLogin() {
+    const out = await this.getGithubAuthUrl();
+    if (!out || !out.auth_url || !out.state) {
+      throw new Error("GitHub OAuth initialization failed");
+    }
+    sessionStorage.setItem("vk_github_oauth_state", out.state);
+    window.location.href = out.auth_url;
+  },
+
+  async finishGithubLogin({ code, state }) {
+    const expectedState = sessionStorage.getItem("vk_github_oauth_state");
+    if (!expectedState || expectedState !== state) {
+      throw new Error("OAuth state mismatch. Please try again.");
+    }
+    sessionStorage.removeItem("vk_github_oauth_state");
+    const t = await this.request(
+      "/auth/github/callback?code=" + encodeURIComponent(code) + "&state=" + encodeURIComponent(state),
+      { method: "POST" }
+    );
+    this.saveTokens(t);
+    return t;
+  },
+
   async me() {
     return this.request("/auth/me");
   },

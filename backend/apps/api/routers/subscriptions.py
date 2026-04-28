@@ -1,14 +1,13 @@
 """Stripe subscription management: plans, checkout, webhook, portal."""
-import json
 import stripe
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from apps.api.deps import get_current_user, require_admin, get_current_workspace_id
+from apps.api.deps import get_current_user
 from core.config import get_settings
 from db.session import get_db
 from db.models import Subscription, PlanTier, SubscriptionStatus, Workspace, User, TokenWallet, TokenTransaction
@@ -17,23 +16,17 @@ settings = get_settings()
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 # ─── Plan catalog ─────────────────────────────────────────────────────────────
-# IMPORTANT: These prices MUST stay in sync with the public landing page
-# (landing/index.html — pricing section). Any change here without updating
-# the page constitutes a billing-disclosure mismatch. See PRICING_TRUTH.md.
-#
-# Pricing model: monthly OR annual. Annual = monthly × 10 (two months free,
-# matches public-page disclaimer language).
-#
-# Internal enum keys (`starter` / `pro` / `enterprise`) are kept stable to
-# avoid a database migration on the PlanTier enum. Display names follow the
-# public page: Sovereign · Standard / Pro / Enterprise.
+# IMPORTANT: Backend subscription pricing and landing/dashboard displays must
+# stay aligned. Token packs are separate one-time purchases handled by the
+# wallet router.
 
 PLANS = {
     "starter": {
-        "name": "Sovereign · Standard",
+        "name": "Starter",
         "tier": "starter",
-        "price_monthly_cents": 750_000,      # $7,500.00 / month
-        "price_yearly_cents": 7_500_000,     # $75,000.00 / year (2 months free)
+        "price_monthly_cents": 9_900,       # $99.00 / month
+        "price_yearly_cents": 99_000,       # $990.00 / year
+        "self_serve_checkout": True,
         "monthly_credits_included": 10_000_000,
         "features": {
             "api_keys_max": 5,
@@ -55,10 +48,11 @@ PLANS = {
         },
     },
     "pro": {
-        "name": "Sovereign · Pro",
+        "name": "Pro",
         "tier": "pro",
-        "price_monthly_cents": 1_800_000,   # $18,000.00 / month
-        "price_yearly_cents": 18_000_000,   # $180,000.00 / year (2 months free)
+        "price_monthly_cents": 49_900,      # $499.00 / month
+        "price_yearly_cents": 499_000,      # $4,990.00 / year
+        "self_serve_checkout": True,
         "monthly_credits_included": 100_000_000,
         "features": {
             "api_keys_max": 20,
@@ -82,10 +76,11 @@ PLANS = {
         },
     },
     "sovereign": {
-        "name": "Sovereign · Legacy",
+        "name": "Sovereign",
         "tier": "sovereign",
-        "price_monthly_cents": 4_500_000,   # Legacy alias to enterprise
-        "price_yearly_cents": 45_000_000,   # Legacy alias to enterprise yearly
+        "price_monthly_cents": 250_000,     # $2,500.00 / month
+        "price_yearly_cents": 2_500_000,    # $25,000.00 / year
+        "self_serve_checkout": True,
         "monthly_credits_included": 500_000_000,
         "features": {
             "api_keys_max": 100,
@@ -112,10 +107,11 @@ PLANS = {
         },
     },
     "enterprise": {
-        "name": "Sovereign · Enterprise",
+        "name": "Enterprise",
         "tier": "enterprise",
-        "price_monthly_cents": 4_500_000,   # $45,000.00 / month
-        "price_yearly_cents": 45_000_000,   # $450,000.00 / year (2 months free)
+        "price_monthly_cents": None,
+        "price_yearly_cents": None,
+        "self_serve_checkout": False,
         "monthly_credits_included": None,
         "features": {
             "api_keys_max": None,            # Unlimited
@@ -185,7 +181,7 @@ class SubscriptionResponse(BaseModel):
 @router.get("/plans")
 async def list_plans():
     """Return all available plans (public endpoint)."""
-    public_keys = ("starter", "pro", "enterprise")
+    public_keys = ("starter", "pro", "sovereign", "enterprise")
     return {"plans": [PLANS[k] for k in public_keys]}
 
 
@@ -239,6 +235,10 @@ async def create_checkout(
     plan_info = PLANS.get(payload.plan.value)
     if not plan_info:
         raise HTTPException(status_code=400, detail="Invalid plan")
+    if payload.billing_cycle not in ("monthly", "yearly"):
+        raise HTTPException(status_code=400, detail="Invalid billing cycle")
+    if not plan_info.get("self_serve_checkout"):
+        raise HTTPException(status_code=400, detail="Enterprise plan requires sales-assisted checkout")
 
     price_key = "price_yearly_cents" if payload.billing_cycle == "yearly" else "price_monthly_cents"
     amount = plan_info[price_key]
@@ -358,8 +358,10 @@ async def stripe_webhook(
     event_type = event["type"]
     data = event["data"]["object"]
 
-    if event_type in ("checkout.session.completed", "customer.subscription.updated",
-                      "customer.subscription.created"):
+    is_checkout_completed = event_type == "checkout.session.completed"
+    is_subscription_checkout = is_checkout_completed and data.get("mode") == "subscription"
+
+    if event_type in ("customer.subscription.updated", "customer.subscription.created") or is_subscription_checkout:
         workspace_id = data.get("metadata", {}).get("workspace_id")
         if not workspace_id and data.get("customer"):
             sub_lookup = db.query(Subscription).filter(
@@ -381,6 +383,13 @@ async def stripe_webhook(
                 sub.plan = PlanTier(plan_val)
             except ValueError:
                 sub.plan = PlanTier.STARTER
+
+            sub.billing_cycle = data.get("metadata", {}).get("billing_cycle", sub.billing_cycle or "monthly")
+            resolved_plan = PLANS.get(sub.plan.value, PLANS["starter"])
+            resolved_price_key = "price_yearly_cents" if sub.billing_cycle == "yearly" else "price_monthly_cents"
+            resolved_amount = resolved_plan.get(resolved_price_key) or 0
+            sub.amount_cents = str(resolved_amount)
+            sub.monthly_credits_included = str(resolved_plan.get("monthly_credits_included") or 0)
 
             stripe_status = data.get("status", "active")
             status_map = {
@@ -406,7 +415,7 @@ async def stripe_webhook(
 
             db.commit()
 
-    elif event_type == "customer.subscription.deleted":
+    if event_type == "customer.subscription.deleted":
         customer_id = data.get("customer")
         if customer_id:
             sub = db.query(Subscription).filter(
@@ -417,7 +426,7 @@ async def stripe_webhook(
                 sub.canceled_at = datetime.utcnow()
                 db.commit()
 
-    elif event_type == "checkout.session.completed":
+    if event_type == "checkout.session.completed":
         # Handle token pack purchases (one-time payments)
         session = data
         if session.get("mode") == "payment":

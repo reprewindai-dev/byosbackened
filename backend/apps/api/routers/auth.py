@@ -1,12 +1,14 @@
 """Authentication endpoints: register, login, logout, refresh, /me, MFA, API keys, GitHub OAuth."""
+import base64
 import hashlib
 import hmac
 import httpx
-import os
 import secrets
 import pyotp
+import time
 from datetime import datetime, timedelta
 from typing import Optional, List
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
@@ -424,27 +426,63 @@ GITHUB_USER_URL = "https://api.github.com/user"
 GITHUB_EMAILS_URL = "https://api.github.com/user/emails"
 
 
+def _build_github_state() -> str:
+    """Build signed short-lived OAuth state token to mitigate CSRF."""
+    ts = str(int(time.time()))
+    nonce = secrets.token_urlsafe(16)
+    payload = f"{ts}.{nonce}"
+    sig = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).digest()
+    sig_b64 = base64.urlsafe_b64encode(sig).decode().rstrip("=")
+    return f"{payload}.{sig_b64}"
+
+
+def _validate_github_state(state: str, max_age_seconds: int = 600) -> bool:
+    """Validate signed OAuth state and expiry window."""
+    try:
+        ts, nonce, sig_b64 = state.split(".", 2)
+        if not ts.isdigit() or not nonce:
+            return False
+        payload = f"{ts}.{nonce}"
+        expected_sig = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).digest()
+        expected_b64 = base64.urlsafe_b64encode(expected_sig).decode().rstrip("=")
+        if not hmac.compare_digest(expected_b64, sig_b64):
+            return False
+        age = int(time.time()) - int(ts)
+        if age < 0 or age > max_age_seconds:
+            return False
+        return True
+    except Exception:
+        return False
+
+
 @router.get("/github/login")
 async def github_login():
     """Redirect user to GitHub OAuth consent screen."""
     if not settings.github_client_id:
         raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
-    state = secrets.token_urlsafe(32)
+    state = _build_github_state()
     params = {
         "client_id": settings.github_client_id,
         "redirect_uri": settings.github_redirect_uri,
         "scope": "user:email read:user",
         "state": state,
     }
-    url = f"{GITHUB_AUTH_URL}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+    url = f"{GITHUB_AUTH_URL}?{urlencode(params)}"
     return {"auth_url": url, "state": state}
 
 
 @router.post("/github/callback")
-async def github_callback(code: str, request: Request, db: Session = Depends(get_db)):
+async def github_callback(
+    code: str,
+    request: Request,
+    state: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """Exchange GitHub auth code for tokens. Creates account if needed."""
     if not settings.github_client_id or not settings.github_client_secret:
         raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
+    if not state or not _validate_github_state(state):
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(

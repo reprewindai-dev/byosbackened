@@ -39,6 +39,8 @@
       </div>
       <button class="btn btn-primary btn-block" id="submit" type="submit">Create workspace</button>
     </form>
+    <div class="oauth-divider"><span>or</span></div>
+    <button class="btn btn-secondary btn-block" id="github_signup" type="button">Continue with GitHub</button>
     <p class="foot">Already have a workspace? <a href="/login/">Sign in</a></p>
   </div>
   <p class="foot">By creating an account you accept the <a href="/legal/terms.html">Terms of Service</a> and <a href="/legal/privacy.html">Privacy Policy</a>.</p>
@@ -48,6 +50,7 @@
 const $alert = document.getElementById("alert");
 const $form  = document.getElementById("form");
 const $btn   = document.getElementById("submit");
+const $githubBtn = document.getElementById("github_signup");
 
 function showError(msg) {
   $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
@@ -73,7 +76,7 @@ $form.addEventListener("submit", async (e) => {
   };
   try {
     await VK.register(data);
-    if (wantedPlan && ["starter","pro","enterprise"].includes(wantedPlan)) {
+    if (wantedPlan && ["starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
       window.location.href = "/dashboard/?plan=" + wantedPlan;
     } else {
       window.location.href = "/dashboard/?welcome=1";
@@ -82,6 +85,19 @@ $form.addEventListener("submit", async (e) => {
     showError(err.message || "Registration failed");
     $btn.disabled = false;
     $btn.innerHTML = "Create workspace";
+  }
+});
+
+$githubBtn.addEventListener("click", async () => {
+  $alert.innerHTML = "";
+  $githubBtn.disabled = true;
+  $githubBtn.innerHTML = '<span class="spinner"></span> Redirecting...';
+  try {
+    await VK.startGithubLogin();
+  } catch (err) {
+    showError(err.message || "GitHub sign-up failed");
+    $githubBtn.disabled = false;
+    $githubBtn.innerHTML = "Continue with GitHub";
   }
 });
 </script>

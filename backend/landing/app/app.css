@@ -121,6 +121,27 @@ a:hover { color: var(--brass); }
 .alert-error { background: rgba(224, 122, 107, 0.1); border: 1px solid var(--danger); color: var(--danger); }
 .alert-ok { background: rgba(123, 179, 122, 0.1); border: 1px solid var(--ok); color: var(--ok); }
 
+.oauth-divider {
+  margin: 18px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+.oauth-divider span {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--mute);
+}
+
 .muted { color: var(--mute); font-size: 13px; }
 .foot {
   margin-top: 24px;

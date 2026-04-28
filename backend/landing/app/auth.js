@@ -1,6 +1,13 @@
 // Veklom self-serve auth client.
 // Stores access + refresh tokens in localStorage, exposes a small API.
-window.VEKLOM_API = window.VEKLOM_API || "https://api.veklom.com/api/v1";
+const _hostname = window.location.hostname;
+if (!window.VEKLOM_API) {
+  if (_hostname.endsWith(".veklom.dev")) {
+    window.VEKLOM_API = "https://api.veklom.dev/api/v1";
+  } else {
+    window.VEKLOM_API = "https://api.veklom.com/api/v1";
+  }
+}
 
 const VK = {
   apiBase: window.VEKLOM_API,

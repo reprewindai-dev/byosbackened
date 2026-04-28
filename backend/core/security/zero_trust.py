@@ -32,6 +32,30 @@ _PUBLIC_PATHS = {
     # f"{settings.api_prefix}/openapi.json",  # LOCKED - requires auth
 }
 
+# Public web-surface prefixes (landing + marketplace UI).
+_PUBLIC_PREFIXES = (
+    "/signup",
+    "/login",
+    "/dashboard",
+    "/blog",
+    "/legal",
+    "/app",
+    "/.well-known",
+)
+
+_PUBLIC_STATIC_SUFFIXES = (
+    ".css",
+    ".js",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".svg",
+    ".ico",
+    ".webmanifest",
+    ".xml",
+    ".txt",
+)
+
 
 class ZeroTrustMiddleware(BaseHTTPMiddleware):
     """
@@ -41,7 +65,11 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
-        path = request.url.path.rstrip("/")
+        path = request.url.path
+        # Normalize trailing slash — but preserve "/" as-is so it matches
+        # _PUBLIC_PATHS. rstrip("/") would turn "/" into "" (empty string).
+        if len(path) > 1:
+            path = path.rstrip("/")
 
         # Block path traversal attempts
         if ".." in path or "//" in path:
@@ -54,6 +82,18 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
         if path in _PUBLIC_PATHS:
             return await call_next(request)
 
+        if path.endswith(_PUBLIC_STATIC_SUFFIXES):
+            return await call_next(request)
+
+        for prefix in _PUBLIC_PREFIXES:
+            if path == prefix or path.startswith(prefix + "/"):
+                return await call_next(request)
+        
+        # Require authentication for all other endpoints
+        # Allow root endpoint without auth for public info
+        if path == "/":
+            return await call_next(request)
+        
         authorization = request.headers.get("Authorization")
         if not authorization:
             return JSONResponse(

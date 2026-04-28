@@ -1,6 +1,10 @@
 """FastAPI application — BYOS AI + Security Suite."""
+import json
+import logging
+from contextlib import asynccontextmanager
 import os
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -178,8 +182,8 @@ async def health():
 
 @app.get("/", include_in_schema=False)
 async def root():
-    """Landing page — serves public/index.html."""
-    html_path = os.path.join(os.path.dirname(__file__), "..", "..", "public", "index.html")
+    """Landing page — serves landing/index.html."""
+    html_path = os.path.join(os.path.dirname(__file__), "..", "..", "landing", "index.html")
     html_path = os.path.normpath(html_path)
     if os.path.exists(html_path):
         return FileResponse(html_path, media_type="text/html")
@@ -286,3 +290,10 @@ async def protected_openapi(request: Request, workspace_id: str = Depends(get_cu
         description=app.description,
         routes=app.routes,
     )
+
+
+# Serve landing + self-serve UI assets from backend/landing.
+# Mounted last so API and health routes stay authoritative.
+landing_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "landing"))
+if os.path.isdir(landing_dir):
+    app.mount("/", StaticFiles(directory=landing_dir, html=True), name="landing")

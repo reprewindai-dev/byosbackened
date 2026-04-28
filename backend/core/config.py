@@ -71,9 +71,13 @@ class Settings(BaseSettings):
 
     # CORS — tighten in production via CORS_ORIGINS env var
     cors_origins: list[str] = [
-        "https://marketplace.veklom.com",
         "https://veklom.com",
         "https://www.veklom.com",
+        "https://veklom.dev",
+        "https://www.veklom.dev",
+        "https://app.veklom.dev",
+        "https://api.veklom.dev",
+        "https://api.veklom.com",
         "http://localhost:3000",
         "http://localhost:3458",
         "http://localhost:3459",
@@ -90,7 +94,7 @@ class Settings(BaseSettings):
     # GitHub OAuth
     github_client_id: str = ""
     github_client_secret: str = ""
-    github_redirect_uri: str = "https://marketplace.veklom.com/auth/github/callback"
+    github_redirect_uri: str = "https://app.veklom.dev/auth/github/callback"
 
     # MFA / Auth security
     max_failed_login_attempts: int = 10

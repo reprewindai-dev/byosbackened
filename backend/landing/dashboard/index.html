@@ -43,7 +43,7 @@
 
     <div class="app-card full">
       <div class="section-h">API keys</div>
-      <p class="muted" style="margin-bottom:16px;">Use your API key to authenticate requests to <code>https://api.veklom.com/api/v1/*</code>. Treat it like a password — Veklom only displays the full key once at creation.</p>
+      <p class="muted" style="margin-bottom:16px;">Use your API key to authenticate requests to <code id="api_base_label">https://api.veklom.com/api/v1/*</code>. Treat it like a password — Veklom only displays the full key once at creation.</p>
       <div id="apikeys"><span class="spinner"></span> loading…</div>
       <div style="margin-top:18px;">
         <button class="btn btn-secondary" id="btn_new_key">Generate new API key</button>
@@ -78,6 +78,14 @@ curl -X POST https://api.veklom.com/v1/exec \
 <script src="/app/auth.js"></script>
 <script>
 if (!VK.isLoggedIn()) { window.location.href = "/login/"; }
+
+const runtimeApiBase = VK.apiBase || "https://api.veklom.com/api/v1";
+const runtimeExecBase = runtimeApiBase.replace(/\/api\/v1$/, "");
+document.getElementById("api_base_label").textContent = runtimeApiBase + "/*";
+document.getElementById("snippet").textContent = document.getElementById("snippet").textContent.replace(
+  "https://api.veklom.com/v1/exec",
+  runtimeExecBase + "/v1/exec"
+);
 
 const $alert = document.getElementById("alert");
 function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }

@@ -11,7 +11,7 @@
 | Standard | Sovereign · Standard | `starter` | $7,500.00 | $75,000.00 | USD |
 | Pro | Sovereign · Pro | `pro` | $18,000.00 | $180,000.00 | USD |
 | Enterprise | Sovereign · Enterprise | `enterprise` | $45,000.00 | $450,000.00 | USD |
-| Acquisition | Acquisition (one-time) | n/a — manual | $750,000.00 | n/a | USD |
+| Strategic Transfer (Private) | Not publicly listed | n/a — manual | $1,000,000.00 | n/a | USD |
 
 **Yearly = monthly × 10** (two months free, matches public page disclaimer).
 
@@ -21,8 +21,8 @@
 
 | Location | File / Surface | Must show |
 |---|---|---|
-| Public landing page | `landing/index.html` § Engagement | $7,500 / $18,000 / $45,000 / $750,000 |
-| SoftwareApplication JSON-LD | `landing/index.html` (head) | Same four prices |
+| Public landing page | `landing/index.html` § Engagement | $7,500 / $18,000 / $45,000 |
+| SoftwareApplication JSON-LD | `landing/index.html` (head) | Same three recurring prices |
 | FAQPage JSON-LD | `landing/index.html` (head) | Pricing FAQ answer references same numbers |
 | Backend plan catalog | `apps/api/routers/subscriptions.py` → `PLANS` | `750_000` / `1_800_000` / `4_500_000` cents |
 | API endpoint | `GET /subscriptions/plans` | Returns the PLANS dict |
@@ -35,7 +35,7 @@
 ## What's intentionally NOT here
 
 - **Pilot/charter discount rates** ($1,500 / $4,000 / $9,500). These are private and live only in `PILOT_PRICING_INTERNAL.md`. They are NEVER on the public page, in code, or in JSON-LD.
-- **Acquisition price** is in the table for completeness but is NOT a self-serve subscription product. It is a one-time deal handled outside Stripe Checkout.
+- **Strategic transfer value** is internal-only and never shown on public pages. It is negotiated privately outside Stripe Checkout.
 
 ---
 
@@ -49,7 +49,7 @@ Before any customer is asked to pay, the Stripe dashboard should contain:
 - [ ] All products tagged with metadata `{ "tier": "starter|pro|enterprise" }` for reconciliation
 - [ ] `STRIPE_SECRET_KEY` set in production environment (`core/config.py` reads `stripe_secret_key`)
 - [ ] `STRIPE_WEBHOOK_SECRET` set in production environment
-- [ ] Webhook endpoint `https://api.veklom.com/subscriptions/webhook` registered in Stripe dashboard, listening for:
+- [ ] Webhook endpoint `https://api.veklom.com/api/v1/subscriptions/webhook` registered in Stripe dashboard, listening for:
   - `checkout.session.completed`
   - `customer.subscription.created`
   - `customer.subscription.updated`

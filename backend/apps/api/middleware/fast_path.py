@@ -40,12 +40,6 @@ _REDIS_KEY_PREFIX = "fp:"
 # Paths that are 100% safe to short-circuit (idempotent, no per-user variance,
 # no auth needed). Anything in here returns identical bytes for all callers.
 _FAST_GET_PATHS = {
-    "/health",
-    "/status",
-    "/",
-    "/api/v1/docs",
-    "/api/v1/redoc",
-    "/api/v1/openapi.json",
     "/metrics",
 }
 

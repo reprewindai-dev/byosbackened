@@ -30,15 +30,16 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 PLANS = {
     "starter": {
-        "name": "Starter",
+        "name": "Sovereign · Standard",
         "tier": "starter",
-        "price_monthly_cents": 9_900,      # $99.00 / month
-        "price_yearly_cents": 99_000,      # $990.00 / year (2 months free)
-        "monthly_credits_included": 10_000_000,  # 10M credits
+        "price_monthly_cents": 750_000,      # $7,500.00 / month
+        "price_yearly_cents": 7_500_000,     # $75,000.00 / year (2 months free)
+        "monthly_credits_included": 10_000_000,
         "features": {
             "api_keys_max": 5,
-            "support_channel": "email",
-            "support_response_hours": 48,
+            "support_channel": "ai_bot",
+            "support_response_hours": 0,
+            "support_escalation": "email_48h",
             "cost_prediction": "limited",
             "execution": "limited",
             "usage_summary": True,
@@ -54,15 +55,16 @@ PLANS = {
         },
     },
     "pro": {
-        "name": "Pro",
+        "name": "Sovereign · Pro",
         "tier": "pro",
-        "price_monthly_cents": 49_900,     # $499.00 / month
-        "price_yearly_cents": 499_000,     # $4,990.00 / year (2 months free)
-        "monthly_credits_included": 100_000_000,  # 100M credits
+        "price_monthly_cents": 1_800_000,   # $18,000.00 / month
+        "price_yearly_cents": 18_000_000,   # $180,000.00 / year (2 months free)
+        "monthly_credits_included": 100_000_000,
         "features": {
             "api_keys_max": 20,
-            "support_channel": "email",
-            "support_response_hours": 24,
+            "support_channel": "ai_bot_priority",
+            "support_response_hours": 0,
+            "support_escalation": "email_24h",
             "cost_prediction": True,
             "routing_select": True,
             "savings_insights": True,
@@ -80,15 +82,16 @@ PLANS = {
         },
     },
     "sovereign": {
-        "name": "Sovereign",
+        "name": "Sovereign · Legacy",
         "tier": "sovereign",
-        "price_monthly_cents": 250_000,    # $2,500.00 / month
-        "price_yearly_cents": 2_500_000,   # $25,000.00 / year (2 months free)
-        "monthly_credits_included": 500_000_000,  # 500M credits
+        "price_monthly_cents": 4_500_000,   # Legacy alias to enterprise
+        "price_yearly_cents": 45_000_000,   # Legacy alias to enterprise yearly
+        "monthly_credits_included": 500_000_000,
         "features": {
             "api_keys_max": 100,
-            "support_channel": "priority",
-            "support_response_hours": 8,
+            "support_channel": "ai_bot_priority",
+            "support_response_hours": 0,
+            "support_escalation": "priority_8h",
             "kill_switch": True,
             "audit_logs": True,
             "audit_verification": True,
@@ -109,15 +112,16 @@ PLANS = {
         },
     },
     "enterprise": {
-        "name": "Enterprise",
+        "name": "Sovereign · Enterprise",
         "tier": "enterprise",
-        "price_monthly_cents": None,       # Custom pricing
-        "price_yearly_cents": None,        # Custom pricing
-        "monthly_credits_included": None,    # Custom
+        "price_monthly_cents": 4_500_000,   # $45,000.00 / month
+        "price_yearly_cents": 45_000_000,   # $450,000.00 / year (2 months free)
+        "monthly_credits_included": None,
         "features": {
             "api_keys_max": None,            # Unlimited
-            "support_channel": "dedicated",
-            "support_response_hours": 4,
+            "support_channel": "ai_bot_dedicated",
+            "support_response_hours": 0,
+            "support_escalation": "dedicated_4h",
             "kill_switch": True,
             "audit_logs": True,
             "audit_verification": True,
@@ -146,9 +150,8 @@ PLANS = {
     },
 }
 
-# Acquisition is intentionally NOT a subscription plan. It is a one-time deal
-# negotiated outside the self-serve checkout flow ($750,000 IP transfer).
-# See landing page section "vii. Engagement" → "Acquisition" tier.
+# Strategic transfer transactions are intentionally NOT a subscription plan.
+# They are negotiated privately outside of self-serve checkout.
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -182,7 +185,8 @@ class SubscriptionResponse(BaseModel):
 @router.get("/plans")
 async def list_plans():
     """Return all available plans (public endpoint)."""
-    return {"plans": list(PLANS.values())}
+    public_keys = ("starter", "pro", "enterprise")
+    return {"plans": [PLANS[k] for k in public_keys]}
 
 
 @router.get("/current", response_model=SubscriptionResponse)
@@ -213,7 +217,7 @@ async def current_subscription(
         plan=sub.plan.value,
         status=sub.status.value,
         billing_cycle=sub.billing_cycle,
-        amount_cents=int(sub.amount_cents),
+        amount_cents=int(sub.amount_cents or 0),
         currency=sub.currency,
         current_period_end=sub.current_period_end.isoformat() if sub.current_period_end else None,
         trial_end=sub.trial_end.isoformat() if sub.trial_end else None,

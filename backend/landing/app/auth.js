@@ -124,6 +124,10 @@ const VK = {
     return this.request("/subscriptions/current");
   },
 
+  async getGithubRepos() {
+    return this.request("/auth/github/repos");
+  },
+
   async createCheckout({ plan, billing_cycle = "monthly" }) {
     return this.request("/subscriptions/checkout", {
       method: "POST",

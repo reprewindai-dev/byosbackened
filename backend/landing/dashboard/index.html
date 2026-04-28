@@ -50,6 +50,16 @@
       </div>
     </div>
 
+    <div class="app-card full">
+      <div class="section-h">GitHub Connection</div>
+      <p class="muted" style="margin-bottom:16px;">Connect GitHub to link repositories and run marketplace jobs through your existing backend stack.</p>
+      <div id="github_panel"><span class="spinner"></span> loading...</div>
+      <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="btn_github_connect">Connect GitHub</button>
+        <button class="btn btn-secondary" id="btn_github_refresh" style="display:none;">Refresh repos</button>
+      </div>
+    </div>
+
     <div class="app-card full" id="upgrade_panel" style="display:none;">
       <div class="section-h">Choose a plan</div>
       <p class="muted" style="margin-bottom:24px;">Subscription unlocks platform access and included monthly credits. Need more usage? Buy token packs separately in wallet top-ups.</p>
@@ -92,6 +102,16 @@ function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' +
 function showOk(msg)    { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
 
 document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
+document.getElementById("btn_github_connect").addEventListener("click", async () => {
+  try {
+    await VK.startGithubLogin();
+  } catch (err) {
+    showError(err.message || "GitHub connect failed");
+  }
+});
+document.getElementById("btn_github_refresh").addEventListener("click", async () => {
+  await refreshGithubPanel();
+});
 
 (async function init() {
   const params = new URLSearchParams(window.location.search);
@@ -130,6 +150,7 @@ document.getElementById("signout").addEventListener("click", (e) => { e.preventD
   }
 
   await refreshKeys();
+  await refreshGithubPanel();
 
   document.getElementById("btn_upgrade").addEventListener("click", () => {
     document.getElementById("upgrade_panel").style.display = "block";
@@ -143,6 +164,38 @@ document.getElementById("signout").addEventListener("click", (e) => { e.preventD
     renderPlans(wantedPlan);
   }
 })();
+
+async function refreshGithubPanel() {
+  const panel = document.getElementById("github_panel");
+  const connectBtn = document.getElementById("btn_github_connect");
+  const refreshBtn = document.getElementById("btn_github_refresh");
+  try {
+    const out = await VK.getGithubRepos();
+    const repos = (out && out.repos) ? out.repos : [];
+    if (!repos.length) {
+      panel.innerHTML = '<p class="muted">GitHub connected, but no repositories were returned.</p>';
+    } else {
+      const top = repos.slice(0, 8);
+      panel.innerHTML = top.map(r =>
+        '<div class="kv">' +
+          '<span class="k">' + r.full_name + '</span>' +
+          '<span class="v"><a href="' + r.html_url + '" target="_blank" rel="noopener">open</a></span>' +
+        '</div>'
+      ).join("") + '<p class="muted" style="margin-top:10px;">Showing ' + top.length + ' of ' + repos.length + ' repos.</p>';
+    }
+    connectBtn.textContent = "Reconnect GitHub";
+    refreshBtn.style.display = "inline-flex";
+  } catch (err) {
+    const msg = (err && err.message) ? err.message : "Unable to load GitHub repos";
+    if ((err && err.status === 400) || /not connected/i.test(msg)) {
+      panel.innerHTML = '<p class="muted">GitHub is not connected yet. Connect to sync repos for marketplace jobs.</p>';
+      connectBtn.textContent = "Connect GitHub";
+      refreshBtn.style.display = "none";
+      return;
+    }
+    panel.innerHTML = '<p class="muted">Unable to load repos: ' + msg + '</p>';
+  }
+}
 
 async function refreshKeys() {
   try {

@@ -2,8 +2,14 @@
 
 This directory is the production static web surface for:
 
-- `veklom.com` (public trust/positioning page)
-- `veklom.dev` (marketplace operating surface with signup/login/dashboard)
+- `veklom.com` (showpiece + live demo + marketplace entry)
+- `veklom.dev` (acquisition/strategic surface when deployed)
+
+## Messaging authority lock
+
+- Canonical public copy source is `COPY_LOCK_ISSUE1.md`.
+- Required `.com` hierarchy is demo-first and marketplace-entry-first.
+- Acquisition positioning is secondary on `.com` and must not be foregrounded.
 
 ## Included routes
 
@@ -36,3 +42,5 @@ You can override at runtime with `window.VEKLOM_API`.
   - `landing/index.html`
   - `apps/api/routers/subscriptions.py`
   - `PRICING_TRUTH.md`
+- Keep public phrasing in sync with:
+  - `landing/COPY_LOCK_ISSUE1.md`

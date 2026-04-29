@@ -41,6 +41,19 @@
    - `POST /api/v1/auth/register`
    - `POST /api/v1/subscriptions/checkout`
 
+## Agent Access Map
+Use these exact access paths when the backend needs hands-on runtime work:
+
+- Veklom production host: `ssh -F NUL -i ~/.ssh/veklom-deploy root@5.78.135.11`
+- CO2 Router / ECOBE host: `ssh -F NUL -i ~/.ssh/veklom-deploy root@5.78.153.146`
+- Veklom Coolify app: `veklom-api`
+- Veklom Coolify project: `veklom`
+- Veklom server resources: PostgreSQL + Redis are already running on `5.78.135.11`
+- CO2 Router server resources: PostgreSQL + Redis are already running on `5.78.153.146`
+- Coolify dashboard listens on port `8000` on each host when the server is up
+
+If a future deploy crashes on startup, check the active container logs on the host before assuming the repo is broken. On the Veklom host, the live app container is the `veklom-api` resource; a restart-looping container can exist beside it during a failed deploy.
+
 ## Security Note
 - All previously exposed tokens/secrets must be rotated in provider dashboards.
 - Keep runtime secrets only in provider secret stores, never in repository files.

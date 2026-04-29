@@ -34,15 +34,25 @@ from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
 from db.models.execution_log import ExecutionLog
 from db.models.token_wallet import TokenWallet, TokenTransaction
-from db.models.vendor import Vendor
-from db.models.listing import Listing
-from db.models.marketplace_file import MarketplaceFile
-from db.models.evidence_package import EvidencePackage
-from db.models.marketplace_order import MarketplaceOrder, MarketplaceOrderItem
-from db.models.marketplace_payout import MarketplacePayout
-from db.models.github_installation import GithubInstallation, GithubRepo
-from db.models.usage_event import UsageEvent
-from db.models.compliance_review import ComplianceReview
+
+
+def _optional_import(path: str, names: tuple[str, ...]) -> tuple[object, ...]:
+    try:
+        module = __import__(path, fromlist=list(names))
+    except ImportError:
+        return tuple(None for _ in names)
+    return tuple(getattr(module, name) for name in names)
+
+
+Vendor, = _optional_import("db.models.vendor", ("Vendor",))
+Listing, = _optional_import("db.models.listing", ("Listing",))
+MarketplaceFile, = _optional_import("db.models.marketplace_file", ("MarketplaceFile",))
+EvidencePackage, = _optional_import("db.models.evidence_package", ("EvidencePackage",))
+MarketplaceOrder, MarketplaceOrderItem = _optional_import("db.models.marketplace_order", ("MarketplaceOrder", "MarketplaceOrderItem"))
+MarketplacePayout, = _optional_import("db.models.marketplace_payout", ("MarketplacePayout",))
+GithubInstallation, GithubRepo = _optional_import("db.models.github_installation", ("GithubInstallation", "GithubRepo"))
+UsageEvent, = _optional_import("db.models.usage_event", ("UsageEvent",))
+ComplianceReview, = _optional_import("db.models.compliance_review", ("ComplianceReview",))
 
 __all__ = [
     "Workspace",
@@ -89,3 +99,19 @@ __all__ = [
 
 if LicenseKey is not None:
     __all__.insert(__all__.index("LicenseTier"), "LicenseKey")
+
+for optional_name in [
+    "Vendor",
+    "Listing",
+    "MarketplaceFile",
+    "EvidencePackage",
+    "MarketplaceOrder",
+    "MarketplaceOrderItem",
+    "MarketplacePayout",
+    "GithubInstallation",
+    "GithubRepo",
+    "UsageEvent",
+    "ComplianceReview",
+]:
+    if globals().get(optional_name) is not None:
+        __all__.append(optional_name)

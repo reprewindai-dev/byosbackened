@@ -74,7 +74,7 @@
       </ol>
       <pre id="snippet" style="margin-top:14px; background:var(--ink); border:1px solid var(--rule); border-radius:3px; padding:16px; font-family:var(--mono); font-size:12px; color:var(--bone-2); overflow-x:auto;">
 curl -X POST https://api.veklom.com/v1/exec \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"summarize this audit log entry","use_memory":false}'
       </pre>
@@ -207,7 +207,7 @@ async function refreshKeys() {
         '<div class="kv">' +
           '<span class="k">' + (k.name || "key") + ' <span class="tag ' + (k.is_active ? "live" : "") + '">' + (k.is_active ? "active" : "revoked") + '</span></span>' +
           '<span class="v">' +
-            '<code style="font-family:var(--mono); font-size:12px; color:var(--bone-2);">' + (k.prefix || k.id) + '...</code> ' +
+            '<code style="font-family:var(--mono); font-size:12px; color:var(--bone-2);">' + (k.key_prefix || k.prefix || k.id) + '...</code> ' +
             (k.is_active ? '<button class="btn btn-danger" data-id="' + k.id + '" style="padding:6px 12px; font-size:10px;">Revoke</button>' : '') +
           '</span>' +
         '</div>'

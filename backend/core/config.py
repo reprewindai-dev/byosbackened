@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "byos-ai"
     s3_region: str = "us-east-1"
     s3_use_ssl: bool = False
+    s3_backup_bucket: str = "veklom-db-backups"
+
+    # AWS
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_default_region: str = "us-east-1"
 
     # Security
     secret_key: str = "change-me-in-production-use-env-var"

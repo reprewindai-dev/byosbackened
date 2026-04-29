@@ -146,6 +146,17 @@ const VK = {
     return this.request("/subscriptions/current");
   },
 
+  async getWalletBalance() {
+    return this.request("/wallet/balance");
+  },
+
+  async aiComplete({ model, prompt, max_tokens = 512 }) {
+    return this.request("/ai/complete", {
+      method: "POST",
+      body: JSON.stringify({ model, prompt, max_tokens })
+    });
+  },
+
   async getGithubRepos() {
     return this.request("/auth/github/repos");
   },

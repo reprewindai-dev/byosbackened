@@ -63,6 +63,44 @@
       </div>
     </div>
 
+    <div class="app-card full" id="ai_playground_card">
+      <div class="section-h">AI Playground</div>
+      <p class="muted" style="margin-bottom:16px;">Run Bedrock completions against your workspace wallet. Charges are deducted from your token balance after the response returns.</p>
+      <div class="ai-meta">
+        <div class="kv ai-kv">
+          <span class="k">Token balance</span>
+          <span class="v" id="ai_balance"><span class="spinner"></span> loading...</span>
+        </div>
+        <div class="kv ai-kv">
+          <span class="k">Cost rule</span>
+          <span class="v">1 token per 100 output tokens</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="ai_model">Model</label>
+        <select id="ai_model">
+          <option value="claude-haiku">Claude Haiku</option>
+          <option value="llama3">Llama 3</option>
+          <option value="mistral">Mistral</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="ai_prompt">Prompt</label>
+        <textarea id="ai_prompt" rows="8" placeholder="Ask the workspace AI to draft, summarize, or analyze something."></textarea>
+      </div>
+      <div class="ai-footer">
+        <div>
+          <button class="btn btn-primary" id="ai_submit" disabled>Submit</button>
+          <div class="muted ai-note" id="ai_access_note">Loading access state...</div>
+        </div>
+        <div class="muted ai-cost" id="ai_cost"></div>
+      </div>
+      <div class="ai-response-wrap">
+        <div class="section-h" style="margin-top:0;">Response</div>
+        <pre id="ai_response" class="ai-response">No response yet.</pre>
+      </div>
+    </div>
+
     <div class="app-card full" id="upgrade_panel" style="display:none;">
       <div class="section-h">Choose a plan</div>
       <p class="muted" style="margin-bottom:24px;">Subscription unlocks platform access and included monthly credits. Need more usage? Buy token packs separately in wallet top-ups.</p>
@@ -103,6 +141,74 @@ document.getElementById("snippet").textContent = document.getElementById("snippe
 const $alert = document.getElementById("alert");
 function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }
 function showOk(msg)    { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
+
+const aiState = {
+  freeTier: false,
+  walletLoaded: false,
+};
+
+function setAiMode(isFreeTier) {
+  aiState.freeTier = isFreeTier;
+  const submit = document.getElementById("ai_submit");
+  const note = document.getElementById("ai_access_note");
+  if (isFreeTier) {
+    submit.disabled = true;
+    submit.textContent = "Upgrade to access AI features";
+    note.textContent = "Upgrade to access AI features";
+  } else {
+    submit.disabled = false;
+    submit.textContent = "Submit";
+    note.textContent = "Charged from your token wallet.";
+  }
+}
+
+async function refreshAiWallet() {
+  const balanceNode = document.getElementById("ai_balance");
+  try {
+    const wallet = await VK.getWalletBalance();
+    aiState.walletLoaded = true;
+    balanceNode.textContent = (wallet.balance || 0).toLocaleString() + " tokens";
+  } catch (err) {
+    balanceNode.textContent = "Unavailable";
+  }
+}
+
+document.getElementById("ai_submit").addEventListener("click", async () => {
+  if (aiState.freeTier) {
+    showError("Upgrade to access AI features");
+    return;
+  }
+
+  const prompt = document.getElementById("ai_prompt").value.trim();
+  const model = document.getElementById("ai_model").value;
+  const responseNode = document.getElementById("ai_response");
+  const costNode = document.getElementById("ai_cost");
+  const submit = document.getElementById("ai_submit");
+
+  if (!prompt) {
+    showError("Enter a prompt");
+    return;
+  }
+
+  submit.disabled = true;
+  submit.innerHTML = '<span class="spinner"></span> Running...';
+  responseNode.textContent = "Waiting for Bedrock...";
+  costNode.textContent = "";
+
+  try {
+    const out = await VK.aiComplete({ model, prompt, max_tokens: 512 });
+    responseNode.textContent = out.response_text || "";
+    costNode.textContent = "Used " + (out.tokens_deducted || 0) + " tokens";
+    document.getElementById("ai_balance").textContent = (out.wallet_balance || 0).toLocaleString() + " tokens";
+    showOk("AI response ready.");
+  } catch (err) {
+    responseNode.textContent = "No response available.";
+    showError(err.message || "AI completion failed");
+  } finally {
+    submit.innerHTML = "Submit";
+    setAiMode(aiState.freeTier);
+  }
+});
 
 document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
 document.getElementById("btn_github_connect").addEventListener("click", async () => {
@@ -148,12 +254,16 @@ document.getElementById("btn_github_refresh").addEventListener("click", async ()
       '<div class="kv"><span class="k">Amount</span><span class="v">' + dollars + '</span></div>' +
       '<div class="kv"><span class="k">Renews</span><span class="v">' + (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "-") + '</span></div>';
     document.getElementById("btn_upgrade").style.display = "inline-flex";
+    setAiMode((sub.plan || "free") === "free");
   } catch (err) {
     document.getElementById("subscription").innerHTML = '<p class="muted">Unable to load subscription: ' + err.message + '</p>';
+    document.getElementById("ai_submit").disabled = true;
+    document.getElementById("ai_access_note").textContent = "Unable to verify access.";
   }
 
   await refreshKeys();
   await refreshGithubPanel();
+  await refreshAiWallet();
 
   document.getElementById("btn_upgrade").addEventListener("click", () => {
     document.getElementById("upgrade_panel").style.display = "block";

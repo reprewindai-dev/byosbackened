@@ -41,6 +41,7 @@ In the API service → **Environment** tab, set:
 | `STRIPE_SECRET_KEY` | https://dashboard.stripe.com/apikeys |
 | `STRIPE_WEBHOOK_SECRET` | https://dashboard.stripe.com/webhooks |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | AWS S3, R2, or DigitalOcean Spaces |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_DEFAULT_REGION` | Amazon Bedrock + Hetzner backup upload |
 | `SENTRY_DSN` | optional, https://sentry.io |
 | `CORS_ORIGINS` | your real frontend URL, e.g. `["https://app.yourcompany.com"]` |
 

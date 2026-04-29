@@ -70,7 +70,7 @@ a:hover { color: var(--brass); }
   color: var(--mute);
   margin-bottom: 8px;
 }
-.field input, .field select {
+.field input, .field select, .field textarea {
   width: 100%;
   background: var(--ink-3);
   color: var(--bone);
@@ -80,7 +80,12 @@ a:hover { color: var(--brass); }
   font: inherit;
   font-size: 15px;
 }
-.field input:focus, .field select:focus {
+.field textarea {
+  min-height: 180px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
   outline: none;
   border-color: var(--brass);
 }
@@ -186,6 +191,62 @@ a:hover { color: var(--brass); }
   .dash-grid { grid-template-columns: 1fr 1fr; }
 }
 .dash-grid > .full { grid-column: 1 / -1; }
+
+.ai-meta {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.ai-kv {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.ai-kv .v { font-family: var(--mono); font-size: 12px; }
+
+.ai-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+}
+.ai-note {
+  margin-top: 10px;
+  max-width: 360px;
+}
+.ai-cost {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--brass-2);
+  text-align: right;
+  min-height: 18px;
+}
+.ai-response-wrap {
+  margin-top: 20px;
+}
+.ai-response {
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  min-height: 160px;
+  padding: 16px;
+  color: var(--bone-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 720px) {
+  .ai-footer {
+    flex-direction: column;
+  }
+  .ai-cost {
+    text-align: left;
+  }
+}
 
 .kv {
   display: flex;

@@ -365,33 +365,32 @@ server {
 ### Database Backups
 
 ```bash
-# Daily backups to S3-compatible storage (Cloudflare R2)
-#!/bin/bash
-BACKUP_DIR=/var/backups/postgresql
-DATE=$(date +%Y%m%d_%H%M%S)
-FILENAME=veklom_${DATE}.sql.gz
+# Install the Hetzner backup job
+sudo apt-get update
+sudo apt-get install -y awscli postgresql-client python3
+sudo install -m 0755 /path/to/backend/infra/scripts/backup-postgres.sh /opt/scripts/backup-postgres.sh
+sudo install -m 0755 /path/to/backend/infra/scripts/install-hetzner-backup.sh /opt/scripts/install-hetzner-backup.sh
 
-# Create backup
-pg_dump -U veklom veklom | gzip > ${BACKUP_DIR}/${FILENAME}
+# Fill in /etc/veklom/backup.env with:
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_DEFAULT_REGION=us-east-1
+# S3_BACKUP_BUCKET=veklom-db-backups
+# DATABASE_URL=postgresql://veklom:...
 
-# Upload to R2
-rclone copy ${BACKUP_DIR}/${FILENAME} r2:veklom-backups/database/
-
-# Keep only last 7 days locally
-find ${BACKUP_DIR} -name "veklom_*.sql.gz" -mtime +7 -delete
-
-# Verify backup
-pg_restore --list ${BACKUP_DIR}/${FILENAME} > /dev/null && echo "Backup OK" || echo "Backup FAILED"
+# Daily backup behavior:
+# - pg_dump the live Postgres database
+# - gzip the dump
+# - upload to s3://veklom-db-backups/postgres/<timestamp>/
+# - remove the local copy
+# - delete S3 objects older than 7 days
 ```
 
 ### Cron Schedule
 
 ```bash
 # Daily at 2 AM
-0 2 * * * /opt/veklom/scripts/backup-database.sh
-
-# Weekly full backup on Sundays at 3 AM
-0 3 * * 0 /opt/veklom/scripts/backup-database.sh full
+0 2 * * * root /opt/scripts/backup-postgres.sh
 ```
 
 ## Security Checklist

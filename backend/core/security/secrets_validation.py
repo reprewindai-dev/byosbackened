@@ -101,6 +101,9 @@ def validate_secrets_on_startup():
     # S3 credentials (required for ML model storage)
     if settings.s3_access_key_id == "minioadmin" and settings.s3_secret_access_key == "minioadmin":
         warnings.append("S3 credentials are using default MinIO values (OK for development)")
+
+    if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+        warnings.append("AWS credentials are not configured (Bedrock AI and S3 backup job will not work until AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set)")
     
     # Log errors and warnings
     for error in errors:

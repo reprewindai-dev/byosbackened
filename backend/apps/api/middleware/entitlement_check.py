@@ -26,6 +26,9 @@ PUBLIC_ENDPOINTS = {
     # "/api/v1/docs",  # LOCKED - requires starter+ plan
     # "/api/v1/redoc",  # LOCKED - requires starter+ plan
     "/api/v1/openapi.json",  # Still public for SDK generation
+    "/api/v1/register",
+    "/api/v1/login",
+    "/api/v1/refresh",
     "/api/v1/auth/register",
     "/api/v1/auth/login",
     "/api/v1/subscriptions/plans",
@@ -37,6 +40,10 @@ PUBLIC_ENDPOINTS = {
 # Values are the minimum required plan tier
 ENDPOINT_PLAN_REQUIREMENTS: Dict[str, str] = {
     # Auth - all plans
+    "/api/v1/me": "starter",
+    "/api/v1/logout": "starter",
+    "/api/v1/mfa": "starter",
+    "/api/v1/api-keys": "starter",
     "/api/v1/auth/me": "starter",
     "/api/v1/auth/refresh": "starter",
     "/api/v1/auth/logout": "starter",

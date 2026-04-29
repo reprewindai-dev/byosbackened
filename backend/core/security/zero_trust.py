@@ -18,6 +18,9 @@ _PUBLIC_PATHS = {
     "/metrics",
     "/status",      # system health — no auth required
     "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
+    f"{settings.api_prefix}/register",
+    f"{settings.api_prefix}/login",
+    f"{settings.api_prefix}/refresh",
     f"{settings.api_prefix}/auth/register",
     f"{settings.api_prefix}/auth/login",
     f"{settings.api_prefix}/auth/refresh",
@@ -26,6 +29,7 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/auth/github/login",
     f"{settings.api_prefix}/auth/github/callback",
     f"{settings.api_prefix}/support/chat",
+    f"{settings.api_prefix}/payments/webhook",
     # Docs now require auth + tokens (100 per view)
     # f"{settings.api_prefix}/docs",      # LOCKED - requires auth + 100 tokens
     # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth + 100 tokens
@@ -34,6 +38,8 @@ _PUBLIC_PATHS = {
 
 # Public web-surface prefixes (landing + marketplace UI).
 _PUBLIC_PREFIXES = (
+    "/marketplace",
+    "/vendor",
     "/signup",
     "/login",
     "/dashboard",
@@ -66,6 +72,7 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+        method = request.method.upper()
         # Normalize trailing slash — but preserve "/" as-is so it matches
         # _PUBLIC_PATHS. rstrip("/") would turn "/" into "" (empty string).
         if len(path) > 1:
@@ -81,6 +88,12 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
         # Pass through public endpoints
         if path in _PUBLIC_PATHS:
             return await call_next(request)
+
+        # Public marketplace browsing endpoints (read-only)
+        if method == "GET":
+            listings_base = f"{settings.api_prefix}/listings"
+            if path == listings_base or path.startswith(listings_base + "/"):
+                return await call_next(request)
 
         if path.endswith(_PUBLIC_STATIC_SUFFIXES):
             return await call_next(request)

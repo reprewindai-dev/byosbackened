@@ -19,6 +19,7 @@
 
 - `backend/infra/scripts/README.md` - Script usage documentation
 - `backend/docs/DEPLOYMENT_GUIDE.md` - Complete deployment guide
+- `backend/docs/AGENT_ACCESS.md` - Live host access, Coolify mapping, bootstrap flow
 
 ### Configuration
 
@@ -159,6 +160,7 @@ All other issues: Document, create ticket, fix in next release.
 
 For deployment questions, refer to:
 - Deployment Guide: `backend/docs/DEPLOYMENT_GUIDE.md`
+- Agent Access: `backend/docs/AGENT_ACCESS.md`
 - Script Documentation: `backend/infra/scripts/README.md`
 - Runbook: `backend/docs/RUNBOOK.md`
 

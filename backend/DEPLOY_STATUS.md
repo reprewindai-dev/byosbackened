@@ -51,6 +51,7 @@ Use these exact access paths when the backend needs hands-on runtime work:
 - Veklom server resources: PostgreSQL + Redis are already running on `5.78.135.11`
 - CO2 Router server resources: PostgreSQL + Redis are already running on `5.78.153.146`
 - Coolify dashboard listens on port `8000` on each host when the server is up
+- Canonical handoff doc: `backend/docs/AGENT_ACCESS.md`
 
 If a future deploy crashes on startup, check the active container logs on the host before assuming the repo is broken. On the Veklom host, the live app container is the `veklom-api` resource; a restart-looping container can exist beside it during a failed deploy.
 

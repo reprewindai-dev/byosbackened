@@ -153,7 +153,7 @@ FREE_PLAN = {
     "price_monthly_cents": 0,
     "price_yearly_cents": 0,
     "self_serve_checkout": False,
-    "monthly_credits_included": 250_000,
+    "monthly_credits_included": 50_000,
     "features": {
         "view_marketplace": True,
         "comment": True,

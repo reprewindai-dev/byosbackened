@@ -78,6 +78,9 @@ class RequestSecurityMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.ip_block_list = IPBlockList()
         self._sensitive_paths = {
+            "/api/v1/login",
+            "/api/v1/register",
+            "/api/v1/refresh",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",

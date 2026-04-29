@@ -202,6 +202,7 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
 
         cached_plan = self._get_cached_plan(workspace_id)
         current_plan = cached_plan
+        cache_ttl = 300
 
         if not current_plan:
             # Look up subscription from database
@@ -224,6 +225,10 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
                             not license_expires_at or license_expires_at > datetime.utcnow()
                         ):
                             current_plan = license_tier
+                            if license_expires_at:
+                                remaining = int((license_expires_at - datetime.utcnow()).total_seconds())
+                                if remaining > 0:
+                                    cache_ttl = min(cache_ttl, remaining)
                         else:
                             current_plan = "starter"
                     else:
@@ -231,7 +236,7 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
                         current_plan = "starter"
 
                 # Cache the result
-                self._cache_plan(workspace_id, current_plan)
+                self._cache_plan(workspace_id, current_plan, ttl=cache_ttl)
             finally:
                 db.close()
 

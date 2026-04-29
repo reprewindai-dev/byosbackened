@@ -186,14 +186,14 @@ const VK = {
     });
   },
 
-  async createCheckout({ plan, billing_cycle = "monthly" }) {
+  async createCheckout({ plan, billing_cycle = "monthly", success_url = null, cancel_url = null }) {
     return this.request("/subscriptions/checkout", {
       method: "POST",
       body: JSON.stringify({
         plan,
         billing_cycle,
-        success_url: window.location.origin + "/dashboard/?checkout=success",
-        cancel_url: window.location.origin + "/dashboard/?checkout=cancel"
+        success_url: success_url || (window.location.origin + "/dashboard/?checkout=success"),
+        cancel_url: cancel_url || (window.location.origin + "/dashboard/?checkout=cancel")
       })
     });
   },

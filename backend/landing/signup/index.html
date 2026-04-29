@@ -18,7 +18,7 @@
   <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
   <div class="app-card">
     <h1 class="app-h1">Create your workspace</h1>
-    <p class="app-sub">Evaluation account. No card required to register. Self-hosted deployment kit and architecture review unlock after subscription.</p>
+    <p class="app-sub">Create an evaluation account. Free access does not require a card. Starter, Pro, and Sovereign continue directly to Stripe checkout after registration.</p>
     <div id="alert"></div>
     <form id="form">
       <div class="field">
@@ -51,17 +51,43 @@ const $alert = document.getElementById("alert");
 const $form  = document.getElementById("form");
 const $btn   = document.getElementById("submit");
 const $githubBtn = document.getElementById("github_signup");
+const SELF_SERVE_PLANS = ["starter", "pro", "sovereign"];
 
 function showError(msg) {
   $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
 }
 
-if (VK.isLoggedIn()) {
-  window.location.href = "/dashboard/";
-}
-
 const params = new URLSearchParams(window.location.search);
 const wantedPlan = params.get("plan");
+const wantedBillingCycle = params.get("billing_cycle") || "monthly";
+
+async function redirectToCheckout(plan) {
+  const out = await VK.createCheckout({
+    plan,
+    billing_cycle: wantedBillingCycle,
+    success_url: window.location.origin + "/dashboard/?checkout=success&plan=" + encodeURIComponent(plan),
+    cancel_url: window.location.origin + "/dashboard/?checkout=cancel&plan=" + encodeURIComponent(plan)
+  });
+  window.location.href = out.checkout_url;
+}
+
+async function afterAuthRedirect() {
+  if (wantedPlan && SELF_SERVE_PLANS.includes(wantedPlan)) {
+    await redirectToCheckout(wantedPlan);
+    return;
+  }
+  if (wantedPlan === "enterprise") {
+    window.location.href = "/dashboard/?plan=enterprise";
+    return;
+  }
+  window.location.href = "/dashboard/?welcome=1";
+}
+
+if (VK.isLoggedIn()) {
+  afterAuthRedirect().catch((err) => {
+    showError(err.message || "Unable to continue to checkout");
+  });
+}
 
 $form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -76,11 +102,7 @@ $form.addEventListener("submit", async (e) => {
   };
   try {
     await VK.register(data);
-    if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
-      window.location.href = "/dashboard/?plan=" + wantedPlan;
-    } else {
-      window.location.href = "/dashboard/?welcome=1";
-    }
+    await afterAuthRedirect();
   } catch (err) {
     showError(err.message || "Registration failed");
     $btn.disabled = false;

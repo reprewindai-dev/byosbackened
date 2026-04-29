@@ -183,6 +183,45 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
             redis.setex(key, ttl, plan)
         except Exception as e:
             logger.warning(f"Failed to cache plan: {e}")
+
+    def _resolve_current_plan(self, request: Request, workspace_id: str) -> str:
+        """
+        Resolve the current effective plan for the request.
+
+        Workspace owners, admins, and superusers are treated as enterprise so
+        the signed-in control plane can access the full surface without getting
+        trapped by subscription gates.
+        """
+        if getattr(request.state, "is_superuser", False):
+            return "enterprise"
+
+        role = str(getattr(request.state, "role", "") or "").lower()
+        if role in {"admin", "owner"}:
+            return "enterprise"
+
+        cached_plan = self._get_cached_plan(workspace_id)
+        current_plan = cached_plan
+
+        if not current_plan:
+            # Look up subscription from database
+            db = SessionLocal()
+            try:
+                subscription = db.query(Subscription).filter(
+                    Subscription.workspace_id == workspace_id
+                ).first()
+
+                if subscription and subscription.status == SubscriptionStatus.ACTIVE:
+                    current_plan = subscription.plan.value
+                else:
+                    # No active subscription - default to starter
+                    current_plan = "starter"
+
+                # Cache the result
+                self._cache_plan(workspace_id, current_plan)
+            finally:
+                db.close()
+
+        return current_plan
     
     async def dispatch(self, request: Request, call_next):
         """
@@ -209,29 +248,8 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
         required_plan = self._get_required_plan(method, path)
         if not required_plan:
             return await call_next(request)
-        
-        # Try cache first
-        cached_plan = self._get_cached_plan(workspace_id)
-        current_plan = cached_plan
-        
-        if not current_plan:
-            # Look up subscription from database
-            db = SessionLocal()
-            try:
-                subscription = db.query(Subscription).filter(
-                    Subscription.workspace_id == workspace_id
-                ).first()
-                
-                if subscription and subscription.status == SubscriptionStatus.ACTIVE:
-                    current_plan = subscription.plan.value
-                else:
-                    # No active subscription - default to starter
-                    current_plan = "starter"
-                
-                # Cache the result
-                self._cache_plan(workspace_id, current_plan)
-            finally:
-                db.close()
+
+        current_plan = self._resolve_current_plan(request, workspace_id)
         
         # Check entitlement
         if not self._has_entitlement(current_plan, required_plan):

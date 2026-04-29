@@ -1,392 +1,293 @@
 # Veklom Landing Page Copy and Structure
 
-## Intent
+## Source of Truth
 
-Use proven cloud infrastructure landing-page language patterns without copying any competitor word-for-word.
+This document must match the live public site at `veklom.com`.
+If the site changes, this document must be updated to match the site.
 
-The style should feel like a serious cloud/provider page:
+Current live positioning:
 
-- direct headings
-- short paragraphs
-- concrete feature blocks
-- pricing clarity
-- infrastructure-grade trust language
-- no fluffy startup wording
-- no cheap SaaS tone
+- Product name: Veklom
+- Public category: Sovereign AI Infrastructure Marketplace
+- Product model: token-metered AI infrastructure marketplace
+- Primary audience: hospitals, banks, government, regulated teams, AI agencies, and builders
+- Public version label: Veklom v1.0
+- Public year label: 2026
 
-The product is **not generic hosting**.
+## Global Messaging Rules
 
-The product is:
+- Use short, direct claims.
+- Lead with control, sovereignty, spend protection, and evidence.
+- Avoid fluffy startup language.
+- Keep all copy aligned to regulated AI infrastructure.
+- Use "self-hosted", "VPC", "air-gapped", "audit", "token-metered", and "kill switch" as core language.
 
-> controlled backend access powered by VCB.
+## Site Navigation
 
----
+- Marketplace
+- Pricing
+- Vendors
+- Dashboard
+- Sign In
+- Get Access
 
-# Naming
-
-## Public naming
-
-- Marketplace brand: **Veklom Marketplace**
-- Public engine name: **VCB**
-- Full name: **Veklom Control Backend**
-- Hero badge: **Veklom Marketplace · Powered by VCB**
-- Product page name: **VCB Control Layer** or **Veklom Control Backend**
-
-## Internal naming rule
-
-Do not use the repo name as customer-facing language. The repo name is implementation-only.
-
----
-
-# Page Style Rules
-
-## How cloud providers talk
-
-They usually use:
-
-- short, confident claims
-- clear product categories
-- practical benefits before abstract vision
-- exact resource/pricing language
-- action-oriented CTAs
-- trust through constraints and transparency
-
-## How Veklom should talk
-
-Veklom should sound like:
-
-- premium infrastructure
-- cost-control platform
-- AI/backend governance layer
-- marketplace for controlled backend capabilities
-- serious enough for enterprise, simple enough for builders
-
-Do not overuse words like “revolutionary,” “next-gen,” “game-changing.”
-
-Use concrete wording:
-
-- credits
-- caps
-- endpoint access
-- usage ledger
-- token wallet
-- subscriptions
-- audit logs
-- control plane
-- marketplace listings
-- VCB
-- Veklom Control Backend
-
----
-
-# Full Page Copy
-
-## Hero
+## Hero Section
 
 ### Eyebrow
-Veklom Marketplace · Powered by VCB
+Sovereign Infrastructure / Token-Metered
 
 ### Headline
-Control backend access before costs run away.
-
-### Alternative headline
-Backend control for AI teams that need predictable usage.
+Run AI jobs without losing control of spend or data.
 
 ### Subheadline
-Veklom gives teams subscription access, token wallets, hard budget caps, endpoint governance, and marketplace discovery around VCB — the Veklom Control Backend — without turning your server into a generic hosting platform.
+Regulated teams in hospitals, banks, and government want AI now. Veklom gives them modern AI without losing control of data, spend, or compliance.
 
-### CTA buttons
-Start with Veklom
-View pricing
+### Primary CTA
+Start Free Trial
 
-### Hero proof strip
-- Subscriptions unlock access
-- Tokens meter usage
-- Budget caps stop overruns
-- Endpoint rules control execution
+### Secondary CTA
+View Pricing
 
----
+### Trust Strip
+- Sovereign Verified
+- SOC 2
+- HIPAA
+- GDPR
+- 99.9% SLA
+- 14-day free trial
 
-## Section 1 — Problem
+## Live Simulation Section
 
-### Heading
-AI tools are easy to start. Hard to control.
+### Section Heading
+See it work. Before you buy.
 
-### Copy
-Most teams do not lose money because they lack AI tools. They lose money because usage spreads across models, APIs, agents, and backend workflows without hard limits.
+### Section Copy
+Pick a scenario - hospital, bank, or agency. Watch Veklom detect PII, auto-redact, meter tokens, enforce spend controls, and generate a crypto-signed audit trail.
 
-Monitoring shows what happened. Veklom is built to stop waste before it becomes an invoice.
+### Scenario Options
+- Memorial Health System
+- HIPAA Compliance Officer
+- First National Bank
+- Chief Risk Officer
+- Apex AI Agency
+- CTO
 
-### Cards
+### Simulation States
+- Incoming Request
+- PII Detection
+- Auto-Redaction
+- Token-Metered Execution
+- Governed Result
 
-#### Runaway usage
-Agents, workflows, and API calls can burn through spend faster than teams can react.
+## Why Veklom Section
 
-#### Weak access control
-Backend features need plan rules, endpoint permissions, and usage limits — not open access.
+### Section Heading
+Built for teams that prefer evidence over rapport.
 
-#### No usage ledger
-If every execution is not recorded, teams cannot price, audit, or improve their systems.
+### Core Claims
 
-#### Procurement friction
-Regulated buyers need clearer proof, limits, and controls before they approve new tools.
+#### True Sovereignty
+Entirely self-hosted in your VPC or fully air-gapped. No data ever calls home.
 
----
+#### Governed AI Control
+Multi-LLM gateway with audit-grade execution, compliance controls, and policy enforcement at runtime.
 
-## Section 2 — What Veklom Is
+#### Spend Protection
+Hard spend limits and instant kill-switch control stop runaway AI before the bill hits.
 
-### Heading
-Not hosting. Controlled backend access.
+#### Token Metering
+Pay-per-call pricing. 100 tokens per docs view. Variable cost endpoints. Hard budget caps at the wallet level.
 
-### Copy
-Veklom does not start by letting vendors upload large applications, databases, or long-running services. Veklom starts as a control plane for VCB: subscriptions, tokens, endpoint entitlements, usage logs, and budget enforcement.
+#### Competitor Reality
+A 3AM alert after a runaway job is too late. Veklom stops runaway AI before money is spent.
 
-### Feature cards
+#### Procurement Bypass
+Perpetual source-available licensing helps teams skip months of vendor security reviews, legal loops, and procurement drag.
 
-#### Subscriptions
-Plans define which backend capabilities a buyer can access.
+## Pricing Section
 
-#### Tokens
-Credits meter executions, gateway calls, routing, API usage, and future GPU/runtime usage.
+### Section Heading
+Transparent rates. No surprise invoices.
 
-#### Entitlements
-Every endpoint can be mapped to a plan, module, rate limit, and risk level.
+### Pricing Rules
+- All plans include monthly credits.
+- Token packs are available anytime.
+- Annual billing offers two months free on paid plans.
+- Free trial is 14 days on Starter.
 
-#### Hard caps
-Budgets stop usage when limits are reached, instead of sending alerts after the damage is done.
+### Free
 
----
+Explore the platform - no credit card required
 
-## Section 3 — Flagship Product
-
-### Heading
-First premium listing: VCB.
-
-### Copy
-The marketplace begins with Veklom’s own backend as the anchor product. Buyers are not just browsing a catalog — they are purchasing governed access to backend features that help control AI spend, execution, and usage.
-
-### Included capabilities
-
-- Token wallet and credit ledger
-- Endpoint access by plan
-- Usage tracking by account, endpoint, and module
-- Budget caps and future hard kill-switch logic
-- Routing and cost-control modules where available
-- Audit and usage records for premium plans
-- Marketplace listing layer for future tools
-
-### CTA
-Explore VCB
-
----
-
-## Section 4 — How It Works
-
-### Heading
-Every request passes through rules before it runs.
-
-### Flow
-
-1. User authenticates
-2. Plan is checked
-3. Endpoint entitlement is verified
-4. Credit balance is checked
-5. Budget cap is enforced
-6. Request executes
-7. Usage event is written
-8. Credits are deducted
-9. Audit record is stored when required
-
-### Copy
-This turns backend usage into a managed commercial system. Access is not random. Every endpoint can have a price, a limit, a plan, and a record.
-
----
-
-## Section 5 — Pricing
-
-### Heading
-Access by subscription. Usage by tokens.
-
-### Copy
-Subscriptions unlock backend capability. Tokens meter usage. Budget caps prevent overruns.
+- Price: $0
+- Credits: 50K credits / month
+- 1 workspace
+- 1 API key
+- Health and status endpoints
+- 50K tokens / month included
+- Basic token wallet
+- Community docs access
+- Cost prediction
+- Savings insights
+- Kill switch
+- Compliance reports
+- Audit verification
+- Priority escalation
 
 ### Starter
-$99/month
 
-For builders and small teams testing controlled backend access.
+For builders and small teams testing controlled backend access
 
-Includes:
-- Starter endpoint access
-- Basic token wallet
-- Included monthly credits
-- Usage summary
-- Essential marketplace access
+- Price: $99/mo or $990/yr
+- Credits: 10M credits / month
+- Up to 5 API keys
+- 10M tokens / month included
+- Basic cost prediction
+- Usage summary and analytics
+- AI support bot
+- Kill switch
+- Compliance reports
+- Audit verification
+- Advanced routing
+- Priority escalation
 
 ### Pro
-$499/month
 
-For agencies and teams running real AI workflows.
+For AI teams and agencies trying to reduce waste
 
-Includes:
-- Higher endpoint access
-- Larger monthly credits
+- Price: $499/mo or $4,990/yr
+- Credits: 100M credits / month
+- Higher execution limits
+- Routing select and statistics
+- Cost prediction and history
+- Savings insights
+- Budget status and forecast
+- Billing breakdown
+- Performance metrics
+- Alerts summary
+- Text content scan
+- Job history
 - Token top-ups
-- Usage analytics
-- Project/team limits
-- Cost-control features where available
+- Priority AI support with email escalation in 24h
+- Kill switch
+- Compliance reports
+- Advanced security controls
 
 ### Sovereign
-$2,500/month
 
-For regulated teams that need stronger controls and evidence.
+For regulated teams that need control and evidence
 
-Includes:
-- Premium endpoint access
-- Hard budget controls
-- Audit logs and exports
-- Policy-ready access structure
-- Sovereign marketplace access
-- Priority support
+- Price: $2,500/mo or $25,000/yr
+- Credits: 500M credits / month
+- Hard budget caps
+- Kill switch
+- Audit logs
+- Audit verification
+- Compliance checks and reports
+- Privacy workflows
+- Explainability
+- Detailed health
+- Threat stats
+- Security controls
+- File scan
+- Content logs
+- Governed execution
+- 99.9% SLA guarantee
+- White-label rights
+- Priority AI support with escalation in 8h
 
 ### Enterprise
-Custom
 
-For banks, hospitals, government, defense, and high-volume teams.
+For banks, hospitals, government, defense
 
-Includes:
+- Price: Custom
+- Custom credits / month
 - Custom endpoint access
-- Private limits
+- Custom usage limits
 - Custom compliance package
-- Dedicated support
-- Future self-host/private deployment options
+- Dedicated AI support agent
+- Workspace and user administration
+- Advanced security control operations
+- Custom routing rules
+- Training and custom optimization
+- Private deployment path
+- 99.99% SLA guarantee
+- AI-triaged escalation in 4h
+- Annual architecture review
+- Penetration test report
 
----
+## Token Packs Section
 
-## Section 6 — Token Packs
+### Section Heading
+Top up anytime.
 
-### Heading
-Add credits when usage grows.
-
-### Copy
-Token packs keep usage predictable. Teams can top up manually, or later enable auto top-up with budget controls.
+### Section Copy
+The more you buy, the more you save.
 
 ### Packs
-- $25 starter pack
-- $100 growth pack
-- $500 team pack
-- $2,000 enterprise usage pack
 
-### Note
-No credit balance, no tokenized execution. This is how Veklom prevents silent overuse.
+#### Starter Pack
+- Price: $25
+- Credits: 2.5M
+- Best for testing and small projects
 
----
+#### Growth Pack
+- Price: $100
+- Credits: 12M
+- Bonus: +20%
+- Best for growing teams
 
-## Section 7 — Marketplace Model
+#### Team Pack
+- Price: $500
+- Credits: 75M
+- Bonus: +50%
+- Best for teams and agencies
 
-### Heading
-A marketplace built around control, not clutter.
+#### Enterprise Pack
+- Price: $2,000
+- Credits: 350M
+- Bonus: +75%
+- Best for large operators
 
-### Sovereign Marketplace
-For regulated or serious buyers.
+## FAQ Section
 
-Listings require stronger documentation, clearer deployment models, compliance claims, data-flow explanations, and approval.
+### What happens when I run out of credits?
+API requests return `402 Payment Required`. Customers can purchase token packs or upgrade their plan.
 
-### Essential Marketplace
-For useful tools that do not yet meet sovereign requirements.
+### Do credits roll over?
+Monthly included credits expire at the end of the billing period. Purchased token pack credits remain until used.
 
-These listings still provide value, but they are not promoted as regulated-ready until they graduate.
+### Can I upgrade or downgrade?
+Yes. Upgrades apply immediately. Downgrades take effect at the end of the current billing period.
 
-### Vendor rule
-Vendors do not upload large backends to Veklom at launch. They submit listings for review. Veklom approves, categorizes, and connects buyers to the tool.
+### Is there a free trial?
+Yes. Starter includes a 14-day free trial. Higher tiers can be evaluated by request.
 
----
+### How is each API call priced?
+Each endpoint has a fixed token cost. Variable-cost endpoints like `/exec` are metered by input and output tokens.
 
-## Section 8 — Competitor Comparison
+### Can I self-host?
+Yes. Sovereign and Enterprise tiers include source-available license terms with perpetual self-host rights.
 
-### Heading
-Built for the gaps other tools leave open.
+## Footer Copy
 
-| Category | Common gap | Veklom answer |
-|---|---|---|
-| AI monitoring tools | Show usage after it happens | Tokens, caps, and endpoint enforcement |
-| Observability platforms | Logs without execution control | Plan-based access and governed requests |
-| AI gateways | Routing without full marketplace/business layer | Billing, marketplace, endpoint access, and usage records |
-| Generic SaaS AI tools | Vendor risk and unclear spend | Controlled backend access and tokenized usage |
-| Hosting platforms | Generic compute | AI/backend-specific control plane |
+### Closing Message
+Start with evidence.
 
-### Line
-The product is not cheap hosting. The product is control.
+### Footer Line
+The future of enterprise AI is moving back on-prem. Start where your data already lives.
 
----
-
-## Section 9 — Deployment Truth
-
-### Heading
-Start as a control node. Scale into execution later.
-
-### Copy
-Veklom’s launch infrastructure should run the marketplace, billing, VCB control layer, token ledger, and lightweight approved jobs only. It should not host arbitrary full applications, customer databases, or GPU-heavy workloads at launch.
-
-### Now
+### Footer Links
 - Marketplace
-- VCB access
-- Subscriptions
-- Token wallet
-- Endpoint entitlements
-- Usage ledger
+- Pricing
+- Vendors
+- Sign In
+- Terms
+- Privacy
 
-### Later
-- Worker nodes
-- GPU runtime pools
-- Customer-hosted agents
-- Private deployments
-- Sovereign installs
+## Implementation Notes
 
----
-
-## Final CTA
-
-### Heading
-Control your backend before it controls your budget.
-
-### Copy
-Start with VCB, then expand into marketplace listings, tokenized usage, and sovereign-ready deployment paths.
-
-### Buttons
-Start with Veklom
-Request Sovereign Access
-
----
-
-# Design Direction
-
-- Dark background: near-black / deep charcoal
-- Accent: muted gold
-- Cards: subtle borders, high contrast
-- Typography: premium, calm, infrastructure-grade
-- Avoid bright SaaS gradients
-- Show dashboard mockups, not cartoon illustrations
-- Use proof strips, tables, usage cards, pricing blocks
-
----
-
-# Windsurf Prompt
-
-```text
-Create the Veklom Marketplace landing page using the copy in docs/VEKLOM_LANDING_PAGE_COPY_AND_STRUCTURE.md.
-
-Follow the tone of high-trust cloud infrastructure pages: short headings, concrete benefits, clear pricing, practical product language, premium dark design.
-
-Do not copy competitor wording. Use the same style mechanics: clean hero, proof strip, feature cards, pricing table, comparison table, deployment truth section, final CTA.
-
-Product truth:
-- Veklom is not generic hosting.
-- Veklom Marketplace is powered by VCB, the Veklom Control Backend.
-- VCB is the first premium marketplace listing.
-- Subscriptions unlock access.
-- Tokens meter usage.
-- Budget caps prevent overruns.
-- Vendors submit marketplace listings; they do not upload big backends at launch.
-
-Use premium Veklom aesthetic: dark background, muted gold accents, infrastructure-grade cards, clean spacing, serious enterprise feel.
-```
+- Keep the live site and this document synchronized.
+- Do not reintroduce the old internal product naming unless the live site changes.
+- Do not describe the product as generic hosting.
+- Preserve the site's premium, evidence-first tone.

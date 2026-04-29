@@ -1,1041 +1,247 @@
-# Veklom Marketplace Blueprint — Built Around the Existing Backend
+# Veklom Marketplace Blueprint
 
-## 0. Naming Correction
+## Source of Truth
 
-The repository is named `byosbackened`. That is the repo name only.
+This blueprint reflects the live marketplace at `veklom.com` and `veklom.com/vendor`.
+If the live site changes, this blueprint must be revised to match.
 
-Do **not** use `BYOSBackend`, `BYOSBackend Marketplace`, or any repo-name-derived wording as the public product name unless explicitly approved.
+## Product Definition
 
-Customer-facing names should be:
+Veklom is a sovereign AI infrastructure marketplace.
 
-- **Veklom**
-- **Veklom Marketplace**
-- **Veklom Backend**
-- **Veklom Control Layer**
-- **Veklom Runtime** if needed later
+Core positioning:
 
-The repo name should stay internal.
+- regulated AI infrastructure
+- token-metered execution
+- self-hosted or air-gapped deployment
+- spend control with hard caps and kill switches
+- audit-grade controls
+- buyer trust through evidence, not hype
 
----
+## Current Public Surface
 
-## 1. Purpose
+### Main Site
 
-This blueprint defines how to turn the existing Veklom backend into the commercial engine behind **Veklom Marketplace**.
-
-The goal is not to build a generic hosting company. The goal is to sell access to Veklom’s existing backend capabilities — tokens, cost controls, routing, auditability, execution governance, marketplace listings, and premium control features — through a premium marketplace experience that matches Veklom’s positioning.
-
-**Core principle:**
-
-> Veklom does not start as a place where strangers upload huge backends. Veklom starts as a marketplace and control layer powered by its own backend, with Veklom’s backend as the first premium product.
-
----
-
-## 2. Product Thesis
-
-Regulated and AI-heavy teams do not only need “AI tools.” They need:
-
-- cost control
-- policy control
-- token control
-- endpoint access control
-- audit trails
-- safe execution
-- buyer-friendly procurement
-- usage visibility
-- optional sovereign/self-hosted paths later
-
-The existing backend already contains many backend capabilities. The marketplace must package those capabilities into clear buyer-facing products and plans.
-
-The marketplace should answer:
-
-> “Why does this tier cost money?”
-
-The answer is:
-
-> “Because this tier unlocks specific Veklom backend capabilities that save money, reduce runaway AI costs, govern execution, and make usage easier to audit.”
-
----
-
-## 3. What Veklom Is Selling First
-
-The first premium listing is **Veklom Backend**.
-
-Positioning:
-
-> **The backend control layer for AI operations, usage governance, and sovereign-ready execution.**
-
-Buyer-facing line:
-
-> **Run AI and backend workflows without losing control of your data, tokens, or costs.**
-
-Veklom is not just selling a dashboard. Veklom is selling governed access to backend capabilities.
-
----
-
-## 4. Hosting Strategy: What We Host and What We Do Not Host
-
-### 4.1 Current infra reality
-
-The current production server should be treated as a **control node**, not a general hosting platform.
-
-It should run:
-
-- the Veklom marketplace app
-- user accounts/auth
-- listing database
-- subscription/payment state
-- token/credit ledger
-- Veklom backend gateway/API control layer
-- usage event ingestion
-- admin approvals
-- lightweight execution only when explicitly approved
-
-It should not run arbitrary customer infrastructure.
-
-### 4.2 What is allowed at launch
-
-Allowed:
-
-- Veklom’s own backend
-- marketplace/control plane
-- token/credit accounting
-- API gateway calls
-- short-lived execution jobs
-- small wrappers/connectors
-- approved lightweight jobs
-- download/self-host listings
-- buyer requests for access
-
-### 4.3 What is not allowed at launch
-
-Not allowed:
-
-- arbitrary full SaaS app hosting
-- customer databases
-- vendor databases
-- long-running third-party services
-- big custom backends
-- GPU-heavy workloads on the main server
-- training jobs
-- uncontrolled container hosting
-
-### 4.4 Later expansion
-
-If demand is proven, add:
-
-- dedicated worker nodes
-- queue-based execution
-- GPU worker pools
-- customer-hosted agent/controller
-- private enterprise deployments
-- marketplace-managed customer VPC installs
-
----
-
-## 5. Marketplace Structure
-
-The marketplace has two sides:
-
-### 5.1 Sovereign Marketplace
-
-For regulated or serious buyers.
-
-Requirements:
-
-- no outbound telemetry or clearly documented data flow
-- self-hosted/customer-controlled option where applicable
-- compliance artifacts
-- audit/logging support
-- clear pricing
-- approved by Veklom
-- higher trust positioning
-
-This is the premium side.
-
-### 5.2 Essential Marketplace
-
-For useful tools that do not fully qualify as sovereign.
-
-These may be:
-
-- useful developer tools
-- AI wrappers
-- productivity tools
-- internal tools
-- vendor-hosted SaaS links
-- tools with weaker compliance documentation
-
-They still create value, but they do not get the premium sovereign badge until they meet the standard.
-
-### 5.3 Graduation path
-
-Essential tools can graduate to Sovereign after they provide:
-
-- SBOM or dependency disclosure
-- deployment documentation
-- data-flow explanation
-- security controls
-- audit/logging explanation
-- support terms
-- pricing clarity
-
----
-
-## 6. Listing Types
-
-### 6.1 First-party Veklom listing
-
-This is the main product.
-
-Includes:
-
-- Veklom backend access
-- subscription tiers
-- token/credit usage
-- cost-control features
-- endpoint modules
-- usage logs
-- premium backend capabilities
-
-Revenue: Veklom keeps 100%.
-
-### 6.2 Vendor catalog listing
-
-Vendor does not upload a giant backend to Veklom.
-
-Vendor submits:
-
-- product name
-- product description
-- category
-- Sovereign or Essential application
-- deployment model
-- docs/support link
-- compliance claims
-- pricing proposal
-- contact/support details
-
-Buyer can:
-
-- request access
-- purchase through marketplace later
-- download/self-host if allowed
-- contact vendor through Veklom
-
-Revenue: Veklom can take 20–30% on transactions once payments are enabled.
-
-### 6.3 Lightweight Veklom-routed listing
-
-Later, selected vendors can submit small functions/jobs that run through Veklom with strict limits.
-
-Allowed examples:
-
-- prompt transform
-- document cleaner
-- model routing helper
-- small API wrapper
-- connector call
-- short queue job
-
-Not allowed:
-
-- persistent backend
-- database
-- long-running process
-- heavy compute
-
----
-
-## 7. Existing Backend Capability Mapping
-
-Because the backend has many endpoints, we must map endpoints into buyer-facing modules.
-
-### 7.1 Core modules
-
-#### Module A — Access & Identity
-
-Backend capabilities likely include:
-
-- auth
-- API keys
-- account/team control
-- roles
-- permissions
-
-Marketplace value:
-
-- secure access
-- team governance
-- enterprise readiness
-
-Plan placement:
-
-- Starter: single user/basic keys
-- Pro: team access/API keys
-- Sovereign: RBAC/policy controls
-- Enterprise: custom org controls
-
-#### Module B — Token Wallet / Credits
-
-Backend capabilities:
-
-- token balances
-- credit purchases
-- usage deductions
-- transaction ledger
-- plan allowances
-
-Marketplace value:
-
-- usage-based billing
-- predictable spend
-- no runaway invoices
-
-Plan placement:
-
-- Starter: small included credits
-- Pro: bigger wallet + top-ups
-- Sovereign: budgets by project/team
-- Enterprise: custom token contracts
-
-#### Module C — Cost Controls
-
-Backend capabilities:
-
-- budget caps
-- usage limits
-- per-user/per-project ceilings
-- kill switches
-- usage warnings
-
-Marketplace value:
-
-- saves customers money
-- prevents AI bill shock
-- beats Helicone-style soft alerts if Veklom enforces hard limits
-
-Plan placement:
-
-- Starter: basic monthly limit
-- Pro: project limits + alerts
-- Sovereign: hard caps + enforcement
-- Enterprise: custom policy/budget rules
-
-#### Module D — Routing & Model Control
-
-Backend capabilities may include:
-
-- route requests
-- model/provider selection
-- fallback logic
-- cost-aware routing
-- latency-aware routing
-
-Marketplace value:
-
-- lower model spend
-- better reliability
-- optimized provider choice
-
-Plan placement:
-
-- Starter: default routing
-- Pro: cost-aware routing
-- Sovereign: policy-aware routing
-- Enterprise: custom routing rules
-
-#### Module E — Execution Governance
-
-Backend capabilities:
-
-- execution endpoints
-- job/run management
-- instance controls
-- request policies
-- workflow execution
-
-Marketplace value:
-
-- controlled AI/backend workflows
-- safe execution without becoming a hosting company
-
-Plan placement:
-
-- Starter: limited runs
-- Pro: more runs + queue priority
-- Sovereign: logged/policy-controlled execution
-- Enterprise: private worker strategy
-
-#### Module F — Audit & Logs
-
-Backend capabilities:
-
-- request logs
-- run logs
-- usage logs
-- proof records
-- exportable traces
-
-Marketplace value:
-
-- compliance evidence
-- buyer trust
-- audit readiness
-
-Plan placement:
-
-- Starter: basic logs
-- Pro: extended logs
-- Sovereign: audit exports/proof trails
-- Enterprise: custom retention/export formats
-
-#### Module G — Marketplace Listings
-
-Backend capabilities:
-
-- listing creation
-- approval status
-- vendor metadata
-- categories
-- tool profiles
-- request access
-
-Marketplace value:
-
-- commercial catalog
-- vendor onboarding
-- premium discovery layer
-
-Plan placement:
-
-- Community/Essential vendor: free or low-cost listing
-- Sovereign vendor: paid review/verification
-- Enterprise partner: custom listing/support
-
----
-
-## 8. Pricing Model
-
-Pricing must reflect backend value, not random page access.
-
-### 8.1 Buyer plans
-
-#### Starter — $49–$99/month
-
-Audience:
-
-- solo builders
-- small teams
-- early agencies
-
-Includes:
-
-- account access
-- limited Veklom backend endpoints
-- basic token wallet
-- monthly included credits
-- basic usage logs
-- access to Essential marketplace
-
-Limits:
-
-- low monthly requests
-- no hard enterprise controls
-- no compliance exports
-
-#### Pro — $199–$499/month
-
-Audience:
-
-- AI agencies
-- teams running workflows
-- SMBs using AI tools
-
-Includes:
-
-- more endpoint access
-- higher credits allowance
-- token top-ups
-- cost-aware routing
-- usage analytics
-- project/team limits
-- access to selected Sovereign listings
-
-Value:
-
-- saves money through routing and caps
-- prevents runaway usage
-- gives teams visibility
-
-#### Sovereign — $1,000–$3,000/month
-
-Audience:
-
-- regulated teams
-- healthcare
-- finance
-- public-sector pilots
-- serious enterprise evaluation
-
-Includes:
-
-- premium Veklom backend endpoints
-- hard budget caps
-- audit logs/export
-- policy enforcement
-- compliance evidence package
-- higher support priority
-- Sovereign marketplace access
-
-Value:
-
-- not just usage; auditability and control
-- can justify price through avoided procurement/compliance cost
-
-#### Enterprise — Custom
-
-Audience:
-
-- banks
-- hospitals
-- government
-- defense
-- large AI platforms/agencies
-
-Includes:
-
-- custom endpoint access
-- private limits
-- private deployment option later
-- custom contract/MSA
-- dedicated support
-- custom compliance docs
-- optional dedicated worker nodes
-
-Value:
-
-- full procurement support
-- control and evidence
-- custom architecture
-
-### 8.2 Token/credit model
-
-Subscriptions give access. Tokens meter usage.
-
-Tokens should be consumed for:
-
-- executions
-- gateway calls
-- model/API usage
-- heavy runs
-- future GPU runtime
-- premium routing events
-- vendor-routed calls later
-
-Token rules:
-
-- every usage event writes to ledger
-- every account has balance
-- hard caps stop execution when balance/budget is exceeded
-- admins can view spend by tool/project/user
-
-This is one of the biggest competitive advantages.
-
-### 8.3 Vendor plans
-
-#### Free listing
-
-- Essential-only
-- manual approval
-- limited profile
-- no compliance badge
-
-#### Verified listing — $99–$299/month
-
-- better placement
-- vendor profile
-- request-access form
-- basic review
-
-#### Sovereign verified — $500–$2,000 setup + monthly fee
-
-- compliance review
-- documentation checklist
-- badge
-- premium catalog placement
-- marketplace sales support
-
-#### Transaction fee
-
-Once Stripe marketplace transactions are enabled:
-
-- Veklom takes 20–30%
-- vendor receives 70–80%
-
----
-
-## 9. Competitive Win Map
-
-### 9.1 Against Helicone
-
-Helicone-style weakness:
-
-- monitoring and alerts may not stop spend fast enough
-
-Veklom angle:
-
-- hard caps
-- token wallet
-- kill switches
-- budget enforcement
-- usage ledger
-
-Sales line:
-
-> Stop runaway AI spend before it becomes an invoice.
-
-### 9.2 Against LangSmith
-
-LangSmith-style weakness:
-
-- cloud-first observability
-- not ideal for air-gapped/regulated deployment
-
-Veklom angle:
-
-- backend control layer
-- audit exports
-- policy-based usage
-- later self-host/customer-controlled path
-
-Sales line:
-
-> Observability is not enough. Regulated teams need controlled execution.
-
-### 9.3 Against Portkey
-
-Portkey-style weakness:
-
-- gateway/control may still depend on external SaaS architecture depending on deployment
-
-Veklom angle:
-
-- sovereign positioning
-- zero/controlled outbound design
-- backend access tiers
-- cost-control + audit together
-
-Sales line:
-
-> AI routing without sovereignty is still vendor risk.
-
-### 9.4 Against generic SaaS AI vendors
-
-Weakness:
-
-- procurement drag
-- uncontrolled data flow
-- external dependency
-- unclear usage costs
-
-Veklom angle:
-
-- marketplace + backend control
-- token accounting
-- vendor/product review
-- one control layer
-
-Sales line:
-
-> Buy and run AI tools without losing control of spend, data, or execution.
-
----
-
-## 10. Marketplace Pages Required
-
-### 10.1 Home
-
-Hero:
-
-> AI and backend tools that do not run away with your data or your budget.
-
-Sub:
-
-> Veklom Marketplace is powered by the Veklom backend — a control layer for AI usage, cost limits, endpoint access, and sovereign-ready execution.
-
-CTA:
-
-- Start with Veklom
-- Explore Marketplace
-- Submit Tool
-
-### 10.2 Veklom Backend product page
-
-Sections:
-
-- What it is
-- Why it saves money
-- Token wallet
-- Cost controls
-- Routing/model control
-- Audit logs
-- Endpoint modules
+- Marketplace
 - Pricing
-- Use cases
-- CTA: Start subscription / request access
+- Vendors
+- Dashboard
+- Sign In
+- Get Access
 
-### 10.3 Pricing
+### Public Hero
 
-Must show:
+Run AI jobs without losing control of spend or data.
 
+### Trust Signals
+
+- Sovereign Verified
+- SOC 2
+- HIPAA
+- GDPR
+- 99.9% SLA
+- 14-day free trial
+
+## Commercial Model
+
+### Buyer Plans
+
+The public pricing page sells subscription access plus monthly credits.
+
+Plans:
+
+- Free
 - Starter
 - Pro
 - Sovereign
 - Enterprise
-- Token top-ups
-- vendor listing plans
 
-### 10.4 Marketplace catalog
+### Token Packs
 
-Filters:
+Customers can buy additional credits at any time.
 
-- Sovereign
-- Essential
-- AI infrastructure
-- cost control
-- audit/compliance
-- developer tools
-- internal ops
+Packs:
 
-Each listing card:
+- Starter Pack
+- Growth Pack
+- Team Pack
+- Enterprise Pack
 
-- name
-- tier
-- deployment model
-- compliance status
-- pricing model
-- CTA
+### Consumption Rules
 
-### 10.5 Vendor submission
+- Credits are the primary metering unit.
+- API requests return `402 Payment Required` when credits are exhausted.
+- Monthly included credits expire at the end of the billing period.
+- Purchased token-pack credits remain until consumed.
 
-Fields:
+## Buyer Experience
 
-- company/product
+The marketplace is designed for buyers who want evidence before purchase.
+
+The public site shows:
+
+- live simulation
+- scenario-based product demo
+- regulated-industry use cases
+- pricing with explicit limits
+- self-host and air-gap claims
+- vendor and marketplace entry points
+
+## Live Simulation Model
+
+The simulation is part of the public sales surface.
+
+Supported scenarios:
+
+- Memorial Health System
+- First National Bank
+- Apex AI Agency
+
+Simulation states:
+
+- Incoming Request
+- PII Detection
+- Auto-Redaction
+- Token-Metered Execution
+- Governed Result
+
+Business purpose:
+
+- prove control before purchase
+- demonstrate compliance behavior
+- make spend governance visible
+- show audit trail generation
+
+## Vendor Model
+
+The vendor page is the marketplace intake path.
+
+Public vendor tiers:
+
+- Verified Listing
+- Sovereign Verified
+
+### Verified Listing
+
+- price: $199/mo
+- better marketplace placement
+- full vendor profile page
+- request-access form for buyers
+- basic listing analytics
+- reviewed within 5 business days
+- sovereign badge path
+- compliance review path
+
+### Sovereign Verified
+
+- price: $1,500 setup + $500/mo
+- sovereign badge and premium placement
+- compliance documentation review
+- security controls checklist
+- audit/logging explanation verification
+- full vendor analytics dashboard
+- marketplace sales support
+- priority listing review in 48h
+
+### Transaction Fee Model
+
+When transactions are enabled:
+
+- vendor receives 70-80%
+- Veklom platform fee is 20-30%
+
+## Sovereign Graduation Standard
+
+Essential tools can graduate into Sovereign Verified if they provide:
+
+1. SBOM or dependency disclosure
+2. deployment documentation
+3. data-flow explanation
+4. security controls
+5. audit/logging explanation
+6. support terms
+
+## Vendor Submission Flow
+
+The public listing form supports:
+
+- company or organization name
+- product name
 - category
-- Sovereign or Essential application
+- application tier
+- GitHub repository URL
 - deployment model
-- docs link
-- pricing
+- documentation URL
+- pricing model
+- contact email
 - compliance claims
-- support contact
-- file/docs upload later
+- product description
 
-### 10.6 Buyer dashboard
+The live flow also supports GitHub connection so the marketplace can:
 
-Shows:
+- link the repository
+- pull the README
+- detect capabilities
+- pre-fill listing fields
+- show star counts on the marketplace card
 
-- active plan
-- token balance
-- usage by endpoint/tool
-- budget caps
-- invoices
-- API keys
-- purchased listings
+## Revenue Architecture
 
-### 10.7 Admin dashboard
+Revenue streams currently visible on the public site:
 
-Shows:
-
-- users
-- plans
-- listings pending approval
-- token transactions
-- endpoint usage
-- flags/violations
-- revenue
-
----
-
-## 11. Backend Implementation Blueprint
-
-### 11.1 Core tables
-
-Required tables:
-
-- users
-- organizations
-- memberships
-- plans
 - subscriptions
-- token_wallets
-- token_transactions
-- usage_events
-- endpoint_catalog
-- endpoint_entitlements
-- marketplace_listings
-- listing_reviews
-- vendor_profiles
-- api_keys
-- invoices/payments
-- audit_logs
+- annual plans
+- token packs
+- vendor listing fees
+- sovereign verification fees
+- future transaction fees
 
-### 11.2 Endpoint catalog
+## Product Constraints
 
-Every endpoint should be registered with:
+The marketplace is not positioned as generic hosting.
 
-- endpoint path
-- method
-- internal name
-- module
-- required plan
-- token cost
-- rate limit
-- logging level
-- sovereign eligibility
-- public/private/admin classification
+Current public constraints:
 
-This turns 135+ endpoints into a product system.
+- self-hosted in VPC or air-gapped
+- no data calls home
+- governance at runtime
+- spend caps and kill switches
+- evidence-first sales motion
+- regulated buyer focus
 
-### 11.3 Entitlement check
+## Site Copy Rules
 
-Every protected endpoint should enforce:
+Use this language consistently:
 
-1. user authenticated
-2. org active
-3. subscription active or free tier allowed
-4. endpoint is included in plan
-5. token balance sufficient if tokenized
-6. budget cap not exceeded
-7. usage event logged
-8. audit event stored if required
+- sovereign infrastructure
+- token-metered
+- controlled spend
+- governed AI
+- audit-grade execution
+- compliance reports
+- self-hosted
+- air-gapped
+- evidence over rapport
 
-### 11.4 Token flow
+Do not revert to the old internal product naming unless the public site changes.
 
-When user calls tokenized endpoint:
+## Update Rule
 
-1. estimate token/credit cost
-2. check wallet balance
-3. check budget cap
-4. execute request
-5. calculate final usage
-6. deduct credits
-7. write token transaction
-8. write usage event
-9. return response with remaining balance
+This blueprint is a living snapshot of the live product.
 
-### 11.5 Stripe flow
+Any time the public site changes:
 
-Subscriptions:
+1. update the site copy first
+2. update pricing and vendor terms
+3. update this blueprint
+4. update any related docs or sales assets
 
-- Starter price ID
-- Pro price ID
-- Sovereign price ID
-- Vendor listing price ID
+## Deployment Notes
 
-One-time/top-up:
+The docs should stay aligned with:
 
-- token pack price IDs
-- verification fee price ID
-
-Webhooks:
-
-- checkout.session.completed
-- customer.subscription.created
-- customer.subscription.updated
-- customer.subscription.deleted
-- invoice.paid
-- invoice.payment_failed
-- payment_intent.succeeded
-
-Webhook updates:
-
-- subscription status
-- plan entitlements
-- token top-up balance
-- invoice/payment records
-
----
-
-## 12. Security Rules
-
-### 12.1 Repo safety
-
-Backend repo should stay private.
-
-No secrets should be committed:
-
-- no API keys
-- no Stripe keys
-- no database URLs
-- no provider tokens
-- no private endpoint docs that reveal attack paths
-
-Keep public marketing/docs separate where possible.
-
-### 12.2 Runtime safety
-
-- rate limit all API keys
-- protect admin endpoints
-- log all paid endpoint usage
-- add budget kill switches
-- do not allow arbitrary code execution initially
-- isolate any future execution workers
-
-### 12.3 Vendor safety
-
-- vendors cannot upload arbitrary backend services
-- vendors submit listings only at launch
-- any runnable tool requires manual approval
-- all execution must be sandboxed later
-
----
-
-## 13. Build Plan for Windsurf
-
-### Phase 1 — Inventory backend
-
-Task:
-
-- scan backend routes
-- extract all endpoints
-- generate `endpoint_catalog.json`
-- classify by module, plan, token cost, and risk
-
-Output:
-
-- endpoint inventory
-- module map
-- first pricing map
-
-### Phase 2 — Marketplace shell inside Veklom aesthetic
-
-Task:
-
-- build marketplace pages using premium dark/gold Veklom aesthetic
-- add home, catalog, Veklom product, pricing, vendor submit, dashboard
-
-Output:
-
-- production UI connected to backend routes where available
-
-### Phase 3 — Billing foundation
-
-Task:
-
-- add Stripe checkout
-- add subscription plans
-- add token top-up checkout
-- add webhook handling
-
-Output:
-
-- subscriptions and token wallet working
-
-### Phase 4 — Endpoint entitlement middleware
-
-Task:
-
-- add middleware around existing endpoints
-- enforce plan access
-- enforce tokens
-- log usage
-
-Output:
-
-- paid backend access tied to plans
-
-### Phase 5 — Admin and vendor review
-
-Task:
-
-- vendor submissions
-- listing approval
-- Sovereign/Essential classification
-- admin dashboard
-
-Output:
-
-- real marketplace operating system
-
-### Phase 6 — Launch
-
-Task:
-
-- Veklom Backend as first premium listing
-- Essential/Sovereign catalog live
-- Stripe live keys
-- production server env configured
-- DNS connected
-
-Output:
-
-- marketplace can accept buyers and vendors
-
----
-
-## 14. Final Positioning
-
-Use this everywhere:
-
-> **Veklom is the marketplace for AI and backend tools that need cost control, usage governance, and sovereign-ready deployment.**
-
-Short version:
-
-> **Control your AI spend. Control your backend access. Control your deployment.**
-
-Most important line:
-
-> **The product is not hosting. The product is controlled backend access.**
-
----
-
-## 15. Immediate Windsurf Prompt
-
-Paste this into Windsurf:
-
-```text
-We are building Veklom Marketplace around the existing Veklom backend in this repo.
-
-Important naming rule:
-- Do not use the repository name as the customer-facing product name.
-- Customer-facing names are Veklom, Veklom Marketplace, Veklom Backend, Veklom Control Layer.
-
-Do not build a generic hosting platform.
-Do not allow arbitrary third-party backend uploads.
-
-First, inspect the backend and generate a complete endpoint inventory. Classify every endpoint by module, plan eligibility, token cost, and risk level.
-
-Then build the marketplace around the actual backend capabilities:
-- subscriptions for access
-- token/credit wallet for usage
-- hard budget caps
-- usage event ledger
-- endpoint entitlement middleware
-- Veklom Backend as the first premium listing
-- vendor submissions as catalog listings only at launch
-- two marketplace tiers: Sovereign and Essential
-
-Use a premium Veklom aesthetic: dark background, gold accents, clean enterprise layout, high-trust compliance language.
-
-Required pages:
-- home
-- marketplace catalog
-- Veklom Backend product page
-- pricing
-- vendor submission
-- buyer dashboard
-- admin dashboard
-
-Required backend work:
-- endpoint_catalog table/json
-- plan entitlements
-- token wallets
-- token transactions
-- usage events
-- Stripe subscriptions
-- Stripe token top-ups
-- webhook handler
-- protected endpoint middleware
-
-The main product is controlled access to Veklom backend capabilities, not third-party hosting.
-```
+- the public homepage
+- the pricing page
+- the vendor page
+- the live demo behavior
+- the current plan and token-pack structure

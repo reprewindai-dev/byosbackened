@@ -18,13 +18,14 @@ from sqlalchemy.orm import Session
 from core.config import get_settings
 from core.security import create_access_token, decode_access_token, get_password_hash, verify_password
 from db.session import get_db
-from db.models import User, UserRole, UserStatus, UserSession, APIKey, Workspace
+from db.models import User, UserRole, UserStatus, UserSession, APIKey, Workspace, TokenWallet, TokenTransaction
 from apps.api.deps import get_current_user
 
 settings = get_settings()
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 _API_KEY_PREFIX = "byos_"
+FREE_TRIAL_CREDITS = 50_000
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
@@ -152,6 +153,25 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         is_superuser=False,
     )
     db.add(user)
+    wallet = TokenWallet(
+        workspace_id=workspace.id,
+        balance=FREE_TRIAL_CREDITS,
+        monthly_credits_included=FREE_TRIAL_CREDITS,
+        monthly_credits_used=0,
+        total_credits_purchased=0,
+        total_credits_used=0,
+    )
+    db.add(wallet)
+    db.flush()
+    db.add(TokenTransaction(
+        wallet_id=wallet.id,
+        workspace_id=workspace.id,
+        transaction_type="monthly_allotment",
+        amount=FREE_TRIAL_CREDITS,
+        balance_before=0,
+        balance_after=FREE_TRIAL_CREDITS,
+        description="Free workspace trial credits",
+    ))
     db.commit()
     db.refresh(user)
 

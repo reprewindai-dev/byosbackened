@@ -47,8 +47,36 @@ def validate_secrets_on_startup():
     if "host.docker.internal" not in settings.llm_base_url and "127.0.0.1" not in settings.llm_base_url:
         warnings.append(f"LLM_BASE_URL is set to '{settings.llm_base_url}' — ensure Ollama is reachable")
 
+    # GitHub OAuth is a public login path, so production must not ship without it.
+    if not settings.github_client_id or not settings.github_client_secret:
+        if settings.debug:
+            warnings.append("GitHub OAuth credentials are not configured (GitHub sign-in will be unavailable)")
+        else:
+            errors.append("GitHub OAuth credentials must be configured for production (GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)")
+
     if not settings.serpapi_key:
         warnings.append("SERPAPI_KEY not set (search features will not work)")
+
+    if settings.license_enforcement_enabled and not settings.license_key:
+        if settings.debug:
+            warnings.append("LICENSE_KEY is not configured (license gate disabled in debug)")
+        else:
+            errors.append("LICENSE_KEY must be configured when license enforcement is enabled")
+
+    if settings.license_enforcement_enabled and not settings.license_verify_url:
+        if settings.debug:
+            warnings.append("LICENSE_VERIFY_URL is not configured")
+        else:
+            errors.append("LICENSE_VERIFY_URL must be configured when license enforcement is enabled")
+
+    if settings.license_enforcement_enabled and not settings.license_verify_backup_url:
+        if settings.debug:
+            warnings.append("LICENSE_VERIFY_BACKUP_URL is not configured")
+        else:
+            warnings.append("LICENSE_VERIFY_BACKUP_URL is not configured; backup verifier disabled")
+
+    if settings.license_enforcement_enabled and settings.license_cache_grace_hours < 1:
+        errors.append("LICENSE_CACHE_GRACE_HOURS must be at least 1 when license enforcement is enabled")
     
     # S3 credentials (required for ML model storage)
     if settings.s3_access_key_id == "minioadmin" and settings.s3_secret_access_key == "minioadmin":

@@ -61,6 +61,9 @@ from apps.api.routers.locker_users import router as locker_users_router
 from apps.api.routers.kill_switch import router as kill_switch_router
 from apps.api.routers.token_wallet import router as token_wallet_router
 from apps.api.routers.support_bot import router as support_bot_router
+from apps.api.routers.marketplace_v1 import router as marketplace_v1_router
+from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
+from license.middleware import LicenseGateMiddleware, bootstrap_license_check
 import logging
 
 logger = logging.getLogger(__name__)
@@ -97,6 +100,8 @@ async def startup_validation():
         logger.info("✅ Production configuration validated successfully")
         if result.get("warnings"):
             logger.warning(f"Configuration warnings: {len(result['warnings'])}")
+        if settings.license_enforcement_enabled:
+            await bootstrap_license_check()
         # Safety net: ensure core tables exist even if migrations were missed.
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database schema presence check completed")
@@ -114,6 +119,7 @@ app.add_middleware(RequestSecurityMiddleware)
 app.add_middleware(RateLimitMiddleware)
 # 4. Zero-trust authentication
 app.add_middleware(ZeroTrustMiddleware)
+app.add_middleware(LicenseGateMiddleware)
 app.add_middleware(EntitlementCheckMiddleware)
 app.add_middleware(TokenDeductionMiddleware)
 app.add_middleware(MetricsMiddleware)
@@ -174,6 +180,7 @@ app.include_router(token_wallet_router, prefix=settings.api_prefix)
 
 # ── AI Support Bot ────────────────────────────────────────────────────────────
 app.include_router(support_bot_router, prefix=settings.api_prefix)
+app.include_router(marketplace_v1_router, prefix=settings.api_prefix)
 
 # ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
 app.include_router(exec_router)
@@ -197,6 +204,25 @@ async def root():
         "version": settings.app_version,
         "docs": f"{settings.api_prefix}/docs",
     }
+
+
+@app.post("/api/webhooks/stripe", include_in_schema=False)
+async def legacy_stripe_webhook(request: Request):
+    """
+    Backward-compatible Stripe webhook path.
+    Keeps old dashboard endpoint working while canonical endpoint is
+    /api/v1/subscriptions/webhook.
+    """
+    stripe_signature = request.headers.get("stripe-signature")
+    db = SessionLocal()
+    try:
+        return await subscriptions_webhook_handler(
+            request=request,
+            stripe_signature=stripe_signature,
+            db=db,
+        )
+    finally:
+        db.close()
 
 
 def deduct_tokens_for_docs(workspace_id: str, endpoint: str):

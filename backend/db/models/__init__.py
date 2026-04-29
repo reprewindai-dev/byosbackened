@@ -24,11 +24,21 @@ from db.models.security_event import SecurityEvent, ThreatType, SecurityLevel
 from db.models.user_session import UserSession
 from db.models.api_key import APIKey
 from db.models.subscription import Subscription, PlanTier, SubscriptionStatus
+from db.models.license_key import LicenseKey, LicenseTier
 from db.models.content_filter import ContentFilterLog, AgeVerification, ContentCategory, AgeVerificationStatus
 from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
 from db.models.execution_log import ExecutionLog
 from db.models.token_wallet import TokenWallet, TokenTransaction
+from db.models.vendor import Vendor
+from db.models.listing import Listing
+from db.models.marketplace_file import MarketplaceFile
+from db.models.evidence_package import EvidencePackage
+from db.models.marketplace_order import MarketplaceOrder, MarketplaceOrderItem
+from db.models.marketplace_payout import MarketplacePayout
+from db.models.github_installation import GithubInstallation, GithubRepo
+from db.models.usage_event import UsageEvent
+from db.models.compliance_review import ComplianceReview
 
 __all__ = [
     "Workspace",
@@ -56,9 +66,19 @@ __all__ = [
     "UserSession",
     "APIKey",
     "Subscription", "PlanTier", "SubscriptionStatus",
+    "LicenseKey", "LicenseTier",
     "ContentFilterLog", "AgeVerification", "ContentCategory", "AgeVerificationStatus",
     "SystemMetrics",
     "Alert", "AlertSeverity",
     "ExecutionLog",
     "TokenWallet", "TokenTransaction",
+    "Vendor",
+    "Listing",
+    "MarketplaceFile",
+    "EvidencePackage",
+    "MarketplaceOrder", "MarketplaceOrderItem",
+    "MarketplacePayout",
+    "GithubInstallation", "GithubRepo",
+    "UsageEvent",
+    "ComplianceReview",
 ]

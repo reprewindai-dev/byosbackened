@@ -91,10 +91,22 @@ class Settings(BaseSettings):
     stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
 
+    # License gate
+    license_enforcement_enabled: bool = False
+    license_verify_url: str = "https://license.veklom.com/verify"
+    license_verify_backup_url: str = "https://license2.veklom.com/verify"
+    license_key: str = ""
+    license_admin_token: str = ""
+    license_cache_grace_hours: int = 48
+    license_grace_hours: int = 72
+    license_revalidation_seconds: int = 900
+    license_cache_path: str = ""
+
     # GitHub OAuth
     github_client_id: str = ""
     github_client_secret: str = ""
-    github_redirect_uri: str = "https://app.veklom.dev/auth/github/callback"
+    github_redirect_uri: str = "https://veklom.com/auth/github/callback"
+    marketplace_admin_emails: list[str] = ["veklomdev@hotmail.com"]
 
     # MFA / Auth security
     max_failed_login_attempts: int = 10

@@ -129,3 +129,39 @@ Run: `docker exec -it byos_api alembic upgrade head`
 ```bash
 pytest tests/test_exec_endpoints.py -v
 ```
+
+---
+
+## License Server Monitoring
+
+Use this for the public license servers and the status page health check.
+
+### Endpoints
+
+- Primary license server: `https://license.veklom.com/health`
+- Backup license server: `https://license2.veklom.com/health`
+- Status page target: `https://status.veklom.com/health`
+
+### UptimeRobot Setup
+
+1. Create a free UptimeRobot account at `https://uptimerobot.com/`.
+2. Add a new monitor for the primary license server.
+3. Select `HTTP(s)` as the monitor type.
+4. Set the URL to `https://license.veklom.com/health`.
+5. Set the monitoring interval to `5 minutes`.
+6. Enable failure notifications for both `Email` and `SMS` contacts.
+7. Add a second `HTTP(s)` monitor for `https://license2.veklom.com/health`.
+8. Use the same `5 minutes` interval and the same email + SMS alert contacts.
+9. Add a third monitor for `https://status.veklom.com/health` if you want the public status page monitored too.
+10. Set the status page to display the HTTP `status`, `uptime_seconds`, and `timestamp` fields returned by the health endpoint.
+
+### Recommended Alerting Rules
+
+- Alert on 1 failed check for the license servers.
+- Alert on recovery as soon as UptimeRobot confirms the endpoint is back.
+- Keep the backup monitor separate so you can tell whether primary or backup is failing.
+
+### Operational Note
+
+- The license validator should try the primary verifier first, then the backup verifier, then the local cache grace window.
+- UptimeRobot is only for detection and response. It does not replace the validator failover logic.

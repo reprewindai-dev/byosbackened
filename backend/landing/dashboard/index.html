@@ -98,7 +98,6 @@ document.getElementById("snippet").textContent = document.getElementById("snippe
 );
 
 const $alert = document.getElementById("alert");
-let githubRepoIndex = [];
 function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }
 function showOk(msg)    { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
 
@@ -113,13 +112,6 @@ document.getElementById("btn_github_connect").addEventListener("click", async ()
 document.getElementById("btn_github_refresh").addEventListener("click", async () => {
   await refreshGithubPanel();
 });
-
-function getGithubRepoUrl(repo) {
-  const htmlUrl = repo && repo.html_url ? String(repo.html_url).trim() : "";
-  if (htmlUrl) return htmlUrl;
-  const fullName = repo && repo.full_name ? String(repo.full_name).trim() : "";
-  return fullName ? "https://github.com/" + fullName.replace(/^\/+/, "") : "https://github.com/";
-}
 
 (async function init() {
   const params = new URLSearchParams(window.location.search);
@@ -188,7 +180,7 @@ async function refreshGithubPanel() {
       panel.innerHTML = top.map(r =>
         '<div class="kv">' +
           '<span class="k">' + r.full_name + '</span>' +
-          '<span class="v"><a class="btn btn-secondary" href="' + getGithubRepoUrl(r) + '" target="_blank" rel="noopener noreferrer" style="padding:6px 12px; font-size:10px;">Open repo</a></span>' +
+          '<span class="v"><a href="' + r.html_url + '" target="_blank" rel="noopener">open</a></span>' +
         '</div>'
       ).join("") + '<p class="muted" style="margin-top:10px;">Showing ' + top.length + ' of ' + repos.length + ' repos.</p>';
     }

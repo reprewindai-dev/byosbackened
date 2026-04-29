@@ -2,7 +2,9 @@
 set -eu
 
 if command -v alembic >/dev/null 2>&1; then
-  alembic upgrade head
+  alembic upgrade head || {
+    echo "warning: alembic upgrade failed; continuing startup" >&2
+  }
 fi
 
 python scripts/seed_marketplace_first_party.py || {

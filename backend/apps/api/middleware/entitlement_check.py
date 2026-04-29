@@ -1,6 +1,7 @@
 """Entitlement check middleware - enforces plan-based access control."""
 import json
 import logging
+from datetime import datetime
 from typing import Dict, Set, Optional
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -8,7 +9,7 @@ from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
-from db.models import Subscription, PlanTier, SubscriptionStatus
+from db.models import Subscription, Workspace, PlanTier, SubscriptionStatus
 from core.redis_pool import get_redis
 
 logger = logging.getLogger(__name__)
@@ -210,11 +211,24 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
                     Subscription.workspace_id == workspace_id
                 ).first()
 
-                if subscription and subscription.status == SubscriptionStatus.ACTIVE:
+                if subscription and subscription.status in {SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING}:
                     current_plan = subscription.plan.value
                 else:
-                    # No active subscription - default to starter
-                    current_plan = "starter"
+                    workspace = db.query(Workspace).filter(
+                        Workspace.id == workspace_id
+                    ).first()
+                    if workspace and workspace.license_tier:
+                        license_tier = str(workspace.license_tier).lower()
+                        license_expires_at = workspace.license_expires_at
+                        if license_tier in PLAN_HIERARCHY and (
+                            not license_expires_at or license_expires_at > datetime.utcnow()
+                        ):
+                            current_plan = license_tier
+                        else:
+                            current_plan = "starter"
+                    else:
+                        # No active subscription or trial license - default to starter
+                        current_plan = "starter"
 
                 # Cache the result
                 self._cache_plan(workspace_id, current_plan)

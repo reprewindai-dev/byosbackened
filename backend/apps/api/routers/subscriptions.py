@@ -221,6 +221,23 @@ async def current_subscription(
         Subscription.workspace_id == current_user.workspace_id
     ).first()
     if not sub:
+        ws = db.query(Workspace).filter(
+            Workspace.id == current_user.workspace_id
+        ).first()
+        if ws and ws.license_tier and ws.license_expires_at and ws.license_expires_at > datetime.utcnow():
+            plan_info = PLANS.get(ws.license_tier, FREE_PLAN)
+            return SubscriptionResponse(
+                workspace_id=current_user.workspace_id,
+                plan=ws.license_tier,
+                status="trialing",
+                billing_cycle="monthly",
+                amount_cents=0,
+                currency="usd",
+                current_period_end=None,
+                trial_end=ws.license_expires_at.isoformat(),
+                features=plan_info["features"],
+            )
+
         plan_info = FREE_PLAN
         return SubscriptionResponse(
             workspace_id=current_user.workspace_id,

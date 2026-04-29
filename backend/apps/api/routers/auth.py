@@ -311,8 +311,9 @@ async def logout(current_user: User = Depends(get_current_user), db: Session = D
 
 
 @router.get("/me")
-async def me(current_user: User = Depends(get_current_user)):
+async def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Return authenticated user profile."""
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -320,6 +321,11 @@ async def me(current_user: User = Depends(get_current_user)):
         "role": current_user.role.value,
         "status": current_user.status.value,
         "workspace_id": current_user.workspace_id,
+        "workspace_name": workspace.name if workspace else None,
+        "workspace_slug": workspace.slug if workspace else None,
+        "license_tier": workspace.license_tier if workspace else None,
+        "license_expires_at": workspace.license_expires_at.isoformat() if workspace and workspace.license_expires_at else None,
+        "license_download_url": workspace.license_download_url if workspace else None,
         "mfa_enabled": current_user.mfa_enabled,
         "is_superuser": current_user.is_superuser,
         "last_login": current_user.last_login.isoformat() if current_user.last_login else None,

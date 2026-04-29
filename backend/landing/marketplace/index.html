@@ -61,7 +61,7 @@ function fmtPrice(cents, currency) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: (currency || "usd").toUpperCase() }).format((cents || 0) / 100);
 }
 
-if (VK.isLoggedIn()) { $authLink.href = "/dashboard/"; $authLink.textContent = "Dashboard"; }
+if (VK.isLoggedIn()) { $authLink.href = "/dashboard/"; $authLink.textContent = "Workspace"; }
 
 function render() {
   const q = ($search.value || "").trim().toLowerCase();

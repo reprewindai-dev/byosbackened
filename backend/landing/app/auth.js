@@ -25,7 +25,21 @@ const VK = {
   },
 
   isLoggedIn() {
-    return !!localStorage.getItem("vk_access");
+    const access = localStorage.getItem("vk_access");
+    const expiresAtRaw = localStorage.getItem("vk_expires_at");
+    if (!access) return false;
+    const expiresAt = Number(expiresAtRaw || 0);
+    if (expiresAt && Date.now() >= expiresAt - 30000) {
+      this.clearTokens();
+      return false;
+    }
+    return true;
+  },
+
+  requireLogin(redirectUrl = "/login/") {
+    if (this.isLoggedIn()) return true;
+    window.location.href = redirectUrl;
+    return false;
   },
 
   authHeader() {

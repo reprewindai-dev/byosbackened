@@ -128,6 +128,64 @@ const VK = {
     return this.request("/auth/github/repos");
   },
 
+  async marketplaceList(status_filter = null) {
+    const qs = status_filter ? ("?status_filter=" + encodeURIComponent(status_filter)) : "";
+    return this.request("/listings" + qs, { method: "GET" });
+  },
+
+  async marketplaceCreateVendor({ display_name }) {
+    return this.request("/vendors/create", {
+      method: "POST",
+      body: JSON.stringify({ display_name })
+    });
+  },
+
+  async marketplaceCreateListing({ title, description = "", price_cents = 0, currency = "usd" }) {
+    return this.request("/listings/create", {
+      method: "POST",
+      body: JSON.stringify({ title, description, price_cents, currency })
+    });
+  },
+
+  async marketplaceSubmitListing({ listing_id }) {
+    return this.request("/listings/submit", {
+      method: "POST",
+      body: JSON.stringify({ listing_id })
+    });
+  },
+
+  async marketplaceMyListings() {
+    return this.request("/vendors/me/listings", { method: "GET" });
+  },
+
+  async marketplaceGetUploadUrl({ listing_id, file_name, file_type = null }) {
+    return this.request("/files/upload-url", {
+      method: "POST",
+      body: JSON.stringify({ listing_id, file_name, file_type })
+    });
+  },
+
+  async marketplaceConfirmFile({ listing_id, s3_key, size = null, checksum = null, file_type = null }) {
+    return this.request("/files/confirm", {
+      method: "POST",
+      body: JSON.stringify({ listing_id, s3_key, size, checksum, file_type })
+    });
+  },
+
+  async marketplaceCreateOrder({ items }) {
+    return this.request("/orders/create", {
+      method: "POST",
+      body: JSON.stringify({ items })
+    });
+  },
+
+  async marketplaceCreateCheckout({ order_id, success_url = null, cancel_url = null }) {
+    return this.request("/payments/create-checkout", {
+      method: "POST",
+      body: JSON.stringify({ order_id, success_url, cancel_url })
+    });
+  },
+
   async createCheckout({ plan, billing_cycle = "monthly" }) {
     return this.request("/subscriptions/checkout", {
       method: "POST",

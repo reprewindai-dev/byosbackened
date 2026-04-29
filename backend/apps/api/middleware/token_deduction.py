@@ -29,6 +29,9 @@ PUBLIC_ENDPOINTS = {
     # "/api/v1/docs": 100,  # Moved to costing
     # "/api/v1/redoc": 100,  # Moved to costing
     "/api/v1/openapi.json",  # Free for SDKs
+    "/api/v1/register",
+    "/api/v1/login",
+    "/api/v1/refresh",
     "/api/v1/auth/register",
     "/api/v1/auth/login",
     "/api/v1/auth/refresh",
@@ -40,6 +43,9 @@ PUBLIC_ENDPOINTS = {
 # More specific patterns should come before general ones
 DEFAULT_ENDPOINT_COSTS: Dict[str, int] = {
     # Free metadata
+    "/api/v1/me": 0,
+    "/api/v1/mfa": 0,
+    "/api/v1/api-keys": 0,
     "/api/v1/auth/me": 0,
     "/api/v1/auth/mfa": 0,
     "/api/v1/auth/api-keys": 0,

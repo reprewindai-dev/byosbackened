@@ -87,6 +87,12 @@ class APIKeyCreateResponse(APIKeyResponse):
     raw_key: str
 
 
+class ConnectedAccountsResponse(BaseModel):
+    github_connected: bool
+    github_username: Optional[str] = None
+    github_connected_at: Optional[str] = None
+
+
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
 def _hash_api_key(raw_key: str) -> str:
@@ -523,7 +529,14 @@ async def github_callback(
     github_id = str(gh_user.get("id", ""))
     full_name = gh_user.get("name") or github_username
 
+    # Enforce one GitHub identity per user account.
+    already_linked = db.query(User).filter(User.github_id == github_id).first()
     user = db.query(User).filter(User.email == email).first()
+    if already_linked and user and already_linked.id != user.id:
+        raise HTTPException(
+            status_code=409,
+            detail="This GitHub account is already linked to a different user.",
+        )
     is_new = False
 
     if not user:
@@ -550,6 +563,7 @@ async def github_callback(
         db.commit()
         db.refresh(user)
     else:
+        # Existing account path: link OAuth credentials instead of creating duplicate account.
         user.github_id = github_id
         user.github_username = github_username
         user.github_access_token = gh_access_token
@@ -580,6 +594,31 @@ async def github_callback(
         "is_new_user": is_new,
         "github_username": github_username,
     }
+
+
+@router.get("/connected-accounts", response_model=ConnectedAccountsResponse)
+async def connected_accounts(current_user: User = Depends(get_current_user)):
+    github_connected = bool(current_user.github_id and current_user.github_access_token)
+    return ConnectedAccountsResponse(
+        github_connected=github_connected,
+        github_username=current_user.github_username,
+        github_connected_at=current_user.updated_at.isoformat() if github_connected and current_user.updated_at else None,
+    )
+
+
+@router.delete("/connected-accounts/github")
+async def unlink_github_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.github_id:
+        raise HTTPException(status_code=400, detail="GitHub is not connected.")
+    current_user.github_id = None
+    current_user.github_username = None
+    current_user.github_access_token = None
+    current_user.updated_at = datetime.utcnow()
+    db.commit()
+    return {"message": "GitHub account disconnected"}
 
 
 @router.get("/github/repos")

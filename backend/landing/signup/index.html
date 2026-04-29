@@ -98,7 +98,8 @@ $form.addEventListener("submit", async (e) => {
     email: document.getElementById("email").value.trim().toLowerCase(),
     password: document.getElementById("password").value,
     full_name: document.getElementById("full_name").value.trim(),
-    workspace_name: document.getElementById("workspace_name").value.trim()
+    workspace_name: document.getElementById("workspace_name").value.trim(),
+    trial_tier: wantedPlan || "starter"
   };
   try {
     await VK.register(data);

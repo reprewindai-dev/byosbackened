@@ -14,7 +14,7 @@ from db.models import (
     AIAuditLog, Budget, SecurityAuditLog,
     AbuseLog, IncidentLog, RoutingPolicy, CostAllocation,
     SecurityEvent, UserSession, APIKey,
-    Subscription, ContentFilterLog, AgeVerification,
+    Subscription, LicenseKey, ContentFilterLog, AgeVerification,
     SystemMetrics, Alert, ExecutionLog,
 )
 

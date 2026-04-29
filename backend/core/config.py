@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     license_grace_hours: int = 72
     license_revalidation_seconds: int = 900
     license_cache_path: str = ""
+    license_issue_url: str = "https://license.veklom.com/issue"
+    buyer_download_base_url: str = ""
+    buyer_download_version: str = ""
 
     # GitHub OAuth
     github_client_id: str = ""
@@ -118,6 +121,16 @@ class Settings(BaseSettings):
     log_format: str = "json"
     metrics_enabled: bool = True
     prometheus_port: int = 9090
+
+    # SMTP / customer onboarding email
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    mail_from: str = ""
+    mail_reply_to: str = ""
 
     # Content safety
     content_filtering_enabled: bool = True

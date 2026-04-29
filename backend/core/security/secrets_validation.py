@@ -75,8 +75,28 @@ def validate_secrets_on_startup():
         else:
             warnings.append("LICENSE_VERIFY_BACKUP_URL is not configured; backup verifier disabled")
 
+    if settings.license_enforcement_enabled and not settings.license_issue_url:
+        if settings.debug:
+            warnings.append("LICENSE_ISSUE_URL is not configured")
+        else:
+            errors.append("LICENSE_ISSUE_URL must be configured when license enforcement is enabled")
+
     if settings.license_enforcement_enabled and settings.license_cache_grace_hours < 1:
         errors.append("LICENSE_CACHE_GRACE_HOURS must be at least 1 when license enforcement is enabled")
+
+    if settings.license_enforcement_enabled and not settings.license_admin_token:
+        if settings.debug:
+            warnings.append("LICENSE_ADMIN_TOKEN is not configured")
+        else:
+            errors.append("LICENSE_ADMIN_TOKEN must be configured when license enforcement is enabled")
+    if settings.license_issue_url and not settings.license_admin_token:
+        if settings.debug:
+            warnings.append("LICENSE_ADMIN_TOKEN is not configured (trial issuance will fail)")
+        else:
+            errors.append("LICENSE_ADMIN_TOKEN must be configured when LICENSE_ISSUE_URL is set")
+
+    if settings.smtp_host and not settings.mail_from:
+        errors.append("MAIL_FROM must be configured when SMTP_HOST is set")
     
     # S3 credentials (required for ML model storage)
     if settings.s3_access_key_id == "minioadmin" and settings.s3_secret_access_key == "minioadmin":

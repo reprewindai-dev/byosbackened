@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import httpx
 import secrets
+import logging
 import pyotp
 import time
 from datetime import datetime, timedelta
@@ -20,8 +21,10 @@ from core.security import create_access_token, decode_access_token, get_password
 from db.session import get_db
 from db.models import User, UserRole, UserStatus, UserSession, APIKey, Workspace, TokenWallet, TokenTransaction
 from apps.api.deps import get_current_user
+from core.services.trial_onboarding import issue_trial_license, send_trial_welcome
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 _API_KEY_PREFIX = "byos_"
@@ -36,6 +39,7 @@ class RegisterRequest(BaseModel):
     full_name: Optional[str] = None
     workspace_name: str
     invite_code: Optional[str] = None
+    trial_tier: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -172,10 +176,31 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         balance_after=FREE_TRIAL_CREDITS,
         description="Free workspace trial credits",
     ))
-    db.commit()
-    db.refresh(user)
+    try:
+        license_payload = await issue_trial_license(
+            db=db,
+            workspace=workspace,
+            user_email=payload.email,
+            user_name=payload.full_name or payload.workspace_name,
+            requested_tier=payload.trial_tier,
+        )
+        db.commit()
+        db.refresh(user)
+        db.refresh(workspace)
+    except Exception:
+        db.rollback()
+        raise
 
     tokens = _create_tokens(user)
+    try:
+        await send_trial_welcome(
+            workspace=workspace,
+            user_email=payload.email,
+            user_name=payload.full_name or payload.workspace_name,
+            license_payload=license_payload,
+        )
+    except Exception as exc:
+        logger.warning("Trial welcome email failed for workspace %s: %s", workspace.id, exc)
     return TokenResponse(
         **tokens,
         user_id=user.id,

@@ -56,10 +56,10 @@ const VK = {
     return data;
   },
 
-  async register({ email, password, full_name, workspace_name }) {
+  async register({ email, password, full_name, workspace_name, trial_tier = null }) {
     const t = await this.request("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, full_name, workspace_name })
+      body: JSON.stringify({ email, password, full_name, workspace_name, trial_tier })
     });
     this.saveTokens(t);
     return t;
@@ -79,7 +79,15 @@ const VK = {
   },
 
   async startGithubLogin() {
-    const out = await this.getGithubAuthUrl();
+    let out;
+    try {
+      out = await this.getGithubAuthUrl();
+    } catch (err) {
+      if (err && err.status === 503) {
+        throw new Error("GitHub sign-in is not configured on the server.");
+      }
+      throw err;
+    }
     if (!out || !out.auth_url || !out.state) {
       throw new Error("GitHub OAuth initialization failed");
     }

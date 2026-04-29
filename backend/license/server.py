@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session
 
 from core.config import get_settings
 from core.security.encryption import encrypt_field
-from db.models import LicenseKey, LicenseTier
+from db.models import LicenseKey
 from db.session import Base, engine, get_db
+from license.tier import LicenseTier
 from license.stripe_webhook import router as stripe_webhook_router
 
 settings = get_settings()

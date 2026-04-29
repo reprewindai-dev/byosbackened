@@ -1,5 +1,5 @@
 """Workspace model (multi-tenant)."""
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.session import Base
@@ -18,7 +18,7 @@ class Workspace(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    license_key_id = Column(String, ForeignKey("license_keys.id"), nullable=True, index=True)
+    license_key_id = Column(String, nullable=True, index=True)
     license_key_prefix = Column(String, nullable=True)
     license_tier = Column(String, nullable=True)
     license_issued_at = Column(DateTime, nullable=True)

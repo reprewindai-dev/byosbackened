@@ -3,12 +3,37 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
-import os
 from pathlib import Path
 import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Buyer-facing runtime surface. Everything else stays out of the download zip.
+BUYER_DIRS = {
+    "apps",
+    "config",
+    "core",
+    "db",
+    "infra",
+    "landing",
+    "license",
+    "public",
+    "static",
+    "acquisition",
+}
+
+BUYER_ROOT_FILES = {
+    "README.md",
+    "alembic.ini",
+    "pyproject.toml",
+    "gunicorn_conf.py",
+    "docker-compose.yaml",
+    "docker-compose.dev.yml",
+    "docker-compose.prod.yml",
+    ".env.example",
+    ".env.production.example",
+}
 
 # Files that stay on the seller-side license server and must not ship to buyers.
 SERVER_ONLY_EXACT = {
@@ -35,6 +60,7 @@ EXCLUDED_GLOBS = {
     "*.log",
     "*.sqlite",
     "*.db",
+    "*.zip",
     ".env",
     ".env.*",
     "*_secret*",
@@ -42,25 +68,28 @@ EXCLUDED_GLOBS = {
     "*password*",
 }
 
-ALLOWED_ENV_EXACT = {
-    ".env.example",
-    ".env.production.example",
-}
-
 
 def should_include(path: Path) -> bool:
     rel = path.relative_to(ROOT).as_posix()
-    name = path.name
+    parts = rel.split("/")
 
     if rel in SERVER_ONLY_EXACT:
         return False
-    if any(part in EXCLUDED_DIRS for part in path.parts):
+    if parts[0] not in BUYER_DIRS and rel not in BUYER_ROOT_FILES:
         return False
-    if name in ALLOWED_ENV_EXACT:
+    if any(part in EXCLUDED_DIRS for part in parts):
+        return False
+    if parts[0] == "license" and rel == "license/tier.py":
         return True
-    if any(fnmatch.fnmatch(name, pattern) for pattern in EXCLUDED_GLOBS):
-        return False
-    if rel.startswith("scripts/__pycache__"):
+    if rel in BUYER_ROOT_FILES:
+        return True
+    if len(parts) > 1 and parts[0] == "license" and parts[1] in {"__init__.py", "fingerprint.py", "middleware.py", "tier.py", "validator.py"}:
+        return True
+    if len(parts) > 1 and parts[0] in BUYER_DIRS:
+        if any(fnmatch.fnmatch(path.name, pattern) for pattern in EXCLUDED_GLOBS):
+            return False
+        return True
+    if any(fnmatch.fnmatch(path.name, pattern) for pattern in EXCLUDED_GLOBS):
         return False
     return True
 

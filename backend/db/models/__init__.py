@@ -24,7 +24,11 @@ from db.models.security_event import SecurityEvent, ThreatType, SecurityLevel
 from db.models.user_session import UserSession
 from db.models.api_key import APIKey
 from db.models.subscription import Subscription, PlanTier, SubscriptionStatus
-from db.models.license_key import LicenseKey, LicenseTier
+from license.tier import LicenseTier
+try:
+    from db.models.license_key import LicenseKey
+except ImportError:  # buyer package excludes the server-side license service model
+    LicenseKey = None
 from db.models.content_filter import ContentFilterLog, AgeVerification, ContentCategory, AgeVerificationStatus
 from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
@@ -66,7 +70,7 @@ __all__ = [
     "UserSession",
     "APIKey",
     "Subscription", "PlanTier", "SubscriptionStatus",
-    "LicenseKey", "LicenseTier",
+    "LicenseTier",
     "ContentFilterLog", "AgeVerification", "ContentCategory", "AgeVerificationStatus",
     "SystemMetrics",
     "Alert", "AlertSeverity",
@@ -82,3 +86,6 @@ __all__ = [
     "UsageEvent",
     "ComplianceReview",
 ]
+
+if LicenseKey is not None:
+    __all__.insert(__all__.index("LicenseTier"), "LicenseKey")

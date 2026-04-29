@@ -1,19 +1,12 @@
 """License key model for server-side entitlement control."""
 from datetime import datetime
-import enum
 import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import relationship
 
 from db.session import Base
-
-
-class LicenseTier(str, enum.Enum):
-    STARTER = "starter"
-    PRO = "pro"
-    SOVEREIGN = "sovereign"
-    ENTERPRISE = "enterprise"
+from license.tier import LicenseTier
 
 
 class LicenseKey(Base):

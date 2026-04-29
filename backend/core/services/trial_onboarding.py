@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from core.config import get_settings
 from core.notifications.emailer import send_trial_welcome_email
-from db.models import LicenseTier, Workspace
+from db.models import Workspace
+from license.tier import LicenseTier
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -129,4 +130,3 @@ async def send_trial_welcome(
         download_url=download_url,
         expires_at_iso=license_payload.expires_at.astimezone(timezone.utc).isoformat(),
     )
-

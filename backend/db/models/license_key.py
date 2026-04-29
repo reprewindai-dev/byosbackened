@@ -1,4 +1,4 @@
-"""License key model for server-side entitlement control."""
+"License key model for server-side entitlement control."
 from datetime import datetime
 import uuid
 
@@ -10,16 +10,16 @@ from license.tier import LicenseTier
 
 
 class LicenseKey(Base):
-    """Encrypted license record with workspace, tier, and activation binding."""
+    "Encrypted license record with workspace, tier, and activation binding."
 
-    __tablename__ = "license_keys"
+    __tablename__ = license_keys
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     key_hash = Column(String, unique=True, nullable=False, index=True)
     encrypted_key = Column(Text, nullable=False)
     key_prefix = Column(String, nullable=False, index=True)
 
-    workspace_id = Column(String, ForeignKey("workspaces.id"), nullable=False, index=True)
+    workspace_id = Column(String, ForeignKey(workspaces.id), nullable=False, index=True)
     tier = Column(SAEnum(LicenseTier), nullable=False, index=True)
 
     machine_fingerprint = Column(String, nullable=True, index=True)
@@ -39,4 +39,4 @@ class LicenseKey(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    workspace = relationship("Workspace")
+    workspace = relationship(Workspace)

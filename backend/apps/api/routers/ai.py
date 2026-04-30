@@ -19,6 +19,11 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
 from core.config import get_settings
+from core.services.workspace_gateway import (
+    TOKEN_USD_RATE,
+    get_model_setting,
+    record_request_log,
+)
 from db.models import AIAuditLog, TokenTransaction, TokenWallet, User
 from db.session import get_db
 
@@ -107,6 +112,11 @@ async def complete(
 ):
     """Run a wallet-backed Bedrock completion and record the audit trail."""
     model_id = _resolve_model(payload.model)
+    model_row = get_model_setting(db, current_user.workspace_id, payload.model)
+    if not model_row.enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Model disabled for this workspace")
+    if not model_row.connected:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model is not connected through Bedrock")
     reservation_tokens = max(1, math.ceil(payload.max_tokens / 100))
 
     wallet = _get_or_create_wallet(db, current_user.workspace_id)
@@ -148,6 +158,7 @@ async def complete(
         usage = response.get("usage", {}) or {}
         output_tokens = int(usage.get("outputTokens") or 0)
         tokens_deducted = math.ceil(output_tokens / 100) if output_tokens > 0 else 0
+        cost_usd = (Decimal(tokens_deducted) * TOKEN_USD_RATE).quantize(Decimal("0.000001"))
 
         balance_before = wallet.balance
         if tokens_deducted > balance_before:
@@ -206,7 +217,7 @@ async def complete(
             output_hash=_sha256(response_text),
             input_preview=payload.prompt[:500],
             output_preview=response_text[:500],
-            cost=Decimal(tokens_deducted),
+            cost=cost_usd,
             tokens_input=None,
             tokens_output=output_tokens,
             routing_decision_id=None,
@@ -219,6 +230,37 @@ async def complete(
         )
         db.add(audit_entry)
         db.commit()
+        record_request_log(
+            db,
+            workspace_id=current_user.workspace_id,
+            request_kind="ai.complete",
+            request_path="/api/v1/ai/complete",
+            model=payload.model,
+            provider="bedrock",
+            status="success",
+            prompt_preview=payload.prompt[:500],
+            response_preview=response_text[:500],
+            request_json={
+                "model": payload.model,
+                "prompt": payload.prompt,
+                "max_tokens": payload.max_tokens,
+            },
+            response_json={
+                "response_text": response_text,
+                "bedrock_model_id": model_id,
+                "output_tokens": output_tokens,
+                "tokens_deducted": tokens_deducted,
+                "wallet_balance": wallet.balance,
+            },
+            tokens_in=0,
+            tokens_out=output_tokens,
+            latency_ms=int((datetime.utcnow() - started_at).total_seconds() * 1000),
+            cost_usd=cost_usd,
+            source_table="ai_audit_logs",
+            source_id=audit_entry.id,
+            user_id=current_user.id,
+            error_message=None,
+        )
     except HTTPException:
         db.rollback()
         raise

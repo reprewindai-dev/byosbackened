@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dashboard - Veklom</title>
+<title>Workspace - Veklom</title>
 <meta name="robots" content="noindex, nofollow" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -11,15 +11,221 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app/app.css">
+<style>
+.workspace-shell { max-width: 1240px; }
+.workspace-hero {
+  background:
+    radial-gradient(circle at top right, rgba(212, 176, 124, 0.16), transparent 35%),
+    radial-gradient(circle at left bottom, rgba(123, 179, 122, 0.08), transparent 28%),
+    var(--ink-2);
+}
+.workspace-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 24px 0 28px;
+}
+.tab-btn {
+  background: transparent;
+  color: var(--bone-2);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.tab-btn.active {
+  color: var(--ink);
+  background: var(--bone);
+  border-color: var(--bone);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+.stat-card {
+  background: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 18px;
+}
+.stat-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--mute);
+}
+.stat-value {
+  font-family: var(--serif);
+  font-size: 32px;
+  margin-top: 10px;
+  letter-spacing: -0.03em;
+}
+.stat-sub {
+  margin-top: 6px;
+  color: var(--bone-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.panel-grid {
+  display: grid;
+  gap: 18px;
+}
+.panel-grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.feed-list { display: grid; gap: 10px; }
+.feed-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.feed-item:last-child { border-bottom: 0; }
+.feed-meta { color: var(--bone-2); font-size: 13px; line-height: 1.5; }
+.feed-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--mute); }
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.metric-chip {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 12px 14px;
+  color: var(--bone-2);
+  font-size: 13px;
+}
+.metric-chip strong { color: var(--bone); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--ink-2); }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid var(--rule); padding: 12px 14px; text-align: left; font-size: 13px; vertical-align: top; }
+th {
+  color: var(--mute);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: 10px;
+}
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: rgba(255,255,255,0.02); }
+.chart {
+  display: grid;
+  gap: 10px;
+}
+.chart-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20px, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-height: 180px;
+}
+.bar {
+  background: linear-gradient(180deg, rgba(212,176,124,0.95), rgba(184,148,102,0.45));
+  border: 1px solid rgba(212,176,124,0.4);
+  border-radius: 4px 4px 2px 2px;
+  min-height: 16px;
+  position: relative;
+}
+.bar span {
+  position: absolute;
+  bottom: -22px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  color: var(--mute);
+  font-family: var(--mono);
+}
+.filter-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filter-row .field { margin-bottom: 0; min-width: 180px; flex: 1; }
+.split-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.toggle-row:last-child { border-bottom: 0; }
+.switch {
+  appearance: none;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--rule-2);
+  background: var(--ink);
+  position: relative;
+  cursor: pointer;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bone-2);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.switch:checked {
+  background: rgba(123,179,122,0.2);
+  border-color: var(--ok);
+}
+.switch:checked::after {
+  transform: translateX(20px);
+  background: var(--ok);
+}
+.detail-box {
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 16px;
+  color: var(--bone-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 180px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.subtle-note { color: var(--mute); font-size: 12px; }
+@media (max-width: 760px) {
+  .workspace-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+  .tab-btn { white-space: nowrap; }
+}
+</style>
 </head>
 <body>
-<main class="app-shell wide">
+<main class="app-shell wide workspace-shell">
   <div class="app-topnav">
-    <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
+    <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Workspace</div>
     <div class="links">
       <a href="/">Home</a>
       <a href="/marketplace/">Marketplace</a>
       <a href="/vendor/">Vendors</a>
+      <a href="/status">Status</a>
       <span id="user_email" class="muted"></span>
       <a href="#" id="signout">Sign out</a>
     </div>
@@ -27,42 +233,69 @@
 
   <div id="alert"></div>
 
-  <h1 class="app-h1" style="margin-bottom:32px;">Workspace</h1>
+  <section class="app-card workspace-hero">
+    <div class="section-h">Workspace Control Plane</div>
+    <h1 class="app-h1">AI gateway workspace</h1>
+    <p class="app-sub">Operate AI access, wallet spend, API keys, observability, model controls, and budget policy from one tenant boundary.</p>
+    <div class="metric-strip" id="hero_metrics"></div>
+  </section>
 
-  <div class="dash-grid">
+  <nav class="workspace-tabs" id="tab_bar">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="ai">AI Playground</button>
+    <button class="tab-btn" data-tab="observability">Observability</button>
+    <button class="tab-btn" data-tab="api_keys">API Keys</button>
+    <button class="tab-btn" data-tab="models">Models</button>
+    <button class="tab-btn" data-tab="budget">Cost &amp; Budget</button>
+  </nav>
 
-    <div class="app-card">
-      <div class="section-h">Identity</div>
-      <div id="identity"><span class="spinner"></span> loading...</div>
-    </div>
-
-    <div class="app-card">
-      <div class="section-h">Subscription</div>
-      <div id="subscription"><span class="spinner"></span> loading...</div>
-      <div style="margin-top:16px;">
-        <button class="btn btn-primary" id="btn_upgrade" style="display:none;">Upgrade plan</button>
+  <section id="panel_overview" class="tab-panel active">
+    <div class="panel-grid two">
+      <div class="app-card">
+        <div class="section-h">Identity</div>
+        <div id="identity"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card">
+        <div class="section-h">Subscription</div>
+        <div id="subscription"><span class="spinner"></span> loading...</div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" id="btn_upgrade" style="display:none;">Upgrade plan</button>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Token Wallet</div>
+        <div id="wallet_panel"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Marketplace + GitHub</div>
+        <div id="github_panel"><span class="spinner"></span> loading...</div>
+        <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="btn_github_connect">Connect GitHub</button>
+          <button class="btn btn-secondary" id="btn_github_refresh" style="display:none;">Refresh repos</button>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Live Feed</div>
+        <div id="live_feed" class="feed-list"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Quickstart</div>
+        <ol style="padding-left:18px; line-height:1.9; color:var(--bone-2); font-size:14px;">
+          <li>Generate an API key above.</li>
+          <li>Use the API key in `X-API-Key` for `/v1/exec` requests.</li>
+          <li>Use JWT auth in the dashboard to manage AI and wallet controls.</li>
+        </ol>
+        <pre id="snippet" style="margin-top:14px; background:var(--ink); border:1px solid var(--rule); border-radius:3px; padding:16px; font-family:var(--mono); font-size:12px; color:var(--bone-2); overflow-x:auto;">
+curl -X POST https://api.veklom.com/v1/exec \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"summarize this audit log entry","use_memory":false}'
+        </pre>
       </div>
     </div>
+  </section>
 
-    <div class="app-card full">
-      <div class="section-h">API keys</div>
-      <p class="muted" style="margin-bottom:16px;">Use your API key to authenticate requests to <code id="api_base_label">https://api.veklom.com/api/v1/*</code>. Treat it like a password - Veklom only displays the full key once at creation.</p>
-      <div id="apikeys"><span class="spinner"></span> loading...</div>
-      <div style="margin-top:18px;">
-        <button class="btn btn-secondary" id="btn_new_key">Generate new API key</button>
-      </div>
-    </div>
-
-    <div class="app-card full">
-      <div class="section-h">GitHub Connection</div>
-      <p class="muted" style="margin-bottom:16px;">Connect GitHub to link repositories and run marketplace jobs through your existing backend stack.</p>
-      <div id="github_panel"><span class="spinner"></span> loading...</div>
-      <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-secondary" id="btn_github_connect">Connect GitHub</button>
-        <button class="btn btn-secondary" id="btn_github_refresh" style="display:none;">Refresh repos</button>
-      </div>
-    </div>
-
+  <section id="panel_ai" class="tab-panel">
     <div class="app-card full" id="ai_playground_card">
       <div class="section-h">AI Playground</div>
       <p class="muted" style="margin-bottom:16px;">Run Bedrock completions against your workspace wallet. Charges are deducted from your token balance after the response returns.</p>
@@ -100,28 +333,156 @@
         <pre id="ai_response" class="ai-response">No response yet.</pre>
       </div>
     </div>
+  </section>
 
-    <div class="app-card full" id="upgrade_panel" style="display:none;">
-      <div class="section-h">Choose a plan</div>
-      <p class="muted" style="margin-bottom:24px;">Subscription unlocks platform access and included monthly credits. Need more usage? Buy token packs separately in wallet top-ups.</p>
-      <div class="dash-grid" id="plans"></div>
+  <section id="panel_observability" class="tab-panel">
+    <div class="panel-grid">
+      <div class="app-card">
+        <div class="section-h">Filters</div>
+        <div class="filter-row">
+          <div class="field">
+            <label for="obs_model">Model</label>
+            <select id="obs_model">
+              <option value="">All models</option>
+              <option value="claude-haiku">Claude Haiku</option>
+              <option value="llama3">Llama 3</option>
+              <option value="mistral">Mistral</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="obs_status">Status</label>
+            <select id="obs_status">
+              <option value="">All statuses</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="obs_days">Window</label>
+            <select id="obs_days">
+              <option value="7">7 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </div>
+          <div class="field" style="display:flex; align-items:flex-end; gap:10px;">
+            <button class="btn btn-secondary" id="obs_refresh" type="button">Refresh</button>
+            <button class="btn btn-secondary" id="obs_reset" type="button">Reset</button>
+          </div>
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="app-card">
+          <div class="section-h">Error Rate</div>
+          <div class="chart">
+            <div id="error_chart" class="chart-bars"></div>
+          </div>
+        </div>
+        <div class="app-card">
+          <div class="section-h">Average Latency</div>
+          <div class="chart">
+            <div id="latency_chart" class="chart-bars"></div>
+          </div>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Request Log</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Model</th>
+                <th>Prompt Preview</th>
+                <th>Tokens In</th>
+                <th>Tokens Out</th>
+                <th>Latency</th>
+                <th>Cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="obs_body">
+              <tr><td colspan="8" class="muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Request / Response Trace</div>
+        <div id="obs_detail" class="detail-box">Select a row to inspect the full trace.</div>
+      </div>
     </div>
+  </section>
 
-    <div class="app-card full">
-      <div class="section-h">Quickstart</div>
-      <ol style="padding-left:18px; line-height:1.9; color:var(--bone-2); font-size:14px;">
-        <li>Generate an API key above.</li>
-        <li>Hit the live API using the snippet below.</li>
-      </ol>
-      <pre id="snippet" style="margin-top:14px; background:var(--ink); border:1px solid var(--rule); border-radius:3px; padding:16px; font-family:var(--mono); font-size:12px; color:var(--bone-2); overflow-x:auto;">
-curl -X POST https://api.veklom.com/v1/exec \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"summarize this audit log entry","use_memory":false}'
-      </pre>
-      <p class="muted" style="margin-top:12px;">Need help? <a href="mailto:hello@veklom.com">hello@veklom.com</a>.</p>
+  <section id="panel_api_keys" class="tab-panel">
+    <div class="panel-grid">
+      <div class="app-card full">
+        <div class="section-h">API Keys</div>
+        <p class="muted" style="margin-bottom:16px;">Create and revoke workspace keys. Copy the raw key once at creation.</p>
+        <div style="margin-bottom:18px;">
+          <button class="btn btn-secondary" id="btn_new_key">Generate new API key</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Last Used</th>
+                <th>Total Calls</th>
+                <th>Total Cost</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="keys_body">
+              <tr><td colspan="7" class="muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <section id="panel_models" class="tab-panel">
+    <div class="panel-grid">
+      <div class="app-card full">
+        <div class="section-h">Models</div>
+        <p class="muted" style="margin-bottom:16px;">Enable or disable model access per workspace. Bedrock connectivity is shown per model.</p>
+        <div id="models_list"><span class="spinner"></span> loading...</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel_budget" class="tab-panel">
+    <div class="panel-grid two">
+      <div class="app-card">
+        <div class="section-h">Monthly Spend</div>
+        <div id="budget_chart" class="chart-bars"></div>
+      </div>
+      <div class="app-card">
+        <div class="section-h">Budget Limit</div>
+        <div id="budget_panel"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Cost Breakdown</div>
+        <div class="split-grid">
+          <div>
+            <div class="muted" style="margin-bottom:10px;">By model</div>
+            <div id="model_breakdown"></div>
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:10px;">By API key</div>
+            <div id="key_breakdown"></div>
+          </div>
+        </div>
+        <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="btn_budget_save">Save budget</button>
+          <button class="btn btn-secondary" id="btn_budget_export">Export CSV</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <p class="foot">Need help? <a href="mailto:hello@veklom.com">hello@veklom.com</a> - <a href="/legal/">Legal</a></p>
 </main>
@@ -132,20 +493,38 @@ if (!VK.isLoggedIn()) { window.location.href = "/login/"; }
 
 const runtimeApiBase = VK.apiBase || "https://api.veklom.com/api/v1";
 const runtimeExecBase = runtimeApiBase.replace(/\/api\/v1$/, "");
-document.getElementById("api_base_label").textContent = runtimeApiBase + "/*";
-document.getElementById("snippet").textContent = document.getElementById("snippet").textContent.replace(
-  "https://api.veklom.com/v1/exec",
-  runtimeExecBase + "/v1/exec"
-);
+document.getElementById("api_base_label") && (document.getElementById("api_base_label").textContent = runtimeApiBase + "/*");
 
 const $alert = document.getElementById("alert");
 function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }
 function showOk(msg)    { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
+function money(n) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n || 0));
+}
+function formatDate(v) {
+  if (!v) return "-";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString();
+}
+function setTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
+  document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
+  const target = document.getElementById("panel_" + tab);
+  if (target) target.classList.add("active");
+}
 
-const aiState = {
-  freeTier: false,
-  walletLoaded: false,
+let state = {
+  me: null,
+  subscription: null,
+  wallet: null,
+  overview: null,
+  keys: [],
+  models: [],
+  observability: null,
+  budget: null,
 };
+
+const aiState = { freeTier: false };
 
 function setAiMode(isFreeTier) {
   aiState.freeTier = isFreeTier;
@@ -162,89 +541,53 @@ function setAiMode(isFreeTier) {
   }
 }
 
-async function refreshAiWallet() {
-  const balanceNode = document.getElementById("ai_balance");
+async function refreshWallet() {
+  const node = document.getElementById("ai_balance");
   try {
     const wallet = await VK.getWalletBalance();
-    aiState.walletLoaded = true;
-    balanceNode.textContent = (wallet.balance || 0).toLocaleString() + " tokens";
+    state.wallet = wallet;
+    node.textContent = (wallet.balance || 0).toLocaleString() + " tokens";
+    document.getElementById("wallet_panel").innerHTML =
+      '<div class="kv"><span class="k">Balance</span><span class="v">' + (wallet.balance || 0).toLocaleString() + ' tokens</span></div>' +
+      '<div class="kv"><span class="k">Monthly included</span><span class="v">' + (wallet.monthly_credits_included || 0).toLocaleString() + '</span></div>' +
+      '<div class="kv"><span class="k">Monthly used</span><span class="v">' + (wallet.monthly_credits_used || 0).toLocaleString() + '</span></div>' +
+      '<div class="kv"><span class="k">Lifetime purchased</span><span class="v">' + (wallet.total_credits_purchased || 0).toLocaleString() + '</span></div>' +
+      '<div class="kv"><span class="k">Lifetime used</span><span class="v">' + (wallet.total_credits_used || 0).toLocaleString() + '</span></div>';
   } catch (err) {
-    balanceNode.textContent = "Unavailable";
+    node.textContent = "Unavailable";
+    document.getElementById("wallet_panel").innerHTML = '<p class="muted">Unable to load wallet: ' + (err.message || "error") + '</p>';
   }
 }
 
-document.getElementById("ai_submit").addEventListener("click", async () => {
-  if (aiState.freeTier) {
-    showError("Upgrade to access AI features");
-    return;
-  }
+function renderHeroMetrics() {
+  const metrics = [
+    { label: "API calls this month", value: (state.overview && state.overview.total_api_calls) || 0 },
+    { label: "Tokens used this month", value: (state.overview && state.overview.total_tokens_used) || 0 },
+    { label: "Cost this month", value: money(state.overview && state.overview.total_cost_usd) },
+    { label: "Active models", value: (state.overview && state.overview.active_models && state.overview.active_models.length) || 0 },
+  ];
+  document.getElementById("hero_metrics").innerHTML = metrics.map(item =>
+    '<div class="metric-chip"><strong>' + item.value + '</strong><br>' + item.label + '</div>'
+  ).join("");
+}
 
-  const prompt = document.getElementById("ai_prompt").value.trim();
-  const model = document.getElementById("ai_model").value;
-  const responseNode = document.getElementById("ai_response");
-  const costNode = document.getElementById("ai_cost");
-  const submit = document.getElementById("ai_submit");
-
-  if (!prompt) {
-    showError("Enter a prompt");
-    return;
-  }
-
-  submit.disabled = true;
-  submit.innerHTML = '<span class="spinner"></span> Running...';
-  responseNode.textContent = "Waiting for Bedrock...";
-  costNode.textContent = "";
-
+async function refreshOverview() {
   try {
-    const out = await VK.aiComplete({ model, prompt, max_tokens: 512 });
-    responseNode.textContent = out.response_text || "";
-    costNode.textContent = "Used " + (out.tokens_deducted || 0) + " tokens";
-    document.getElementById("ai_balance").textContent = (out.wallet_balance || 0).toLocaleString() + " tokens";
-    showOk("AI response ready.");
-  } catch (err) {
-    responseNode.textContent = "No response available.";
-    showError(err.message || "AI completion failed");
-  } finally {
-    submit.innerHTML = "Submit";
-    setAiMode(aiState.freeTier);
-  }
-});
+    const [me, sub, overview] = await Promise.all([
+      VK.me(),
+      VK.getCurrentSubscription(),
+      VK.workspaceOverview(),
+    ]);
+    state.me = me;
+    state.subscription = sub;
+    state.overview = overview;
 
-document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
-document.getElementById("btn_github_connect").addEventListener("click", async () => {
-  try {
-    await VK.startGithubLogin();
-  } catch (err) {
-    showError(err.message || "GitHub connect failed");
-  }
-});
-document.getElementById("btn_github_refresh").addEventListener("click", async () => {
-  await refreshGithubPanel();
-});
+    document.getElementById("user_email").textContent = me.email || "";
+    document.getElementById("identity").innerHTML =
+      '<div class="kv"><span class="k">Email</span><span class="v">' + (me.email || "") + '</span></div>' +
+      '<div class="kv"><span class="k">Role</span><span class="v">' + (me.role || "owner") + '</span></div>' +
+      '<div class="kv"><span class="k">Workspace</span><span class="v">' + (me.workspace_name || me.workspace_id || "-") + '</span></div>';
 
-(async function init() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("welcome") === "1") showOk("Workspace ready. Generate an API key to start.");
-  if (params.get("checkout") === "success") showOk("Subscription activated.");
-  if (params.get("checkout") === "cancel") showError("Checkout canceled - no charge was made.");
-
-  let me;
-  try {
-    me = await VK.me();
-  } catch (err) {
-    if (err.status === 401) { VK.clearTokens(); window.location.href = "/login/"; return; }
-    showError(err.message);
-    return;
-  }
-
-  document.getElementById("user_email").textContent = me.email || "";
-  document.getElementById("identity").innerHTML =
-    '<div class="kv"><span class="k">Email</span><span class="v">' + (me.email || "") + '</span></div>' +
-    '<div class="kv"><span class="k">Role</span><span class="v">' + (me.role || "owner") + '</span></div>' +
-    '<div class="kv"><span class="k">Workspace</span><span class="v">' + (me.workspace_name || me.workspace_id || "-") + '</span></div>';
-
-  try {
-    const sub = await VK.getCurrentSubscription();
     const isActive = sub.status === "active" || sub.status === "trialing";
     const planName = (sub.plan || "starter");
     const dollars = sub.amount_cents ? "$" + (sub.amount_cents/100).toLocaleString() + "/" + (sub.billing_cycle === "yearly" ? "yr" : "mo") : "-";
@@ -253,30 +596,24 @@ document.getElementById("btn_github_refresh").addEventListener("click", async ()
       '<div class="kv"><span class="k">Billing</span><span class="v">' + (sub.billing_cycle || "-") + '</span></div>' +
       '<div class="kv"><span class="k">Amount</span><span class="v">' + dollars + '</span></div>' +
       '<div class="kv"><span class="k">Renews</span><span class="v">' + (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "-") + '</span></div>';
+
     document.getElementById("btn_upgrade").style.display = "inline-flex";
     setAiMode((sub.plan || "free") === "free");
+    renderHeroMetrics();
+    document.getElementById("live_feed").innerHTML = (overview.live_feed || []).map(item =>
+      '<div class="feed-item">' +
+        '<div>' +
+          '<div class="feed-title">' + item.kind + '</div>' +
+          '<div class="feed-meta">' + (item.model || "-") + ' · ' + (item.latency_ms || 0) + 'ms · ' + (item.tokens || 0) + ' tokens</div>' +
+        '</div>' +
+        '<div class="feed-meta">' + (item.status || "-") + '<br>' + formatDate(item.created_at) + '</div>' +
+      '</div>'
+    ).join("");
   } catch (err) {
-    document.getElementById("subscription").innerHTML = '<p class="muted">Unable to load subscription: ' + err.message + '</p>';
-    document.getElementById("ai_submit").disabled = true;
-    document.getElementById("ai_access_note").textContent = "Unable to verify access.";
+    if (err.status === 401) { VK.clearTokens(); window.location.href = "/login/"; return; }
+    showError(err.message || "Failed to load dashboard");
   }
-
-  await refreshKeys();
-  await refreshGithubPanel();
-  await refreshAiWallet();
-
-  document.getElementById("btn_upgrade").addEventListener("click", () => {
-    document.getElementById("upgrade_panel").style.display = "block";
-    renderPlans();
-    document.getElementById("upgrade_panel").scrollIntoView({ behavior: "smooth" });
-  });
-
-  const wantedPlan = params.get("plan");
-  if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
-    document.getElementById("upgrade_panel").style.display = "block";
-    renderPlans(wantedPlan);
-  }
-})();
+}
 
 async function refreshGithubPanel() {
   const panel = document.getElementById("github_panel");
@@ -285,7 +622,6 @@ async function refreshGithubPanel() {
   try {
     const out = await VK.getGithubRepos();
     const repos = (out && out.repos) ? out.repos : [];
-    githubRepoIndex = repos;
     if (!repos.length) {
       panel.innerHTML = '<p class="muted">GitHub connected, but no repositories were returned.</p>';
     } else {
@@ -311,35 +647,240 @@ async function refreshGithubPanel() {
   }
 }
 
-async function refreshKeys() {
-  try {
-    const keys = await VK.listApiKeys();
-    if (!keys || keys.length === 0) {
-      document.getElementById("apikeys").innerHTML = '<p class="muted">No API keys yet. Generate one to start.</p>';
-    } else {
-      document.getElementById("apikeys").innerHTML = keys.map(k =>
-        '<div class="kv">' +
-          '<span class="k">' + (k.name || "key") + ' <span class="tag ' + (k.is_active ? "live" : "") + '">' + (k.is_active ? "active" : "revoked") + '</span></span>' +
-          '<span class="v">' +
-            '<code style="font-family:var(--mono); font-size:12px; color:var(--bone-2);">' + (k.key_prefix || k.prefix || k.id) + '...</code> ' +
-            (k.is_active ? '<button class="btn btn-danger" data-id="' + k.id + '" style="padding:6px 12px; font-size:10px;">Revoke</button>' : '') +
-          '</span>' +
-        '</div>'
-      ).join("");
+async function refreshAiWallet() {
+  await refreshWallet();
+}
 
-      document.querySelectorAll("button[data-id]").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          if (!confirm("Revoke this API key? Any system using it will stop working.")) return;
-          try { await VK.revokeApiKey(btn.dataset.id); await refreshKeys(); }
-          catch (err) { showError(err.message); }
-        });
-      });
-    }
+async function refreshAiCompletion() {
+  const prompt = document.getElementById("ai_prompt").value.trim();
+  const model = document.getElementById("ai_model").value;
+  const responseNode = document.getElementById("ai_response");
+  const costNode = document.getElementById("ai_cost");
+  const submit = document.getElementById("ai_submit");
+  if (!prompt) {
+    showError("Enter a prompt");
+    return;
+  }
+
+  submit.disabled = true;
+  submit.innerHTML = '<span class="spinner"></span> Running...';
+  responseNode.textContent = "Waiting for Bedrock...";
+  costNode.textContent = "";
+
+  try {
+    const out = await VK.aiComplete({ model, prompt, max_tokens: 512 });
+    responseNode.textContent = out.response_text || "";
+    costNode.textContent = "Used " + (out.tokens_deducted || 0) + " tokens";
+    document.getElementById("ai_balance").textContent = (out.wallet_balance || 0).toLocaleString() + " tokens";
+    showOk("AI response ready.");
   } catch (err) {
-    document.getElementById("apikeys").innerHTML = '<p class="muted">Unable to load keys: ' + err.message + '</p>';
+    responseNode.textContent = "No response available.";
+    showError(err.message || "AI completion failed");
+  } finally {
+    submit.innerHTML = "Submit";
+    setAiMode(aiState.freeTier);
   }
 }
 
+async function refreshApiKeys() {
+  try {
+    const payload = await VK.workspaceApiKeys();
+    state.keys = payload.keys || [];
+    const body = document.getElementById("keys_body");
+    if (!state.keys.length) {
+      body.innerHTML = '<tr><td colspan="7" class="muted">No API keys yet. Generate one to start.</td></tr>';
+      return;
+    }
+    body.innerHTML = state.keys.map(k => {
+      const status = k.is_active ? "active" : "revoked";
+      const actions = [
+        '<button class="btn btn-secondary copy-key" data-raw="' + (k.key_prefix || "") + '" style="padding:8px 10px; font-size:10px;">Copy prefix</button>',
+        k.is_active ? '<button class="btn btn-danger revoke-key" data-id="' + k.id + '" style="padding:8px 10px; font-size:10px;">Revoke</button>' : ''
+      ].join(" ");
+      return (
+        '<tr>' +
+          '<td>' + (k.name || "key") + '</td>' +
+          '<td>' + formatDate(k.created_at) + '</td>' +
+          '<td>' + formatDate(k.last_used_at) + '</td>' +
+          '<td>' + (k.total_calls || 0) + '</td>' +
+          '<td>' + money(k.total_cost_usd || 0) + '</td>' +
+          '<td><span class="tag ' + (k.is_active ? "live" : "") + '">' + status + '</span></td>' +
+          '<td style="display:flex; gap:8px; flex-wrap:wrap;">' + actions + '</td>' +
+        '</tr>'
+      );
+    }).join("");
+
+    document.querySelectorAll(".revoke-key").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Revoke this API key? Any system using it will stop working.")) return;
+        try {
+          await VK.revokeApiKey(btn.dataset.id);
+          await refreshApiKeys();
+        } catch (err) {
+          showError(err.message || "Revoke failed");
+        }
+      });
+    });
+
+    document.querySelectorAll(".copy-key").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.raw || "");
+          showOk("Key prefix copied.");
+        } catch (err) {
+          showError("Unable to copy prefix");
+        }
+      });
+    });
+  } catch (err) {
+    document.getElementById("keys_body").innerHTML = '<tr><td colspan="7" class="muted">Unable to load keys: ' + err.message + '</td></tr>';
+  }
+}
+
+function renderChartBars(node, rows, valueKey, labelKey = "date", formatter = v => String(v)) {
+  const el = document.getElementById(node);
+  if (!rows || !rows.length) {
+    el.innerHTML = '<div class="muted">No data yet.</div>';
+    return;
+  }
+  const max = Math.max(...rows.map(row => Number(row[valueKey] || 0)), 1);
+  el.innerHTML = rows.map(row => {
+    const value = Number(row[valueKey] || 0);
+    const height = Math.max(16, Math.round((value / max) * 160));
+    return '<div class="bar" style="height:' + height + 'px;"><span>' + formatter(row[labelKey]) + '</span></div>';
+  }).join("");
+}
+
+async function refreshObservability() {
+  const model = document.getElementById("obs_model").value || "";
+  const status = document.getElementById("obs_status").value || "";
+  const days = Number(document.getElementById("obs_days").value || 30);
+  try {
+    const payload = await VK.workspaceObservability({ model, status, days, limit: 100, offset: 0 });
+    state.observability = payload;
+    const body = document.getElementById("obs_body");
+    if (!payload.rows.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">No request logs found for the selected filters.</td></tr>';
+    } else {
+      body.innerHTML = payload.rows.map(row => (
+        '<tr class="clickable obs-row" data-row="' + row.id + '">' +
+          '<td>' + formatDate(row.timestamp) + '</td>' +
+          '<td>' + (row.model || "-") + '</td>' +
+          '<td>' + (row.prompt_preview || "-") + '</td>' +
+          '<td>' + (row.tokens_in || 0) + '</td>' +
+          '<td>' + (row.tokens_out || 0) + '</td>' +
+          '<td>' + (row.latency_ms || 0) + ' ms</td>' +
+          '<td>' + money(row.cost_usd || 0) + '</td>' +
+          '<td><span class="tag ' + (row.status === "success" ? "live" : "") + '">' + row.status + '</span></td>' +
+        '</tr>'
+      )).join("");
+    }
+    renderChartBars("error_chart", payload.error_rate_chart || [], "error_rate", "date", v => v);
+    renderChartBars("latency_chart", payload.latency_chart || [], "avg_latency_ms", "date", v => Math.round(Number(v)).toString());
+    document.querySelectorAll(".obs-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const log = (payload.rows || []).find(x => x.id === row.dataset.row);
+        document.getElementById("obs_detail").textContent = JSON.stringify(log || {}, null, 2);
+      });
+    });
+  } catch (err) {
+    document.getElementById("obs_body").innerHTML = '<tr><td colspan="8" class="muted">Unable to load logs: ' + err.message + '</td></tr>';
+  }
+}
+
+async function refreshModels() {
+  try {
+    const payload = await VK.workspaceModels();
+    state.models = payload.models || [];
+    const root = document.getElementById("models_list");
+    if (!state.models.length) {
+      root.innerHTML = '<p class="muted">No models configured for this workspace.</p>';
+      return;
+    }
+    root.innerHTML = state.models.map(model => (
+      '<div class="toggle-row">' +
+        '<div>' +
+          '<div style="font-family:var(--serif); font-size:22px;">' + model.display_name + '</div>' +
+          '<div class="subtle-note">' + model.bedrock_model_id + '</div>' +
+          '<div class="subtle-note">Workspace cost: $' + Number(model.workspace_cost_per_1k_output_tokens || 0).toFixed(4) + ' / 1K output tokens</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<div class="subtle-note">' + (model.connected ? "Bedrock connected" : "Not connected") + '</div>' +
+          '<input type="checkbox" class="switch model-switch" data-model="' + model.model_slug + '"' + (model.enabled ? ' checked' : '') + ' />' +
+        '</div>' +
+      '</div>'
+    )).join("");
+    document.querySelectorAll(".model-switch").forEach(toggle => {
+      toggle.addEventListener("change", async () => {
+        toggle.disabled = true;
+        try {
+          await VK.workspaceToggleModel(toggle.dataset.model, toggle.checked);
+          showOk("Model updated.");
+        } catch (err) {
+          toggle.checked = !toggle.checked;
+          showError(err.message || "Model update failed");
+        } finally {
+          toggle.disabled = false;
+        }
+      });
+    });
+  } catch (err) {
+    document.getElementById("models_list").innerHTML = '<p class="muted">Unable to load models: ' + err.message + '</p>';
+  }
+}
+
+async function refreshBudget() {
+  try {
+    const [costs, budget] = await Promise.all([
+      VK.workspaceCostBudget(),
+      VK.workspaceBudget(),
+    ]);
+    state.budget = budget;
+    document.getElementById("budget_panel").innerHTML =
+      '<div class="kv"><span class="k">Budget limit</span><span class="v"><input id="budget_amount" type="number" min="0" step="0.01" value="' + ((budget[0] && budget[0].amount) || (costs.budget && costs.budget.amount) || 0) + '" style="width:160px; background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone); padding:8px 10px; border-radius:3px;" /></span></div>' +
+      '<div class="kv"><span class="k">Current spend</span><span class="v">' + money(costs.total_cost_usd || 0) + '</span></div>' +
+      '<div class="kv"><span class="k">Remaining</span><span class="v">' + (costs.budget && costs.budget.remaining ? money(costs.budget.remaining) : money(0)) + '</span></div>' +
+      '<div class="kv"><span class="k">Hard stop</span><span class="v">' + ((costs.budget && costs.budget.is_hard_stop) ? "Active" : "Inactive") + '</span></div>';
+    renderChartBars("budget_chart", costs.monthly_spend_chart || [], "cost_usd", "date", v => String(v).slice(5));
+    document.getElementById("model_breakdown").innerHTML = (costs.cost_by_model || []).map(row =>
+      '<div class="kv"><span class="k">' + row.model + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
+    ).join("") || '<p class="muted">No model spend yet.</p>';
+    document.getElementById("key_breakdown").innerHTML = (costs.cost_by_api_key || []).map(row =>
+      '<div class="kv"><span class="k">' + row.api_key_id + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
+    ).join("") || '<p class="muted">No API key spend yet.</p>';
+  } catch (err) {
+    document.getElementById("budget_panel").innerHTML = '<p class="muted">Unable to load budget: ' + err.message + '</p>';
+  }
+}
+
+document.getElementById("tab_bar").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  setTab(btn.dataset.tab);
+  if (btn.dataset.tab === "observability" && !state.observability) refreshObservability();
+  if (btn.dataset.tab === "api_keys" && (!state.keys || !state.keys.length)) refreshApiKeys();
+  if (btn.dataset.tab === "models" && (!state.models || !state.models.length)) refreshModels();
+  if (btn.dataset.tab === "budget" && !state.budget) refreshBudget();
+});
+
+document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
+document.getElementById("btn_github_connect").addEventListener("click", async () => {
+  try { await VK.startGithubLogin(); } catch (err) { showError(err.message || "GitHub connect failed"); }
+});
+document.getElementById("btn_github_refresh").addEventListener("click", async () => {
+  await refreshGithubPanel();
+});
+document.getElementById("btn_upgrade").addEventListener("click", () => {
+  window.location.href = "/marketplace/?plan=pro";
+});
+document.getElementById("ai_submit").addEventListener("click", refreshAiCompletion);
+document.getElementById("obs_refresh").addEventListener("click", refreshObservability);
+document.getElementById("obs_reset").addEventListener("click", () => {
+  document.getElementById("obs_model").value = "";
+  document.getElementById("obs_status").value = "";
+  document.getElementById("obs_days").value = "30";
+  refreshObservability();
+});
 document.getElementById("btn_new_key").addEventListener("click", async () => {
   const name = prompt("Name this key (e.g. staging or prod-server-1):", "default");
   if (!name) return;
@@ -353,63 +894,65 @@ document.getElementById("btn_new_key").addEventListener("click", async () => {
           '<span style="flex:1;">' + raw + '</span>' +
           '<button class="copy" onclick="navigator.clipboard.writeText(\'' + raw + '\').then(() => this.textContent=\'copied\')">copy</button>' +
         '</div></div>';
-      document.getElementById("snippet").textContent = document.getElementById("snippet").textContent.replace("YOUR_API_KEY", raw);
     } else {
       showOk("Key created.");
     }
-    await refreshKeys();
+    await refreshApiKeys();
   } catch (err) { showError(err.message); }
 });
-
-function renderPlans(autoSelect) {
-  const plans = [
-    { id: "free", name: "Free", price: "$0", cta: "Current base tier", selfServe: false, features: ["View marketplace listings", "Comment and ask questions", "Limited free tools access", "1 API key and light usage"] },
-    { id: "starter", name: "Starter", price: "$99/mo", cta: "Subscribe", selfServe: true, features: ["10M monthly credits included", "Up to 5 API keys", "Basic cost controls", "Email support (48h)"] },
-    { id: "pro", name: "Pro", price: "$499/mo", cta: "Subscribe", selfServe: true, features: ["100M monthly credits included", "Up to 20 API keys", "Routing + savings insights", "Priority support (24h)"] },
-    { id: "sovereign", name: "Sovereign", price: "$2,500/mo", cta: "Subscribe", selfServe: true, features: ["500M monthly credits included", "Up to 100 API keys", "Kill switch + compliance reporting", "SLA-backed support"] },
-    { id: "enterprise", name: "Enterprise", price: "Custom", cta: "Contact sales", selfServe: false, features: ["Custom deployment and limits", "99.99% SLA options", "Dedicated engineering support", "Procurement and compliance package"] }
-  ];
-
-  document.getElementById("plans").innerHTML = plans.map(p =>
-    '<div class="plan-card">' +
-      '<h3>' + p.name + '</h3>' +
-      '<div class="price">' + p.price + '</div>' +
-      '<ul>' + p.features.map(f => '<li>' + f + '</li>').join('') + '</ul>' +
-      '<button class="btn btn-primary btn-block" data-plan="' + p.id + '">' + p.cta + '</button>' +
-    '</div>'
-  ).join("");
-
-  document.querySelectorAll("button[data-plan]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const plan = plans.find(p => p.id === btn.dataset.plan);
-      if (!plan) return;
-      if (plan.id === "free") {
-        showOk("You are already on the free access tier.");
-        return;
-      }
-      if (!plan.selfServe) {
-        window.location.href = "mailto:sales@veklom.com?subject=Veklom%20Enterprise%20Plan%20Inquiry";
-        return;
-      }
-
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Redirecting...';
-      try {
-        const out = await VK.createCheckout({ plan: plan.id });
-        window.location.href = out.checkout_url;
-      } catch (err) {
-        showError(err.message);
-        btn.disabled = false;
-        btn.textContent = plan.cta;
-      }
+document.getElementById("btn_budget_save").addEventListener("click", async () => {
+  try {
+    const amount = Number(document.getElementById("budget_amount").value || 0);
+    await VK.workspaceBudgetUpdate({
+      budget_type: "monthly",
+      amount,
+      alert_thresholds: [50, 80, 95],
     });
-  });
-
-  if (autoSelect) {
-    const tgt = document.querySelector('button[data-plan="' + autoSelect + '"]');
-    if (tgt) tgt.scrollIntoView({ behavior: "smooth", block: "center" });
+    showOk("Budget saved.");
+    state.budget = null;
+    await refreshBudget();
+  } catch (err) {
+    showError(err.message || "Budget update failed");
   }
-}
+});
+document.getElementById("btn_budget_export").addEventListener("click", async () => {
+  try {
+    const csv = await VK.workspaceCostCsv();
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "veklom-costs.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showError(err.message || "Export failed");
+  }
+});
+
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("welcome") === "1") showOk("Workspace ready. Generate an API key to start.");
+  if (params.get("checkout") === "success") showOk("Subscription activated.");
+  if (params.get("checkout") === "cancel") showError("Checkout canceled - no charge was made.");
+
+  await refreshOverview();
+  await refreshWallet();
+  await refreshGithubPanel();
+  await refreshApiKeys();
+  await refreshModels();
+  await refreshBudget();
+  await refreshObservability();
+
+  document.getElementById("btn_upgrade").style.display = "inline-flex";
+
+  const wantedPlan = params.get("plan");
+  if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
+    showOk("Plan selected: " + wantedPlan);
+  }
+})();
 </script>
 </body>
 </html>

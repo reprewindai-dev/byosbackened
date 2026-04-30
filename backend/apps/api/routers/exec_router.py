@@ -15,6 +15,7 @@ import hashlib
 import logging
 import time
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 import sqlalchemy
@@ -27,6 +28,7 @@ from core.llm.circuit_breaker import record_failure, record_success, is_open, st
 from core.llm.groq_fallback import call_groq, GroqFallbackError
 from core.llm.ollama_client import OllamaClient, OllamaError, get_ollama_client
 from core.memory.conversation import get_memory
+from core.services.workspace_gateway import TOKEN_USD_RATE, record_request_log
 from db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,7 @@ class StatusResponse(BaseModel):
 _start_time = time.monotonic()
 
 
-def _resolve_api_key(raw_key: str, db: Session) -> tuple[str, str]:
+def _resolve_api_key(raw_key: str, db: Session):
     """Validate X-API-Key → returns (tenant_id, workspace_id) or raises 401."""
     from db.models.api_key import APIKey
 
@@ -96,7 +98,7 @@ def _resolve_api_key(raw_key: str, db: Session) -> tuple[str, str]:
 
     api_key.last_used_at = datetime.utcnow()
     db.commit()
-    return api_key.workspace_id, api_key.workspace_id
+    return api_key
 
 
 def _set_rls(db: Session, tenant_id: str) -> None:
@@ -109,6 +111,8 @@ def _log_execution(
     *,
     tenant_id: str,
     workspace_id: str,
+    api_key_id: Optional[str],
+    api_key_prefix: Optional[str],
     prompt: str,
     model: str,
     response: str,
@@ -135,7 +139,7 @@ def _log_execution(
             latency_ms=latency_ms,
             success=success,
             error_message=error_message,
-            cost_usd=0.0,
+            cost_usd=float(Decimal(total_tokens or 0) * TOKEN_USD_RATE),
         )
         db.add(log)
         db.commit()
@@ -215,7 +219,9 @@ def exec_llm(
     7. Return response + provider info
     """
     # 1. Resolve tenant
-    tenant_id, workspace_id = _resolve_api_key(x_api_key, db)
+    api_key = _resolve_api_key(x_api_key, db)
+    tenant_id = api_key.workspace_id
+    workspace_id = api_key.workspace_id
 
     # 2. RLS enforcement
     try:
@@ -241,7 +247,9 @@ def exec_llm(
         options["temperature"] = body.temperature
 
     # 5. Call LLM (Ollama → Groq via circuit breaker)
+    started = time.perf_counter()
     result, provider = _call_with_circuit_breaker(ollama, effective_prompt, model, options)
+    latency_ms = int((time.perf_counter() - started) * 1000) or result["latency_ms"]
 
     # 6. Persist conversation turn
     if mem is not None:
@@ -253,14 +261,51 @@ def exec_llm(
         db,
         tenant_id=tenant_id,
         workspace_id=workspace_id,
+        api_key_id=api_key.id,
+        api_key_prefix=api_key.key_prefix,
         prompt=effective_prompt,
         model=result["model"],
         response=result["response"],
         prompt_tokens=result["prompt_tokens"],
         completion_tokens=result["completion_tokens"],
         total_tokens=result["total_tokens"],
-        latency_ms=result["latency_ms"],
+        latency_ms=latency_ms,
         success=True,
+    )
+
+    record_request_log(
+        db,
+        workspace_id=workspace_id,
+        request_kind="exec",
+        request_path="/v1/exec",
+        model=result["model"],
+        provider=provider,
+        status="success",
+        prompt_preview=effective_prompt[:500],
+        response_preview=result["response"][:500],
+        request_json={
+            "prompt": body.prompt,
+            "model": body.model,
+            "conversation_id": body.conversation_id,
+            "use_memory": body.use_memory,
+            "temperature": body.temperature,
+            "max_tokens": body.max_tokens,
+        },
+        response_json={
+            "response": result["response"],
+            "provider": provider,
+            "prompt_tokens": result["prompt_tokens"],
+            "completion_tokens": result["completion_tokens"],
+            "total_tokens": result["total_tokens"],
+        },
+        tokens_in=result["prompt_tokens"],
+        tokens_out=result["completion_tokens"],
+        latency_ms=latency_ms,
+        cost_usd=(Decimal(result["total_tokens"] or 0) * TOKEN_USD_RATE).quantize(Decimal("0.000001")),
+        source_table="execution_logs",
+        source_id=log_id or f"exec-{int(time.time() * 1000)}",
+        user_id=None,
+        api_key_id=api_key.id,
     )
 
     return ExecResponse(
@@ -271,7 +316,7 @@ def exec_llm(
         prompt_tokens=result["prompt_tokens"],
         completion_tokens=result["completion_tokens"],
         total_tokens=result["total_tokens"],
-        latency_ms=result["latency_ms"],
+        latency_ms=latency_ms,
         conversation_id=body.conversation_id,
         log_id=log_id,
     )

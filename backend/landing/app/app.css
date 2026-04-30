@@ -191,6 +191,7 @@ a:hover { color: var(--brass); }
   .dash-grid { grid-template-columns: 1fr 1fr; }
 }
 .dash-grid > .full { grid-column: 1 / -1; }
+.full { grid-column: 1 / -1; }
 
 .ai-meta {
   display: grid;

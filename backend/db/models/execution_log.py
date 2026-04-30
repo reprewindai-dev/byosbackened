@@ -27,7 +27,7 @@ class ExecutionLog(Base):
     success = Column(Boolean, default=True)
     error_message = Column(Text, nullable=True)
 
-    # Cost tracking (local = $0, but keep field for future)
+    # Cost tracking in USD-equivalent workspace billing terms.
     cost_usd = Column(Float, default=0.0)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

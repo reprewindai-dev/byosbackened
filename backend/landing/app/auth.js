@@ -70,6 +70,28 @@ const VK = {
     return data;
   },
 
+  async publicRequest(path, opts = {}) {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(opts.headers || {})
+    };
+    const res = await fetch(this.apiBase + path, { ...opts, headers });
+    let data = null;
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      data = await res.json();
+    } else {
+      data = await res.text();
+    }
+    if (!res.ok) {
+      const err = new Error((data && data.detail) || ("HTTP " + res.status));
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  },
+
   async register({ email, password, full_name, workspace_name, trial_tier = null }) {
     const t = await this.request("/auth/register", {
       method: "POST",
@@ -144,6 +166,55 @@ const VK = {
 
   async getCurrentSubscription() {
     return this.request("/subscriptions/current");
+  },
+
+  async workspaceOverview() {
+    return this.request("/workspace/overview");
+  },
+
+  async workspaceObservability(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.model) qs.set("model", params.model);
+    if (params.status) qs.set("status", params.status);
+    if (params.days) qs.set("days", String(params.days));
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.offset) qs.set("offset", String(params.offset));
+    const suffix = qs.toString() ? ("?" + qs.toString()) : "";
+    return this.request("/workspace/observability" + suffix, { method: "GET" });
+  },
+
+  async workspaceApiKeys() {
+    return this.request("/workspace/api-keys");
+  },
+
+  async workspaceModels() {
+    return this.request("/workspace/models");
+  },
+
+  async workspaceToggleModel(model_slug, enabled) {
+    return this.request("/workspace/models/" + encodeURIComponent(model_slug), {
+      method: "PATCH",
+      body: JSON.stringify({ enabled: !!enabled })
+    });
+  },
+
+  async workspaceCostBudget() {
+    return this.request("/workspace/cost-budget");
+  },
+
+  async workspaceBudget() {
+    return this.request("/workspace/budget");
+  },
+
+  async workspaceBudgetUpdate(payload) {
+    return this.request("/workspace/budget", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async workspaceCostCsv() {
+    return this.request("/workspace/cost-budget.csv", { method: "GET" });
   },
 
   async getWalletBalance() {

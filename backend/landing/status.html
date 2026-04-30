@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Veklom Status</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+<style>
+.status-shell { max-width: 980px; margin: 0 auto; padding: 64px 24px 96px; }
+.status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:20px; }
+.status-card { background:var(--ink-2); border:1px solid var(--rule); border-radius:6px; padding:20px; }
+.status-pill { display:inline-flex; padding:4px 10px; border:1px solid var(--ok); color:var(--ok); font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; border-radius:2px; }
+.status-row { display:flex; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--rule); }
+.status-row:last-child { border-bottom:0; }
+.status-title { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--mute); }
+.status-value { color:var(--bone); }
+.status-small { color:var(--bone-2); font-size:14px; line-height:1.6; }
+</style>
+</head>
+<body>
+<main class="status-shell">
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Status</div>
+  <div class="status-card">
+    <div class="status-pill" id="status-pill">Loading</div>
+    <h1 class="app-h1" style="margin-top:14px;">Service status and incident feed</h1>
+    <p class="app-sub">Public uptime and incident view for API, Auth, Marketplace, and AI Proxy.</p>
+    <div id="status-root" class="status-small">Loading status...</div>
+  </div>
+</main>
+<script src="/app/auth.js"></script>
+<script>
+async function loadStatus() {
+  const root = document.getElementById("status-root");
+  const pill = document.getElementById("status-pill");
+  try {
+    const out = await VK.publicRequest("/status/data");
+    pill.textContent = "Operational";
+    root.innerHTML = [
+      '<div class="status-grid">' + out.services.map(service =>
+        '<div class="status-card">' +
+          '<div class="status-title">' + service.name + '</div>' +
+          '<div style="font-family:var(--serif); font-size:28px; margin:10px 0 6px;">' + Number(service.uptime_90d).toFixed(2) + '%</div>' +
+          '<div class="status-small">Status: ' + service.status + '</div>' +
+        '</div>'
+      ).join("") + '</div>',
+      '<div class="status-card" style="margin-top:18px;">' +
+        '<div class="status-title">Current Incidents</div>' +
+        (out.incidents.length ? out.incidents.map(i => '<div class="status-row"><div><strong>' + i.title + '</strong><div class="status-small">' + (i.description || "") + '</div></div><div class="status-value">' + i.severity + ' / ' + i.status + '</div></div>').join("") : '<p class="status-small" style="margin-top:12px;">No current incidents.</p>') +
+      '</div>',
+      '<div class="status-card" style="margin-top:18px;">' +
+        '<div class="status-title">Scheduled Maintenance</div>' +
+        (out.maintenance.length ? out.maintenance.map(i => '<div class="status-row"><div><strong>' + i.title + '</strong><div class="status-small">' + (i.description || "") + '</div></div><div class="status-value">' + i.severity + '</div></div>').join("") : '<p class="status-small" style="margin-top:12px;">No scheduled maintenance.</p>') +
+      '</div>'
+    ].join("");
+  } catch (err) {
+    pill.textContent = "Degraded";
+    root.innerHTML = '<div class="alert alert-error">' + (err.message || "Unable to load status") + '</div>';
+  }
+}
+loadStatus();
+</script>
+</body>
+</html>

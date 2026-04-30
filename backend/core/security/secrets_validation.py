@@ -47,12 +47,9 @@ def validate_secrets_on_startup():
     if "host.docker.internal" not in settings.llm_base_url and "127.0.0.1" not in settings.llm_base_url:
         warnings.append(f"LLM_BASE_URL is set to '{settings.llm_base_url}' â€” ensure Ollama is reachable")
 
-    # GitHub OAuth is a public login path, so production must not ship without it.
+    # GitHub OAuth is optional for marketplace access; warn if missing but do not block startup.
     if not settings.github_client_id or not settings.github_client_secret:
-        if settings.debug:
-            warnings.append("GitHub OAuth credentials are not configured (GitHub sign-in will be unavailable)")
-        else:
-            errors.append("GitHub OAuth credentials must be configured for production (GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)")
+        warnings.append("GitHub OAuth credentials are not configured (GitHub sign-in will be unavailable)")
 
     if not settings.serpapi_key:
         warnings.append("SERPAPI_KEY not set (search features will not work)")

@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 import base64
+import binascii
 import os
 from typing import Optional
 from core.config import get_settings
@@ -34,7 +35,25 @@ def get_encryption_key() -> bytes:
     """Get encryption key from settings or generate."""
     encryption_key = getattr(settings, "encryption_key", None)
     if encryption_key:
-        return encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+        key_text = encryption_key.decode() if isinstance(encryption_key, bytes) else str(encryption_key)
+        key_text = key_text.strip()
+        try:
+            decoded = base64.urlsafe_b64decode(key_text.encode())
+            if len(decoded) == 32 and base64.urlsafe_b64encode(decoded).decode().rstrip("=") == key_text.rstrip("="):
+                return key_text.encode()
+        except Exception:
+            pass
+
+        try:
+            raw = binascii.unhexlify(key_text)
+            if len(raw) == 32:
+                return base64.urlsafe_b64encode(raw)
+        except (binascii.Error, ValueError):
+            pass
+
+        if len(key_text.encode()) == 32:
+            return base64.urlsafe_b64encode(key_text.encode())
+        return generate_key(key_text.encode())
     # Fallback: use secret_key (not ideal, but works)
     return generate_key(settings.secret_key.encode())
 

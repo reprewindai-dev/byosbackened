@@ -1,14 +1,23 @@
-# Deployment Status — sanitized snapshot
+﻿# Deployment Status - live snapshot
+
+## Current Live State
+- `api.veklom.com/health` returns `{"status":"ok","version":"1.0.0","service":"Veklom"}`.
+- The routed Veklom Coolify container is healthy: `zjhp30ys1jlk8yaoxc96h2zd-213941724689`.
+- AWS runtime vars are present in the live service env: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-east-1`, and `S3_BACKUP_BUCKET=veklom-db-backups`.
+- The latest Coolify build artifact for commit `9493aceb` is still restart-looping beside the routed live container and should be treated as a non-routed deploy artifact until Coolify is reconciled.
+- `veklom.dev` is live on Cloudflare Pages and attached to the acquisition / marketplace entry surface.
 
 ## Infrastructure
 - Hetzner + Coolify backing infrastructure is provisioned.
 - Cloudflare Pages is serving `veklom.com`.
+- `veklom.dev` is live on Cloudflare Pages.
 - API and engine services are expected on dedicated subdomains.
 
 ## Domain Strategy
 - `veklom.com`: public positioning and trust surface.
-- `veklom.dev`: marketplace operating surface (signup/login/dashboard).
-- `api.veklom.dev` (or `api.veklom.com`): backend API surface.
+- `veklom.dev`: acquisition, signup, login, and dashboard entry surface.
+- `api.veklom.com`: backend API surface.
+- `engine.veklom.com`: CO2 Router surface.
 
 ## Production Checklist (must pass)
 - Backend app deployed from `/backend` using `infra/docker/Dockerfile.api`.

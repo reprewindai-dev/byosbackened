@@ -38,12 +38,12 @@ async function loadStatus() {
   const root = document.getElementById("status-root");
   const pill = document.getElementById("status-pill");
   try {
-    if (!localStorage.getItem("vk_access")) {
-      pill.textContent = "Auth Required";
-      root.innerHTML = "<p class='status-small'>Sign in to load live service telemetry from your workspace.</p>";
-      return;
+    const statusApiBase = (VK.apiBase || "").replace(/\/api\/v1$/, "");
+    const statusResp = await fetch(`${statusApiBase}/status/data`);
+    if (!statusResp.ok) {
+      throw new Error(`status endpoint returned ${statusResp.status}`);
     }
-    const out = await VK.publicRequest("/workspace/status/data");
+    const out = await statusResp.json();
     pill.textContent = "Operational";
     root.innerHTML = [
       '<div class="status-grid">' + out.services.map(service =>

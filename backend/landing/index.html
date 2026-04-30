@@ -398,9 +398,13 @@
 
       async function loadStatusData() {
         if (!window.VK || !window.VK.publicRequest) return;
-        if (!localStorage.getItem("vk_access")) return;
         try {
-          const payload = await VK.publicRequest('/workspace/status/data');
+          const statusApiBase = (VK.apiBase || "").replace(/\/api\/v1$/, "");
+          const statusResp = await fetch(`${statusApiBase}/status/data`);
+          if (!statusResp.ok) {
+            throw new Error(`status endpoint returned ${statusResp.status}`);
+          }
+          const payload = await statusResp.json();
           const first = Array.isArray(payload.services) && payload.services[0];
           if (first) {
             statusMeta.textContent = `Service health: ${payload.services.map((s) => s.name + ' ' + s.status).join(' | ')}`;

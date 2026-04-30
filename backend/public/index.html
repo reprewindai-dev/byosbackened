@@ -814,7 +814,7 @@
 <script>
 (async () => {
   try {
-    const r = await fetch('/status');
+    const r = await fetch('/status/data', { headers: { 'Accept': 'application/json' } });
     if (!r.ok) return;
     const d = await r.json();
     const bar = document.getElementById('status-bar');

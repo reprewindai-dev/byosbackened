@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 LICENSE_EXEMPT_PATHS = {
     "/health",
     "/status",
+    "/status/data",
     "/",
     "/api/v1/subscriptions/plans",
     "/api/v1/subscriptions/webhook",

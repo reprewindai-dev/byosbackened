@@ -1,4 +1,17 @@
-"""Stripe subscription management: plans, checkout, webhook, portal."""
+"""Stripe subscription management: plans, checkout, webhook, portal.
+
+Pricing model: flat annual license — charge for the control plane, not inference.
+Tiers: Free (permanent) → Team ($12K/yr) → Business ($35K/yr) → Enterprise (custom).
+
+DB enum mapping (PlanTier in db/models.py must stay in sync):
+    free       → Free
+    starter    → Team        ($12,000/year)
+    pro        → Business    ($35,000/year)
+    enterprise → Enterprise  (custom, sales-assisted)
+
+NOTE: The DB enum values 'starter' and 'pro' are kept stable to avoid a
+migration. Display names are 'Team' and 'Business' in all API responses and UI.
+"""
 import stripe
 from datetime import datetime
 from typing import Optional
@@ -9,178 +22,205 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
 from core.config import get_settings
+from core.license import (
+    LicenseStatus,
+    require_active_license,
+    TIER_FREE, TIER_TEAM, TIER_BUSINESS, TIER_ENTERPRISE,
+    TIER_API_KEY_LIMITS, TIER_REQUEST_LIMITS, TIER_VENDOR_LIMITS,
+)
 from db.session import get_db
 from db.models import Subscription, PlanTier, SubscriptionStatus, Workspace, User, TokenWallet, TokenTransaction
 
 settings = get_settings()
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
-# ─── Plan catalog ─────────────────────────────────────────────────────────────
-# IMPORTANT: Backend subscription pricing and landing/dashboard displays must
-# stay aligned. Token packs are separate one-time purchases handled by the
-# wallet router.
+
+# ─── Plan catalog ──────────────────────────────────────────────────────────────
+# Flat annual license model. No per-token credits — charge for the control
+# plane (routing, governance, cost intelligence, security), not inference.
+#
+# Price keys use 'yearly' only. Monthly billing is available as a convenience
+# at a 20% premium (annual_cents / 10 * 1.2 per month).
 
 PLANS = {
-    "starter": {
-        "name": "Starter",
+    "starter": {                                    # DB enum: starter | Display: Team
+        "name": "Team",
         "tier": "starter",
-        "price_monthly_cents": 9_900,       # $99.00 / month
-        "price_yearly_cents": 99_000,       # $990.00 / year
+        "price_monthly_cents": 120_000,             # $1,200/month (20% premium over annual)
+        "price_yearly_cents": 1_200_000,            # $12,000/year flat
         "self_serve_checkout": True,
-        "monthly_credits_included": 10_000_000,
+        "trial_days": 14,
+        "monthly_credits_included": None,           # No credit model — flat license
+        "limits": {
+            "api_keys_max": TIER_API_KEY_LIMITS[TIER_TEAM],
+            "requests_per_month": TIER_REQUEST_LIMITS[TIER_TEAM],
+            "vendor_connections": TIER_VENDOR_LIMITS[TIER_TEAM],
+        },
         "features": {
-            "api_keys_max": 5,
-            "support_channel": "ai_bot",
-            "support_response_hours": 0,
-            "support_escalation": "email_48h",
-            "cost_prediction": "limited",
-            "execution": "limited",
-            "usage_summary": True,
-            "kill_switch": False,
-            "compliance_reports": False,
-            "audit_logs_retention_days": 7,
-            "advanced_routing": False,
-            "advanced_security": False,
-            "plugin_execution": False,
-            "enterprise_admin": False,
-            "sla_guarantee": None,
-            "white_label": False,
+            "multi_vendor_routing":   True,
+            "advanced_routing":       True,
+            "cost_dashboard":         True,
+            "budget_controls":        True,
+            "kill_switch":            True,
+            "savings_insights":       True,
+            "audit_logs":             True,
+            "rbac":                   True,
+            "support_tier":           "silver",
+            "support_sla_sev1_hrs":   1,
+            # Business+ only
+            "sso":                    False,
+            "compliance_reports":     False,
+            "gdpr_exports":           False,
+            "hipaa_controls":         False,
+            "failover_routing":       False,
+            "content_safety":         False,
+            "data_masking":           False,
+            "privacy_audit_trail":    False,
+            "locker_security":        False,
+            "plugin_execution":       False,
+            "governed_execution":     False,
+            "audit_exports":          False,
+            "white_label":            False,
+            "sla_guarantee":          None,
+            "private_deployment":     False,
         },
     },
-    "pro": {
-        "name": "Pro",
+
+    "pro": {                                        # DB enum: pro | Display: Business
+        "name": "Business",
         "tier": "pro",
-        "price_monthly_cents": 49_900,      # $499.00 / month
-        "price_yearly_cents": 499_000,      # $4,990.00 / year
+        "price_monthly_cents": 350_000,             # $3,500/month (20% premium)
+        "price_yearly_cents": 3_500_000,            # $35,000/year flat
         "self_serve_checkout": True,
-        "monthly_credits_included": 100_000_000,
+        "trial_days": 14,
+        "monthly_credits_included": None,
+        "limits": {
+            "api_keys_max": TIER_API_KEY_LIMITS[TIER_BUSINESS],
+            "requests_per_month": TIER_REQUEST_LIMITS[TIER_BUSINESS],
+            "vendor_connections": TIER_VENDOR_LIMITS[TIER_BUSINESS],
+        },
         "features": {
-            "api_keys_max": 20,
-            "support_channel": "ai_bot_priority",
-            "support_response_hours": 0,
-            "support_escalation": "email_24h",
-            "cost_prediction": True,
-            "routing_select": True,
-            "savings_insights": True,
-            "budget_management": True,
-            "performance_metrics": True,
-            "alerts": True,
-            "content_scan": "text",
-            "audit_logs_retention_days": 30,
-            "kill_switch": False,
-            "compliance_reports": False,
-            "advanced_security": False,
-            "plugin_execution": False,
-            "sla_guarantee": None,
-            "white_label": False,
+            "multi_vendor_routing":   True,
+            "advanced_routing":       True,
+            "failover_routing":       True,
+            "cost_dashboard":         True,
+            "budget_controls":        True,
+            "kill_switch":            True,
+            "savings_insights":       True,
+            "audit_logs":             True,
+            "audit_exports":          True,
+            "rbac":                   True,
+            "sso":                    True,
+            "compliance_reports":     True,
+            "gdpr_exports":           True,
+            "hipaa_controls":         True,
+            "content_safety":         True,
+            "data_masking":           True,
+            "privacy_audit_trail":    True,
+            "locker_security":        True,
+            "plugin_execution":       True,
+            "governed_execution":     True,
+            "support_tier":           "gold",
+            "support_sla_sev1_hrs":   0.5,
+            # Enterprise only
+            "custom_routing":         False,
+            "custom_endpoints":       False,
+            "workspace_admin":        False,
+            "white_label":            False,
+            "private_deployment":     False,
+            "sla_guarantee":          None,
+            "annual_review":          False,
         },
     },
-    "sovereign": {
-        "name": "Sovereign",
-        "tier": "sovereign",
-        "price_monthly_cents": 250_000,     # $2,500.00 / month
-        "price_yearly_cents": 2_500_000,    # $25,000.00 / year
-        "self_serve_checkout": True,
-        "monthly_credits_included": 500_000_000,
-        "features": {
-            "api_keys_max": 100,
-            "support_channel": "ai_bot_priority",
-            "support_response_hours": 0,
-            "support_escalation": "priority_8h",
-            "kill_switch": True,
-            "audit_logs": True,
-            "audit_verification": True,
-            "compliance_checks": True,
-            "compliance_reports": True,
-            "privacy_workflows": True,
-            "explainability": True,
-            "detailed_health": True,
-            "threat_stats": True,
-            "security_controls": True,
-            "content_scan": "full",
-            "content_logs": True,
-            "governed_execution": True,
-            "audit_exports": True,
-            "plugin_execution": True,
-            "sla_guarantee": "99.9%",
-            "white_label": True,
-        },
-    },
+
     "enterprise": {
         "name": "Enterprise",
         "tier": "enterprise",
-        "price_monthly_cents": None,
-        "price_yearly_cents": None,
-        "self_serve_checkout": False,
+        "price_monthly_cents": None,                # Sales-assisted, custom pricing
+        "price_yearly_cents": None,                 # Minimum $75,000/year
+        "self_serve_checkout": False,               # No self-serve — demo + scoping call required
+        "trial_days": 0,                            # No trial — POC via scoping call instead
         "monthly_credits_included": None,
+        "limits": {
+            "api_keys_max": TIER_API_KEY_LIMITS[TIER_ENTERPRISE],   # None = unlimited
+            "requests_per_month": TIER_REQUEST_LIMITS[TIER_ENTERPRISE],
+            "vendor_connections": TIER_VENDOR_LIMITS[TIER_ENTERPRISE],
+        },
         "features": {
-            "api_keys_max": None,            # Unlimited
-            "support_channel": "ai_bot_dedicated",
-            "support_response_hours": 0,
-            "support_escalation": "dedicated_4h",
-            "kill_switch": True,
-            "audit_logs": True,
-            "audit_verification": True,
-            "compliance_checks": True,
-            "compliance_reports": True,
-            "privacy_workflows": True,
-            "explainability": True,
-            "detailed_health": True,
-            "threat_stats": True,
-            "security_controls": True,
-            "content_scan": "full",
-            "content_logs": True,
-            "governed_execution": True,
-            "audit_exports": True,
-            "plugin_execution": True,
-            "custom_endpoints": True,
-            "custom_training": True,
-            "workspace_admin": True,
-            "advanced_security": True,
-            "custom_routing": True,
-            "private_deployment": True,
-            "sla_guarantee": "99.99%",
-            "white_label": True,
-            "annual_review": True,
+            "multi_vendor_routing":   True,
+            "advanced_routing":       True,
+            "failover_routing":       True,
+            "custom_routing":         True,
+            "cost_dashboard":         True,
+            "budget_controls":        True,
+            "kill_switch":            True,
+            "savings_insights":       True,
+            "audit_logs":             True,
+            "audit_exports":          True,
+            "rbac":                   True,
+            "sso":                    True,
+            "compliance_reports":     True,
+            "gdpr_exports":           True,
+            "hipaa_controls":         True,
+            "content_safety":         True,
+            "data_masking":           True,
+            "privacy_audit_trail":    True,
+            "locker_security":        True,
+            "advanced_security":      True,
+            "plugin_execution":       True,
+            "governed_execution":     True,
+            "custom_endpoints":       True,
+            "workspace_admin":        True,
+            "white_label":            True,
+            "private_deployment":     True,
+            "annual_review":          True,
+            "sla_guarantee":          "99.99%",
+            "support_tier":           "platinum",
+            "support_sla_sev1_hrs":   0,             # 24x7 Sev1+2
+            "dedicated_tse":          True,
         },
     },
 }
 
-# Free tier is handled outside Stripe subscription checkout.
+# Free tier — permanent, no expiry, no Stripe subscription needed.
 FREE_PLAN = {
     "name": "Free",
     "tier": "free",
     "price_monthly_cents": 0,
     "price_yearly_cents": 0,
     "self_serve_checkout": False,
-    "monthly_credits_included": 50_000,
+    "trial_days": 0,
+    "monthly_credits_included": None,
+    "limits": {
+        "api_keys_max": TIER_API_KEY_LIMITS[TIER_FREE],
+        "requests_per_month": TIER_REQUEST_LIMITS[TIER_FREE],
+        "vendor_connections": TIER_VENDOR_LIMITS[TIER_FREE],
+    },
     "features": {
-        "view_marketplace": True,
-        "comment": True,
-        "ask_questions": True,
-        "api_keys_max": 1,
-        "download_free_tools": True,
-        "support_channel": "community",
-        "support_response_hours": None,
-        "kill_switch": False,
-        "compliance_reports": False,
-        "advanced_routing": False,
-        "advanced_security": False,
-        "plugin_execution": False,
-        "enterprise_admin": False,
-        "sla_guarantee": None,
+        "view_marketplace":       True,
+        "multi_vendor_routing":   False,
+        "advanced_routing":       False,
+        "cost_dashboard":         False,
+        "budget_controls":        False,
+        "kill_switch":            False,
+        "audit_logs":             False,
+        "rbac":                   False,
+        "sso":                    False,
+        "compliance_reports":     False,
+        "plugin_execution":       False,
+        "white_label":            False,
+        "sla_guarantee":          None,
+        "support_tier":           "community",
+        "support_sla_sev1_hrs":   None,
     },
 }
 
-# Strategic transfer transactions are intentionally NOT a subscription plan.
-# They are negotiated privately outside of self-serve checkout.
 
-
-# ─── Schemas ──────────────────────────────────────────────────────────────────
+# ─── Schemas ───────────────────────────────────────────────────────────────────
 
 class CheckoutRequest(BaseModel):
     plan: PlanTier
-    billing_cycle: str = "monthly"
+    billing_cycle: str = "yearly"           # Default to annual — aligns with flat license model
     success_url: str
     cancel_url: str
 
@@ -193,74 +233,52 @@ class CheckoutResponse(BaseModel):
 class SubscriptionResponse(BaseModel):
     workspace_id: str
     plan: str
+    plan_display_name: str
     status: str
     billing_cycle: str
-    amount_cents: int
+    amount_cents: Optional[int]
     currency: str
     current_period_end: Optional[str]
     trial_end: Optional[str]
+    trial_days_remaining: Optional[int]
+    limits: dict
     features: dict
 
 
-# ─── Routes ───────────────────────────────────────────────────────────────────
+# ─── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/plans")
 async def list_plans():
-    """Return all available plans (public endpoint)."""
-    public_keys = ("starter", "pro", "sovereign", "enterprise")
-    return {"plans": [FREE_PLAN] + [PLANS[k] for k in public_keys]}
+    """Return all available plans (public endpoint — no auth required)."""
+    return {"plans": [FREE_PLAN] + [PLANS[k] for k in ("starter", "pro", "enterprise")]}
 
 
 @router.get("/current", response_model=SubscriptionResponse)
 async def current_subscription(
+    license_status: LicenseStatus = Depends(require_active_license),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get the current workspace subscription."""
+    """Get the current workspace subscription and license status."""
     sub = db.query(Subscription).filter(
         Subscription.workspace_id == current_user.workspace_id
     ).first()
-    if not sub:
-        ws = db.query(Workspace).filter(
-            Workspace.id == current_user.workspace_id
-        ).first()
-        if ws and ws.license_tier and ws.license_expires_at and ws.license_expires_at > datetime.utcnow():
-            plan_info = PLANS.get(ws.license_tier, FREE_PLAN)
-            return SubscriptionResponse(
-                workspace_id=current_user.workspace_id,
-                plan=ws.license_tier,
-                status="trialing",
-                billing_cycle="monthly",
-                amount_cents=0,
-                currency="usd",
-                current_period_end=None,
-                trial_end=ws.license_expires_at.isoformat(),
-                features=plan_info["features"],
-            )
 
-        plan_info = FREE_PLAN
-        return SubscriptionResponse(
-            workspace_id=current_user.workspace_id,
-            plan="free",
-            status="active",
-            billing_cycle="monthly",
-            amount_cents=0,
-            currency="usd",
-            current_period_end=None,
-            trial_end=None,
-            features=plan_info["features"],
-        )
-    plan_info = PLANS.get(sub.plan.value, PLANS["starter"])
+    plan_info = PLANS.get(license_status.tier, FREE_PLAN)
+
     return SubscriptionResponse(
-        workspace_id=sub.workspace_id,
-        plan=sub.plan.value,
-        status=sub.status.value,
-        billing_cycle=sub.billing_cycle,
-        amount_cents=int(sub.amount_cents or 0),
-        currency=sub.currency,
-        current_period_end=sub.current_period_end.isoformat() if sub.current_period_end else None,
-        trial_end=sub.trial_end.isoformat() if sub.trial_end else None,
-        features=plan_info["features"],
+        workspace_id=current_user.workspace_id,
+        plan=license_status.tier,
+        plan_display_name=license_status.display_tier,
+        status=license_status.state.value,
+        billing_cycle=sub.billing_cycle if sub else "yearly",
+        amount_cents=int(sub.amount_cents or 0) if sub and sub.amount_cents else None,
+        currency=sub.currency if sub else "usd",
+        current_period_end=sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
+        trial_end=license_status.trial_end.isoformat() if license_status.trial_end else None,
+        trial_days_remaining=license_status.days_remaining,
+        limits=plan_info.get("limits", {}),
+        features=plan_info.get("features", {}),
     )
 
 
@@ -279,12 +297,17 @@ async def create_checkout(
     if not plan_info:
         raise HTTPException(status_code=400, detail="Invalid plan")
     if payload.billing_cycle not in ("monthly", "yearly"):
-        raise HTTPException(status_code=400, detail="Invalid billing cycle")
+        raise HTTPException(status_code=400, detail="billing_cycle must be 'monthly' or 'yearly'")
     if not plan_info.get("self_serve_checkout"):
-        raise HTTPException(status_code=400, detail="Enterprise plan requires sales-assisted checkout")
+        raise HTTPException(
+            status_code=400,
+            detail="Enterprise plan requires a scoping call. Contact sales@co2router.com"
+        )
 
     price_key = "price_yearly_cents" if payload.billing_cycle == "yearly" else "price_monthly_cents"
     amount = plan_info[price_key]
+    if not amount:
+        raise HTTPException(status_code=400, detail="Price not configured for this plan/cycle")
 
     sub = db.query(Subscription).filter(
         Subscription.workspace_id == current_user.workspace_id
@@ -311,6 +334,18 @@ async def create_checkout(
             sub.stripe_customer_id = customer_id
         db.commit()
 
+    # Add 14-day trial for Team and Business self-serve checkouts
+    trial_days = plan_info.get("trial_days", 0)
+    subscription_data = {
+        "metadata": {
+            "workspace_id": current_user.workspace_id,
+            "plan": payload.plan.value,
+            "billing_cycle": payload.billing_cycle,
+        }
+    }
+    if trial_days > 0:
+        subscription_data["trial_period_days"] = trial_days
+
     session = stripe.checkout.Session.create(
         customer=customer_id,
         payment_method_types=["card"],
@@ -318,8 +353,11 @@ async def create_checkout(
             "price_data": {
                 "currency": "usd",
                 "product_data": {
-                    "name": plan_info["name"],  # e.g. "Sovereign · Pro"
-                    "description": f"Veklom AI operations platform — {plan_info['tier']} tier",
+                    "name": f"BYOS AI Router — {plan_info['name']} License",
+                    "description": (
+                        f"Flat annual license for the BYOS AI control plane. "
+                        f"Routing · Cost intelligence · Governance · Security."
+                    ),
                 },
                 "unit_amount": amount,
                 "recurring": {
@@ -329,6 +367,7 @@ async def create_checkout(
             "quantity": 1,
         }],
         mode="subscription",
+        subscription_data=subscription_data,
         success_url=payload.success_url + "?session_id={CHECKOUT_SESSION_ID}",
         cancel_url=payload.cancel_url,
         metadata={
@@ -362,7 +401,7 @@ async def billing_portal(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a Stripe Customer Portal session for self-service billing."""
+    """Create a Stripe Customer Portal session for self-service billing management."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
     stripe.api_key = settings.stripe_secret_key
@@ -427,21 +466,22 @@ async def stripe_webhook(
             except ValueError:
                 sub.plan = PlanTier.STARTER
 
-            sub.billing_cycle = data.get("metadata", {}).get("billing_cycle", sub.billing_cycle or "monthly")
+            sub.billing_cycle = data.get("metadata", {}).get("billing_cycle", sub.billing_cycle or "yearly")
             resolved_plan = PLANS.get(sub.plan.value, PLANS["starter"])
             resolved_price_key = "price_yearly_cents" if sub.billing_cycle == "yearly" else "price_monthly_cents"
             resolved_amount = resolved_plan.get(resolved_price_key) or 0
             sub.amount_cents = str(resolved_amount)
-            sub.monthly_credits_included = str(resolved_plan.get("monthly_credits_included") or 0)
+            # No monthly_credits in flat license model
+            sub.monthly_credits_included = None
 
             stripe_status = data.get("status", "active")
             status_map = {
-                "active": SubscriptionStatus.ACTIVE,
-                "trialing": SubscriptionStatus.TRIALING,
-                "past_due": SubscriptionStatus.PAST_DUE,
-                "canceled": SubscriptionStatus.CANCELED,
+                "active":     SubscriptionStatus.ACTIVE,
+                "trialing":   SubscriptionStatus.TRIALING,
+                "past_due":   SubscriptionStatus.PAST_DUE,
+                "canceled":   SubscriptionStatus.CANCELED,
                 "incomplete": SubscriptionStatus.INCOMPLETE,
-                "paused": SubscriptionStatus.PAUSED,
+                "paused":     SubscriptionStatus.PAUSED,
             }
             sub.status = status_map.get(stripe_status, SubscriptionStatus.ACTIVE)
 
@@ -469,65 +509,4 @@ async def stripe_webhook(
                 sub.canceled_at = datetime.utcnow()
                 db.commit()
 
-    if event_type == "checkout.session.completed":
-        # Handle token pack purchases (one-time payments)
-        session = data
-        if session.get("mode") == "payment":
-            workspace_id = session.get("metadata", {}).get("workspace_id")
-            credits = session.get("metadata", {}).get("credits")
-            if workspace_id and credits:
-                _credit_token_wallet(
-                    db, workspace_id, int(credits),
-                    stripe_checkout_session_id=session.get("id"),
-                    stripe_payment_intent_id=session.get("payment_intent")
-                )
-
     return {"received": True}
-
-
-def _credit_token_wallet(
-    db: Session,
-    workspace_id: str,
-    credits: int,
-    stripe_checkout_session_id: str = None,
-    stripe_payment_intent_id: str = None,
-    description: str = "Token pack purchase"
-):
-    """Credit token wallet for a workspace."""
-    # Get or create wallet
-    wallet = db.query(TokenWallet).filter(
-        TokenWallet.workspace_id == workspace_id
-    ).first()
-    
-    if not wallet:
-        wallet = TokenWallet(
-            workspace_id=workspace_id,
-            balance=0
-        )
-        db.add(wallet)
-        db.flush()
-    
-    # Record transaction
-    balance_before = wallet.balance
-    balance_after = balance_before + credits
-    
-    transaction = TokenTransaction(
-        wallet_id=wallet.id,
-        workspace_id=workspace_id,
-        transaction_type="purchase",
-        amount=credits,
-        balance_before=balance_before,
-        balance_after=balance_after,
-        stripe_checkout_session_id=stripe_checkout_session_id,
-        stripe_payment_intent_id=stripe_payment_intent_id,
-        description=description
-    )
-    db.add(transaction)
-    
-    # Update wallet
-    wallet.balance = balance_after
-    wallet.total_credits_purchased = (wallet.total_credits_purchased or 0) + credits
-    wallet.updated_at = datetime.utcnow()
-    
-    db.commit()
-    return wallet

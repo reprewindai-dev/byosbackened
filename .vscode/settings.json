@@ -1,3 +1,5 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "skillSync.sourceMode": "github-repo",
+    "skillSync.sourceRepository": "reprewindai-dev/byosbackened"
 }

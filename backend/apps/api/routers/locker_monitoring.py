@@ -112,7 +112,7 @@ def get_alerts_summary(
     
     total = db.query(Alert).count()
     critical = db.query(Alert).filter(Alert.severity == AlertSeverity.CRITICAL).count()
-    warning = db.query(Alert).filter(Alert.severity == AlertSeverity.WARNING).count()
+    warning = db.query(Alert).filter(Alert.severity == AlertSeverity.HIGH).count()
     info = db.query(Alert).filter(Alert.severity == AlertSeverity.INFO).count()
     
     # Recent alerts
@@ -125,7 +125,17 @@ def get_alerts_summary(
         critical=critical,
         warning=warning,
         info=info,
-        recent_alerts=recent
+        recent_alerts=[
+            {
+                "id": a.id,
+                "title": a.title,
+                "severity": a.severity.value if hasattr(a.severity, "value") else str(a.severity),
+                "type": a.alert_type,
+                "status": a.status,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in recent
+        ]
     )
 
 

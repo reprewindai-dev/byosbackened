@@ -60,13 +60,17 @@ class SavingsCalculator:
                     "actual_cost": Decimal("0.00"),
                     "savings_percent": 0.0,
                     "operations_count": 0,
+                    "latency_reduction_ms": 0,
+                    "cache_hit_rate_improvement": 0.0,
+                    "period_start": start_date.isoformat(),
+                    "period_end": end_date.isoformat(),
                 }
             
             # Calculate baseline (single-provider cost)
             baseline_cost = self._calculate_baseline_cost(operations)
             
             # Calculate actual cost
-            actual_cost = sum(Decimal(str(op.cost)) for op in operations if op.cost)
+            actual_cost = sum(Decimal(str(op.cost)) for op in operations if op.cost is not None)
             
             # Calculate savings
             total_savings = baseline_cost - actual_cost
@@ -112,10 +116,12 @@ class SavingsCalculator:
         }
         
         for op in operations:
-            if op.input_tokens and op.output_tokens:
+            input_tokens = getattr(op, 'input_tokens', None) or getattr(op, 'tokens_input', None)
+            output_tokens = getattr(op, 'output_tokens', None) or getattr(op, 'tokens_output', None)
+            if input_tokens and output_tokens:
                 # Calculate cost with most expensive provider
-                input_cost = (Decimal(op.input_tokens) / Decimal(1_000_000)) * pricing["openai"]["input"]
-                output_cost = (Decimal(op.output_tokens) / Decimal(1_000_000)) * pricing["openai"]["output"]
+                input_cost = (Decimal(str(input_tokens)) / Decimal(1_000_000)) * pricing["openai"]["input"]
+                output_cost = (Decimal(str(output_tokens)) / Decimal(1_000_000)) * pricing["openai"]["output"]
                 baseline_total += input_cost + output_cost
         
         return baseline_total
@@ -131,8 +137,8 @@ class SavingsCalculator:
         
         # Get actual latencies
         latencies = [
-            op.latency_ms for op in operations
-            if hasattr(op, 'latency_ms') and op.latency_ms
+            getattr(op, 'latency_ms', None) for op in operations
+            if getattr(op, 'latency_ms', None)
         ]
         
         if not latencies:

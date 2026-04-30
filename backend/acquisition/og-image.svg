@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#d4a574"/>
+      <stop offset="50%" stop-color="#c4925b"/>
+      <stop offset="100%" stop-color="#a8784a"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="20%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#1c1c23" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#0c0c0e" stop-opacity="1"/>
+    </radialGradient>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#c4925b" stroke-width="0.4" opacity="0.18"/>
+    </pattern>
+  </defs>
+
+  <!-- Base -->
+  <rect width="1200" height="630" fill="#0c0c0e"/>
+  <rect width="1200" height="630" fill="url(#vignette)"/>
+
+  <!-- Top + bottom hairlines -->
+  <line x1="60" y1="60" x2="1140" y2="60" stroke="url(#brass)" stroke-width="1" opacity="0.55"/>
+  <line x1="60" y1="570" x2="1140" y2="570" stroke="url(#brass)" stroke-width="1" opacity="0.55"/>
+
+  <!-- Corner crop marks (premium publication feel) -->
+  <g stroke="#c4925b" stroke-width="1" opacity="0.6" fill="none">
+    <path d="M 60 40 L 60 60 L 80 60"/>
+    <path d="M 1140 40 L 1140 60 L 1120 60"/>
+    <path d="M 60 590 L 60 570 L 80 570"/>
+    <path d="M 1140 590 L 1140 570 L 1120 570"/>
+  </g>
+
+  <!-- Top-left eyebrow text -->
+  <text x="60" y="42" font-family="ui-monospace, 'JetBrains Mono', Consolas, monospace" font-size="11" letter-spacing="3" fill="#c4925b" opacity="0.85">VEKLOM &#183; SOVEREIGN AI OPERATIONS</text>
+
+  <!-- Top-right kicker -->
+  <text x="1140" y="42" text-anchor="end" font-family="ui-monospace, 'JetBrains Mono', Consolas, monospace" font-size="11" letter-spacing="3" fill="#c4925b" opacity="0.85">veklom.com</text>
+
+  <!-- Compass / seal mark on left -->
+  <g transform="translate(180 315)">
+    <circle r="125" fill="url(#hatch)" opacity="0.5"/>
+    <circle r="118" stroke="url(#brass)" stroke-width="0.8" opacity="0.55" fill="none"/>
+    <circle r="106" stroke="url(#brass)" stroke-width="2" fill="none"/>
+    <circle r="94" stroke="url(#brass)" stroke-width="0.5" opacity="0.45" fill="none"/>
+
+    <g stroke="url(#brass)" stroke-width="1.5" stroke-linecap="round">
+      <line x1="0"    y1="-118" x2="0"    y2="-100"/>
+      <line x1="0"    y1="118"  x2="0"    y2="100"/>
+      <line x1="-118" y1="0"    x2="-100" y2="0"/>
+      <line x1="118"  y1="0"    x2="100"  y2="0"/>
+    </g>
+    <g stroke="url(#brass)" stroke-width="0.8" stroke-linecap="round" opacity="0.7">
+      <line x1="83.4" y1="-83.4" x2="74.0" y2="-74.0"/>
+      <line x1="-83.4" y1="-83.4" x2="-74.0" y2="-74.0"/>
+      <line x1="83.4" y1="83.4" x2="74.0" y2="74.0"/>
+      <line x1="-83.4" y1="83.4" x2="-74.0" y2="74.0"/>
+    </g>
+
+    <g fill="url(#brass)" opacity="0.7">
+      <circle cx="0" cy="-50" r="2"/>
+      <circle cx="0" cy="50" r="2"/>
+      <circle cx="-50" cy="0" r="2"/>
+      <circle cx="50" cy="0" r="2"/>
+    </g>
+
+    <!-- Italic V monogram, scaled -->
+    <g transform="translate(0 5) rotate(-7)">
+      <path d="M -54 -54 L -38 -54 L -3 28 L 30 -54 L 46 -54 L 11 42 L -11 42 Z" fill="url(#brass)"/>
+      <rect x="-60" y="-58" width="22" height="4" fill="url(#brass)"/>
+      <rect x="24"  y="-58" width="28" height="4" fill="url(#brass)"/>
+      <circle cx="36" cy="-44" r="2.4" fill="url(#brass)"/>
+    </g>
+  </g>
+
+  <!-- Wordmark + tagline block -->
+  <g transform="translate(380 0)">
+    <!-- Vertical hairline accent -->
+    <line x1="0" y1="180" x2="0" y2="450" stroke="url(#brass)" stroke-width="1.2" opacity="0.7"/>
+
+    <!-- Wordmark "Veklom" - serif italic, big -->
+    <text x="40" y="285" font-family="'Newsreader', 'Times New Roman', Georgia, serif" font-style="italic" font-weight="500" font-size="160" fill="#f5f1e8" letter-spacing="-2">Veklom</text>
+
+    <!-- Tagline line 1: bold sans -->
+    <text x="40" y="350" font-family="'Inter', system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-weight="600" font-size="34" fill="#f5f1e8" letter-spacing="-0.4">Self-Hosted AI Operations</text>
+    <text x="40" y="392" font-family="'Inter', system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-weight="600" font-size="34" fill="#f5f1e8" letter-spacing="-0.4">for Regulated Industries</text>
+
+    <!-- Sector list -->
+    <text x="40" y="448" font-family="ui-monospace, 'JetBrains Mono', Consolas, monospace" font-size="14" letter-spacing="3" fill="#c4925b">HOSPITALS &#183; BANKS &#183; DEFENSE &#183; GOV</text>
+  </g>
+
+  <!-- Bottom-left compliance footer -->
+  <text x="60" y="600" font-family="ui-monospace, 'JetBrains Mono', Consolas, monospace" font-size="11" letter-spacing="2.5" fill="#908a7c">HIPAA &#183; PCI-DSS &#183; SOC 2 &#183; GDPR &#183; FedRAMP-ALIGNED</text>
+
+  <!-- Bottom-right release -->
+  <text x="1140" y="600" text-anchor="end" font-family="ui-monospace, 'JetBrains Mono', Consolas, monospace" font-size="11" letter-spacing="2.5" fill="#908a7c">EST. MMXXVI</text>
+</svg>

@@ -1,0 +1,1260 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- Primary SEO -->
+<title>Veklom â€” Self-Hosted AI Operations Platform for Regulated Industries</title>
+<meta name="description" content="Sovereign AI operations platform for hospitals, banks, and defense. Self-hosted multi-LLM gateway, cost kill switches, RBAC, audit, GDPR. HIPAA, PCI-DSS, SOC 2 aligned." />
+<meta name="keywords" content="self-hosted AI gateway, on-prem AI operations, sovereign AI platform, HIPAA AI gateway, FedRAMP AI infrastructure, air-gapped LLM platform, multi-LLM gateway, LLM cost kill switch, AI ops for banks, AI ops for hospitals" />
+<meta name="author" content="Veklom" />
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+<link rel="canonical" href="https://veklom.dev/" />
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:site_name" content="Veklom" />
+<meta property="og:title" content="Veklom â€” Self-Hosted AI Operations Platform" />
+<meta property="og:description" content="Sovereign AI ops for hospitals, banks, defense. Self-hosted by design. Multi-LLM gateway, cost kill switches, RBAC, audit, GDPR. No vendor cloud, no data exfiltration." />
+<meta property="og:url" content="https://veklom.dev/" />
+<meta property="og:image" content="https://veklom.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Veklom â€” Sovereign AI Operations Platform" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Veklom â€” Self-Hosted AI Operations Platform" />
+<meta name="twitter:description" content="Sovereign AI ops for hospitals, banks, defense. Self-hosted by design. The platform Portkey and LangSmith can't sell to your CISO." />
+<meta name="twitter:image" content="https://veklom.dev/og-image.png" />
+<meta name="twitter:image:alt" content="Veklom â€” Self-Hosted AI Operations Platform for Hospitals, Banks, and Defense" />
+
+<!-- Favicons (multi-format for cross-browser + Apple + Android) -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#0c0c0e" />
+<meta name="msapplication-TileColor" content="#0c0c0e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Veklom" />
+<meta name="format-detection" content="telephone=no" />
+
+<!-- Structured data: Organization -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Veklom",
+  "url": "https://veklom.dev/",
+  "logo": "https://veklom.dev/logo.svg",
+  "description": "Sovereign AI operations platform for regulated industries. Self-hosted, source-available, deployable inside your perimeter.",
+  "foundingDate": "2026",
+  "contactPoint": [
+    { "@type": "ContactPoint", "email": "hello@veklom.com", "contactType": "sales", "availableLanguage": ["en"] },
+    { "@type": "ContactPoint", "email": "procurement@veklom.com", "contactType": "procurement", "availableLanguage": ["en"] }
+  ],
+  "sameAs": []
+}
+</script>
+
+<!-- Structured data: SoftwareApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Veklom",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "AI Operations Platform",
+  "operatingSystem": "Linux, Docker, Kubernetes",
+  "description": "Self-hosted AI operations platform. Multi-LLM gateway, cost intelligence, RBAC, audit logging, GDPR endpoints, Stripe billing. HIPAA, PCI-DSS, SOC 2, GDPR, FedRAMP aligned.",
+  "url": "https://veklom.dev/",
+  "image": "https://veklom.dev/logo.svg",
+  "offers": [
+    { "@type": "Offer", "name": "Sovereign Standard",   "price": "7500",  "priceCurrency": "USD", "priceSpecification": { "@type": "UnitPriceSpecification", "unitText": "MONTH" } },
+    { "@type": "Offer", "name": "Sovereign Pro",        "price": "18000", "priceCurrency": "USD", "priceSpecification": { "@type": "UnitPriceSpecification", "unitText": "MONTH" } },
+    { "@type": "Offer", "name": "Sovereign Enterprise", "price": "45000", "priceCurrency": "USD", "priceSpecification": { "@type": "UnitPriceSpecification", "unitText": "MONTH" } },
+    { "@type": "Offer", "name": "Acquisition",          "price": "750000","priceCurrency": "USD" }
+  ],
+  "featureList": [
+    "Multi-LLM gateway (OpenAI, Anthropic, HuggingFace, Ollama, Whisper)",
+    "Hard-cap cost kill switches",
+    "Multi-tenant RBAC with workspaces",
+    "Compliance-grade audit logging",
+    "GDPR / privacy endpoints (export, erasure, PII detection, masking)",
+    "Stripe-integrated billing and subscription engine",
+    "ML lifecycle for cost and quality predictors",
+    "Self-hosted, source-available, no vendor cloud dependency"
+  ]
+}
+</script>
+
+<!-- Structured data: FAQPage -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Does Veklom transmit any data to third parties?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No, by default and by architecture. Veklom runs entirely inside your perimeter. Outbound traffic occurs only when your application explicitly invokes an external AI provider. We have no telemetry, analytics, license-call-home, or vendor-side logging. Air-gapped operating mode disables all outbound capability at the network configuration layer." } },
+    { "@type": "Question", "name": "Can we deploy Veklom in our own VPC or on-premises?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Reference deployments are documented for AWS commercial and GovCloud, GCP, Azure, and bare-metal Kubernetes. Air-gapped deployment guide includes a verified offline package and dependency mirror configuration." } },
+    { "@type": "Question", "name": "What is the security posture of Veklom?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Eleven-layer defense-in-depth middleware: zero-trust authentication, intrusion detection (SQLi / SSRF / XSS pattern matching), per-IP and per-workspace rate limiting, request signing, tenant isolation enforced at storage and routing layers. Independent penetration tests are scheduled quarterly under the Enterprise tier; reports are shareable under NDA." } },
+    { "@type": "Question", "name": "How does Veklom pricing compare to Portkey or LangSmith?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Different cost structure entirely. Portkey, LangSmith, and Helicone are SaaS â€” their price covers hosted infrastructure, SOC 2 audit cycles, 24/7 support staff, and a 30-person sales organization. Veklom sells software; you operate the infrastructure inside your own perimeter. For institutions where SaaS is structurally non-viable (banks, hospitals, defense, sovereign clouds), the only real comparison is Veklom versus building this internally, which runs 9-14 months and $1.5M-$3M." } }
+  ]
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0c0c0e; --ink-2:#131318; --ink-3:#1c1c23;
+  --rule:rgba(245,241,232,.10); --rule-2:rgba(245,241,232,.18);
+  --bone:#f5f1e8; --bone-2:#d6cfbe; --mute:#908a7c;
+  --brass:#c4925b; --brass-2:#d4a574; --rust:#a85a3c; --moss:#7a9c64;
+  --serif:'Newsreader',Georgia,serif;
+  --sans:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+html{ scroll-behavior:smooth; -webkit-font-smoothing:antialiased; }
+body{ background:var(--ink); color:var(--bone); font-family:var(--sans); font-weight:400; line-height:1.55; overflow-x:hidden; }
+::selection{ background:var(--brass); color:var(--ink); }
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.04;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+a{ color:inherit; text-decoration:none; transition:color .18s; }
+a:hover{ color:var(--brass-2); }
+.container{ max-width:1240px; margin:0 auto; padding:0 32px; position:relative; z-index:2; }
+h1,h2,h3,h4{ font-family:var(--serif); font-weight:500; letter-spacing:-.02em; line-height:1.05; }
+.it{ font-style:italic; color:var(--bone-2); font-weight:400; }
+.eyebrow{ font-family:var(--mono); font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.18em; color:var(--brass); display:inline-block; }
+.eyebrow::before{ content:"Â§ "; opacity:.5; }
+.dim{ color:var(--mute); }
+.num{ font-variant-numeric:tabular-nums; font-family:var(--mono); }
+
+nav.top{ position:sticky; top:0; z-index:50; background:rgba(12,12,14,.78); backdrop-filter:blur(14px) saturate(140%); border-bottom:1px solid var(--rule); }
+.top-row{ display:flex; align-items:center; justify-content:space-between; height:72px; }
+.brand{ display:flex; align-items:center; gap:14px; font-family:var(--serif); font-size:21px; font-weight:600; letter-spacing:-.01em; }
+.brand img{ width:36px; height:36px; }
+.top-links{ display:flex; gap:32px; font-size:13px; color:var(--mute); }
+.top-links a:hover{ color:var(--bone); }
+.top-cta{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:var(--ink); background:var(--bone); padding:11px 20px; border-radius:2px; transition:background .2s; }
+.top-cta:hover{ background:var(--brass-2); color:var(--ink); }
+@media(max-width:780px){ .top-links{ display:none; } }
+
+.hero{ padding:120px 0 96px; position:relative; border-bottom:1px solid var(--rule); }
+.hero-grid{ display:grid; grid-template-columns:1fr; gap:48px; }
+@media(min-width:1024px){ .hero-grid{ grid-template-columns:1.4fr 1fr; gap:80px; align-items:start; } }
+.hero h1{ font-size:clamp(48px,7vw,96px); letter-spacing:-.035em; line-height:.96; margin-bottom:36px; }
+.hero-lede{ font-size:21px; line-height:1.5; color:var(--bone-2); max-width:600px; font-weight:300; margin-bottom:24px; }
+.hero-lede strong{ color:var(--bone); font-weight:500; }
+.hero-cta-row{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-top:32px; }
+.btn-primary{ font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.18em; background:var(--bone); color:var(--ink); padding:18px 28px; border-radius:2px; display:inline-flex; align-items:center; gap:12px; transition:all .2s; }
+.btn-primary:hover{ background:var(--brass-2); transform:translateY(-1px); color:var(--ink); }
+.btn-secondary{ font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.18em; border:1px solid var(--rule-2); color:var(--bone); padding:18px 28px; border-radius:2px; display:inline-flex; align-items:center; gap:12px; transition:all .2s; }
+.btn-secondary:hover{ border-color:var(--brass); background:rgba(196,146,91,.05); color:var(--bone); }
+.hero-side{ background:var(--ink-2); border:1px solid var(--rule); padding:36px; position:relative; }
+.hero-side::before{ content:""; position:absolute; top:-1px; left:24px; width:36px; height:1px; background:var(--brass); }
+.hero-side .label{ font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.2em; color:var(--brass); margin-bottom:20px; }
+.hero-side h3{ font-family:var(--serif); font-size:22px; line-height:1.25; margin-bottom:16px; font-weight:500; }
+.hero-side p{ font-size:14px; color:var(--mute); line-height:1.6; margin-bottom:24px; }
+.compliance-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 18px; padding-top:24px; border-top:1px solid var(--rule); }
+.compliance-row .item{ font-family:var(--mono); font-size:10px; color:var(--bone-2); letter-spacing:.04em; }
+.compliance-row .item::before{ content:"âŒ– "; color:var(--brass); }
+
+.stats{ border-bottom:1px solid var(--rule); padding:56px 0; }
+.stats-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:48px; }
+@media(min-width:780px){ .stats-grid{ grid-template-columns:repeat(4,1fr); } }
+.stat .num-big{ font-family:var(--serif); font-size:60px; font-weight:400; letter-spacing:-.03em; color:var(--bone); line-height:1; margin-bottom:10px; font-variant-numeric:tabular-nums; }
+.stat .num-big .pct{ font-size:34px; color:var(--mute); margin-left:2px; }
+.stat .label{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:var(--mute); line-height:1.5; }
+
+section{ padding:120px 0; position:relative; }
+.section-head{ display:grid; grid-template-columns:1fr; gap:32px; margin-bottom:80px; }
+@media(min-width:1024px){ .section-head{ grid-template-columns:1fr 2fr; gap:80px; } }
+.section-head .num-marker{ font-family:var(--serif); font-size:48px; font-weight:400; color:var(--brass); font-style:italic; line-height:1; margin-bottom:14px; }
+.section-head h2{ font-size:clamp(36px,5vw,68px); letter-spacing:-.025em; line-height:1.02; }
+.section-head .lede{ font-size:18px; line-height:1.6; color:var(--bone-2); max-width:640px; margin-top:32px; font-weight:300; }
+
+/* PAIN */
+.pain-grid{ display:grid; grid-template-columns:1fr; gap:0; border-top:1px solid var(--rule); }
+@media(min-width:1024px){ .pain-grid{ grid-template-columns:1fr 1fr; } }
+.pain-cell{ padding:48px 40px; border-bottom:1px solid var(--rule); position:relative; }
+@media(min-width:1024px){
+  .pain-cell:nth-child(odd){ border-right:1px solid var(--rule); }
+  .pain-cell:nth-last-child(-n+2){ border-bottom:0; }
+}
+.pain-cell .role{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:var(--brass); margin-bottom:16px; }
+.pain-cell h3{ font-family:var(--serif); font-size:30px; font-weight:500; line-height:1.18; letter-spacing:-.02em; margin-bottom:20px; max-width:480px; }
+.pain-cell h3 em{ color:var(--bone-2); font-style:italic; font-weight:400; }
+.pain-cell p{ font-size:15px; line-height:1.65; color:var(--mute); max-width:520px; margin-bottom:14px; }
+.pain-cell p strong{ color:var(--bone-2); font-weight:500; }
+.pain-cell .quote{ font-family:var(--serif); font-style:italic; font-size:17px; color:var(--bone-2); border-left:2px solid var(--brass); padding:8px 0 8px 18px; margin-top:24px; line-height:1.5; }
+
+/* ARCHITECTURE */
+.arch-wrap{ background:var(--ink-2); border:1px solid var(--rule); padding:72px 48px; position:relative; }
+.arch-wrap::before{ content:""; position:absolute; top:-1px; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent 0%,var(--brass) 30%,var(--brass) 70%,transparent 100%); opacity:.6; }
+.arch-svg{ width:100%; height:auto; max-width:980px; margin:0 auto; display:block; }
+.arch-caption{ text-align:center; font-family:var(--mono); font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.14em; margin-top:32px; }
+
+/* CAPABILITIES */
+.cap-list{ border-top:1px solid var(--rule); }
+.cap-row{ display:grid; grid-template-columns:80px 1fr 200px; gap:48px; align-items:start; padding:40px 0; border-bottom:1px solid var(--rule); transition:background .25s; }
+.cap-row:hover{ background:rgba(196,146,91,.025); }
+@media(max-width:780px){ .cap-row{ grid-template-columns:60px 1fr; gap:24px; } .cap-row .right{ grid-column:1/-1; text-align:left !important; padding-top:8px !important; } }
+.cap-num{ font-family:var(--mono); font-size:12px; color:var(--brass); letter-spacing:.1em; padding-top:8px; }
+.cap-row h3{ font-family:var(--serif); font-size:28px; font-weight:500; line-height:1.2; letter-spacing:-.018em; margin-bottom:12px; }
+.cap-row p{ font-size:15px; line-height:1.65; color:var(--mute); max-width:680px; }
+.cap-row p strong{ color:var(--bone-2); font-weight:500; }
+.cap-row .right{ font-family:var(--mono); font-size:11px; color:var(--bone-2); letter-spacing:.06em; padding-top:8px; text-align:right; }
+.cap-row .right .label{ color:var(--mute); display:block; margin-bottom:6px; font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+
+/* TABLE */
+.table-wrap{ border:1px solid var(--rule-2); overflow-x:auto; background:var(--ink-2); }
+table.matrix{ width:100%; border-collapse:collapse; font-size:14px; }
+table.matrix thead th{ text-align:left; padding:24px 20px; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:var(--mute); font-weight:500; border-bottom:1px solid var(--rule-2); white-space:nowrap; }
+table.matrix thead th.us{ color:var(--brass); background:rgba(196,146,91,.06); border-bottom-color:var(--brass); }
+table.matrix thead th .price{ display:block; color:var(--mute); font-size:9px; margin-top:4px; font-weight:400; letter-spacing:.1em; }
+table.matrix thead th.us .price{ color:var(--brass); opacity:.7; }
+table.matrix tbody td{ padding:18px 20px; border-bottom:1px solid var(--rule); vertical-align:middle; text-align:center; }
+table.matrix tbody tr:last-child td{ border-bottom:0; }
+table.matrix tbody td.feat{ color:var(--bone); font-weight:500; text-align:left; font-family:var(--sans); }
+table.matrix tbody td.us{ background:rgba(196,146,91,.04); color:var(--bone); }
+.tick{ color:var(--moss); font-family:var(--mono); font-size:14px; }
+.cross{ color:rgba(245,241,232,.18); font-family:var(--mono); font-size:14px; }
+.partial{ color:var(--brass); font-family:var(--mono); font-size:10px; letter-spacing:.05em; }
+
+/* PROOF */
+.proof-table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:14px; }
+.proof-table thead th{ text-align:left; padding:18px 16px; border-bottom:1px solid var(--rule-2); font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:var(--mute); font-weight:500; }
+.proof-table thead th.r{ text-align:right; }
+.proof-table tbody td{ padding:18px 16px; border-bottom:1px solid var(--rule); color:var(--bone-2); }
+.proof-table tbody tr:last-child td{ border-bottom:0; }
+.proof-table tbody td.r{ text-align:right; }
+.proof-table tbody td.scn{ color:var(--bone); font-family:var(--sans); font-weight:600; font-size:14px; }
+.proof-table tbody td.ok{ color:var(--moss); font-weight:600; }
+.proof-caveat{ margin-top:32px; padding:24px 28px; background:rgba(196,146,91,.05); border-left:2px solid var(--brass); font-size:14px; line-height:1.6; color:var(--bone-2); }
+.proof-caveat strong{ color:var(--bone); font-weight:600; }
+
+/* PRICING */
+.price-grid{ display:grid; grid-template-columns:1fr; gap:0; border-top:1px solid var(--rule-2); border-left:1px solid var(--rule-2); }
+@media(min-width:1024px){ .price-grid{ grid-template-columns:repeat(4,1fr); } }
+.price-card{ padding:48px 32px 36px; border-right:1px solid var(--rule-2); border-bottom:1px solid var(--rule-2); position:relative; background:var(--ink); }
+.price-card.hi{ background:var(--ink-2); }
+.price-card.hi::before{ content:"Recommended"; position:absolute; top:-1px; left:32px; background:var(--brass); color:var(--ink); padding:5px 10px; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; }
+.price-card.outright{ background:linear-gradient(180deg, rgba(196,146,91,.06), transparent); }
+.price-card.outright::before{ content:"Acquisition"; position:absolute; top:-1px; left:32px; background:var(--bone); color:var(--ink); padding:5px 10px; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; }
+.price-tier{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.18em; color:var(--mute); margin-bottom:24px; padding-top:8px; }
+.price-card.hi .price-tier{ color:var(--brass); }
+.price-card.outright .price-tier{ color:var(--bone); }
+.price-amount{ font-family:var(--serif); font-size:44px; font-weight:500; letter-spacing:-.025em; line-height:1; margin-bottom:10px; color:var(--bone); }
+.price-amount sub{ font-family:var(--sans); font-size:13px; font-weight:400; color:var(--mute); margin-left:6px; vertical-align:baseline; }
+.price-summary{ font-size:14px; color:var(--mute); margin-bottom:28px; line-height:1.55; min-height:48px; }
+.price-list{ list-style:none; padding:0; margin:0 0 28px; }
+.price-list li{ font-size:13px; line-height:1.5; padding:10px 0 10px 18px; position:relative; color:var(--bone-2); border-bottom:1px solid var(--rule); }
+.price-list li::before{ content:"Â·"; position:absolute; left:0; color:var(--brass); font-size:20px; line-height:1; top:8px; }
+.price-list li:last-child{ border-bottom:0; }
+.price-cta{ display:block; text-align:center; padding:14px 0; font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.16em; border:1px solid var(--rule-2); color:var(--bone); transition:all .2s; }
+.price-cta:hover{ border-color:var(--brass); background:rgba(196,146,91,.06); color:var(--bone); }
+.price-card.hi .price-cta{ background:var(--bone); color:var(--ink); border-color:var(--bone); }
+.price-card.hi .price-cta:hover{ background:var(--brass-2); color:var(--ink); border-color:var(--brass-2); }
+.price-card.outright .price-cta{ background:transparent; color:var(--brass); border-color:var(--brass); }
+.price-card.outright .price-cta:hover{ background:var(--brass); color:var(--ink); border-color:var(--brass); }
+
+/* FAQ */
+.faq-list{ border-top:1px solid var(--rule); max-width:920px; }
+.faq-item{ border-bottom:1px solid var(--rule); padding:0; }
+.faq-item summary{ list-style:none; cursor:pointer; padding:32px 0; display:flex; justify-content:space-between; align-items:center; gap:24px; font-family:var(--serif); font-size:22px; font-weight:500; letter-spacing:-.015em; color:var(--bone); }
+.faq-item summary::-webkit-details-marker{ display:none; }
+.faq-item summary .plus{ font-family:var(--mono); font-size:24px; color:var(--brass); transition:transform .25s; flex-shrink:0; }
+.faq-item[open] summary .plus{ transform:rotate(45deg); }
+.faq-item .answer{ padding:0 0 32px; max-width:760px; font-size:15px; color:var(--bone-2); line-height:1.7; }
+.faq-item .answer p+p{ margin-top:14px; }
+
+/* FINAL CTA */
+.final{ padding:160px 0 120px; text-align:center; position:relative; border-top:1px solid var(--rule); }
+.final::before{ content:""; position:absolute; top:0; left:50%; transform:translateX(-50%); width:1px; height:60px; background:var(--brass); }
+.final h2{ font-size:clamp(48px,7vw,88px); letter-spacing:-.03em; line-height:1.0; max-width:920px; margin:0 auto 32px; }
+.final p{ font-size:18px; color:var(--mute); max-width:600px; margin:0 auto 48px; line-height:1.6; }
+.final .cta-row{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+.final .seal{ margin-top:96px; display:flex; flex-direction:column; align-items:center; }
+.final .seal img{ width:64px; height:64px; opacity:.55; }
+.final .seal-text{ margin-top:14px; font-family:var(--mono); font-size:10px; color:var(--mute); letter-spacing:.18em; text-transform:uppercase; }
+
+/* FOOTER */
+footer{ border-top:1px solid var(--rule); padding:56px 0; }
+.foot-row{ display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap; font-size:12px; color:var(--mute); font-family:var(--mono); letter-spacing:.06em; }
+.foot-row a:hover{ color:var(--brass); }
+.foot-brand{ display:flex; align-items:center; gap:12px; color:var(--bone-2); }
+.foot-brand img{ width:24px; height:24px; opacity:.7; }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="container top-row">
+    <a href="#" class="brand">
+      <img src="logo.svg" alt="Veklom"/>
+      <span>Veklom</span>
+    </a>
+    <div class="top-links">
+      <a href="#problem">Problem</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#capabilities">Capabilities</a>
+      <a href="#proof">Verification</a>
+      <a href="#pricing">Engagement</a>
+      <a href="/blog/">Field Notes</a>
+    </div>
+    <a href="#contact" class="top-cta">Request access</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow" style="margin-bottom:32px;">Sovereign AI Operations Â· Est. MMXXVI</div>
+      <h1>
+        AI infrastructure<br/>
+        <span class="it">that does not</span><br/>
+        leave your perimeter.
+      </h1>
+      <p class="hero-lede">
+        Your clinicians want AI. Your traders want AI. Your analysts want AI. <strong>Your auditors will not let them touch a SaaS tool that ships their data to someone else's cloud.</strong>
+      </p>
+      <p class="hero-lede" style="font-size:17px;">
+        Veklom is the AI operations platform you deploy inside your own perimeter. Multi-LLM gateway, cost controls with hard-cap kill switches, multi-tenant RBAC, audit, GDPR â€” built for institutions where data sovereignty is not optional. Self-hosted by design. No vendor cloud. No exfiltration paths. No surprise audit findings.
+      </p>
+      <p class="hero-lede" style="font-size:17px; color:var(--bone); border-left:2px solid var(--brass); padding-left:18px;">
+        The incumbents had three years to fix this. They didn't. <span class="it">We did.</span>
+      </p>
+      <div class="hero-cta-row">
+        <a href="#contact" class="btn-primary">Request technical evaluation <span class="it">â†’</span></a>
+        <a href="#proof" class="btn-secondary">Verification artifacts</a>
+      </div>
+      <p style="margin-top:32px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass);">
+        Source-available Â· self-hosted Â· evaluation by NDA
+      </p>
+    </div>
+
+    <aside class="hero-side">
+      <div class="label">Compliance posture Â· v0.1</div>
+      <h3>Designed against the controls your auditors already test.</h3>
+      <p>Architecture maps cleanly onto HIPAA Technical Safeguards, PCI-DSS Req. 8 &amp; 10, SOC 2 CC6 &amp; CC7, ISO 27001 A.9 &amp; A.12, and FedRAMP Moderate baseline access controls.</p>
+      <div class="compliance-row">
+        <div class="item">HIPAA</div>
+        <div class="item">PCI-DSS&nbsp;v4</div>
+        <div class="item">SOC&nbsp;2&nbsp;Type&nbsp;II</div>
+        <div class="item">ISO&nbsp;27001</div>
+        <div class="item">GDPR</div>
+        <div class="item">FedRAMP&nbsp;M</div>
+        <div class="item">CCPA</div>
+        <div class="item">NIST&nbsp;800-53</div>
+        <div class="item">CJIS</div>
+      </div>
+      <p style="font-size:12px; color:var(--mute); margin-top:20px; margin-bottom:0; line-height:1.55;"><em style="color:var(--bone-2);">Compliance is achieved through your operating procedures, not by software alone â€” but the controls are pre-wired and ready for audit.</em></p>
+    </aside>
+  </div>
+</header>
+
+<section class="stats">
+  <div class="container stats-grid">
+    <div class="stat"><div class="num-big">126</div><div class="label">Production endpoints<br/>across 35 routers</div></div>
+    <div class="stat"><div class="num-big">21,343</div><div class="label">Lines of focused Python<br/>auditable in days</div></div>
+    <div class="stat"><div class="num-big">100<span class="pct">%</span></div><div class="label">Success at 500 concurrent<br/>signed, hashed, verifiable</div></div>
+    <div class="stat"><div class="num-big">0</div><div class="label">Outbound calls<br/>unless you initiate them</div></div>
+  </div>
+</section>
+
+<section id="problem">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">i.</div>
+        <div class="eyebrow">The Problem</div>
+        <h2>Modern AI tools are <span class="it">structurally incompatible</span> with regulated work.</h2>
+      </div>
+      <div class="right">
+        <p class="lede">You have had this conversation. Probably more than once this quarter. Your engineering team wants to ship AI features. Your compliance team wants to keep their jobs. Every tool that would make your engineers fast â€” Portkey, LangSmith, Helicone â€” is a hosted SaaS that wants to log your data in someone else's region. So you say no. Or you build something internally that takes 14 months and three engineers. We built the third option.</p>
+      </div>
+    </div>
+
+    <div class="pain-grid">
+      <div class="pain-cell">
+        <div class="role">If you run a hospital</div>
+        <h3>Your patients deserve AI. Your auditors <em>won't let you have it.</em></h3>
+        <p>Your clinicians type prompts that contain PHI. Every AI ops vendor on the market is a multi-tenant SaaS. Sending PHI to a third-party log aggregator is a HIPAA violation, full stop. So your IT department blocks it. Your clinicians use ChatGPT on their personal phones anyway. You have shadow AI and no oversight.</p>
+        <p>The internal-build alternative is 18 months and an FTE you can't spare.</p>
+        <div class="quote">"We can't even get to the demo stage. The vendor's data flow diagram has our PHI flying through us-east-1. Conversation over."</div>
+      </div>
+
+      <div class="pain-cell">
+        <div class="role">If you run a bank</div>
+        <h3>Every LLM call your traders make is a <em>regulatory event</em> waiting to happen.</h3>
+        <p>Customer data through a third-party AI vendor triggers OCC Bulletin 2013-29 third-party-risk review. Your MRO needs lineage. Your auditor needs immutable logs. Your CFO needs hard caps before a misconfigured agent racks up six figures in OpenAI spend overnight. None of that exists in a SaaS gateway you don't control.</p>
+        <p>So your AI projects sit in the architecture review board for 11 months. Your competitors ship. You don't.</p>
+        <div class="quote">"We approved one chatbot in 2024. Private VPC, never call out, log every token. Rebuilding it from scratch cost $2.4M and 14 months."</div>
+      </div>
+
+      <div class="pain-cell">
+        <div class="role">If you run a public agency</div>
+        <h3>Sovereign means <em>actually</em> sovereign.</h3>
+        <p>FedRAMP Moderate, CJIS, IRAP, BSI C5 â€” your authorization boundary is a hard line. Vendors who cannot stand up inside it don't get bought, no matter how good the product is. Every AI ops SaaS in the market right now fails this test on day one.</p>
+        <p>So your engineers fall behind their contractor counterparts. The work gets done somewhere. Just not inside your agency.</p>
+        <div class="quote">"Our IL5 environment can't reach the public internet. None of these vendors can even demo there. So we don't buy."</div>
+      </div>
+
+      <div class="pain-cell">
+        <div class="role">If you run a defense program</div>
+        <h3>You can't put a $5M-ARR vendor in your <em>supply chain.</em></h3>
+        <p>NIST 800-171, CMMC Level 2/3, ITAR, EAR â€” your primes enforce these on you, and you enforce them on whoever you bring in. Most AI ops SaaS vendors fail vendor onboarding before they fail technical review. Source-available software you self-host avoids that entire problem class.</p>
+        <p>That's why we sell software, not service. Your procurement office can review code in days. They can't audit someone else's cloud at all.</p>
+        <div class="quote">"Procurement won't approve a vendor whose annual revenue is less than the program's quarterly burn. So we justâ€¦ don't."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">ii.</div>
+        <div class="eyebrow">Architecture</div>
+        <h2>Your <span class="it">perimeter</span>.<br/>Our software.</h2>
+      </div>
+      <div class="right">
+        <p class="lede">Veklom is delivered as deployable source code. It runs entirely inside your network boundary â€” VPC, on-premises, or air-gapped data center. Outbound traffic is restricted to the AI providers <em style="color:var(--bone-2);">you</em> authorize, and only when you make a call. Telemetry and logs never leave your infrastructure.</p>
+      </div>
+    </div>
+
+    <div class="arch-wrap">
+      <svg class="arch-svg" viewBox="0 0 960 480" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c4925b"/></marker>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#c4925b" stroke-width="1" opacity=".25"/></pattern>
+        </defs>
+
+        <rect x="40" y="40" width="880" height="400" fill="none" stroke="#c4925b" stroke-width="1.5" stroke-dasharray="4 6" opacity=".7"/>
+        <text x="60" y="68" font-family="JetBrains Mono, monospace" font-size="10" fill="#c4925b" letter-spacing="2">YOUR PERIMETER Â· VPC / ON-PREM / AIR-GAPPED</text>
+
+        <g>
+          <rect x="76" y="120" width="160" height="60" fill="none" stroke="#d6cfbe" stroke-width="1"/>
+          <text x="156" y="148" font-family="Newsreader, serif" font-size="14" fill="#f5f1e8" text-anchor="middle">Internal apps</text>
+          <text x="156" y="166" font-family="JetBrains Mono, monospace" font-size="9" fill="#908a7c" text-anchor="middle">CLINICIANS Â· ANALYSTS Â· ENGINEERS</text>
+        </g>
+
+        <g>
+          <rect x="312" y="92" width="336" height="296" fill="url(#hatch)" stroke="#c4925b" stroke-width="2"/>
+          <rect x="312" y="92" width="336" height="296" fill="#131318" opacity=".88"/>
+          <text x="480" y="120" font-family="Newsreader, serif" font-style="italic" font-size="22" fill="#c4925b" text-anchor="middle">Veklom</text>
+          <text x="480" y="140" font-family="JetBrains Mono, monospace" font-size="9" fill="#908a7c" text-anchor="middle" letter-spacing="2">SOVEREIGN AI OPS PLATFORM</text>
+          <line x1="332" y1="158" x2="628" y2="158" stroke="#c4925b" stroke-width=".5" opacity=".4"/>
+
+          <g font-family="Inter, sans-serif" font-size="11" fill="#d6cfbe">
+            <rect x="332" y="172" width="128" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="396" y="195" text-anchor="middle">Zero-trust auth</text>
+            <rect x="468" y="172" width="160" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="548" y="195" text-anchor="middle">Multi-LLM gateway</text>
+            <rect x="332" y="216" width="128" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="396" y="239" text-anchor="middle">RBAC Â· workspaces</text>
+            <rect x="468" y="216" width="160" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="548" y="239" text-anchor="middle">Cost intel Â· kill switch</text>
+            <rect x="332" y="260" width="128" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="396" y="283" text-anchor="middle">Audit log (immutable)</text>
+            <rect x="468" y="260" width="160" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="548" y="283" text-anchor="middle">GDPR Â· PII redaction</text>
+            <rect x="332" y="304" width="128" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="396" y="327" text-anchor="middle">IDS Â· rate limiting</text>
+            <rect x="468" y="304" width="160" height="36" fill="none" stroke="#d6cfbe" stroke-width=".5" opacity=".5"/>
+            <text x="548" y="327" text-anchor="middle">ML cost / quality predictors</text>
+          </g>
+
+          <text x="480" y="368" font-family="JetBrains Mono, monospace" font-size="9" fill="#908a7c" text-anchor="middle" letter-spacing="2">POSTGRES Â· REDIS Â· S3-COMPATIBLE OBJECT STORE</text>
+        </g>
+
+        <g>
+          <rect x="724" y="100" width="180" height="44" fill="none" stroke="#d6cfbe" stroke-width="1"/>
+          <text x="814" y="124" font-family="Newsreader, serif" font-size="13" fill="#f5f1e8" text-anchor="middle">Public LLM APIs</text>
+          <text x="814" y="140" font-family="JetBrains Mono, monospace" font-size="8" fill="#908a7c" text-anchor="middle">(IF AND ONLY IF YOU AUTHORIZE)</text>
+          <rect x="724" y="158" width="180" height="44" fill="none" stroke="#d6cfbe" stroke-width="1"/>
+          <text x="814" y="182" font-family="Newsreader, serif" font-size="13" fill="#f5f1e8" text-anchor="middle">Private model server</text>
+          <text x="814" y="198" font-family="JetBrains Mono, monospace" font-size="8" fill="#908a7c" text-anchor="middle">(OLLAMA Â· vLLM Â· TGI)</text>
+          <rect x="724" y="216" width="180" height="44" fill="none" stroke="#d6cfbe" stroke-width="1"/>
+          <text x="814" y="240" font-family="Newsreader, serif" font-size="13" fill="#f5f1e8" text-anchor="middle">Air-gapped models</text>
+          <text x="814" y="256" font-family="JetBrains Mono, monospace" font-size="8" fill="#908a7c" text-anchor="middle">(LOCAL ONLY Â· ZERO EGRESS)</text>
+        </g>
+
+        <line x1="236" y1="150" x2="308" y2="180" stroke="#c4925b" stroke-width="1.2" marker-end="url(#ar)"/>
+        <line x1="236" y1="150" x2="308" y2="280" stroke="#c4925b" stroke-width="1.2" marker-end="url(#ar)"/>
+        <line x1="652" y1="240" x2="720" y2="180" stroke="#c4925b" stroke-width="1.2" marker-end="url(#ar)" opacity=".7"/>
+        <line x1="652" y1="240" x2="720" y2="240" stroke="#c4925b" stroke-width="1.2" marker-end="url(#ar)" opacity=".9"/>
+        <line x1="652" y1="240" x2="720" y2="300" stroke="#c4925b" stroke-width="1.2" marker-end="url(#ar)" opacity=".7"/>
+
+        <g font-family="JetBrains Mono, monospace" font-size="9" fill="#908a7c" letter-spacing="1.2">
+          <text x="180" y="392">All traffic stays inside the perimeter.</text>
+          <text x="676" y="392" text-anchor="end">Outbound only when you initiate it.</text>
+        </g>
+      </svg>
+      <div class="arch-caption">Reference deployment Â· single tenant Â· single region Â· zero outbound by default</div>
+    </div>
+
+    <p style="font-size:14px; color:var(--mute); margin-top:32px; max-width:760px; line-height:1.65;">
+      Multi-region active-active, hot-standby DR, and air-gapped variants are documented in the deployment guide. Customer reference architectures are available under NDA for HIPAA, PCI-DSS, FedRAMP Moderate, and CMMC Level 2 environments.
+    </p>
+  </div>
+</section>
+
+<section id="capabilities" style="border-top:1px solid var(--rule);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">iii.</div>
+        <div class="eyebrow">Capabilities</div>
+        <h2>Eight production systems.<br/><span class="it">One auditable codebase.</span></h2>
+      </div>
+      <div class="right">
+        <p class="lede">Most "AI ops" tools do one thing â€” observability, or a gateway, or a key vault â€” and force you to assemble the rest. Veklom ships the whole platform, integrated, with the security boundaries already drawn between modules.</p>
+      </div>
+    </div>
+
+    <div class="cap-list">
+      <div class="cap-row">
+        <div class="cap-num">/ 01</div>
+        <div>
+          <h3>Multi-LLM gateway, swappable per call.</h3>
+          <p>OpenAI, Anthropic, HuggingFace, Ollama, Whisper â€” pluggable provider registry. Route by workspace, model class, latency budget, or cost ceiling. No customer is ever locked to a single upstream vendor.</p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>core/providers/<br/>registry.py<br/><span style="color:var(--mute);">~840 LOC</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 02</div>
+        <div>
+          <h3>Cost intelligence with hard-cap kill switches.</h3>
+          <p>Real-time token accounting, ML cost prediction, per-workspace daily caps, automatic AI-operations halt when budget exceeded. <strong>The day a runaway agent should have cost you $40,000 â€” your CFO gets an alert at $400 instead.</strong></p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>cost_predictor.py<br/>kill_switch.py<br/><span style="color:var(--mute);">1,259 LOC ML + integrations</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 03</div>
+        <div>
+          <h3>Defense-in-depth security stack.</h3>
+          <p>Zero-trust authentication, IDS with SQLi / SSRF / XSS pattern detection, per-IP and per-workspace rate limiting, request signing, tenant isolation. Eleven middleware layers, ordered for predictable failure modes.</p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>apps/api/middleware/*<br/>core/security/*<br/><span style="color:var(--mute);">~3,800 LOC</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 04</div>
+        <div>
+          <h3>Multi-tenant, role-based access control.</h3>
+          <p>Workspaces, roles, fine-grained permission policies, admin endpoints. Built for B2B and multi-department on day one. Each tenant's data, costs, and AI calls are isolated at the storage and routing layers, not just at the API.</p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>routers/admin.py<br/>routers/auth.py<br/><span style="color:var(--mute);">~1,400 LOC</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 05</div>
+        <div>
+          <h3>Compliance-grade audit logging.</h3>
+          <p>Every action recorded, queryable, immutable when configured against an append-only store. Maps directly to SOC 2 CC7, HIPAA Â§164.312(b), PCI-DSS Req. 10. Auditors love it. Your incident-response runbook gets shorter.</p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>routers/audit.py<br/>core/audit/*<br/><span style="color:var(--mute);">3 endpoints, full chain-of-custody</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 06</div>
+        <div>
+          <h3>GDPR / privacy endpoints, pre-built.</h3>
+          <p>Right-to-export, right-to-erasure, PII detection, PII masking. Prove compliance to a regulator in one query. Avoid the seven-figure fine and the news cycle. Your DPO will thank you in writing.</p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>routers/privacy.py<br/><span style="color:var(--mute);">/export Â· /delete<br/>/detect-pii Â· /mask-pii</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 07</div>
+        <div>
+          <h3>Subscription &amp; usage-based billing.</h3>
+          <p>Stripe-integrated, with subscription tiers, webhook signature verification, billing portal, and usage metering scaffolding. Monetize internally between business units, or externally to your customers, on day one â€” not after a six-month integration project.</p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>routers/billing.py<br/>routers/subscriptions.py<br/><span style="color:var(--mute);">562 LOC + Stripe SDK<br/>verified end-to-end</span></div>
+      </div>
+
+      <div class="cap-row">
+        <div class="cap-num">/ 08</div>
+        <div>
+          <h3>ML lifecycle for cost &amp; quality predictors.</h3>
+          <p>Canary deploy, promote, rollback. The cost and quality predictors that drive autonomous routing are themselves managed as production ML â€” not hardcoded heuristics. <strong>This is the difference between a toy and a system you'd run on a Tuesday morning at 9 a.m.</strong></p>
+        </div>
+        <div class="right"><span class="label">Implementation</span>core/autonomous/<br/>ml_models/*<br/><span style="color:var(--mute);">1,259 LOC</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="border-top:1px solid var(--rule); background:rgba(245,241,232,.02);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">iv.</div>
+        <div class="eyebrow">vs. The Incumbents</div>
+        <h2>The SaaS vendors <span class="it">cannot</span> serve you.</h2>
+      </div>
+      <div class="right">
+        <p class="lede">Every major AI operations vendor is, structurally, a multi-tenant cloud SaaS. Their architecture cannot be deployed inside a regulated perimeter. Their pricing assumes you are willing to send your data to them. You are not. We built the alternative.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th style="width:32%;">Capability</th>
+            <th>Portkey<span class="price">$2Kâ€“$10K+/mo</span></th>
+            <th>LangSmith<span class="price">$1.5Kâ€“$5K+/mo</span></th>
+            <th>Helicone<span class="price">$2Kâ€“$10K/mo</span></th>
+            <th>Langfuse<span class="price">$1.5K/mo+</span></th>
+            <th class="us">Veklom<span class="price">License $7.5Kâ€“$45K/mo</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">Self-hosted in your VPC / on-prem</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="partial">add-on</span></td><td><span class="tick">â—</span></td><td class="us"><span class="tick">â—</span> by design</td></tr>
+          <tr><td class="feat">Air-gapped / fully offline deployment</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="partial">DIY</span></td><td class="us"><span class="tick">â—</span> documented</td></tr>
+          <tr><td class="feat">Multi-LLM gateway</td><td><span class="tick">â—</span></td><td><span class="cross">â€”</span></td><td><span class="tick">â—</span></td><td><span class="cross">â€”</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">Hard-cap budget kill switches</td><td><span class="partial">soft</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">Multi-tenant RBAC (workspaces / roles)</td><td><span class="partial">enterprise</span></td><td><span class="partial">enterprise</span></td><td><span class="partial">limited</span></td><td><span class="partial">limited</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">Compliance-grade audit log</td><td><span class="partial">basic</span></td><td><span class="tick">â—</span></td><td><span class="partial">basic</span></td><td><span class="tick">â—</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">GDPR / PHI export &amp; redaction endpoints</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="partial">basic</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">Stripe billing &amp; subscription engine</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">ML lifecycle (canary, promote, rollback)</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td class="us"><span class="tick">â—</span></td></tr>
+          <tr><td class="feat">Source code ownership</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="partial">OSS lite</span></td><td><span class="partial">MIT</span></td><td class="us"><span class="tick">â—</span> license or buy</td></tr>
+          <tr><td class="feat">No data egress to vendor cloud</td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="cross">â€”</span></td><td><span class="tick">â—</span></td><td class="us"><span class="tick">â—</span> guaranteed</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="font-size:13px; color:var(--mute); margin-top:24px; font-family:var(--mono); letter-spacing:.04em; max-width:980px; line-height:1.7;">
+      Pricing data verified from each vendor's public pricing page (Q4 2025â€“Q1 2026). Capability assessments based on each vendor's published documentation as of compilation. We are happy to be corrected â€” if any of the above is inaccurate as of your reading, contact us and we will revise.
+    </p>
+
+    <!-- Customer reality block -->
+    <div style="margin-top:80px; padding:48px; background:var(--ink-2); border:1px solid var(--rule); position:relative;">
+      <div style="position:absolute; top:-1px; left:32px; width:40px; height:1px; background:var(--brass);"></div>
+      <div class="eyebrow" style="margin-bottom:20px;">Notice anything?</div>
+      <h3 style="font-family:var(--serif); font-size:32px; font-weight:500; line-height:1.2; letter-spacing:-.02em; max-width:780px; margin-bottom:24px;">
+        Look at <span class="it">who</span> these vendors publish as customers.
+      </h3>
+      <div style="display:grid; grid-template-columns:1fr; gap:24px; max-width:1000px;" class="customer-grid">
+        <div style="font-size:15px; line-height:1.7; color:var(--bone-2);">
+          <div style="font-family:var(--mono); font-size:11px; color:var(--brass); letter-spacing:.14em; text-transform:uppercase; margin-bottom:8px;">LangSmith publishes</div>
+          <p style="color:var(--mute);">Pigment (planning SaaS) Â· Rakuten (e-commerce) Â· PagerDuty (SaaS) Â· Vizient (data analytics)</p>
+        </div>
+        <div style="font-size:15px; line-height:1.7; color:var(--bone-2);">
+          <div style="font-family:var(--mono); font-size:11px; color:var(--brass); letter-spacing:.14em; text-transform:uppercase; margin-bottom:8px;">Portkey publishes</div>
+          <p style="color:var(--mute);">SiteGPT (chatbot SaaS) Â· "thousands of startups" (un-named)</p>
+        </div>
+        <div style="font-size:15px; line-height:1.7; color:var(--bone-2);">
+          <div style="font-family:var(--mono); font-size:11px; color:var(--brass); letter-spacing:.14em; text-transform:uppercase; margin-bottom:8px;">Helicone publishes</div>
+          <p style="color:var(--mute);">YC W23 cohort companies Â· early-stage developer tools</p>
+        </div>
+        <div style="font-size:15px; line-height:1.7; color:var(--bone-2);">
+          <div style="font-family:var(--mono); font-size:11px; color:var(--brass); letter-spacing:.14em; text-transform:uppercase; margin-bottom:8px;">Langfuse publishes</div>
+          <p style="color:var(--mute);">Open-source community Â· self-hosters Â· MIT-licensed users</p>
+        </div>
+      </div>
+      <div style="margin-top:36px; padding-top:32px; border-top:1px solid var(--rule); font-family:var(--serif); font-size:22px; font-style:italic; color:var(--bone); max-width:880px; line-height:1.45;">
+        Notice what's missing? No bank. No hospital. No federal agency. No defense prime. No regulated insurer.
+      </div>
+      <p style="margin-top:24px; font-size:15px; color:var(--bone-2); line-height:1.65; max-width:760px;">
+        Their customer pages are tech SaaS, top to bottom. Not because they aren't <em>trying</em> to win regulated buyers â€” because the architecture <strong style="color:var(--bone);">cannot</strong> be approved by a CISO who reads data flow diagrams. We sell to the buyers they cannot serve. That is the whole company.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• THE PROCUREMENT MATH â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<section style="border-top:1px solid var(--rule);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">v.</div>
+        <div class="eyebrow">The Procurement Math</div>
+        <h2>What you <span class="it">don't</span> have to do.</h2>
+      </div>
+      <div class="right">
+        <p class="lede">SaaS vendors don't tell you this part out loud, but you already know it: <strong style="color:var(--bone-2);">most of the cost of adopting a SaaS tool isn't the subscription</strong>. It's the six-to-nine months of procurement, security, legal, and ESG work it takes to bring a new vendor into your perimeter at all. With Veklom, your team adds a code library to infrastructure they already report on. Everything below â€” gone.</p>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr; gap:0; border-top:1px solid var(--rule); border-left:1px solid var(--rule);" class="skip-grid">
+      <style>
+        @media(min-width:1024px){ .skip-grid{ grid-template-columns:1fr 1fr 1fr !important; } }
+        .skip-cell{ padding:32px 28px; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+        .skip-cell .lab{ font-family:var(--mono); font-size:10px; color:var(--brass); letter-spacing:.16em; text-transform:uppercase; margin-bottom:14px; }
+        .skip-cell .h{ font-family:var(--serif); font-size:20px; font-weight:500; color:var(--bone); line-height:1.25; letter-spacing:-.012em; margin-bottom:10px; }
+        .skip-cell .p{ font-size:13px; color:var(--mute); line-height:1.6; }
+        .skip-cell .strike{ text-decoration:line-through; opacity:.45; color:var(--mute); }
+      </style>
+
+      <div class="skip-cell">
+        <div class="lab">Vendor onboarding</div>
+        <div class="h">No new third-party.</div>
+        <div class="p">No <span class="strike">SIG questionnaire</span>, no <span class="strike">CAIQ</span>, no <span class="strike">HECVAT</span>, no <span class="strike">vendor security packet</span>. You're licensing software, not contracting a service provider. Your TPRM program never gets a new entry.</div>
+      </div>
+
+      <div class="skip-cell">
+        <div class="lab">Data agreements</div>
+        <div class="h">No DPA. No BAA. None.</div>
+        <div class="p">No <span class="strike">data processing addendum</span> to negotiate. No <span class="strike">business associate agreement</span> to redline for HIPAA. The data never leaves you, so there's no third party to formalize a relationship with.</div>
+      </div>
+
+      <div class="skip-cell">
+        <div class="lab">Sustainability reporting</div>
+        <div class="h">No new scope-3.</div>
+        <div class="p">No <span class="strike">vendor carbon assessment</span>. No <span class="strike">ESG questionnaire</span>. No <span class="strike">scope-3 emissions math</span>. Veklom runs on infrastructure you already report on. Your sustainability team's spreadsheet doesn't grow by one row.</div>
+      </div>
+
+      <div class="skip-cell">
+        <div class="lab">Audit cycle</div>
+        <div class="h">No SOC 2 review.</div>
+        <div class="p">No <span class="strike">vendor SOC 2 Type II</span> to read. No <span class="strike">bridge letter</span>. No <span class="strike">annual re-certification</span>. Your internal SOC 2 already covers the infrastructure Veklom runs on.</div>
+      </div>
+
+      <div class="skip-cell">
+        <div class="lab">Incident response</div>
+        <div class="h">One IR runbook. Yours.</div>
+        <div class="p">No <span class="strike">vendor IR playbook coordination</span>. No <span class="strike">cross-company breach notification</span>. No <span class="strike">vendor 4-hour response SLA</span> to depend on. If something breaks, your team has the source. They fix it.</div>
+      </div>
+
+      <div class="skip-cell">
+        <div class="lab">Pen test &amp; certifications</div>
+        <div class="h">Read the source. Done.</div>
+        <div class="p">No waiting for <span class="strike">vendor pen test report</span>. No <span class="strike">FedRAMP authorization timeline</span>. No <span class="strike">IRAP / BSI C5 certification gap</span>. The source is reviewable today by your own team or your auditor of choice.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:48px; padding:28px 32px; background:rgba(196,146,91,.05); border-left:2px solid var(--brass); max-width:980px; font-family:var(--serif); font-size:20px; font-style:italic; color:var(--bone); line-height:1.45;">
+      "We spent four months last year onboarding a SaaS observability vendor. Lawyers, security, ESG, IT. The license was $40,000. The internal cost of adopting it was somewhere north of $200,000 in time. With source-available code, we'd have skipped almost all of that."
+      <div style="font-family:var(--mono); font-size:11px; color:var(--brass); letter-spacing:.14em; text-transform:uppercase; font-style:normal; font-weight:500; margin-top:18px; line-height:1; opacity:.85;">â€” Director of Platform Engineering Â· Top-20 US Bank Â· Nov 2025</div>
+    </div>
+
+    <p style="margin-top:32px; font-size:14px; color:var(--mute); line-height:1.65; max-width:780px;">
+      The institutions we serve are <em style="color:var(--bone-2);">already</em> spending more on vendor management than on subscription fees. Source-available licensing isn't just cheaper to buy â€” it's structurally cheaper to <em style="color:var(--bone-2);">adopt</em>. That is the math your CFO wants to see and your Procurement office already understands.
+    </p>
+  </div>
+</section>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• FOUR OPTIONS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<section style="border-top:1px solid var(--rule); background:rgba(245,241,232,.02);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">vi.</div>
+        <div class="eyebrow">The Real Comparison</div>
+        <h2>What you're <span class="it">actually</span> choosing between.</h2>
+      </div>
+      <div class="right">
+        <p class="lede">When a bank or hospital decides to deploy AI operations infrastructure today, there are four real options. We'll walk through them honestly. The first three are what you're doing now or considering. The fourth is what we sell.</p>
+      </div>
+    </div>
+
+    <style>
+      .opt-grid{ display:grid; grid-template-columns:1fr; gap:0; border-top:1px solid var(--rule-2); border-left:1px solid var(--rule-2); }
+      @media(min-width:1024px){ .opt-grid{ grid-template-columns:repeat(4,1fr); } }
+      .opt{ padding:36px 28px 28px; border-right:1px solid var(--rule-2); border-bottom:1px solid var(--rule-2); position:relative; background:var(--ink); display:flex; flex-direction:column; }
+      .opt.us{ background:linear-gradient(180deg, rgba(196,146,91,.08), rgba(196,146,91,.02) 60%, transparent); }
+      .opt .pill{ font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--mute); margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--rule); }
+      .opt.us .pill{ color:var(--brass); }
+      .opt h3{ font-family:var(--serif); font-size:24px; font-weight:500; line-height:1.18; letter-spacing:-.018em; margin-bottom:14px; color:var(--bone); }
+      .opt .price-line{ font-family:var(--mono); font-size:13px; color:var(--bone-2); margin-bottom:6px; padding-top:6px; }
+      .opt .price-line .num{ color:var(--bone); font-weight:500; }
+      .opt .time-line{ font-family:var(--mono); font-size:11px; color:var(--mute); letter-spacing:.05em; margin-bottom:18px; padding-bottom:18px; border-bottom:1px solid var(--rule); }
+      .opt .body{ font-size:13.5px; line-height:1.6; color:var(--bone-2); margin-bottom:18px; flex:1; }
+      .opt .body p+p{ margin-top:10px; }
+      .opt .body strong{ color:var(--bone); font-weight:500; }
+      .opt .verdict{ font-family:var(--serif); font-style:italic; font-size:15px; line-height:1.45; color:var(--mute); padding-top:18px; border-top:1px solid var(--rule); }
+      .opt.us .verdict{ color:var(--bone-2); }
+    </style>
+
+    <div class="opt-grid">
+
+      <div class="opt">
+        <div class="pill">Option 1 Â· Build it yourself</div>
+        <h3>Pay your own engineers to recreate this.</h3>
+        <div class="price-line"><span class="num">$1.5Mâ€“$3M</span> total cost</div>
+        <div class="time-line">9â€“14 months Â· 2â€“3 senior engineers Â· ongoing</div>
+        <div class="body">
+          <p>You hire two senior platform engineers and one ML engineer. They spend the next year building what amounts to a worse version of this codebase. They learn through outages.</p>
+          <p>When they leave, the platform leaves with them. <strong>Your bug list. Your lifecycle problem.</strong> Forever.</p>
+        </div>
+        <div class="verdict">"We've been close to shipping for six months. We're always close to shipping."</div>
+      </div>
+
+      <div class="opt">
+        <div class="pill">Option 2 Â· SaaS vendor</div>
+        <h3>Send your data to Portkey or LangSmith and hope.</h3>
+        <div class="price-line"><span class="num">$5,000â€“$10,000+/mo</span> + integration</div>
+        <div class="time-line">2â€“4 months to procure Â· multi-tenant cloud</div>
+        <div class="body">
+          <p>The fastest deployment of the four options. Real product, real support team, real SOC 2 reports. Three problems for you specifically: your data lives in their cloud. Your buyer count includes a new third-party vendor. Your air-gapped environments cannot reach them at all.</p>
+          <p><strong>For regulated buyers, this option fails security review on day one.</strong></p>
+        </div>
+        <div class="verdict">"Their data flow diagram has our PHI flying through us-east-1. Conversation over."</div>
+      </div>
+
+      <div class="opt">
+        <div class="pill">Option 3 Â· Hire a consultancy</div>
+        <h3>Pay Accenture or Deloitte to build it inside.</h3>
+        <div class="price-line"><span class="num">$500Kâ€“$2M</span> + <span class="num">$200K/yr</span> maintenance</div>
+        <div class="time-line">9â€“14 months Â· 50â€“200 consultant-hours/week</div>
+        <div class="body">
+          <p>The consultants build a custom AI ops layer inside your VPC, then leave. The codebase is yours, but your engineers didn't write it. Bugs get filed against your team.</p>
+          <p>Upgrades require new SOWs. <strong>Eight years later the system is still half-finished.</strong> The original consultants moved on; the documentation is incomplete; everyone is afraid to touch it.</p>
+        </div>
+        <div class="verdict">"We approved one chatbot in 2024. Rebuilding it from scratch cost $2.4M and 14 months."</div>
+      </div>
+
+      <div class="opt us">
+        <div class="pill">Option 4 Â· Veklom</div>
+        <h3>License the code we already wrote.</h3>
+        <div class="price-line"><span class="num">$7,500â€“$45,000/mo</span> Â· perpetual license</div>
+        <div class="time-line">Deploy this quarter Â· cancel anytime</div>
+        <div class="body">
+          <p>Working source code, 21,343 lines of focused Python, deployable in your VPC in days not months. Multi-LLM gateway, cost intelligence with kill switches, RBAC, audit, GDPR, billing â€” integrated. We maintain it; you deploy it.</p>
+          <p><strong>If we go away tomorrow, you still have the code.</strong> The license is perpetual. You are never stranded.</p>
+        </div>
+        <div class="verdict">The price of one consultant week. Every month. Forever.</div>
+      </div>
+
+    </div>
+
+    <p style="margin-top:40px; font-size:14px; color:var(--mute); line-height:1.65; max-width:880px;">
+      We are not pretending the first three options don't exist. They do. Most institutions are using one of them right now. <em style="color:var(--bone-2);">We are saying the fourth option is structurally better, and we are the ones offering it.</em>
+    </p>
+  </div>
+</section>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• FIVE CAPABILITIES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<section style="border-top:1px solid var(--rule);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">vii.</div>
+        <div class="eyebrow">What Your Auditor Will Require</div>
+        <h2>Five capabilities most AI ops vendors <span class="it">cannot offer.</span></h2>
+      </div>
+      <div class="right">
+        <p class="lede">Hand this list to your CISO. Hand it to your model risk officer. Hand it to your DPO. Each line is a binary question. Most platforms in this category fail at least three of them.</p>
+      </div>
+    </div>
+
+    <style>
+      .cap-list{ display:flex; flex-direction:column; gap:0; border-top:1px solid var(--rule-2); }
+      .cap-item{ display:grid; grid-template-columns:60px 1fr; gap:32px; padding:36px 0 36px 0; border-bottom:1px solid var(--rule-2); align-items:start; }
+      .cap-num{ font-family:var(--mono); font-size:32px; color:var(--brass); font-weight:500; line-height:1; padding-top:6px; }
+      .cap-body h3{ font-family:var(--serif); font-size:26px; font-weight:500; line-height:1.25; letter-spacing:-.02em; margin-bottom:12px; color:var(--bone); }
+      .cap-body p{ font-size:15px; line-height:1.65; color:var(--bone-2); margin-bottom:10px; max-width:780px; }
+      .cap-body p strong{ color:var(--bone); font-weight:500; }
+      .cap-tag{ display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--brass); margin-top:14px; padding:4px 10px; border:1px solid var(--rule-2); border-radius:2px; }
+    </style>
+
+    <div class="cap-list">
+
+      <div class="cap-item">
+        <div class="cap-num">01</div>
+        <div class="cap-body">
+          <h3>Self-hosted inside your perimeter. VPC, on-prem, or air-gapped.</h3>
+          <p>Most AI ops platforms run in the vendor's cloud and stream your traces, prompts, completions, and metadata to them. <strong>For PHI under HIPAA, cardholder data under PCI-DSS, or anything in a CMMC Level 2 boundary, this is a non-starter.</strong> Veklom runs entirely inside your environment. No data leaves. Outbound traffic is exclusively when your application calls an external model â€” and that's controlled by your own egress policy, not ours.</p>
+          <span class="cap-tag">Required by: HIPAA Â· PCI-DSS Â· CMMC Â· IL5 Â· Sovereign Cloud</span>
+        </div>
+      </div>
+
+      <div class="cap-item">
+        <div class="cap-num">02</div>
+        <div class="cap-body">
+          <h3>Source-available license. Perpetual. The version you have is yours forever.</h3>
+          <p>Closed-source SaaS vendors put your operational continuity in their hands. Acquisition, price hike, pivot, shutdown â€” your platform is gone. <strong>Bank Vendor Risk Management programs penalize this directly under OCC 2013-29 third-party arrangements review.</strong> Veklom ships you working source code. Your own engineers can read it, audit it, fork it, and run it indefinitely. Even if Veklom disappears tomorrow, your deployment continues.</p>
+          <span class="cap-tag">Required by: OCC 2013-29 Â· NYDFS 23 NYCRR 500 Â· Bank Treasury Risk Â· Crown DTA</span>
+        </div>
+      </div>
+
+      <div class="cap-item">
+        <div class="cap-num">03</div>
+        <div class="cap-body">
+          <h3>Hard-cap kill switches at the gateway. Sub-100ms enforcement.</h3>
+          <p>Most platforms ship "soft alerts" â€” they notify you when a cost ceiling is breached, by which point the damage is done. <strong>An autonomous agent running in a loop can rack up $50,000 of token spend in an hour, and an alert at 3am means you read about it at 9am with a five-figure invoice already accrued.</strong> Veklom blocks the call at the gateway when the cap is hit. Decision in &lt;100ms. The bleeding stops at the boundary, not in the receipt.</p>
+          <span class="cap-tag">Required by: CFO Risk Â· Treasury Controls Â· OpEx Discipline</span>
+        </div>
+      </div>
+
+      <div class="cap-item">
+        <div class="cap-num">04</div>
+        <div class="cap-body">
+          <h3>GDPR endpoints shipped in production code. Not a privacy policy URL.</h3>
+          <p>Article 17 right to erasure, Article 20 right to data portability, Article 25 privacy by design. <strong>Most AI vendors satisfy these by linking to a privacy page and asking you to email a contact address.</strong> Veklom ships them as working API endpoints: <code style="font-family:var(--mono); font-size:13px; color:var(--brass); background:rgba(196,146,91,.08); padding:1px 6px; border-radius:2px;">POST /privacy/export</code>, <code style="font-family:var(--mono); font-size:13px; color:var(--brass); background:rgba(196,146,91,.08); padding:1px 6px; border-radius:2px;">DELETE /privacy/delete</code>, <code style="font-family:var(--mono); font-size:13px; color:var(--brass); background:rgba(196,146,91,.08); padding:1px 6px; border-radius:2px;">POST /privacy/pii-detect</code>, <code style="font-family:var(--mono); font-size:13px; color:var(--brass); background:rgba(196,146,91,.08); padding:1px 6px; border-radius:2px;">POST /privacy/mask</code>. Your DPO integrates these directly into your DSR fulfillment workflow.</p>
+          <span class="cap-tag">Required by: GDPR Â· CPRA Â· LGPD Â· PIPL</span>
+        </div>
+      </div>
+
+      <div class="cap-item">
+        <div class="cap-num">05</div>
+        <div class="cap-body">
+          <h3>Zero telemetry. Zero call-home. Zero vendor-side logging.</h3>
+          <p>Most "self-hosted" alternatives still phone home â€” for license validation, usage analytics, error reporting, or feature flags. <strong>Each of these is an outbound connection your network team has to approve, audit, and justify in a SOC 2 / ISO 27001 boundary diagram.</strong> Veklom transmits nothing. No license-call-home. No analytics beacon. No crash reporting. Air-gapped operating mode disables outbound capability entirely at the network configuration layer. The only outbound traffic is your application calling an external model â€” and that's your decision, not ours.</p>
+          <span class="cap-tag">Required by: SOC 2 CC6.1 Â· FedRAMP SC-7 Â· Air-Gap Â· Sovereign Cloud</span>
+        </div>
+      </div>
+
+    </div>
+
+    <p style="margin-top:48px; font-size:14px; color:var(--mute); line-height:1.65; max-width:880px;">
+      Each line above is a question your auditor will ask. Hand them this page and a current vendor's documentation. The contrast will be quiet, factual, and unmistakable.
+    </p>
+  </div>
+</section>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• COMPLIANCE MAPPING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<section style="border-top:1px solid var(--rule); background:rgba(245,241,232,.02);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">viii.</div>
+        <div class="eyebrow">Compliance, Mapped</div>
+        <h2>Specific clauses, mapped to <span class="it">specific deliverables.</span></h2>
+      </div>
+      <div class="right">
+        <p class="lede">Compliance is not a marketing claim. It is a clause-by-clause exercise. Below is the mapping your compliance team will produce anyway â€” we are saving them three weeks of work. The "What you still own" column is honest: no vendor satisfies a compliance regime alone. We deliver the engineering. You deliver the policy, the audit cycle, and the human governance.</p>
+      </div>
+    </div>
+
+    <div style="overflow-x:auto; margin-top:32px;">
+      <table style="width:100%; min-width:920px; border-collapse:collapse; font-size:14px; line-height:1.55;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--rule-2);">
+            <th style="text-align:left; padding:14px 18px 14px 0; font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--mute); font-weight:500; width:130px;">Standard</th>
+            <th style="text-align:left; padding:14px 18px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--mute); font-weight:500; width:280px;">Specific clause</th>
+            <th style="text-align:left; padding:14px 18px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass); font-weight:500;">What Veklom delivers</th>
+            <th style="text-align:left; padding:14px 0 14px 18px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--mute); font-weight:500; width:240px;">What you still own</th>
+          </tr>
+        </thead>
+        <tbody style="color:var(--bone-2);">
+
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">HIPAA</td><td style="padding:18px; vertical-align:top; color:var(--bone-2);">Â§164.312(a)(1) Access control</td><td style="padding:18px; vertical-align:top;">Multi-tenant RBAC, workspace isolation, JWT-bearer auth on every route</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">User provisioning, role taxonomy</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">HIPAA</td><td style="padding:18px; vertical-align:top;">Â§164.312(b) Audit controls</td><td style="padding:18px; vertical-align:top;">Append-only audit log on every API call, correlation IDs, hash-signed entries</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Retention policy, regulator reporting cadence</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">HIPAA</td><td style="padding:18px; vertical-align:top;">Â§164.312(c)(1) Integrity</td><td style="padding:18px; vertical-align:top;">Request signing middleware, immutable audit log, hash chain</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Cryptographic key custody</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">HIPAA</td><td style="padding:18px; vertical-align:top;">Â§164.312(e)(1) Transmission security</td><td style="padding:18px; vertical-align:top;">TLS-everywhere, no third-party egress, optional air-gap mode</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Network segmentation, BAA execution</td></tr>
+
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">PCI-DSS v4.0</td><td style="padding:18px; vertical-align:top;">Req 6.4.3 Secure custom software</td><td style="padding:18px; vertical-align:top;">Source-code review, static analysis hooks, optional pen-test report (Enterprise tier)</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Annual external pen test, SDLC procedures</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">PCI-DSS v4.0</td><td style="padding:18px; vertical-align:top;">Req 7 Need-to-know access</td><td style="padding:18px; vertical-align:top;">RBAC + workspace isolation; per-route permission decorators</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Role definitions, access reviews</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">PCI-DSS v4.0</td><td style="padding:18px; vertical-align:top;">Req 8 Strong authentication / MFA</td><td style="padding:18px; vertical-align:top;">JWT + refresh-token rotation, MFA scaffolding (TOTP-ready)</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">MFA factor enforcement, password policy</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">PCI-DSS v4.0</td><td style="padding:18px; vertical-align:top;">Req 10 Logging and monitoring</td><td style="padding:18px; vertical-align:top;">Audit log per request; Prometheus metrics; correlation IDs across services</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">SIEM integration, log archival, daily review</td></tr>
+
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">SOC 2</td><td style="padding:18px; vertical-align:top;">CC6.1 Logical access</td><td style="padding:18px; vertical-align:top;">RBAC, workspace isolation, zero-trust middleware</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Quarterly access reviews, evidence collection</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">SOC 2</td><td style="padding:18px; vertical-align:top;">CC7.2 System monitoring</td><td style="padding:18px; vertical-align:top;">11-layer middleware with metrics; intrusion detection (SQLi/SSRF/XSS); rate limiters</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Alert routing, on-call rotation</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">SOC 2</td><td style="padding:18px; vertical-align:top;">CC8.1 Change management</td><td style="padding:18px; vertical-align:top;">Source-controlled releases, signed releases, ML-model lifecycle (canary â†’ promote â†’ rollback)</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Change advisory board, approval records</td></tr>
+
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">FedRAMP M.</td><td style="padding:18px; vertical-align:top;">AC-4 Information flow enforcement</td><td style="padding:18px; vertical-align:top;">Provider-registry routing, configurable egress allowlist, per-workspace boundary</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">SSP boundary diagrams, ATO process</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">FedRAMP M.</td><td style="padding:18px; vertical-align:top;">AU-2 / AU-3 Auditable events</td><td style="padding:18px; vertical-align:top;">Audit middleware on all endpoints; configurable event taxonomy</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Audit baseline configuration, retention</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">FedRAMP M.</td><td style="padding:18px; vertical-align:top;">SC-7 Boundary protection</td><td style="padding:18px; vertical-align:top;">Air-gapped operating mode, no inbound vendor connections, pure-tenant deployment</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Network architecture, FIPS 140-3 modules</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">FedRAMP M.</td><td style="padding:18px; vertical-align:top;">SI-4 System monitoring</td><td style="padding:18px; vertical-align:top;">IDS middleware (SQLi/SSRF/XSS pattern matching); per-IP and per-workspace rate limits</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Continuous-monitoring program, POAMs</td></tr>
+
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">GDPR</td><td style="padding:18px; vertical-align:top;">Art. 17 Right to erasure</td><td style="padding:18px; vertical-align:top;"><code style="font-family:var(--mono); font-size:12px; color:var(--brass);">DELETE /privacy/delete</code> endpoint with cascade across raw data, embeddings, audit log markers</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">DSR intake process, identity verification</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">GDPR</td><td style="padding:18px; vertical-align:top;">Art. 20 Data portability</td><td style="padding:18px; vertical-align:top;"><code style="font-family:var(--mono); font-size:12px; color:var(--brass);">POST /privacy/export</code> endpoint returning structured JSON</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Format-conversion if not JSON, delivery channel</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">GDPR</td><td style="padding:18px; vertical-align:top;">Art. 25 Privacy by design</td><td style="padding:18px; vertical-align:top;">No-third-party-egress default; PII detection middleware; PII masking utilities</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Privacy impact assessment, DPO sign-off</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">GDPR</td><td style="padding:18px; vertical-align:top;">Art. 32 Security of processing</td><td style="padding:18px; vertical-align:top;">11-layer middleware; encryption-at-rest scaffolding; encrypted-transport default</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">Key custody, vendor security questionnaires</td></tr>
+
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">OCC 2013-29</td><td style="padding:18px; vertical-align:top;">Third-party arrangement assessment</td><td style="padding:18px; vertical-align:top;">Source-available licensing â€” buyer continues operation if vendor disappears; perpetual license preserves operational continuity</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">TPRM committee approval, ongoing monitoring</td></tr>
+          <tr style="border-bottom:1px solid var(--rule);"><td style="padding:18px 18px 18px 0; color:var(--bone); font-family:var(--mono); font-size:12px; vertical-align:top;">CMMC L2</td><td style="padding:18px; vertical-align:top;">110 Level 2 controls (subset)</td><td style="padding:18px; vertical-align:top;">Air-gapped deployment guide, ITAR-handling documentation, FIPS-compatible cryptography</td><td style="padding:18px 0 18px 18px; vertical-align:top; color:var(--mute); font-style:italic;">SCIF environment, RPO certification</td></tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:32px; font-size:14px; color:var(--mute); line-height:1.65; max-width:980px;">
+      Full mapping with control-level evidence, including SIG / CAIQ / HECVAT exports and a sample audit-evidence package, is available under NDA as part of the Enterprise tier or any technical evaluation engagement. Annual third-party penetration test report under <em style="color:var(--bone-2);">Sovereign Â· Enterprise</em> tier; redacted versions on request.
+    </p>
+  </div>
+</section>
+
+<section id="proof">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">ix.</div>
+        <div class="eyebrow">Verification</div>
+        <h2>Receipts.<br/><span class="it">Not vibes.</span></h2>
+      </div>
+      <div class="right">
+        <p class="lede">Most AI tools ship with marketing benchmarks that fall apart under independent test. Below is the actual stress test, with the full audit JSON in the repo. Every request is signed with a unique correlation ID. Every response body is hashed. Every latency datapoint is preserved. Re-run the benchmark and verify yourself.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="proof-table">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th class="r">Concurrent users</th>
+            <th class="r">Total requests</th>
+            <th class="r">Success rate</th>
+            <th class="r">P50 latency</th>
+            <th class="r">P95 latency</th>
+            <th class="r">Throughput</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="scn">Smoke</td>     <td class="r">10</td>  <td class="r">100</td>   <td class="r ok">100.0%</td><td class="r">3 ms</td>   <td class="r">21 ms</td>  <td class="r">300 req/s</td></tr>
+          <tr><td class="scn">Light</td>     <td class="r">50</td>  <td class="r">500</td>   <td class="r ok">100.0%</td><td class="r">67 ms</td>  <td class="r">209 ms</td> <td class="r">572 req/s</td></tr>
+          <tr><td class="scn">Baseline</td>  <td class="r">100</td> <td class="r">1,000</td> <td class="r ok">100.0%</td><td class="r">127 ms</td> <td class="r">466 ms</td> <td class="r">550 req/s</td></tr>
+          <tr><td class="scn">Sustained</td> <td class="r">200</td> <td class="r">3,000</td> <td class="r ok">100.0%</td><td class="r">396 ms</td> <td class="r">1.7 s</td>  <td class="r">334 req/s</td></tr>
+          <tr><td class="scn">Heavy</td>     <td class="r">500</td> <td class="r">5,000</td> <td class="r ok">100.0%</td><td class="r">2.4 s</td>  <td class="r">10.5 s</td> <td class="r">123 req/s</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="proof-caveat">
+      <strong>Test rig disclosure:</strong> Single-process Uvicorn on a developer laptop, SQLite database, no Redis, Windows. Posted unembellished so technical due-diligence sees the floor, not the ceiling. <strong>Production deployment</strong> (gunicorn 4-worker + Postgres + Redis on Linux) measures roughly an order of magnitude faster across all scenarios â€” full deployment guide and reference numbers available under NDA.
+    </div>
+  </div>
+</section>
+
+<section id="pricing" style="border-top:1px solid var(--rule); background:rgba(245,241,232,.02);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">x.</div>
+        <div class="eyebrow">Engagement</div>
+        <h2>License.<br/>Or <span class="it">acquire.</span></h2>
+      </div>
+      <div class="right">
+        <p class="lede">Two paths. License the source as a perpetual right to deploy and modify, billed monthly. Or acquire the platform outright with full IP and trademark transfer. License rates are month-to-month, no minimum term. Cancel anytime, the version you have stays yours forever. Pilot terms for qualified institutions discussed under NDA.</p>
+      </div>
+    </div>
+
+    <div class="price-grid">
+      <div class="price-card">
+        <div class="price-tier">Sovereign Â· Standard</div>
+        <div class="price-amount">$7,500<sub>/ month</sub></div>
+        <div class="price-summary">Self-host in your VPC. Written-first support. For teams self-deploying on internal infrastructure.</div>
+        <ul class="price-list">
+          <li>Full source-code access Â· perpetual</li>
+          <li>Self-host in your VPC or on-prem</li>
+          <li>14-day SLA on confirmed bug fixes</li>
+          <li>Quarterly version updates</li>
+          <li>Private Discord Â· written-first support</li>
+          <li>Cancel anytime Â· license stays valid</li>
+        </ul>
+        <a href="#contact" class="price-cta">Request access</a>
+      </div>
+
+      <div class="price-card hi">
+        <div class="price-tier">Sovereign Â· Pro</div>
+        <div class="price-amount">$18,000<sub>/ month</sub></div>
+        <div class="price-summary">For production teams with real regulatory deadlines. SLA, direct email channel, monthly updates.</div>
+        <ul class="price-list">
+          <li>Everything in Standard, plus:</li>
+          <li><strong>5-business-day SLA</strong> on bug fixes</li>
+          <li>Direct email channel Â· 24-hour first response</li>
+          <li>Monthly version updates</li>
+          <li>Annual architecture review session</li>
+          <li>White-label rights for client deployments</li>
+        </ul>
+        <a href="#contact" class="price-cta">Schedule evaluation</a>
+      </div>
+
+      <div class="price-card">
+        <div class="price-tier">Sovereign Â· Enterprise</div>
+        <div class="price-amount">$45,000<sub>/ month</sub></div>
+        <div class="price-summary">For regulated institutions with formal vendor management programs.</div>
+        <ul class="price-list">
+          <li>Everything in Pro, plus:</li>
+          <li><strong>24-hour SLA</strong> Â· priority engineering channel</li>
+          <li>Custom feature commitments per quarter</li>
+          <li>Compliance-mapping documentation package</li>
+          <li>Penetration test report Â· re-test on request</li>
+          <li>Procurement-friendly MSA Â· standard redlines</li>
+        </ul>
+        <a href="#contact" class="price-cta">Contact procurement</a>
+      </div>
+
+      <div class="price-card outright">
+        <div class="price-tier">Acquisition</div>
+        <div class="price-amount">$750,000<sub>one-time</sub></div>
+        <div class="price-summary">Full IP and trademark transfer. The product leaves the market.</div>
+        <ul class="price-list">
+          <li>Full source code &amp; all IP rights</li>
+          <li>Veklom trademark and domain transfer</li>
+          <li>Exclusive use Â· pulled from sale</li>
+          <li>60-day transition support included</li>
+          <li>Customer license book transfer (if any)</li>
+          <li>Custom deal structures considered</li>
+        </ul>
+        <a href="#contact" class="price-cta">Open negotiation</a>
+      </div>
+    </div>
+
+    <p style="font-size:13px; color:var(--mute); margin-top:32px; font-family:var(--mono); letter-spacing:.04em; max-width:980px; line-height:1.7;">
+      All license tiers Â· month-to-month, no minimum term. Annual prepayment receives two months free. Pilot terms for qualified institutions discussed under NDA. Strategic acquirers and venture buyers contact directly. All engagements begin with a written technical evaluation â€” we are an async-first organization. No live phone calls until both parties agree the fit is real.
+    </p>
+  </div>
+</section>
+
+<section style="border-top:1px solid var(--rule);">
+  <div class="container">
+    <div class="section-head">
+      <div class="left">
+        <div class="num-marker">xi.</div>
+        <div class="eyebrow">Common Questions</div>
+        <h2>The questions <span class="it">your auditors</span> ask first.</h2>
+      </div>
+      <div class="right">
+        <p class="lede">Selected, not exhaustive. Full security and compliance question bank available under NDA, with mapped responses to SIG, CAIQ, and HECVAT formats.</p>
+      </div>
+    </div>
+
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Does Veklom transmit any data to third parties? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>No, by default and by architecture. Veklom runs entirely inside your perimeter. Outbound traffic occurs only when your application explicitly invokes an external AI provider (e.g., calls OpenAI for an inference). We have no telemetry, analytics, license-call-home, or vendor-side logging. The codebase has been audited against this guarantee.</p>
+          <p>Air-gapped operating mode disables all outbound capability at the network configuration layer.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>Can we deploy in our own VPC or on-premises? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>Yes â€” that is the design. Reference deployments are documented for AWS (commercial &amp; GovCloud), GCP, Azure, and bare-metal Kubernetes. Air-gapped deployment guide includes a verified offline package and dependency mirror configuration.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>What is your security posture and pen-test status? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>Eleven-layer defense-in-depth middleware: zero-trust authentication, intrusion detection (SQLi / SSRF / XSS pattern matching), per-IP and per-workspace rate limiting, request signing, tenant isolation enforced at storage and routing layers. Honest stress-test artifacts are linked above. Independent penetration tests are scheduled quarterly under the Enterprise tier; reports are shareable under NDA.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>How is the platform licensed when you sell it to multiple customers? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>Standard, Pro, and Enterprise are non-exclusive perpetual licenses. We may license to other non-competing buyers. Acquisition is exclusive: the product is pulled from sale entirely upon close, all existing licenses are either transitioned to the acquirer or grandfathered (your choice as buyer).</p>
+          <p>License agreements include explicit assignability clauses to support clean transfer in the event of acquisition.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>What languages, frameworks, and dependencies are used? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>Python 3.11+, FastAPI, SQLAlchemy 2.0 (async + sync), Postgres or SQLite, Redis (optional), Celery for background jobs, gunicorn + uvicorn workers in production. Standard, well-supported, readable. Any senior Python engineer becomes productive on day one.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>Can we evaluate before committing? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>Yes. Standard evaluation: signed NDA â†’ repository read access + sandbox URL â†’ 14-day evaluation period â†’ decision. Enterprise evaluation: extended to 30 days, with one async architecture review session and customized compliance-mapping output for your specific regulatory framework.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>How does your pricing compare to Portkey or LangSmith? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>Different cost structure entirely. Portkey, LangSmith, and Helicone are SaaS â€” their price covers hosted infrastructure, their SOC 2 audit cycle, 24/7 support staff, and their sales organization. We sell software. You operate the infrastructure inside your own perimeter. The total cost of ownership is comparable; the cost <em>structure</em> is fundamentally different.</p>
+          <p>For institutions where SaaS is structurally non-viable â€” banks, hospitals, defense, sovereign clouds â€” the only real comparison is Veklom versus building this internally. Internal builds run 9â€“14 months and cost $1.5Mâ€“$3M in engineering time. License pricing makes the math obvious.</p>
+          <p>Pilot terms for qualified institutions are discussed individually under NDA.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>What does "async-first" mean for engagement? <span class="plus">+</span></summary>
+        <div class="answer">
+          <p>We do not run sales calls until written exchange has confirmed the fit is real. First contact is by email or written form. Technical evaluation is repository + documentation. Procurement is by written MSA with standard redlines. A short call is offered before contract signing if either party wants one â€” but neither party is required to take it.</p>
+          <p>This is deliberate. The buyers we serve well are buyers who prefer evidence over rapport.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MANIFESTO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<section style="border-top:1px solid var(--rule); padding:120px 0; background:linear-gradient(180deg, transparent 0%, rgba(196,146,91,.04) 100%);">
+  <div class="container" style="max-width:920px;">
+    <div class="eyebrow" style="margin-bottom:32px;">A note to the incumbents</div>
+    <h2 style="font-size:clamp(36px,5vw,60px); letter-spacing:-.025em; line-height:1.05; margin-bottom:36px;">
+      The next decade of AI infrastructure<br/>
+      <span class="it">will be built inside</span> the perimeter,<br/>
+      not on top of it.
+    </h2>
+    <div style="font-family:var(--serif); font-size:19px; line-height:1.6; color:var(--bone-2); max-width:780px;">
+      <p style="margin-bottom:18px;">To Portkey, LangSmith, Helicone, Langfuse, Fiddler, Arize, Datadog, Splunk â€” and to whichever venture-funded entrant launches next month: this category is changing. The buyers you have lost for compliance reasons every quarter for two years are about to start saying <em>yes</em>. To someone else.</p>
+      <p style="margin-bottom:18px;">We did not build this because we wanted to compete with you. We built it because the institutions you have been unable to serve have been waiting, and we are tired of watching capable engineers inside hospitals and banks rebuild the same platform every eighteen months because the SaaS market refused to meet them where they live.</p>
+      <p style="margin-bottom:18px;">If your architecture eventually catches up â€” deployable in our customers' VPCs, no telemetry leaving their perimeter, source available for review â€” we will welcome the company. Buyers in this market deserve more than one option.</p>
+      <p style="color:var(--bone); font-style:italic;">Until then, we will be quietly raising the bar.</p>
+    </div>
+    <div style="margin-top:48px; padding-top:32px; border-top:1px solid var(--rule); font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--brass);">
+      Veklom Â· MMXXVI
+    </div>
+  </div>
+</section>
+
+<section class="final" id="contact">
+  <div class="container">
+    <h2>Take the demo<br/>to your <span class="it">network architect</span>.</h2>
+    <p>Send the architecture diagram and the verification table to your CISO and your engineering lead. If both come back with a "yes, evaluate," reach us in writing.</p>
+    <div class="cta-row">
+      <a href="/cdn-cgi/l/email-protection#b6ded3dadad9f6c0d3dddad9db98d5d9db89c5c3d4dcd3d5c28be0d3dddad9db93848693f384938e86938f82938486c2d3d5ded8dfd5d7da938486d3c0d7dac3d7c2dfd9d8938486c4d3c7c3d3c5c2" class="btn-primary"><span class="__cf_email__" data-cfemail="bed6dbd2d2d1fec8dbd5d2d1d390ddd1d3">[email&#160;protected]</span> <span class="it">â†’</span></a>
+      <a href="/cdn-cgi/l/email-protection#0b7b7964687e796e666e657f4b7d6e606764662568646634787e69616e687f365d6e606764662e393b2e4e392e333b2e323f2e393b7b7964687e796e666e657f" class="btn-secondary"><span class="__cf_email__" data-cfemail="66161409051314030b0308122610030d0a090b4805090b">[email&#160;protected]</span></a>
+    </div>
+    <p style="margin-top:32px; font-size:14px;">First reply within 1 business day Â· NDA &amp; evaluation packet sent within 24 hours of mutual interest</p>
+
+    <div class="seal">
+      <img src="logo.svg" alt="Veklom seal" width="64" height="64"/>
+      <div class="seal-text">Veklom Â· Sovereign AI Operations Â· MMXXVI</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container foot-row">
+    <div class="foot-brand">
+      <img src="logo.svg" alt="Veklom logo" width="24" height="24"/>
+      <span style="font-family:var(--serif); font-size:16px;">Veklom</span>
+      <span style="opacity:.5;">â€” sovereign AI operations</span>
+    </div>
+    <div>
+      <a href="/cdn-cgi/l/email-protection#eb838e878784ab9d8e80878486c5888486"><span class="__cf_email__" data-cfemail="c4aca1a8a8ab84b2a1afa8aba9eaa7aba9">[email&#160;protected]</span></a>
+      &nbsp;Â·&nbsp;
+      <a href="https://veklom.dev">veklom.com</a>
+    </div>
+    <div>Â© MMXXVI Veklom Â· All rights reserved</div>
+  </div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click', e=>{
+    const id = a.getAttribute('href');
+    if(id==='#') return;
+    const el = document.querySelector(id);
+    if(el){ e.preventDefault(); el.scrollIntoView({behavior:'smooth', block:'start'}); }
+  });
+});
+</script>
+<!-- Cloudflare Web Analytics -->
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "a66b0fc93e0e4e9c9ee872abb7aab47d"}'></script>
+<!-- End Cloudflare Web Analytics -->
+</body>
+</html>

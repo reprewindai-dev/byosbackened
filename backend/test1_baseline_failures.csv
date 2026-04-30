@@ -1,0 +1,8 @@
+Method,Name,Error,Occurrences
+GET,/health,HTTPError('500 Server Error: Internal Server Error for url: /health'),37
+POST,/v1/exec,HTTPError('500 Server Error: Internal Server Error for url: /v1/exec'),133
+GET,/status,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",1
+POST,/v1/exec,HTTPError('422 Client Error: Unprocessable Entity for url: /v1/exec'),3
+POST,/v1/exec,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",3
+GET,/status,HTTPError('500 Server Error: Internal Server Error for url: /status'),47
+GET,/health,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",2

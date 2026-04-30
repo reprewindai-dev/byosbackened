@@ -1,5 +1,5 @@
 """Token wallet model for credit-based usage metering."""
-from sqlalchemy import Column, String, DateTime, BigInteger, Index, text
+from sqlalchemy import Column, String, DateTime, BigInteger, Index, text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.session import Base
@@ -43,7 +43,7 @@ class TokenTransaction(Base):
     __tablename__ = "token_transactions"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    wallet_id = Column(String, nullable=False, index=True)
+    wallet_id = Column(String, ForeignKey("token_wallets.id"), nullable=False, index=True)
     workspace_id = Column(String, nullable=False, index=True)
     
     # Transaction type: 'monthly_allotment', 'purchase', 'usage', 'refund', 'adjustment'

@@ -1,226 +1,432 @@
-# VEKLOM — COMPLETE AGENT HANDOFF
-## For: Windsurf / Devin
-## Date: 2026-04-30
-## From: Perplexity AI session
-## Owner: Anthony (solo founder, Quinte West, Ontario, Canada)
+# Veklom Handoff Document — Complete Context for Windsurf/Devin
+
+**Status**: Ready for continuation  
+**Last Updated**: 2026-04-30  
+**Agent Rule**: Read this entire file before any work. No exceptions.
 
 ---
 
-## RULE #1 — READ BEFORE TOUCHING ANYTHING
+## Infrastructure
 
-Anthony does not touch code, terminals, or dashboards.
-YOU do 100% of all work. If a human click is unavoidable, tell Anthony exactly:
-- What to click
-- Where it is
-- What to paste
-One instruction. Not a tutorial.
+### Servers (Current IPs from AGENT_CONTEXT.md)
 
----
+| Server | IP | Purpose | Status |
+|--------|-----|---------|--------|
+| Hetzner Server 1 | **5.78.135.11** | Production: Coolify + API + Ollama | ✅ Live |
+| Hetzner Server 2 | **5.78.153.146** | CO2 Router / ECOBE Engine (can host license server) | ✅ Live |
 
-## WHAT THIS PRODUCT IS
+**SSH Access:** `ssh -i ~/.ssh/veklom-deploy root@<IP>`
 
-**Veklom** — Multi-tenant AI ops backend. Sovereign AI gateway / private AI control plane.
-**Tagline:** Run any AI model inside your perimeter with audit logs, budget controls, and policy enforcement.
+**Coolify Dashboards:**
+- Server 1: `http://5.78.135.11:8000` (veklom project)
+- Server 2: `http://5.78.153.146:8000` (ecobe project)
 
-**The repo:** `reprewindai-dev/byosbackened` (private) — this is the ONLY repo. Backend + docs, no separate frontend repo.
+### DNS Routing
 
----
+| Domain | Target | Status | Notes |
+|--------|--------|--------|-------|
+| `veklom.com` | Cloudflare Pages | **🔴 NEEDS DEPLOY** | pricing.html ready |
+| `api.veklom.com` | 5.78.135.11 | ✅ Live | veklom-api container |
+| `license.veklom.com` | **Not deployed** | 🟡 Pending | Can use Server 2 or new VPS |
+| `veklom.dev` | Cloudflare Pages | ✅ Live | Acquisition surface |
+| `engine.veklom.com` | 5.78.153.146 | ✅ Live | CO2 Router |
 
-## LIVE URLS
+### Coolify Apps
 
-| Surface | URL | Status |
-|---|---|---|
-| Landing / acquisition page | https://veklom.com | Live (Cloudflare Pages) |
-| API | https://api.veklom.com | Live, returns 200 |
-| Marketplace catalog | https://veklom.com/api/v1/listings | Live |
-| Signup | https://veklom.com/signup/ | Live |
-| CO2 Router engine | https://engine.veklom.com | Separate product, separate server |
+- **Project:** `veklom`
+- **App:** `veklom-api` (live container: `zjhp30ys1jlk8yaoxc96h2zd-213941724689`)
+- **Resources:** PostgreSQL + Redis (both on 5.78.135.11)
+- **Ollama:** `veklom-ollama` container with `qwen2.5:0.5b` model
 
----
-
-## INFRASTRUCTURE
-
-### Veklom Production Server
-- **Provider:** Hetzner
-- **IP:** 5.78.135.11
-- **Server name:** veklom-prod-1
-- **SSH:** `ssh -F NUL -i ~/.ssh/veklom-deploy root@5.78.135.11`
-- **Coolify dashboard:** http://5.78.135.11:8000
-- **Coolify app name:** `veklom-api`
-- **Coolify project:** `veklom`
-- **Postgres:** Running on this server via Coolify
-- **Redis:** Running on this server via Coolify
-- **Ollama:** Running as `veklom-ollama` container on Coolify network, model: qwen2.5:0.5b
-
-### CO2 Router / ECOBE (SEPARATE — do not mix with Veklom)
-- **IP:** 5.78.153.146
-- **Server name:** co2routerengine-prod-1
-- **SSH:** `ssh -F NUL -i ~/.ssh/veklom-deploy root@5.78.153.146`
-- **Coolify app:** `ecobe-engine`
-- **Coolify project:** `ecobe`
-- **Coolify dashboard:** http://5.78.153.146:8000
-
-### DNS / Frontend
-- **veklom.com** → Cloudflare Pages (acquisition/landing page — the FRONTEND)
-- **api.veklom.com** → Veklom API on 5.78.135.11
-- **engine.veklom.com** → CO2 Router on 5.78.153.146
+**⚠️ CRITICAL:** Stray artifact from commit `9493aceb` is restart-looping beside live service. **DO NOT touch live service** — investigate separately.
 
 ---
 
-## REPO STRUCTURE (byosbackened)
+## Repository Structure
 
 ```
 byosbackened/
-├── AGENT_CONTEXT.md          ← Master context file, always read first
-├── backend/
-│   ├── apps/
-│   │   ├── api/
-│   │   │   ├── main.py       ← FastAPI entrypoint, all route mounts
-│   │   │   ├── deps.py       ← Dependency injection (DB, auth, current user)
-│   │   │   ├── routers/      ← All API route handlers
-│   │   │   │   └── auth.py   ← Register, login, refresh, MFA, API keys, GitHub OAuth
-│   │   │   ├── schemas/      ← Pydantic schemas
-│   │   │   └── middleware/   ← Middleware stack
-│   │   ├── ai/               ← AI module
-│   │   ├── plugins/          ← Plugin system
-│   │   └── worker/           ← Background worker
-│   ├── core/
-│   │   ├── config.py         ← Settings, env loading
-│   │   ├── auth.py           ← Re-export shim (real logic in deps.py)
-│   │   ├── security.py       ← JWT + bcrypt primitives
-│   │   ├── license.py        ← ✅ IMPLEMENTED: License enforcement, feature gates, tier checks
-│   │   ├── redis.py          ← Redis client
-│   │   └── redis_pool.py     ← Connection pooling
-│   ├── db/
-│   │   ├── models/           ← 30 SQLAlchemy models
-│   │   └── session.py        ← SQLAlchemy engine (Postgres / SQLite fallback)
-│   ├── scripts/
-│   │   ├── bootstrap_prod.sh         ← Run once to verify Postgres+Redis
-│   │   └── build_buyer_package.py    ← Builds buyer zip by tier
-│   ├── license/
-│   │   └── server.py         ← License server (NOT YET deployed to license.veklom.com)
-│   ├── docker-compose.dev.yml
-│   ├── docker-compose.prod.yml
-│   ├── render.yaml
-│   └── alembic.ini
-└── docs/
+├── backend/                    # Main FastAPI application
+│   ├── apps/api/routers/       # All API endpoints
+│   │   ├── subscriptions.py    # PLANS dict (cents) ⭐ KEEP IN SYNC
+│   │   ├── auth.py            # Registration + trial license trigger
+│   │   ├── stripe_billing.py  # Stripe integration
+│   │   └── ...
+│   ├── core/services/
+│   │   └── trial_onboarding.py  # Trial license HTTP client
+│   ├── license/                # License server code
+│   │   ├── server.py          # FastAPI license server (to deploy)
+│   │   ├── stripe_webhook.py  # Payment failure → deactivation
+│   │   ├── validator.py       # License verification logic
+│   │   └── middleware.py      # FastAPI license middleware
+│   ├── db/models/subscription.py  # PlanTier enum
+│   ├── core/config.py          # Environment variables
+│   └── PRICING_TRUTH.md        # ⭐ Authoritative pricing reference
+├── landing/
+│   └── pricing.html            # ✅ Public pricing page (ready to deploy)
+├── AGENT_CONTEXT.md            # Historical context
+└── HANDOFF.md                  # This file
 ```
 
 ---
 
-## WHAT IS ALREADY IMPLEMENTED ✅
+## Pricing (Single Source of Truth)
 
-| Feature | File | Notes |
-|---|---|---|
-| Auth (register, login, logout, refresh) | `apps/api/routers/auth.py` | Full JWT + refresh token rotation |
-| MFA (TOTP) | `apps/api/routers/auth.py` | Setup, verify, disable |
-| GitHub OAuth | `apps/api/routers/auth.py` | Full flow with signed CSRF state |
-| API key management | `apps/api/routers/auth.py` | Create, list, revoke |
-| License enforcement | `core/license.py` | Tier gates, trial TTL, free fallback |
-| Feature gating | `core/license.py` | `require_feature(tier, "feature_name")` |
-| Stripe subscription | `apps/api/routers/subscriptions.py` | Team $12K/yr, Business $35K/yr, Enterprise custom |
-| Stripe webhook | backend | Payment fail = instant key deactivation |
-| Token wallet | `db/models/` | 50,000 free trial credits on registration |
-| Admin bypass | `apps/api/middleware/entitlement_check.py` | Superuser skips all plan gates |
-| Ollama proxy | via main.py | qwen2.5:0.5b live on Coolify |
-| Bedrock proxy | `apps/api/` | JWT auth, wallet checks, token deduction, audit log |
-| Marketplace catalog | `/api/v1/listings` | Public, live |
-| Buyer package builder | `scripts/build_buyer_package.py` | `--tier [starter|pro|sovereign]` |
-| S3 backup | `scripts/` | Daily cron, 7-day retention |
-| License system | `backend/license/server.py` | Issue, activate, verify, deactivate |
+### Public Pricing
 
----
+| Tier | DB Enum | Monthly | Yearly | Display Name |
+|------|---------|---------|--------|--------------|
+| Team | `starter` | $12,000 | $120,000 | Team |
+| Business | `pro` | $35,000 | $350,000 | Business |
+| Sovereign | `sovereign` | $2,500 | $25,000 | Sovereign |
+| Enterprise | `enterprise` | Custom | Custom | Enterprise |
 
-## WHAT IS NOT DONE YET ⚠️ — ACTUAL TODO LIST
+**Yearly = 10× monthly** (2 months free)
 
-### PRIORITY 1 — MISSING FRONTEND PRICING PAGE
-- The acquisition page is at veklom.com (Cloudflare Pages)
-- **The pricing section is MISSING or not rendering** — Anthony cannot see pricing on the live site
-- Pricing tiers:
-  - **Team** — $12,000/year (DB enum: `starter`)
-  - **Business** — $35,000/year (DB enum: `pro`)
-  - **Enterprise** — Custom pricing, contact sales only
-- Stripe checkout is wired in `apps/api/routers/subscriptions.py`
-- Frontend needs a `/pricing` page or section calling the Stripe checkout endpoint
-- **First step:** Locate the Cloudflare Pages source for veklom.com and find where pricing should render
+### Files to Keep in Sync
 
-### PRIORITY 2 — COOLIFY STABILITY
-- Stray Coolify artifact for commit `9493aceb` is restart-looping next to the live `veklom-api` container
-- Do NOT touch the routed `veklom-api` service — it is live and working
-- Reconcile the stray artifact without disrupting live traffic
-- Reconcile Alembic migration state in production after stability is confirmed
+| Location | File Path | Must Show |
+|----------|-----------|-----------|
+| Backend PLANS dict | `backend/apps/api/routers/subscriptions.py:23-147` | `1_200_000` / `3_500_000` / `250_000` cents |
+| Human reference | `backend/PRICING_TRUTH.md` | All tiers with explanations |
+| Public page | `landing/pricing.html` | Cards, JSON-LD, FAQ |
+| Structured data | `veklom_landing_reference.html` | JSON-LD SoftwareApplication |
+| Stripe Dashboard | Manual setup | Same monthly/yearly prices |
 
-### PRIORITY 3 — LICENSE SERVER DEPLOY
-- `backend/license/server.py` exists but is NOT deployed
-- Needs its own deploy to `license.veklom.com`
-- Can be a subdomain on existing Hetzner server (5.78.135.11) or separate VPS
+### Current PLANS Dict Reference (subscriptions.py)
 
-### PRIORITY 4 — TRIAL KEY AUTO-ISSUANCE
-- Token wallet gets 50k credits on signup (working)
-- Trial license key issuance NOT wired end-to-end yet
-- `core/services/trial_onboarding.py` has `issue_trial_license` and `send_trial_welcome`
-
-### PRIORITY 5 — UPTIME MONITORING
-- UptimeRobot (free) — instructions in `backend/README.md`
-- Not set up yet
+```python
+"starter": {
+    "name": "Team",
+    "price_monthly_cents": 1_200_000,   # $12,000
+    "price_yearly_cents": 12_000_000,   # $120,000
+    "monthly_credits_included": 10_000_000,
+},
+"pro": {
+    "name": "Business",
+    "price_monthly_cents": 3_500_000,   # $35,000
+    "price_yearly_cents": 35_000_000,   # $350,000
+    "monthly_credits_included": 100_000_000,
+},
+"sovereign": {
+    "name": "Sovereign",
+    "price_monthly_cents": 250_000,     # $2,500
+    "price_yearly_cents": 2_500_000,    # $25,000
+    "monthly_credits_included": 500_000_000,
+},
+"enterprise": {
+    "name": "Enterprise",
+    "price_monthly_cents": None,        # Custom
+    "self_serve_checkout": False,
+}
+```
 
 ---
 
-## PRICING MODEL (for frontend)
+## Priority TODO (In Order)
 
-| Tier | Display Name | DB Enum | Price | Trial |
-|---|---|---|---|---|
-| Free | Free | `free` | $0 | No |
-| Team | Team | `starter` | $12,000/year | 14 days (Stripe-managed) |
-| Business | Business | `pro` | $35,000/year | 14 days (Stripe-managed) |
-| Enterprise | Enterprise | `enterprise` | Custom | None — contact sales |
+### 🔴 #1: Pricing Page on veklom.com
 
-**Feature gates (from `core/license.py` → `FEATURE_MIN_TIER`):**
-- **Free:** 100k requests/month, 3 vendor connections, 1 API key
-- **Team+:** Unlimited requests, 20 API keys, multi-vendor routing, cost dashboard, budget controls, audit logs, RBAC
-- **Business+:** SSO, content safety, data masking, GDPR exports, HIPAA controls, plugin execution, audit exports
-- **Enterprise:** Custom endpoints, workspace admin, white-label, private deployment, annual review
+**Status:** `landing/pricing.html` is complete and ready  
+**Action:** Deploy to Cloudflare Pages
 
----
+```bash
+cd C:\Users\antho\OneDrive\Desktop\.windsurf\byosbackened\landing
+wrangler pages deploy . --project-name=veklom-pricing
+```
 
-## KNOWN ISSUES / TECH DEBT
-
-- Previous agent fabricated 777ms P95 benchmark claims — FALSE. Real numbers in `backend/HONEST_AUDIT_REPORT.md`
-- `CONSISTENCY_TESTING.md` and old `AUDIT_REPORT.md` contain fabricated numbers — do not reference
-- `core/security.py` and `core/redis.py` shadow real implementations — dead code, safe to delete
-- `PRODUCTION_READINESS_REPORT.md` is 0 bytes / empty
-- GitHub access tokens stored plaintext in User row — should be Fernet-encrypted at rest before v1.0
+**After deploy:**
+1. Cloudflare Pages dashboard → veklom-pricing → Custom domains
+2. Add `veklom.com` as custom domain
+3. Ensure DNS record points to Cloudflare Pages
 
 ---
 
-## COMMIT FORMAT
+### 🟡 #2: Coolify Stray Artifact Restart Loop
 
-Lowercase, descriptive, no fluff.
-✅ `wire pricing page to stripe checkout`
-❌ `Update pricing component to include new Stripe integration`
+**Status:** Known issue, monitored  
+**Action:** **DO NOT touch live service** — investigate only
 
----
+**Details:** Container from commit `9493aceb` is restart-looping beside the routed `veklom-api` container. The live service at `api.veklom.com` is healthy.
 
-## KEY DOCS
+**Investigation (safe):**
+```bash
+ssh -i ~/.ssh/veklom-deploy root@5.78.135.11
+docker ps -a | grep veklom
+docker logs <stray_container_id> --tail 50
+```
 
-| File | Purpose |
-|---|---|
-| `AGENT_CONTEXT.md` | Master context — always read first |
-| `backend/DEPLOY_STATUS.md` | Infra map, SSH, Coolify |
-| `backend/HONEST_AUDIT_REPORT.md` | Real benchmark numbers |
-| `backend/PRICING_STRATEGY.md` | Full pricing rationale |
-| `backend/STRIPE_GO_LIVE.md` | Stripe setup |
-| `backend/CLOUDFLARE_TUNNEL_SETUP.md` | Cloudflare tunnel |
-| `backend/USER_MANUAL.md` | 40KB full user manual |
+Do NOT stop, remove, or modify any containers without explicit direction.
 
 ---
 
-## FIRST ACTION FOR NEW AGENT
+### 🟡 #3: License Server Deploy
 
-1. Read `AGENT_CONTEXT.md` in full
-2. Go to the Cloudflare Pages project for veklom.com — find where the pricing section lives
-3. Implement the pricing page with the 3 tiers above
-4. Push so it deploys live to veklom.com
-5. Confirm with Anthony that pricing is now visible on the live site
+**Status:** Code ready, not deployed  
+**Action:** Deploy to `license.veklom.com`
 
-That is the #1 blocker. Everything else is secondary.
+**License server file:** `backend/license/server.py`
+
+**Available endpoints:**
+- `POST /issue` — Issue new license (admin only, X-Admin-Token required)
+- `POST /activate` — Activate license on machine
+- `POST /verify` — Verify license validity
+- `POST /deactivate` — Deactivate license (admin only)
+- `GET /health` — Health check
+- `POST /stripe/webhook` — Stripe payment failure handling
+
+**Deployment Options:**
+
+**Option A: Hetzner Server 2 (Recommended for isolation)**
+```bash
+# Server 2 already exists (5.78.153.146)
+# Add DNS: license.veklom.com → 5.78.153.146
+ssh root@5.78.153.146
+git clone <repo>
+cd byosbackened/backend
+pip install -r requirements.txt
+# Set env vars (see below)
+python -m license.server  # Runs on :8000
+```
+
+**Option B: New dedicated VPS**
+- Create $5-10/mo Hetzner VPS
+- Same setup as Option A
+
+**Required env vars for license server:**
+```bash
+DATABASE_URL=postgresql://...  # Can share main DB or separate
+LICENSE_ADMIN_TOKEN=vladmin_$(openssl rand -hex 32)
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+APP_VERSION=1.0.0
+# Optional for Stripe webhooks:
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+---
+
+### 🟡 #4: Trial Key Auto-Issuance
+
+**Status:** Code exists, needs license server deployed first  
+**Action:** Test end-to-end after license server deploy
+
+**Current implementation:**
+
+1. **Registration trigger** (`backend/apps/api/routers/auth.py:179-186`):
+```python
+license_payload = await issue_trial_license(
+    db=db,
+    workspace=workspace,
+    user_email=payload.email,
+    user_name=payload.full_name or payload.workspace_name,
+    requested_tier=payload.trial_tier,  # "starter", "pro", etc.
+)
+```
+
+2. **License client** (`backend/core/services/trial_onboarding.py:53-114`):
+   - POSTs to `LICENSE_SERVER_URL/issue` (default: `https://license.veklom.com/issue`)
+   - Requires `X-Admin-Token` header
+   - 14-day trial duration
+
+3. **Welcome email** (`backend/core/services/trial_onboarding.py:117-133`):
+   - Sends license key + download link
+   - Uses `buyer_download_base_url` for package URL
+
+**Testing steps (after license server deploy):**
+```bash
+# 1. Register with trial tier
+curl -X POST https://api.veklom.com/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"test123","workspace_name":"Test","trial_tier":"starter"}'
+
+# 2. Verify workspace has license
+curl https://api.veklom.com/api/v1/admin/workspaces \
+  -H "Authorization: Bearer <admin_token>"
+
+# 3. Test license verification
+curl -X POST https://license.veklom.com/verify \
+  -H "Content-Type: application/json" \
+  -d '{"license_key":"vklm_...","machine_fingerprint":"test-fingerprint"}'
+```
+
+---
+
+### 🟡 #5: UptimeRobot Monitoring
+
+**Status:** Not configured  
+**Action:** Set up free monitoring
+
+**Monitors to create:**
+
+| Monitor | URL | Check |
+|---------|-----|-------|
+| 1 | `https://veklom.com` | HTTPS, keyword: "Veklom" |
+| 2 | `https://api.veklom.com/health` | HTTPS, keyword: `"status":"ok"` |
+| 3 | `https://license.veklom.com/health` | HTTPS (after deploy) |
+
+**Steps:**
+1. Sign up at uptimerobot.com (free tier: 50 monitors)
+2. Add HTTP(s) monitors with 5-minute intervals
+3. Configure alert contacts (email → Anthony)
+
+---
+
+## Working Features (Confirmed Live)
+
+| Feature | Status | Endpoint/Location |
+|---------|--------|-------------------|
+| Health check | ✅ | `GET /health` → `{"status":"ok"}` |
+| Status dashboard | ✅ | `GET /status` → includes `llm_ok: true` |
+| Authentication (JWT, MFA, GitHub OAuth) | ✅ | `/api/v1/auth/*` |
+| Stripe billing (checkout, portal, webhooks) | ✅ | `/api/v1/subscriptions/*` |
+| License gates | ✅ | Token wallet middleware |
+| Ollama proxy | ✅ | `POST /v1/exec` |
+| Marketplace | ✅ | `GET /api/v1/listings` |
+| Trial wallet (50K credits) | ✅ | Auto-issued on signup |
+| Admin bypass for plan gates | ✅ | `entitlement_check.py` |
+
+---
+
+## Environment Variables
+
+### Production (Coolify)
+
+```bash
+# Database & Redis
+DATABASE_URL=postgresql://postgres:...@postgres:5432/veklom
+REDIS_URL=redis://redis:6379/0
+
+# Stripe (LIVE keys)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+
+# License server (main API calls this)
+LICENSE_SERVER_URL=https://license.veklom.com
+LICENSE_ADMIN_TOKEN=vladmin_...  # Must match license server
+
+# Security
+SECRET_KEY=...
+ENCRYPTION_KEY=...
+
+# LLM (Ollama on same server via Docker network)
+LLM_BASE_URL=http://veklom-ollama:11434
+LLM_MODEL_DEFAULT=qwen2.5:0.5b
+
+# AWS (for Bedrock proxy)
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_DEFAULT_REGION=us-east-1
+
+# Optional
+SENTRY_DSN=
+SMTP_HOST=  # For trial welcome emails
+BUYER_DOWNLOAD_BASE_URL=  # S3 or CDN for buyer packages
+```
+
+### License Server (separate)
+
+```bash
+DATABASE_URL=postgresql://...  # Can share main or separate
+LICENSE_ADMIN_TOKEN=vladmin_$(openssl rand -hex 32)  # 64-char hex
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+APP_VERSION=1.0.0
+STRIPE_WEBHOOK_SECRET=whsec_...  # Optional
+```
+
+---
+
+## Key File Reference
+
+| File | Purpose | Lines of Interest |
+|------|---------|-------------------|
+| `backend/apps/api/routers/subscriptions.py` | Plan catalog, checkout, webhooks | 23-147 (PLANS dict) |
+| `backend/apps/api/routers/auth.py` | Registration + trial trigger | 179-186, 196-203 |
+| `backend/core/services/trial_onboarding.py` | Trial license HTTP client | 53-133 |
+| `backend/license/server.py` | License server FastAPI app | All |
+| `backend/license/validator.py` | License verification | All |
+| `backend/license/middleware.py` | License gates | All |
+| `backend/core/config.py` | Environment variables | All |
+| `backend/PRICING_TRUTH.md` | Pricing source of truth | All |
+| `landing/pricing.html` | Public pricing page | All |
+
+---
+
+## Deployment Commands
+
+### Cloudflare Pages (Pricing Page)
+```bash
+cd C:\Users\antho\OneDrive\Desktop\.windsurf\byosbackened\landing
+wrangler pages deploy . --project-name=veklom-pricing
+```
+
+### Coolify (Backend)
+- Auto-deploys on git push to main
+- Manual: Coolify dashboard → Deploy
+
+### License Server (Manual)
+```bash
+ssh root@5.78.153.146  # Or new VPS
+cd /opt/veklom-license
+git pull
+pip install -r requirements.txt
+# Set env vars in systemd service or .env
+systemctl restart veklom-license
+```
+
+---
+
+## Quick Health Checks
+
+```bash
+# Main API
+curl https://api.veklom.com/health
+curl https://api.veklom.com/status
+
+# License server (after deploy)
+curl https://license.veklom.com/health
+```
+
+---
+
+## Commit Format Rules
+
+```
+<type>: <short description>
+
+- feat: new feature
+- fix: bug fix
+- docs: documentation
+- refactor: code restructuring
+- deploy: deployment-related
+```
+
+Examples:
+- `feat: add enterprise plan to pricing page`
+- `fix: correct yearly cents calculation in PLANS`
+- `deploy: license server to Hetzner Server 2`
+
+---
+
+## Support
+
+- **Docs:** https://docs.veklom.com
+- **API:** https://api.veklom.com/api/v1/docs
+- **Admin Access:** Contact Anthony for Hetzner/Coolify credentials
+- **SSH Key:** `~/.ssh/veklom-deploy` on Anthony's machine
+
+---
+
+## ⚠️ Critical Rules
+
+1. **DO NOT** touch the live Coolify service — stray artifact under investigation
+2. **DO NOT** modify pricing in only one place — sync all 4 locations
+3. **DO NOT** commit secrets — use Coolify env var UI
+4. **Always** test trial flow after license server deploy
+5. **Always** run `alembic upgrade head` after schema changes
+6. **Never** fabricate benchmark numbers
+7. **Never** document without implementing
+
+---
+
+*Next Agent: Start with 🔴 #1 — deploy pricing page, then proceed in order.*

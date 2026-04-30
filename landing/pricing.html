@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<title>Veklom Pricing — Sovereign AI Operations Platform</title>
+<meta name="description" content="Veklom pricing: Team $12K/mo, Business $35K/mo, Enterprise custom. Self-hosted AI operations platform for regulated industries. No vendor lock-in." />
+<link rel="canonical" href="https://veklom.com/pricing" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Veklom Pricing — Sovereign AI Operations Platform" />
+<meta property="og:description" content="Team $12K/mo · Business $35K/mo · Enterprise custom. Self-hosted AI operations for hospitals, banks, defense." />
+<meta property="og:url" content="https://veklom.com/pricing" />
+<meta property="og:image" content="https://veklom.com/og-image.png" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Veklom Pricing" />
+<meta name="twitter:description" content="Sovereign AI operations platform pricing. Self-hosted, no vendor lock-in." />
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Veklom",
+  "applicationCategory": "DeveloperApplication",
+  "offers": [
+    { "@type": "Offer", "name": "Team", "price": "12000", "priceCurrency": "USD", "priceSpecification": { "@type": "UnitPriceSpecification", "unitText": "MONTH" } },
+    { "@type": "Offer", "name": "Business", "price": "35000", "priceCurrency": "USD", "priceSpecification": { "@type": "UnitPriceSpecification", "unitText": "MONTH" } },
+    { "@type": "Offer", "name": "Enterprise", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/PreOrder" }
+  ]
+}
+</script>
+
+<style>
+:root {
+  --bg: #0c0c0e;
+  --bg-elevated: #141418;
+  --border: #1f1f24;
+  --text: #f5f5f7;
+  --text-secondary: #a1a1aa;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --success: #22c55e;
+  --enterprise: #f59e0b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* Header */
+header {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+.nav { display: flex; align-items: center; justify-content: space-between; }
+.logo { font-size: 24px; font-weight: 700; color: var(--text); text-decoration: none; }
+.nav-links { display: flex; gap: 32px; }
+.nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: var(--text); }
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding: 80px 0 48px;
+}
+.hero h1 {
+  font-size: clamp(40px, 5vw, 56px);
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p {
+  font-size: 18px;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto 32px;
+}
+
+/* Billing Toggle */
+.billing-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 48px;
+}
+.billing-toggle span { color: var(--text-secondary); font-size: 14px; }
+.billing-toggle span.active { color: var(--text); font-weight: 500; }
+.billing-toggle .save { color: var(--success); font-size: 12px; }
+
+/* Pricing Grid */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 80px;
+}
+
+.pricing-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  position: relative;
+  transition: border-color 0.2s;
+}
+.pricing-card:hover { border-color: var(--accent); }
+.pricing-card.featured {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, rgba(99,102,241,0.05) 100%);
+}
+.pricing-card.enterprise { border-color: var(--enterprise); }
+
+.plan-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+.plan-badge.team { background: rgba(99,102,241,0.2); color: var(--accent); }
+.plan-badge.business { background: rgba(34,197,94,0.2); color: var(--success); }
+.plan-badge.enterprise { background: rgba(245,158,11,0.2); color: var(--enterprise); }
+
+.pricing-card h3 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.pricing-card .description {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.price {
+  margin-bottom: 24px;
+}
+.price .amount {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+}
+.price .period {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.price .yearly { display: none; }
+.price.yearly .monthly { display: none; }
+.price.yearly .yearly { display: inline; }
+
+.features {
+  list-style: none;
+  margin-bottom: 32px;
+}
+.features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.features li::before {
+  content: "✓";
+  color: var(--success);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.features li.included { color: var(--text); }
+
+.cta-button {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cta-button.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+}
+.cta-button.primary:hover { background: var(--accent-hover); }
+.cta-button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.cta-button.secondary:hover { border-color: var(--accent); }
+.cta-button.enterprise {
+  background: var(--enterprise);
+  color: #0c0c0e;
+  border: none;
+}
+.cta-button.enterprise:hover { opacity: 0.9; }
+
+/* Compare Table */
+.compare-section { padding: 80px 0; border-top: 1px solid var(--border); }
+.compare-section h2 {
+  text-align: center;
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 48px;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.compare-table th,
+.compare-table td {
+  padding: 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.compare-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.compare-table td:first-child { color: var(--text); }
+.compare-table td:not(:first-child) { text-align: center; }
+.compare-table .check { color: var(--success); }
+.compare-table .dash { color: var(--text-secondary); }
+
+/* FAQ */
+.faq-section { padding: 80px 0; border-top: 1px solid var(--border); }
+.faq-section h2 {
+  text-align: center;
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 48px;
+}
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 32px;
+}
+.faq-item h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.faq-item p {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Footer */
+footer {
+  padding: 48px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+footer p {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .hero { padding: 48px 0; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .faq-grid { grid-template-columns: 1fr; }
+  .compare-table { font-size: 12px; }
+  .compare-table th, .compare-table td { padding: 12px 8px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <nav class="nav">
+      <a href="/" class="logo">Veklom</a>
+      <div class="nav-links">
+        <a href="/">Product</a>
+        <a href="/pricing">Pricing</a>
+        <a href="https://docs.veklom.com">Docs</a>
+        <a href="https://app.veklom.com">Sign In</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container">
+      <h1>Simple pricing for serious infrastructure</h1>
+      <p>Self-hosted AI operations platform. No per-seat fees. No usage surprises. Deploy in your perimeter, own your data.</p>
+    </div>
+  </section>
+
+  <div class="container">
+    <div class="billing-toggle">
+      <span class="active" id="monthly-label">Monthly</span>
+      <label style="position: relative; display: inline-block; width: 48px; height: 24px;">
+        <input type="checkbox" id="billing-toggle" style="opacity: 0; width: 0; height: 0;">
+        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--border); border-radius: 24px; transition: 0.3s;">
+          <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s;" id="toggle-knob"></span>
+        </span>
+      </label>
+      <span id="yearly-label">Yearly</span>
+      <span class="save">Save 17%</span>
+    </div>
+
+    <div class="pricing-grid">
+      <!-- Team -->
+      <div class="pricing-card">
+        <span class="plan-badge team">Team</span>
+        <h3>For growing teams</h3>
+        <p class="description">Multi-LLM gateway, cost tracking, and RBAC for teams adopting AI.</p>
+        <div class="price" id="team-price">
+          <div class="amount monthly">$12,000<span style="font-size: 24px; font-weight: 500;">/mo</span></div>
+          <div class="amount yearly">$120,000<span style="font-size: 24px; font-weight: 500;">/yr</span></div>
+          <span class="period">Billed monthly. Cancel anytime.</span>
+        </div>
+        <ul class="features">
+          <li class="included">10M credits/month included</li>
+          <li class="included">5 API keys</li>
+          <li class="included">Multi-LLM gateway (OpenAI, Anthropic, Ollama)</li>
+          <li class="included">Cost prediction & alerts</li>
+          <li class="included">7-day audit retention</li>
+          <li>AI bot support (48h email)</li>
+        </ul>
+        <a href="https://app.veklom.com/checkout?plan=starter" class="cta-button secondary">Start with Team</a>
+      </div>
+
+      <!-- Business (Featured) -->
+      <div class="pricing-card featured">
+        <span class="plan-badge business">Business</span>
+        <h3>For production deployments</h3>
+        <p class="description">Advanced routing, budget management, and security for regulated industries.</p>
+        <div class="price" id="business-price">
+          <div class="amount monthly">$35,000<span style="font-size: 24px; font-weight: 500;">/mo</span></div>
+          <div class="amount yearly">$350,000<span style="font-size: 24px; font-weight: 500;">/yr</span></div>
+          <span class="period">Billed monthly. Cancel anytime.</span>
+        </div>
+        <ul class="features">
+          <li class="included">100M credits/month included</li>
+          <li class="included">20 API keys</li>
+          <li class="included">Everything in Team, plus:</li>
+          <li class="included">Advanced routing policies</li>
+          <li class="included">Budget management & kill switches</li>
+          <li class="included">Performance metrics & insights</li>
+          <li class="included">30-day audit retention</li>
+          <li>Priority AI bot (24h email)</li>
+        </ul>
+        <a href="https://app.veklom.com/checkout?plan=pro" class="cta-button primary">Start with Business</a>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="pricing-card enterprise">
+        <span class="plan-badge enterprise">Enterprise</span>
+        <h3>For sovereign deployments</h3>
+        <p class="description">Custom infrastructure, dedicated support, and full compliance suite.</p>
+        <div class="price">
+          <div class="amount" style="font-size: 36px;">Custom</div>
+          <span class="period">Annual contracts. Dedicated support.</span>
+        </div>
+        <ul class="features">
+          <li class="included">Unlimited credits</li>
+          <li class="included">Unlimited API keys</li>
+          <li class="included">Everything in Business, plus:</li>
+          <li class="included">Hard-cap kill switches</li>
+          <li class="included">GDPR / privacy workflows</li>
+          <li class="included">Compliance reporting</li>
+          <li class="included">Audit exports</li>
+          <li class="included">Plugin execution</li>
+          <li class="included">99.99% SLA</li>
+          <li>Dedicated support (4h response)</li>
+        </ul>
+        <a href="mailto:sales@veklom.com" class="cta-button enterprise">Contact Sales</a>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <section class="compare-section">
+      <h2>Compare plans</h2>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Team</th>
+            <th>Business</th>
+            <th>Enterprise</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Monthly credits</td><td>10M</td><td>100M</td><td>Unlimited</td></tr>
+          <tr><td>API keys</td><td>5</td><td>20</td><td>Unlimited</td></tr>
+          <tr><td>Multi-LLM gateway</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Cost prediction</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Advanced routing</td><td class="dash">—</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Budget management</td><td class="dash">—</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Kill switches</td><td class="dash">—</td><td class="dash">—</td><td class="check">✓</td></tr>
+          <tr><td>GDPR workflows</td><td class="dash">—</td><td class="dash">—</td><td class="check">✓</td></tr>
+          <tr><td>Compliance reports</td><td class="dash">—</td><td class="dash">—</td><td class="check">✓</td></tr>
+          <tr><td>Audit retention</td><td>7 days</td><td>30 days</td><td>Unlimited</td></tr>
+          <tr><td>SLA guarantee</td><td class="dash">—</td><td class="dash">—</td><td>99.99%</td></tr>
+          <tr><td>Support response</td><td>48h</td><td>24h</td><td>4h</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq-section">
+      <h2>Frequently asked questions</h2>
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h4>What's a "credit"?</h4>
+          <p>One credit = one LLM request through the gateway. Credits are consumed based on actual usage. Unused credits don't roll over.</p>
+        </div>
+        <div class="faq-item">
+          <h4>Can I self-host Veklom?</h4>
+          <p>Yes. Veklom is designed to run in your infrastructure — on-premise, VPC, or air-gapped. We don't hold your API keys or data.</p>
+        </div>
+        <div class="faq-item">
+          <h4>What's the yearly discount?</h4>
+          <p>Pay for 10 months, get 12. That's 17% off compared to monthly billing. Billed annually upfront.</p>
+        </div>
+        <div class="faq-item">
+          <h4>Do you offer pilots?</h4>
+          <p>Yes. Contact sales for a 30-day pilot with dedicated onboarding support. Pilot pricing is customized based on scope.</p>
+        </div>
+        <div class="faq-item">
+          <h4>What payment methods?</h4>
+          <p>Credit card for self-serve. Enterprise customers typically pay via wire/ACH with NET 30 terms.</p>
+        </div>
+        <div class="faq-item">
+          <h4>Can I upgrade or downgrade?</h4>
+          <p>Yes. Changes take effect at the next billing cycle. Contact support for mid-cycle adjustments.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>© 2026 Veklom. Self-hosted AI operations platform.</p>
+  </div>
+</footer>
+
+<script>
+// Billing toggle
+const toggle = document.getElementById('billing-toggle');
+const monthlyLabel = document.getElementById('monthly-label');
+const yearlyLabel = document.getElementById('yearly-label');
+const prices = document.querySelectorAll('.price');
+
+toggle.addEventListener('change', () => {
+  const isYearly = toggle.checked;
+  monthlyLabel.classList.toggle('active', !isYearly);
+  yearlyLabel.classList.toggle('active', isYearly);
+  prices.forEach(p => p.classList.toggle('yearly', isYearly));
+  
+  // Update knob position
+  const knob = document.getElementById('toggle-knob');
+  knob.style.transform = isYearly ? 'translateX(24px)' : 'translateX(0)';
+});
+</script>
+
+</body>
+</html>

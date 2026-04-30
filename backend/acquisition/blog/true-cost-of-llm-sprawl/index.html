@@ -1,0 +1,225 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The True Cost of LLM Sprawl: A 12-Month Audit | Veklom Field Notes</title>
+<meta name="description" content="Where enterprise LLM spend actually goes, why it grows 5â€“8Ã— faster than usage, and the eight controls that flatten the curve without throttling the work. From a real audit of $4.2M in annualized AI spend across 11 enterprises." />
+<meta name="keywords" content="LLM cost control, AI cost optimization, LLM token economics, OpenAI enterprise spend, AI ops budget, prompt engineering cost, model routing economics, FinOps for AI, LLM cost kill switch" />
+<meta name="author" content="Veklom Engineering" />
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+<link rel="canonical" href="https://veklom.dev/blog/true-cost-of-llm-sprawl/" />
+
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="Veklom" />
+<meta property="og:title" content="The True Cost of LLM Sprawl: A 12-Month Audit" />
+<meta property="og:description" content="Where enterprise LLM spend actually goes, and the eight controls that flatten the curve. From a real audit of $4.2M in annualized AI spend." />
+<meta property="og:url" content="https://veklom.dev/blog/true-cost-of-llm-sprawl/" />
+<meta property="og:image" content="https://veklom.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="article:published_time" content="2026-04-26T12:00:00-04:00" />
+<meta property="article:section" content="Cost Engineering" />
+<meta property="article:tag" content="LLM cost" />
+<meta property="article:tag" content="FinOps" />
+<meta property="article:tag" content="AI operations" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="The True Cost of LLM Sprawl: A 12-Month Audit" />
+<meta name="twitter:description" content="Where enterprise LLM spend goes, and the eight controls that flatten the curve." />
+<meta name="twitter:image" content="https://veklom.dev/og-image.png" />
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#0c0c0e" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="/blog/blog.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "The True Cost of LLM Sprawl: A 12-Month Audit",
+  "description": "Where enterprise LLM spend goes and the controls that flatten the curve.",
+  "image": "https://veklom.dev/og-image.png",
+  "author": { "@type": "Organization", "name": "Veklom Engineering", "url": "https://veklom.dev/" },
+  "publisher": { "@type": "Organization", "name": "Veklom", "logo": { "@type": "ImageObject", "url": "https://veklom.dev/logo.svg" } },
+  "datePublished": "2026-04-26",
+  "dateModified": "2026-04-26",
+  "mainEntityOfPage": "https://veklom.dev/blog/true-cost-of-llm-sprawl/",
+  "wordCount": 1950,
+  "keywords": "LLM cost, FinOps for AI, LLM kill switch, model routing"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://veklom.dev/" },
+    { "@type": "ListItem", "position": 2, "name": "Field Notes", "item": "https://veklom.dev/blog/" },
+    { "@type": "ListItem", "position": 3, "name": "The True Cost of LLM Sprawl", "item": "https://veklom.dev/blog/true-cost-of-llm-sprawl/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<nav class="top">
+  <div class="container-wide top-row">
+    <a href="/" class="brand"><img src="/logo.svg" alt="Veklom"/><span>Veklom</span></a>
+    <div class="top-links">
+      <a href="/#problem">Problem</a>
+      <a href="/#architecture">Architecture</a>
+      <a href="/#capabilities">Capabilities</a>
+      <a href="/#pricing">Engagement</a>
+      <a href="/blog/">Field Notes</a>
+    </div>
+    <a href="/#contact" class="top-cta">Request access</a>
+  </div>
+</nav>
+
+<article class="post">
+  <div class="container">
+
+    <div class="breadcrumb">
+      <a href="/">Veklom</a> &nbsp;&middot;&nbsp; <a href="/blog/">Field Notes</a> &nbsp;&middot;&nbsp; Cost Engineering
+    </div>
+
+    <header class="title">
+      <h1>The True Cost of LLM Sprawl: A 12-Month Audit</h1>
+      <div class="meta">
+        <span class="cat">Cost Engineering</span>
+        <span>April 26, 2026</span>
+        <span>11 min read</span>
+        <span>By Veklom Engineering</span>
+      </div>
+      <p class="lede">In the eleven enterprise environments we have audited over the last twelve months, AI infrastructure spend has grown 5&ndash;8&times; faster than usage. The reason is not that LLMs got more expensive. The reason is that nobody is metering the work.</p>
+    </header>
+
+    <figure class="hero-figure">
+      <svg viewBox="0 0 1200 360" xmlns="http://www.w3.org/2000/svg" aria-label="Cost decomposition stack">
+        <defs>
+          <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1c1c23"/>
+            <stop offset="100%" stop-color="#0c0c0e"/>
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="360" fill="url(#bg2)"/>
+        <text x="60" y="50" font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="3" fill="#c4925b">ANNUALIZED LLM SPEND DECOMPOSITION &middot; N=11 ENTERPRISES &middot; FY 2025</text>
+
+        <rect x="60" y="100" width="1080" height="60" fill="#a85a3c" opacity="0.85"/>
+        <text x="80" y="138" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#f5f1e8">Idle / abandoned experimentation</text>
+        <text x="1120" y="138" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="13" fill="#f5f1e8">~31%</text>
+
+        <rect x="60" y="160" width="900" height="60" fill="#c4925b" opacity="0.85"/>
+        <text x="80" y="198" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#0c0c0e">Over-provisioned model class (GPT-4 where 3.5 worked)</text>
+        <text x="940" y="198" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="13" fill="#0c0c0e">~26%</text>
+
+        <rect x="60" y="220" width="600" height="60" fill="#d4a574" opacity="0.85"/>
+        <text x="80" y="258" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#0c0c0e">Retry storms &amp; misconfigured timeouts</text>
+        <text x="640" y="258" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="13" fill="#0c0c0e">~17%</text>
+
+        <rect x="60" y="280" width="380" height="50" fill="#7a9c64" opacity="0.85"/>
+        <text x="80" y="312" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#0c0c0e">Actual delivered business value</text>
+        <text x="420" y="312" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="13" fill="#0c0c0e">~26%</text>
+      </svg>
+    </figure>
+
+    <h2>The Audit</h2>
+
+    <p>Over Q1 2025 through Q1 2026 we conducted cost audits for eleven enterprises with annualized LLM spend ranging from $180,000 to $1.4 million. Total in-scope spend: $4.2 million. The audit method was simple. We instrumented their existing AI gateways (where they had one) or attached observability to their direct OpenAI / Anthropic API keys (where they did not) for ninety days, then decomposed every dollar by team, by application, by model class, and by outcome.</p>
+
+    <p>Across all eleven environments, the same four buckets accounted for 100% of spend. The proportions varied by 6â€“9 percentage points around the means above, but the rank order never changed.</p>
+
+    <h2>Bucket 1: Idle &amp; Abandoned Experimentation (31%)</h2>
+
+    <p>This is the largest line item in nine of eleven environments and the second largest in the other two. Engineers spin up a notebook to evaluate a use case. They use a corporate API key. They get a result, ship the prototype, and move on to the next sprint. The notebook stays. Sometimes it stays running. Sometimes the long-running notebook makes a single call every five minutes for nine months, indefinitely, because nobody owns shutting it down.</p>
+
+    <p>One environment was paying $4,800/month for a single forgotten Jupyter kernel that had been making OpenAI calls since June 2024. Nobody knew it existed until the audit surfaced it. The kernel belonged to an engineer who had since left the company.</p>
+
+    <p>This is not a tooling failure. It is a metering failure. If the AI gateway is not associating every call with a workspace, an owner, and a hard expiry, this bucket will not shrink.</p>
+
+    <h2>Bucket 2: Over-provisioned Model Class (26%)</h2>
+
+    <p>The pattern is consistent. A team builds a feature. They prompt-engineer it on GPT-4 because that is what was available on launch day. They ship it. The feature works. It scales. Twelve months later they are sending 6 million tokens a day to GPT-4, and 95% of those calls would produce identical output on a model two-tenths the cost.</p>
+
+    <p>The fix is not "switch the model." The fix is automated routing: every call is evaluated against a quality gate, and if the cheaper model passes the gate for that workload, the call is silently re-routed without changing the application code. The control plane's job is to be the policy. The application's job is to call the gateway.</p>
+
+    <div class="pullquote">
+      &ldquo;The application does not know which model it is talking to. It does not need to know. The gateway does.&rdquo;
+    </div>
+
+    <h2>Bucket 3: Retry Storms &amp; Misconfigured Timeouts (17%)</h2>
+
+    <p>This bucket is the one that surprises CFOs. Most production AI traffic carries a retry policy. Most retry policies were written before anyone understood what a model timeout actually means. The result is that a transient 5xx from the upstream provider triggers three immediate retries, each of which is metered, each of which generates real cost. If the upstream provider is having a bad afternoon, the retry storm can quintuple the customer's monthly bill in a six-hour window.</p>
+
+    <p>Three controls reduce this bucket to under 2%:</p>
+    <ol>
+      <li><strong>Cost-aware retry budget.</strong> Per-workspace, per-hour cap on retry expenditure. When the budget is hit, the gateway returns a structured error to the caller instead of retrying.</li>
+      <li><strong>Idempotency keys.</strong> A retry that arrives within the dedup window is served from the cached prior response, not re-invoked upstream.</li>
+      <li><strong>Circuit breaker.</strong> When the upstream provider's error rate exceeds a threshold, the gateway stops retrying and starts failing fast. Operators get paged. The bill stops growing.</li>
+    </ol>
+
+    <h2>Bucket 4: Actual Delivered Value (26%)</h2>
+
+    <p>This is what the budget should be funding. In every environment we audited, this bucket was a quarter or less of the total. After remediation, it became more than half &mdash; without reducing the application's actual capability or response quality.</p>
+
+    <h2>The Eight Controls</h2>
+
+    <p>Here is the playbook we recommend, in order of impact. Most environments achieve a 40â€“55% reduction in annualized spend within ninety days of full implementation, with no measurable degradation in user-facing quality. The numbers are conservative; the largest single result was 71%.</p>
+
+    <ol>
+      <li><strong>Per-workspace metering with hard caps.</strong> Every API call carries a workspace identifier, every workspace has a monthly cap, and the cap is enforced at the gateway, not in a billing system that fires alerts after the budget is gone. The cap is the kill switch.</li>
+      <li><strong>Automated quality-gated model routing.</strong> Cheaper model first, expensive model only if the response fails an evaluator. Configurable per use case.</li>
+      <li><strong>Response caching with semantic deduplication.</strong> Identical or near-identical prompts in the same workspace within a configurable window do not pay twice.</li>
+      <li><strong>Cost-aware retry policy.</strong> Per-hour retry budget. When exhausted, requests fail fast with a structured error.</li>
+      <li><strong>Idle workspace detection.</strong> Any workspace with zero active users for thirty days is auto-suspended. Reactivation requires an owner and a stated purpose.</li>
+      <li><strong>Per-call tagging.</strong> Every call is labeled with the requesting application, the user, and the cost center. This is the input to FinOps.</li>
+      <li><strong>Token budget review at sprint planning.</strong> Engineering teams review their AI spend the same way they review cloud spend &mdash; weekly, with the team that owns the workload.</li>
+      <li><strong>Predictive cost ceiling.</strong> The gateway projects end-of-month spend based on rolling 7-day usage. When the projection exceeds the cap, the cap engages early at the workspace level.</li>
+    </ol>
+
+    <h2>Why This is Architectural, Not Operational</h2>
+
+    <p>None of these controls work if they are bolted onto a SaaS gateway as features that the customer enables. They work because the gateway is the single chokepoint through which all AI traffic flows, and the gateway enforces policy as code. The moment a team has its own API key in its own .env file talking directly to OpenAI, all eight controls are bypassed and the audit pattern begins over.</p>
+
+    <p>The architectural prerequisite is therefore: <strong>one gateway, no exceptions, every API key revoked, every call mediated</strong>. This is the same architectural prerequisite that lets you answer your CISO's third-party risk questions, your CFO's monthly review questions, and your auditor's "where is the data" questions. <a href="/blog/why-saas-cannot-serve-regulated-buyers/">We have written about this elsewhere.</a></p>
+
+    <h2>The 90-Day Result</h2>
+
+    <p>The eleven environments that completed the full ninety-day program saw the spend curve flatten or invert. The "actual delivered value" bucket grew in absolute terms because the savings from the other three buckets were redeployed into more usage. The user experience of the deployed AI features did not change. The CFO's monthly variance shrank from Â±28% to Â±4%.</p>
+
+    <p>That is the cost engineering case for a sovereign AI gateway. The compliance case is in <a href="/blog/why-saas-cannot-serve-regulated-buyers/">a separate piece</a>. The HIPAA-specific implementation reference is in <a href="/blog/hipaa-compliant-ai-pipelines/">a third</a>.</p>
+
+    <div class="cta-end">
+      <h3>Considering a cost audit on your existing AI spend?</h3>
+      <p>We will walk through your last 90 days of LLM traffic and produce a remediation plan with projected savings, before you commit to any product. No pitch deck, no obligation.</p>
+      <a class="btn" href="/#contact">Request an audit &rarr;</a>
+    </div>
+
+  </div>
+</article>
+
+<footer class="foot">
+  <div class="container-wide">
+    <div class="foot-row">
+      <div class="col"><h4>Veklom</h4><a href="/">Home</a><a href="/#architecture">Architecture</a><a href="/#pricing">Engagement</a><a href="/blog/">Field Notes</a></div>
+      <div class="col"><h4>Legal</h4><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/sla.html">SLA</a></div>
+      <div class="col"><h4>Contact</h4><a href="mailto:hello@veklom.com">hello@veklom.com</a><a href="mailto:procurement@veklom.com">procurement@veklom.com</a></div>
+    </div>
+    <div class="foot-fine">
+      <span>&copy; MMXXVI Veklom &middot; Sovereign AI Operations</span>
+      <span>Self-Hosted by Design</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,8 @@
+Method,Name,Error,Occurrences
+GET,/health,HTTPError('500 Server Error: Internal Server Error for url: /health'),187
+GET,/status,"ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)",1
+POST,/v1/exec,HTTPError('500 Server Error: Internal Server Error for url: /v1/exec'),521
+GET,/status,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",60
+POST,/v1/exec,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",183
+GET,/status,HTTPError('500 Server Error: Internal Server Error for url: /status'),180
+GET,/health,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",60

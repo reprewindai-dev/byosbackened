@@ -1,0 +1,7 @@
+# Cloudflare Pages config for the Veklom acquisition/strategic surface.
+# Deploy this directory to veklom.dev. The marketplace/demo surface remains
+# backend/landing on veklom.com.
+
+name = "veklom-dev-acquisition"
+compatibility_date = "2026-04-29"
+pages_build_output_dir = "."

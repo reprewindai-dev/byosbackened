@@ -107,7 +107,14 @@ async def support_chat(payload: SupportMessage, request: Request):
         from core.llm import get_ollama_client, is_open, call_groq
         from core.memory import get_memory
 
-        memory = get_memory()
+        # Support both memory signatures:
+        # - get_memory()
+        # - get_memory(tenant_id)
+        try:
+            memory = get_memory("support")
+        except TypeError:
+            memory = get_memory()
+
         history = []
 
         if payload.conversation_id:

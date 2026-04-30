@@ -18,7 +18,7 @@
   <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
   <div class="app-card">
     <h1 class="app-h1">Create your workspace</h1>
-    <p class="app-sub">Create an evaluation account. Free access does not require a card. Starter, Pro, and Sovereign continue directly to Stripe checkout after registration.</p>
+    <p class="app-sub">Create an evaluation account. Free access does not require a card. Team and Business continue directly to Stripe checkout after registration. Enterprise is sales-assisted.</p>
     <div id="alert"></div>
     <form id="form">
       <div class="field">
@@ -51,7 +51,7 @@ const $alert = document.getElementById("alert");
 const $form  = document.getElementById("form");
 const $btn   = document.getElementById("submit");
 const $githubBtn = document.getElementById("github_signup");
-const SELF_SERVE_PLANS = ["starter", "pro", "sovereign"];
+const SELF_SERVE_PLANS = ["starter", "pro"];
 
 function showError(msg) {
   $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>';

@@ -589,10 +589,18 @@ async function refreshOverview() {
       '<div class="kv"><span class="k">Workspace</span><span class="v">' + (me.workspace_name || me.workspace_id || "-") + '</span></div>';
 
     const isActive = sub.status === "active" || sub.status === "trialing";
-    const planName = (sub.plan || "starter");
+    const planLabels = {
+      free: "Free",
+      starter: "Team",
+      pro: "Business",
+      sovereign: "Sovereign",
+      enterprise: "Enterprise",
+    };
+    const planKey = sub.plan || "starter";
+    const planName = planLabels[planKey] || planKey;
     const dollars = sub.amount_cents ? "$" + (sub.amount_cents/100).toLocaleString() + "/" + (sub.billing_cycle === "yearly" ? "yr" : "mo") : "-";
     document.getElementById("subscription").innerHTML =
-      '<div class="kv"><span class="k">Plan</span><span class="v">' + planName.toUpperCase() + ' <span class="tag ' + (isActive ? "live" : "") + '">' + sub.status + '</span></span></div>' +
+      '<div class="kv"><span class="k">Plan</span><span class="v">' + planName + ' <span class="tag ' + (isActive ? "live" : "") + '">' + sub.status + '</span></span></div>' +
       '<div class="kv"><span class="k">Billing</span><span class="v">' + (sub.billing_cycle || "-") + '</span></div>' +
       '<div class="kv"><span class="k">Amount</span><span class="v">' + dollars + '</span></div>' +
       '<div class="kv"><span class="k">Renews</span><span class="v">' + (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "-") + '</span></div>';
@@ -950,7 +958,14 @@ document.getElementById("btn_budget_export").addEventListener("click", async () 
 
   const wantedPlan = params.get("plan");
   if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
-    showOk("Plan selected: " + wantedPlan);
+    const planLabels = {
+      free: "Free",
+      starter: "Team",
+      pro: "Business",
+      sovereign: "Sovereign",
+      enterprise: "Enterprise",
+    };
+    showOk("Plan selected: " + (planLabels[wantedPlan] || wantedPlan));
   }
 })();
 </script>

@@ -37,6 +37,10 @@ class User(Base):
     is_superuser = Column(Boolean, default=False, nullable=False)
     workspace_id = Column(String, ForeignKey("workspaces.id"), nullable=False, index=True)
 
+    github_id = Column(String, nullable=True, index=True)
+    github_username = Column(String, nullable=True)
+    github_access_token = Column(String, nullable=True)
+
     mfa_enabled = Column(Boolean, default=False, nullable=False)
     mfa_secret = Column(String, nullable=True)
     failed_login_attempts = Column(Integer, default=0, nullable=False)

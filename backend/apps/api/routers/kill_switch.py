@@ -121,22 +121,26 @@ async def deactivate_kill_switch(
 async def get_kill_switch_status(
     workspace_id: str = Depends(get_current_workspace_id),
     current_user: User = Depends(require_admin),
-    redis = Depends(get_redis),
 ):
     """
     Get current kill switch status.
     """
-    state = _get_redis_state(redis, workspace_id)
+    try:
+        redis = get_redis()
+        state = _get_redis_state(redis, workspace_id)
 
-    # Auto-restore check
-    if state["killed"] and state.get("auto_restore_at"):
-        try:
-            restore_time = datetime.fromisoformat(state["auto_restore_at"])
-            if datetime.utcnow() >= restore_time:
-                # Auto-restore triggered
-                _set_redis_state(redis, workspace_id, {"killed": False})
-                return KillSwitchResponse(killed=False)
-        except (ValueError, TypeError):
-            pass  # Invalid timestamp, ignore
+        # Auto-restore check
+        if state["killed"] and state.get("auto_restore_at"):
+            try:
+                restore_time = datetime.fromisoformat(state["auto_restore_at"])
+                if datetime.utcnow() >= restore_time:
+                    # Auto-restore triggered
+                    _set_redis_state(redis, workspace_id, {"killed": False})
+                    return KillSwitchResponse(killed=False)
+            except (ValueError, TypeError):
+                pass  # Invalid timestamp, ignore
 
-    return KillSwitchResponse(**state)
+        return KillSwitchResponse(**state)
+    except Exception:
+        # Redis unavailable — report not killed (fail-open)
+        return KillSwitchResponse(killed=False)

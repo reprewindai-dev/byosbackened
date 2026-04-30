@@ -1,9 +1,4 @@
-"""FastAPI dependencies.
-
-Core auth dependencies live here.
-License / feature-gate dependencies live in core/license.py and are
-re-exported here for convenience so routers only need one import.
-"""
+"""FastAPI dependencies."""
 import hashlib
 import hmac
 import secrets
@@ -52,11 +47,12 @@ async def get_current_workspace_id(
             APIKey.is_active == True,
         ).first()
         if not api_key:
-            # Constant-time comparison to prevent timing attacks on key enumeration
+            # Use constant-time comparison to prevent timing attacks on key enumeration
             _secure_compare("dummy_hash_for_timing", hashlib.sha256(b"dummy").hexdigest())
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
         if api_key.expires_at and datetime.utcnow() > api_key.expires_at:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired")
+        # Verify workspace owner is active
         workspace_owner = db.query(User).filter(
             User.workspace_id == api_key.workspace_id,
             User.is_active == True
@@ -81,7 +77,8 @@ async def get_current_workspace_id(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Workspace ID missing in token",
         )
-
+    
+    # Verify user is still active (token could be valid but user suspended)
     user_id = payload.get("user_id")
     if user_id:
         from db.models import User
@@ -140,26 +137,3 @@ async def require_superuser(current_user=Depends(get_current_user)):
     if not current_user.is_superuser:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superuser access required")
     return current_user
-
-
-# ─── License dependencies (re-exported from core/license.py) ──────────────────
-# Import these in routers instead of importing directly from core.license,
-# so routers only need: `from apps.api.deps import require_active_license`
-
-from core.license import (  # noqa: E402  (import after definitions intentional)
-    require_active_license,
-    require_paid_license,
-    require_feature,
-    LicenseStatus,
-)
-
-__all__ = [
-    "get_current_workspace_id",
-    "get_current_user",
-    "require_admin",
-    "require_superuser",
-    "require_active_license",
-    "require_paid_license",
-    "require_feature",
-    "LicenseStatus",
-]

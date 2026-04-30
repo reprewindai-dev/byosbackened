@@ -32,3 +32,6 @@ class CostAllocation(Base):
     # Audit
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_by = Column(String, nullable=True)  # User who created allocation
+
+    # Relationship to audit log (nullable — allocation may exist without audit log)
+    audit_log = relationship("AIAuditLog", foreign_keys=[operation_id], primaryjoin="CostAllocation.operation_id == AIAuditLog.id", lazy="select")

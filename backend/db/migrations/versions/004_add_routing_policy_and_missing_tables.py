@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '004_routing_policy_missing'
+revision = '004_add_routing_policy_and_missing_tables'
 down_revision = '003_ollama_exec_multitenant'
 branch_labels = None
 depends_on = None

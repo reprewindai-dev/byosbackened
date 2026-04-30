@@ -55,10 +55,18 @@ def _check_db(db: Session) -> ComponentHealth:
 
 def _check_redis() -> ComponentHealth:
     try:
-        import redis as redis_lib
         from core.config import get_settings
         settings = get_settings()
-        r = redis_lib.from_url(settings.redis_url, socket_connect_timeout=2)
+        if not settings.redis_url or settings.redis_url == "redis://localhost:6379":
+            return ComponentHealth(status="disabled", details={"reason": "Redis not configured"})
+
+        import redis as redis_lib
+        r = redis_lib.from_url(
+            settings.redis_url,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+            decode_responses=True,
+        )
         t0 = time.perf_counter()
         r.ping()
         ms = (time.perf_counter() - t0) * 1000
@@ -69,15 +77,34 @@ def _check_redis() -> ComponentHealth:
 
 def _check_storage() -> ComponentHealth:
     try:
-        import boto3
-        from botocore.exceptions import BotoCoreError, ClientError
         from core.config import get_settings
         settings = get_settings()
+        if not settings.s3_endpoint_url or not settings.s3_access_key_id:
+            return ComponentHealth(status="disabled", details={"reason": "S3 not configured"})
+
+        # Quick TCP probe — if S3 endpoint is unreachable, skip boto3 entirely
+        # (avoids 5× retry with exponential backoff = ~10s hang)
+        from urllib.parse import urlparse
+        import socket
+        parsed = urlparse(settings.s3_endpoint_url)
+        host, port = parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        try:
+            sock.connect((host, port))
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            return ComponentHealth(status="disabled", details={"reason": f"S3 endpoint {host}:{port} unreachable"})
+        finally:
+            sock.close()
+
+        import boto3
+        from botocore.config import Config
         s3 = boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint_url,
             aws_access_key_id=settings.s3_access_key_id,
             aws_secret_access_key=settings.s3_secret_access_key,
+            config=Config(retries={"max_attempts": 1, "mode": "standard"}),
         )
         t0 = time.perf_counter()
         s3.list_buckets()

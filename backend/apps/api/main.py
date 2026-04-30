@@ -66,6 +66,9 @@ from apps.api.routers.workspace import router as workspace_router
 from apps.api.routers.workspace import public_router as public_status_router
 from apps.api.routers.marketplace_v1 import router as marketplace_v1_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
+from edge.routers.edge_ingest import router as edge_ingest_router
+from edge.routers.mqtt import router as edge_mqtt_router
+from edge.routers.control import router as edge_control_router
 from license.middleware import LicenseGateMiddleware, bootstrap_license_check
 import logging
 
@@ -187,6 +190,9 @@ app.include_router(ai_router, prefix=settings.api_prefix)
 app.include_router(workspace_router, prefix=settings.api_prefix)
 app.include_router(public_status_router)
 app.include_router(marketplace_v1_router, prefix=settings.api_prefix)
+app.include_router(edge_ingest_router, prefix=settings.api_prefix)
+app.include_router(edge_mqtt_router, prefix=settings.api_prefix)
+app.include_router(edge_control_router, prefix=settings.api_prefix)
 
 # ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
 app.include_router(exec_router)

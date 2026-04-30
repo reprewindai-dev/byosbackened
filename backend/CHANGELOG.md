@@ -10,3 +10,4 @@
 - Workspace dashboard rebuilt into a tabbed AI gateway control plane with overview metrics, observability, API keys, model toggles, and cost/budget views.
 - Public `/status` page and public status JSON endpoint for API, Auth, Marketplace, and AI Proxy uptime and incident visibility.
 - Normalized workspace request logging for API key usage, AI completions, observability charts, and cost exports.
+- Added Edge execution layer (`/api/v1/edge/...`) with webhook intake, normalized `EdgeMessage`, baseline rule engine (`temperature > 80` alert), and route adapters for AI/API outputs.

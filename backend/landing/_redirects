@@ -10,7 +10,8 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /proof     /#proof     302
 /architecture  /#architecture  302
 /security  /#problem   302
-/status    /status.html 200
+/status    /status/index.html 200
+/status.html  /status/index.html 200
 
 # Legal short paths
 /legal/terms     /legal/terms.html     301

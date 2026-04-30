@@ -20,7 +20,7 @@ services:
       - coolify
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.license-server.rule=Host(`license.veklom.com`)"
+      - "traefik.http.routers.license-server.rule=Host(`license.veklom.com`) || Host(`license2.veklom.com`)"
       - "traefik.http.routers.license-server.tls=true"
       - "traefik.http.routers.license-server.tls.certresolver=letsencrypt"
       - "traefik.http.services.license-server.loadbalancer.server.port=8000"

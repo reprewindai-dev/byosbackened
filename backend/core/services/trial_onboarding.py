@@ -50,6 +50,17 @@ def build_trial_download_url(tier: str) -> str:
     return f"https://veklom.com/downloads/{tier}/{filename}"
 
 
+def _resolve_issue_urls() -> list[str]:
+    urls: list[str] = []
+    primary = settings.license_issue_url.strip()
+    backup = settings.license_issue_backup_url.strip()
+    if primary:
+        urls.append(primary)
+    if backup and backup not in urls:
+        urls.append(backup)
+    return urls
+
+
 async def issue_trial_license(
     *,
     db: Session,
@@ -60,8 +71,8 @@ async def issue_trial_license(
 ) -> TrialLicensePayload:
     tier = resolve_trial_tier(requested_tier)
     expires_at = datetime.now(timezone.utc) + timedelta(days=TRIAL_DURATION_DAYS)
-    issue_url = settings.license_issue_url.strip()
-    if not issue_url:
+    issue_urls = _resolve_issue_urls()
+    if not issue_urls:
         raise HTTPException(status_code=503, detail="License issuance endpoint not configured")
 
     payload = {
@@ -79,12 +90,31 @@ async def issue_trial_license(
     headers = {"X-Admin-Token": settings.license_admin_token} if settings.license_admin_token else {}
 
     timeout = httpx.Timeout(8.0, connect=3.0)
+    response = None
+    last_error: str | None = None
     async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(issue_url, json=payload, headers=headers)
-    if response.status_code >= 400:
+        for issue_url in issue_urls:
+            try:
+                candidate = await client.post(issue_url, json=payload, headers=headers)
+            except httpx.RequestError as exc:
+                last_error = f"{issue_url}: {exc}"
+                logger.warning("License issuance request failed for %s: %s", issue_url, exc)
+                continue
+            if candidate.status_code >= 400:
+                last_error = f"{issue_url}: {candidate.status_code}"
+                logger.warning(
+                    "License issuance returned %s for %s",
+                    candidate.status_code,
+                    issue_url,
+                )
+                continue
+            response = candidate
+            break
+
+    if response is None:
         raise HTTPException(
             status_code=502,
-            detail=f"License issuance failed: {response.status_code}",
+            detail=f"License issuance failed: {last_error or 'no usable issuance endpoint'}",
         )
 
     data = response.json()

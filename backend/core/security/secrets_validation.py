@@ -43,9 +43,9 @@ def validate_secrets_on_startup():
         else:
             errors.append("ENCRYPTION_KEY must be set to a strong random value (32+ chars)")
     
-    # Ollama — warn if base URL is default (not a failure, just informational)
+    # Ollama â€” warn if base URL is default (not a failure, just informational)
     if "host.docker.internal" not in settings.llm_base_url and "127.0.0.1" not in settings.llm_base_url:
-        warnings.append(f"LLM_BASE_URL is set to '{settings.llm_base_url}' — ensure Ollama is reachable")
+        warnings.append(f"LLM_BASE_URL is set to '{settings.llm_base_url}' â€” ensure Ollama is reachable")
 
     # GitHub OAuth is a public login path, so production must not ship without it.
     if not settings.github_client_id or not settings.github_client_secret:
@@ -80,6 +80,9 @@ def validate_secrets_on_startup():
             warnings.append("LICENSE_ISSUE_URL is not configured")
         else:
             errors.append("LICENSE_ISSUE_URL must be configured when license enforcement is enabled")
+
+    if settings.license_enforcement_enabled and not settings.license_issue_backup_url:
+        warnings.append("LICENSE_ISSUE_BACKUP_URL is not configured; trial issuance fallback disabled")
 
     if settings.license_enforcement_enabled and settings.license_cache_grace_hours < 1:
         errors.append("LICENSE_CACHE_GRACE_HOURS must be at least 1 when license enforcement is enabled")
@@ -234,7 +237,7 @@ def validate_production_config():
         if settings.debug:
             # Development: Log loud warning but don't fail
             logger.critical(
-                "⚠️⚠️⚠️ NO ALERT CHANNEL CONFIGURED ⚠️⚠️⚠️\n"
+                "âš ï¸âš ï¸âš ï¸ NO ALERT CHANNEL CONFIGURED âš ï¸âš ï¸âš ï¸\n"
                 "Production alerts will not be delivered!\n"
                 "Set at least one of: ALERT_EMAIL_TO, SLACK_WEBHOOK_URL, PAGERDUTY_INTEGRATION_KEY"
             )
@@ -293,7 +296,7 @@ def validate_production_config():
         # Log all flag states for visibility
         logger.info("Feature flags loaded:")
         for flag_name, flag_value in sorted(all_flags.items()):
-            status = "✅ ENABLED" if flag_value else "❌ DISABLED"
+            status = "âœ… ENABLED" if flag_value else "âŒ DISABLED"
             logger.info(f"  {flag_name}: {status}")
         
         # Verify flags can be toggled (test one)

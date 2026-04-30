@@ -39,27 +39,27 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     encryption_key: str = ""  # For field encryption, defaults to secret_key if not set
 
-    # ── LLM — Local Ollama (primary, no external fallback) ──────────────────────
+    # â”€â”€ LLM â€” Local Ollama (primary, no external fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     llm_base_url: str = "http://host.docker.internal:11434"
     llm_model_default: str = "qwen2.5:3b"
-    llm_fallback: str = "groq"  # "off" | "groq" — groq enables self-healing fallback
+    llm_fallback: str = "groq"  # "off" | "groq" â€” groq enables self-healing fallback
     llm_timeout_seconds: int = 60
     llm_max_tokens: int = 2048
 
-    # ── Groq fallback (self-healing circuit breaker) ─────────────────────────
+    # â”€â”€ Groq fallback (self-healing circuit breaker) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"  # fast model for fallback
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
-    # Circuit breaker — opens after N failures, resets after cooldown_seconds
+    # Circuit breaker â€” opens after N failures, resets after cooldown_seconds
     circuit_breaker_failure_threshold: int = 3
     circuit_breaker_cooldown_seconds: int = 60
 
-    # ── Conversation memory ───────────────────────────────────────────────────
+    # â”€â”€ Conversation memory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     memory_ttl_seconds: int = 86400    # 24h default per conversation
     memory_max_messages: int = 20      # max messages kept in context window
 
-    # ── External AI Providers (optional, for routing diversity) ─────────────
+    # â”€â”€ External AI Providers (optional, for routing diversity) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     openai_api_key: str = ""  # OpenAI API key - used when OpenAI provider selected
     openai_model_chat: str = "gpt-4o-mini"  # Default chat model
     openai_model_whisper: str = "whisper-1"  # Default STT model
@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://redis:6379/0"
     celery_result_backend: str = "redis://redis:6379/0"
 
-    # CORS — tighten in production via CORS_ORIGINS env var
+    # CORS â€” tighten in production via CORS_ORIGINS env var
     cors_origins: list[str] = [
         "https://veklom.com",
         "https://www.veklom.com",
@@ -108,6 +108,7 @@ class Settings(BaseSettings):
     license_revalidation_seconds: int = 900
     license_cache_path: str = ""
     license_issue_url: str = "https://license.veklom.com/issue"
+    license_issue_backup_url: str = "https://license2.veklom.com/issue"
     buyer_download_base_url: str = ""
     buyer_download_version: str = ""
 

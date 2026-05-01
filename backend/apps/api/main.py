@@ -108,6 +108,12 @@ async def startup_validation():
         logger.info("Production configuration validated successfully")
         if result.get("warnings"):
             logger.warning(f"Configuration warnings: {len(result['warnings'])}")
+        if settings.package_manifest_enforcement_enabled:
+            from pathlib import Path
+            from license.package_guard import verify_package_manifest
+
+            verify_package_manifest(Path.cwd())
+            logger.info("Package manifest integrity check completed")
         if settings.license_enforcement_enabled:
             await bootstrap_license_check()
         # Safety net: ensure core tables exist even if migrations were missed.

@@ -21,6 +21,8 @@ _PUBLIC_PATHS = {
     "/status/data", # public demo status payload
     "/api/v1/edge/demo/summary",
     "/api/v1/edge/demo/infrastructure",
+    "/api/v1/demo/pipeline/stream",
+    "/api/v1/demo/pipeline/health",
     "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
     f"{settings.api_prefix}/register",
     f"{settings.api_prefix}/login",

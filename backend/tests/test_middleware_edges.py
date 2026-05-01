@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from apps.api.middleware.entitlement_check import EntitlementCheckMiddleware
+from apps.api.middleware.entitlement_check import PUBLIC_ENDPOINTS as ENTITLEMENT_PUBLIC_ENDPOINTS
 from apps.api.middleware.token_deduction import DEFAULT_ENDPOINT_COSTS
+from apps.api.middleware.token_deduction import PUBLIC_ENDPOINTS as TOKEN_PUBLIC_ENDPOINTS
+from core.security.zero_trust import _PUBLIC_PATHS as ZERO_TRUST_PUBLIC_PATHS
 
 
 def test_edge_entitlement_paths_requirements():
@@ -21,3 +24,28 @@ def test_edge_token_cost_policies_for_protocol_and_webhook():
     assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/protocol/snmp"] == 40
     assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/protocol/modbus"] == 40
 
+
+def test_public_demo_and_pipeline_routes_are_free_and_public():
+    public_paths = {
+        "/api/v1/edge/demo/summary",
+        "/api/v1/edge/demo/infrastructure",
+        "/api/v1/demo/pipeline/health",
+        "/api/v1/demo/pipeline/stream",
+    }
+
+    assert public_paths.issubset(ZERO_TRUST_PUBLIC_PATHS)
+    assert public_paths.issubset(ENTITLEMENT_PUBLIC_ENDPOINTS)
+    assert public_paths.issubset(TOKEN_PUBLIC_ENDPOINTS)
+
+
+def test_edge_protocol_routes_are_not_public():
+    protected_paths = {
+        "/api/v1/edge/snmp",
+        "/api/v1/edge/modbus",
+        "/api/v1/edge/protocol/snmp",
+        "/api/v1/edge/protocol/modbus",
+    }
+
+    assert protected_paths.isdisjoint(ZERO_TRUST_PUBLIC_PATHS)
+    assert protected_paths.isdisjoint(ENTITLEMENT_PUBLIC_ENDPOINTS)
+    assert protected_paths.isdisjoint(TOKEN_PUBLIC_ENDPOINTS)

@@ -36,6 +36,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/subscriptions/webhook",
     "/api/v1/edge/demo/summary",
     "/api/v1/edge/demo/infrastructure",
+    "/api/v1/demo/pipeline/stream",
+    "/api/v1/demo/pipeline/health",
 }
 
 # Endpoint to plan tier mapping

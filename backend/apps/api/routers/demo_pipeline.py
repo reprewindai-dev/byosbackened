@@ -142,6 +142,11 @@ def _chunk_text(text: str, size: int = 18) -> Iterable[str]:
         yield text[i : i + size]
 
 
+def _demo_groq_model() -> str:
+    """Use the strongest configured Groq model for the public theater demo."""
+    return settings.groq_model_smart or settings.groq_model or settings.groq_model_fast
+
+
 def _audit_hash(trace_id: str, model: str, provider: str, tokens: int) -> str:
     raw = f"{trace_id}|{model}|{provider}|{tokens}|{int(time.time())}"
     return hashlib.sha256(raw.encode()).hexdigest()
@@ -316,9 +321,10 @@ async def demo_pipeline_stream(
 
         # Groq fallback path
         if used_groq or result is None:
+            groq_model = _demo_groq_model()
             yield _sse("provider_selected", {
                 "provider": "groq",
-                "model": settings.groq_model,
+                "model": groq_model,
                 "reason": "fallback",
                 "sovereign": False,
             })
@@ -346,7 +352,7 @@ async def demo_pipeline_stream(
                     yield _sse("token_delta", {"delta": delta, "provider": "groq_simulated"})
                 result = {
                     "response": synthetic,
-                    "model": f"groq/{settings.groq_model}",
+                    "model": f"groq/{groq_model}",
                     "total_tokens": len(synthetic) // 4,
                     "prompt_tokens": 0,
                     "completion_tokens": len(synthetic) // 4,
@@ -356,6 +362,7 @@ async def demo_pipeline_stream(
                 try:
                     groq_result = call_groq(
                         prompt=effective_prompt,
+                        model=groq_model,
                         max_tokens=_DEMO_OUTPUT_MAX_TOKENS,
                         temperature=0.5,
                     )
@@ -378,7 +385,7 @@ async def demo_pipeline_stream(
                     })
                     result = {
                         "response": f"Groq fallback failed: {exc}",
-                        "model": f"groq/{settings.groq_model}",
+                        "model": f"groq/{groq_model}",
                         "total_tokens": 0,
                         "prompt_tokens": 0,
                         "completion_tokens": 0,

@@ -55,6 +55,7 @@ from apps.api.routers.admin import router as admin_router
 from apps.api.routers.subscriptions import router as subscriptions_router
 from apps.api.routers.content_safety import router as content_safety_router
 from apps.api.routers.exec_router import router as exec_router
+from apps.api.routers.demo_pipeline import router as demo_pipeline_router
 from apps.api.routers.locker_security import router as locker_security_router
 from apps.api.routers.locker_monitoring import router as locker_monitoring_router
 from apps.api.routers.locker_users import router as locker_users_router
@@ -206,6 +207,9 @@ app.include_router(edge_snmp_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)
+
+# Public Veklom Live Pipeline Theater SSE demo (no auth, IP rate-limited)
+app.include_router(demo_pipeline_router, prefix=settings.api_prefix)
 
 
 @app.get("/health")

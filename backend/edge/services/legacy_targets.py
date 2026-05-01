@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import ipaddress
+import hashlib
+import json
 import socket
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -20,25 +23,46 @@ SCENARIO_PRESETS = {
         "metric": "sysUpTimeInstance",
         "fallback_payload": {
             "protocol": "snmp",
-            "source": "demo.pysnmp.com",
-            "metric": "sysUpTimeInstance",
-            "value": 999999.0,
+            "source": "router-1",
+            "signal": {
+                "cpu_pct": 92,
+                "packet_loss_pct": 18,
+                "retransmissions": 16,
+                "q_count": 1,
+                "rto_ms": 5000,
+            },
         },
         "cost_estimate": 40,
     },
     "machine": {
         "title": "machine",
-        "description": "Machine telemetry control demo (SNMP readback)",
+        "description": "Machine telemetry control demo (Modbus register pattern)",
         "oid": "1.3.6.1.2.1.1.1.0",
         "metric": "sysDescr",
         "fallback_payload": {
-            "protocol": "snmp",
-            "source": "demo.pysnmp.com",
-            "metric": "sysDescr",
-            "value": 42.0,
+            "protocol": "modbus",
+            "source": "press-line-7",
+            "signal": {
+                "temperature_c": 92,
+                "vibration_index": 71,
+            },
         },
         "cost_estimate": 40,
     },
+}
+
+TRACE_STEPS = [
+    "legacy_ingest",
+    "normalize",
+    "policy_control",
+    "decision",
+    "audit_ready",
+]
+
+STABLE_REPLAY_TIMESTAMPS = {
+    "network": "2026-05-01T00:00:00Z",
+    "machine": "2026-05-01T00:00:01Z",
+    "custom": "2026-05-01T00:00:02Z",
 }
 
 
@@ -123,6 +147,197 @@ def scenario_fallback_payload(scenario: str, *, trace_id: str | None = None) -> 
     payload["trace_id"] = trace_id or str(uuid.uuid4())
     payload["fallback"] = True
     return payload
+
+
+def utc_now_iso() -> str:
+    """Return a compact ISO-8601 UTC timestamp."""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def scenario_signal(scenario: str, raw_value: Any | None = None) -> dict[str, Any]:
+    """Return the canonical signal for a demo scenario."""
+    scenario = validate_public_scenario_query(scenario)
+    fallback = SCENARIO_PRESETS[scenario]["fallback_payload"]
+    signal = dict(fallback.get("signal") or {})
+    if scenario == "network" and raw_value is not None:
+        # Preserve the public SNMP read as raw evidence without letting it weaken
+        # the stable routing-failure proof payload.
+        signal["snmp_sys_uptime"] = raw_value
+    return signal
+
+
+def normalize_signal(
+    *,
+    protocol: str,
+    source: str,
+    signal: dict[str, Any],
+    timestamp: str,
+    raw: dict[str, Any] | None = None,
+    tags: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Normalize a scenario signal into the public contract schema."""
+    normalized = []
+    for metric, value in signal.items():
+        normalized.append(
+            {
+                "protocol": protocol,
+                "source": source,
+                "metric": str(metric),
+                "value": value,
+                "units": _units_for_metric(metric),
+                "timestamp": timestamp,
+                "raw": dict(raw or {}),
+                "tags": dict(tags or {}),
+            }
+        )
+    return normalized
+
+
+def _units_for_metric(metric: str) -> str | None:
+    if metric.endswith("_pct"):
+        return "percent"
+    if metric == "temperature_c":
+        return "celsius"
+    if metric == "rto_ms":
+        return "milliseconds"
+    return None
+
+
+def decision_for_scenario(scenario: str) -> dict[str, Any]:
+    """Return the governed decision for the scenario."""
+    if scenario == "network":
+        return {
+            "action": "investigate",
+            "severity": "critical",
+            "summary": "Network instability detected from routing-style retry and queue signals.",
+            "likely_causes": [
+                "MTU mismatch",
+                "unicast path failure",
+                "one-way link",
+                "congestion or link quality issue",
+            ],
+            "recommended_actions": [
+                "Run full-MTU DF ping to neighbor unicast IP",
+                "Check interface errors, MTU, and one-way link symptoms",
+                "Inspect routing event log and neighbor details before clearing adjacency",
+            ],
+            "blocked_actions": [
+                "Do not automatically clear adjacency in demo mode",
+                "Do not change routing configuration without operator approval",
+            ],
+        }
+    if scenario == "machine":
+        return {
+            "action": "reduce_load",
+            "severity": "critical",
+            "summary": "Machine overheating detected from temperature and vibration register signals.",
+            "likely_causes": [
+                "cooling failure",
+                "excess load",
+                "sensor threshold breach",
+            ],
+            "recommended_actions": [
+                "Notify operator",
+                "Reduce load or pause line if policy permits",
+                "Open maintenance ticket with register trace",
+            ],
+            "blocked_actions": [
+                "Do not trigger shutdown without human approval in demo mode",
+            ],
+        }
+    return {
+        "action": "notify",
+        "severity": "normal",
+        "summary": "Custom edge signal processed.",
+        "likely_causes": [],
+        "recommended_actions": ["Review normalized signal and policy trace"],
+        "blocked_actions": [],
+    }
+
+
+def build_decision_response(
+    *,
+    scenario: str,
+    live: bool,
+    fallback: bool,
+    protocol: str,
+    source: str,
+    signal: dict[str, Any],
+    public_demo: bool,
+    customer_route_cost_credits: int | None,
+    generated_at: str | None = None,
+    raw: dict[str, Any] | None = None,
+    error_code: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    """Build the public/customer edge decision response contract."""
+    scenario = scenario if scenario in SCENARIO_PRESETS else "custom"
+    generated_at = generated_at or (STABLE_REPLAY_TIMESTAMPS[scenario] if fallback else utc_now_iso())
+    normalized = normalize_signal(
+        protocol=protocol,
+        source=source,
+        signal=signal,
+        timestamp=generated_at,
+        raw=raw,
+        tags={"scenario": scenario},
+    )
+    decision = decision_for_scenario(scenario)
+    proof_hash = _proof_hash(
+        protocol=protocol,
+        source=source,
+        normalized=normalized,
+        decision_summary=decision["summary"],
+        trace=TRACE_STEPS,
+        generated_at=generated_at,
+    )
+    response = {
+        "status": "degraded" if fallback else "ok",
+        "scenario": scenario,
+        "live": live,
+        "fallback": fallback,
+        "protocol": protocol,
+        "source": source,
+        "normalized": normalized,
+        "decision": decision,
+        "trace": list(TRACE_STEPS),
+        "audit": {
+            "proof_hash": proof_hash,
+            "replayable": True,
+            "source_provenance": source,
+            "generated_at": generated_at,
+        },
+        "cost_control": {
+            "public_demo": public_demo,
+            "billable": not public_demo,
+            "customer_route_cost_credits": customer_route_cost_credits,
+        },
+    }
+    if error_code:
+        response["error_code"] = error_code
+    if error:
+        response["error"] = error
+    return response
+
+
+def _proof_hash(
+    *,
+    protocol: str,
+    source: str,
+    normalized: list[dict[str, Any]],
+    decision_summary: str,
+    trace: list[str],
+    generated_at: str,
+) -> str:
+    material = {
+        "protocol": protocol,
+        "source": source,
+        "normalized": normalized,
+        "decision_summary": decision_summary,
+        "trace": trace,
+        "generated_at": generated_at,
+    }
+    encoded = json.dumps(material, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def validate_public_scenario_query(scenario: str) -> str:

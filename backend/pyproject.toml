@@ -44,6 +44,8 @@ dependencies = [
     "email-validator>=2.1.0",
     "sentry-sdk[fastapi]>=1.38.0",
     "python-slugify>=8.0.0",
+    "pymodbus>=3.6.1,<4.0.0",
+    "pysnmp==4.4.12",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +54,17 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "black>=23.11.0",
     "ruff>=0.1.0",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "acquisition*",
+    "apps*",
+    "config*",
+    "core*",
+    "db*",
+    "edge*",
+    "license*",
 ]
 
 [tool.black]

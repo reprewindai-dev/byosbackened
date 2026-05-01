@@ -17,7 +17,10 @@ _PUBLIC_PATHS = {
     "/",
     "/metrics",
     "/status",      # system health — no auth required
+    "/status.html",
     "/status/data", # public demo status payload
+    "/api/v1/edge/demo/summary",
+    "/api/v1/edge/demo/infrastructure",
     "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
     f"{settings.api_prefix}/register",
     f"{settings.api_prefix}/login",

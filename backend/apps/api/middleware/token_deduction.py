@@ -37,6 +37,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/refresh",
     "/api/v1/subscriptions/plans",
     "/api/v1/subscriptions/webhook",
+    "/api/v1/edge/demo/summary",
+    "/api/v1/edge/demo/infrastructure",
 }
 
 # Default token costs by endpoint pattern
@@ -83,6 +85,13 @@ DEFAULT_ENDPOINT_COSTS: Dict[str, int] = {
     "/api/v1/content-safety/scan": 25,
     "/api/v1/content-safety/scan/file": 40,
     "/api/v1/content-safety/logs": 40,
+
+    # Edge protocol + webhook execution
+    "/api/v1/edge/input/webhook": 25,
+    "/api/v1/edge/snmp": 40,
+    "/api/v1/edge/modbus": 40,
+    "/api/v1/edge/protocol/snmp": 40,
+    "/api/v1/edge/protocol/modbus": 40,
     
     # Explainability (30 tokens)
     "/api/v1/explain/routing": 30,

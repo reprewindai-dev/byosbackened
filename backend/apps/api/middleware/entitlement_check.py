@@ -34,6 +34,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/login",
     "/api/v1/subscriptions/plans",
     "/api/v1/subscriptions/webhook",
+    "/api/v1/edge/demo/summary",
+    "/api/v1/edge/demo/infrastructure",
 }
 
 # Endpoint to plan tier mapping
@@ -108,6 +110,13 @@ ENDPOINT_PLAN_REQUIREMENTS: Dict[str, str] = {
     # Monitoring - pro+ (dashboard), starter (health)
     "/api/v1/monitoring/dashboard": "pro",
     "/api/v1/monitoring/metrics": "pro",
+
+    # Edge execution API - starter/pro gates
+    "/api/v1/edge/input/webhook": "starter",
+    "/api/v1/edge/snmp": "pro",
+    "/api/v1/edge/modbus": "pro",
+    "/api/v1/edge/protocol/snmp": "pro",
+    "/api/v1/edge/protocol/modbus": "pro",
     
     # Admin - enterprise
     "/api/v1/admin": "enterprise",

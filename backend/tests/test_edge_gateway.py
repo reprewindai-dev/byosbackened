@@ -63,17 +63,21 @@ def test_modbus_router_calls_pipeline_with_normalized_payload(monkeypatch):
     monkeypatch.setattr("edge.routers.modbus.process_pipeline", fake_process_pipeline)
     monkeypatch.setattr(
         "edge.routers.modbus._get_client",
-        lambda: SimpleNamespace(read=lambda address, slave=1: 123),
+        lambda *args, **kwargs: SimpleNamespace(read=lambda address, slave=1: 123),
     )
 
     result = asyncio.run(
-        modbus_router.read_modbus(address=100, user=SimpleNamespace(id="user-1"))
+        modbus_router.read_modbus(
+            target="local-rtu-demo",
+            register_key="temperature_c",
+            user=SimpleNamespace(id="user-1"),
+        )
     )
 
     assert result["ok"] is True
     assert called["data"]["protocol"] == "modbus"
-    assert called["data"]["source"] == "device"
-    assert called["data"]["metric"] == "100"
+    assert called["data"]["source"] == "local-rtu-demo"
+    assert called["data"]["metric"] == "temperature_c"
     assert called["data"]["value"] == 123.0
     assert called["user_id"] == "user-1"
 
@@ -87,20 +91,20 @@ def test_snmp_router_calls_pipeline_with_normalized_payload(monkeypatch):
         return {"ok": True}
 
     monkeypatch.setattr("edge.routers.snmp.process_pipeline", fake_process_pipeline)
-    monkeypatch.setattr("edge.routers.snmp.read_snmp", lambda ip, oid: "77")
+    monkeypatch.setattr("edge.routers.snmp.read_snmp", lambda ip, oid, **kwargs: "77")
 
     result = asyncio.run(
         snmp_router.read_snmp_route(
-            ip="8.8.8.8",
-            oid="1.3.6.1.2.1.1.5.0",
+            target="pysnmp-public",
+            oid_key="sys_descr",
             user=SimpleNamespace(id="user-2"),
         )
     )
 
     assert result["ok"] is True
     assert called["data"]["protocol"] == "snmp"
-    assert called["data"]["source"] == "8.8.8.8"
-    assert called["data"]["metric"] == "1.3.6.1.2.1.1.5.0"
+    assert called["data"]["source"] == "pysnmp-public"
+    assert called["data"]["metric"] == "sysDescr"
     assert called["data"]["value"] == 77.0
     assert called["user_id"] == "user-2"
 
@@ -201,7 +205,17 @@ def test_public_demo_live_true_uses_allowlisted_target(monkeypatch):
 
 def test_invalid_ip_oid_is_rejected():
     with pytest.raises(HTTPException):
-        asyncio.run(snmp_router.read_snmp_route(ip="not-a-host", oid="bad", user=None))
+        asyncio.run(snmp_router.read_snmp_route(target="unknown-host", oid_key="bad", user=None))
+
+
+def test_protocol_routes_reject_raw_network_params():
+    request = SimpleNamespace(query_params={"ip": "127.0.0.1", "oid": "1.3.6.1.2.1.1.1.0"})
+    with pytest.raises(HTTPException):
+        asyncio.run(snmp_router.read_snmp_route(request=request, user=SimpleNamespace(id="user-2")))
+
+    request = SimpleNamespace(query_params={"address": "1", "slave": "1"})
+    with pytest.raises(HTTPException):
+        asyncio.run(modbus_router.read_modbus(request=request, user=SimpleNamespace(id="user-1")))
 
 
 @pytest.mark.asyncio

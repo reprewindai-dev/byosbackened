@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from core.auth import get_current_user
 from edge.core.normalizer import normalize
 from edge.core.pipeline import process_pipeline
-from edge.services.legacy_targets import build_decision_response
+from edge.services.legacy_targets import build_decision_response, resolve_customer_modbus_target
 
 router = APIRouter(prefix="/edge", tags=["Edge"])
 
-_CLIENT: object | None = None
+_CLIENTS: dict[tuple[str, int, int | float], object] = {}
 
 
 def _load_modbus_client():
@@ -63,33 +63,48 @@ def _load_modbus_client():
         return _ModbusReadError, _ModbusClient
 
 
-def _get_client():
+def _get_client(port: str = "/dev/ttyUSB0", baudrate: int = 9600, timeout: int | float = 2):
     """Return a cached Modbus client instance."""
-    global _CLIENT
-    if _CLIENT is None:
+    cache_key = (port, baudrate, timeout)
+    if cache_key not in _CLIENTS:
         _, client_cls = _load_modbus_client()
-        _CLIENT = client_cls()
-    return _CLIENT
+        _CLIENTS[cache_key] = client_cls(port=port, baudrate=baudrate, timeout=timeout)
+    return _CLIENTS[cache_key]
 
 
 @router.get("/modbus")
 @router.get("/protocol/modbus")
-async def read_modbus(address: int, slave: int = 1, user=Depends(get_current_user)):
-    """Read a Modbus RTU holding register and ingest into edge execution pipeline."""
-    if address < 0 or address > 65535:
+async def read_modbus(
+    request: Request = None,
+    target: str = Query(default="local-rtu-demo"),
+    register_key: str = Query(default="temperature_c"),
+    user=Depends(get_current_user),
+):
+    """Read an allowlisted Modbus register and ingest into edge execution pipeline."""
+    if request is not None:
+        allowed_query_params = {"target", "register_key"}
+        unexpected_params = set(request.query_params.keys()) - allowed_query_params
+        if unexpected_params:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported query parameter(s): {', '.join(sorted(unexpected_params))}",
+            )
+
+    try:
+        resolved = resolve_customer_modbus_target(target, register_key)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="address must be an integer between 0 and 65535",
-        )
-    if slave < 1 or slave > 247:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="slave must be between 1 and 247",
-        )
+            detail=str(exc),
+        ) from exc
 
     try:
         err_cls, _ = _load_modbus_client()
-        value = _get_client().read(address=address, slave=slave)
+        value = _get_client(
+            port=resolved.port,
+            baudrate=resolved.baudrate,
+            timeout=resolved.timeout,
+        ).read(address=resolved.address, slave=resolved.slave)
     except Exception as exc:
         if isinstance(exc, err_cls):
             raise HTTPException(
@@ -101,18 +116,25 @@ async def read_modbus(address: int, slave: int = 1, user=Depends(get_current_use
             detail=str(exc),
         ) from exc
 
-    data = normalize("modbus", "device", str(address), value)
+    data = normalize("modbus", resolved.source, resolved.metric, value)
     pipeline_result = await process_pipeline(data, user)
     response = build_decision_response(
         scenario="machine",
         live=True,
         fallback=False,
         protocol="modbus",
-        source="device",
-        signal={str(address): data["value"]},
+        source=resolved.source,
+        signal={resolved.metric: data["value"]},
         public_demo=False,
         customer_route_cost_credits=40,
-        raw={"pipeline_result": pipeline_result, "input": data, "slave": slave},
+        raw={
+            "pipeline_result": pipeline_result,
+            "input": data,
+            "target": resolved.target_key,
+            "register_key": resolved.register_key,
+            "address": resolved.address,
+            "slave": resolved.slave,
+        },
     )
     if isinstance(pipeline_result, dict):
         response.update(pipeline_result)

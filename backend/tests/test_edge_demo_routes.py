@@ -85,4 +85,14 @@ def test_public_demo_live_true_uses_allowlist(monkeypatch):
 
 def test_invalid_ip_oid_is_rejected():
     with pytest.raises(HTTPException):
-        asyncio.run(snmp_router.read_snmp_route(ip="127.0.0.1", oid="bad", user=None))
+        asyncio.run(snmp_router.read_snmp_route(target="127-0-0-1", oid_key="bad", user=None))
+
+
+def test_protocol_routes_reject_raw_target_coordinates():
+    request = type("Request", (), {"query_params": {"ip": "127.0.0.1", "oid": "1.3.6.1.2.1.1.1.0"}})()
+    with pytest.raises(HTTPException):
+        asyncio.run(snmp_router.read_snmp_route(request=request, user=None))
+
+    request = type("Request", (), {"query_params": {"address": "1", "slave": "1"}})()
+    with pytest.raises(HTTPException):
+        asyncio.run(modbus_router.read_modbus(request=request, user=None))

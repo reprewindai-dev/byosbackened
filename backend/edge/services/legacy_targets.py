@@ -15,6 +15,48 @@ from urllib.parse import urlparse
 
 DEMO_SNMP_HOSTS = ("demo.pysnmp.com", "demo.snmplabs.com")
 
+CUSTOMER_SNMP_TARGETS: dict[str, dict[str, Any]] = {
+    "pysnmp-public": {
+        "host": "demo.pysnmp.com",
+        "source": "pysnmp-public",
+        "community": "public",
+        "port": 161,
+        "oids": {
+            "sys_descr": {
+                "oid": "1.3.6.1.2.1.1.1.0",
+                "metric": "sysDescr",
+            },
+            "sys_uptime": {
+                "oid": "1.3.6.1.2.1.1.3.0",
+                "metric": "sysUpTimeInstance",
+            },
+        },
+    }
+}
+
+CUSTOMER_MODBUS_TARGETS: dict[str, dict[str, Any]] = {
+    "local-rtu-demo": {
+        "source": "local-rtu-demo",
+        "port": "/dev/ttyUSB0",
+        "baudrate": 9600,
+        "timeout": 2,
+        "registers": {
+            "temperature_c": {
+                "address": 1,
+                "slave": 1,
+                "metric": "temperature_c",
+                "units": "celsius",
+            },
+            "vibration_index": {
+                "address": 2,
+                "slave": 1,
+                "metric": "vibration_index",
+                "units": None,
+            },
+        },
+    }
+}
+
 SCENARIO_PRESETS = {
     "network": {
         "title": "network",
@@ -89,6 +131,32 @@ class DemoTarget:
         }
 
 
+@dataclass(frozen=True)
+class CustomerSnmpTarget:
+    target_key: str
+    oid_key: str
+    host: str
+    oid: str
+    metric: str
+    source: str
+    community: str = "public"
+    port: int = 161
+
+
+@dataclass(frozen=True)
+class CustomerModbusTarget:
+    target_key: str
+    register_key: str
+    source: str
+    port: str
+    address: int
+    slave: int
+    metric: str
+    baudrate: int = 9600
+    timeout: int | float = 2
+    units: str | None = None
+
+
 def _normalise_host(host: str) -> str:
     return (host or "").strip().lower()
 
@@ -136,6 +204,76 @@ def resolve_demo_target_for_live(scenario: str, *, host: str | None = None, oid:
         source=normalized_host,
         cost_estimate=int(preset["cost_estimate"]),
     )
+
+
+def resolve_customer_snmp_target(target: str, oid_key: str) -> CustomerSnmpTarget:
+    """Resolve an authenticated SNMP read to an allowlisted target and OID."""
+    target_key = _normalise_key(target)
+    oid_lookup_key = _normalise_key(oid_key)
+    config = CUSTOMER_SNMP_TARGETS.get(target_key)
+    if not config:
+        raise ValueError("unknown SNMP target")
+    oid_config = dict(config.get("oids") or {}).get(oid_lookup_key)
+    if not oid_config:
+        raise ValueError("unknown SNMP oid_key")
+
+    host = _normalise_host(str(config["host"]))
+    oid = str(oid_config["oid"])
+    enforce_live_target_allowlist(host, oid)
+    return CustomerSnmpTarget(
+        target_key=target_key,
+        oid_key=oid_lookup_key,
+        host=host,
+        oid=oid,
+        metric=str(oid_config["metric"]),
+        source=str(config.get("source") or target_key),
+        community=str(config.get("community") or "public"),
+        port=int(config.get("port") or 161),
+    )
+
+
+def resolve_customer_modbus_target(target: str, register_key: str) -> CustomerModbusTarget:
+    """Resolve an authenticated Modbus read to an allowlisted device/register."""
+    target_key = _normalise_key(target)
+    register_lookup_key = _normalise_key(register_key)
+    config = CUSTOMER_MODBUS_TARGETS.get(target_key)
+    if not config:
+        raise ValueError("unknown Modbus target")
+    register_config = dict(config.get("registers") or {}).get(register_lookup_key)
+    if not register_config:
+        raise ValueError("unknown Modbus register_key")
+
+    address = int(register_config["address"])
+    slave = int(register_config.get("slave") or 1)
+    validate_modbus_bounds(address=address, slave=slave)
+    return CustomerModbusTarget(
+        target_key=target_key,
+        register_key=register_lookup_key,
+        source=str(config.get("source") or target_key),
+        port=str(config["port"]),
+        address=address,
+        slave=slave,
+        metric=str(register_config.get("metric") or register_lookup_key),
+        baudrate=int(config.get("baudrate") or 9600),
+        timeout=config.get("timeout") or 2,
+        units=register_config.get("units"),
+    )
+
+
+def validate_modbus_bounds(*, address: int, slave: int) -> None:
+    if address < 0 or address > 65535:
+        raise ValueError("address must be an integer between 0 and 65535")
+    if slave < 1 or slave > 247:
+        raise ValueError("slave must be between 1 and 247")
+
+
+def _normalise_key(value: str) -> str:
+    key = (value or "").strip().lower()
+    if not key:
+        raise ValueError("target key is required")
+    if not all(char.isalnum() or char in {"-", "_"} for char in key):
+        raise ValueError("target key contains unsupported characters")
+    return key
 
 
 def scenario_fallback_payload(scenario: str, *, trace_id: str | None = None) -> dict[str, Any]:

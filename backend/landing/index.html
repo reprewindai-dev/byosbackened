@@ -533,15 +533,15 @@
             <span class="chip" id="chipCB"><span class="dot"></span>Circuit: closed</span>
           </div>
           <div class="mode-toggle" role="tablist" aria-label="Theater mode">
-            <button role="tab" class="active" data-mode="ai">AI Request</button>
-            <button role="tab" data-mode="edge">Legacy Infrastructure</button>
+            <button role="tab" data-mode="ai">AI Request</button>
+            <button role="tab" class="active" data-mode="edge">Legacy Infrastructure</button>
           </div>
         </div>
 
         <div class="theater-body">
           <!-- ---- CONTROLS ---- -->
           <aside class="pane controls-pane" aria-label="Controls">
-            <div class="pane-title" id="ctrlTitle">AI Request ? Vertical</div>
+            <div class="pane-title" id="ctrlTitle">Legacy Infrastructure ? Scenario</div>
 
             <div class="verticals" id="verticals" role="tablist" data-visible="ai">
               <button class="vertical active" data-vertical="default">Default</button>
@@ -552,7 +552,7 @@
               <button class="vertical" data-vertical="infrastructure">Infrastructure</button>
             </div>
 
-            <div id="aiControls">
+            <div id="aiControls" hidden>
               <textarea
                 id="promptInput"
                 class="prompt"
@@ -577,7 +577,7 @@
               </div>
             </div>
 
-            <div id="edgeControls" hidden>
+            <div id="edgeControls">
               <div class="scenario-grid" style="grid-template-columns: 1fr;">
                 <button class="scenario-btn" id="btnNetwork">
                   <span class="sb-title">Network Instability</span>
@@ -591,7 +591,7 @@
             </div>
 
             <button class="run-btn" id="btnRun">
-              <span id="runLabel">Run pipeline</span>
+              <span id="runLabel">Run network scenario</span>
             </button>
 
             <div class="control-note">
@@ -898,7 +898,7 @@
   const verticalsBar  = $("verticals");
   const ctrlTitle     = $("ctrlTitle");
 
-  let mode = "ai";
+  let mode = "edge";
   let selectedVertical = "default";
   let currentES = null;
   let nodeEls = new Map();

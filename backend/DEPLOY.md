@@ -105,6 +105,16 @@ docker exec byos-api alembic upgrade head
 # 6. Put nginx + Let's Encrypt in front (or use Caddy for auto-TLS)
 ```
 
+For the production stack in `docker-compose.prod.yml`, Ollama now runs as a named server container:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml exec ollama ollama pull qwen2.5:1.5b
+docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+```
+
+That keeps the public site pointed at `http://ollama:11434` inside the server network instead of back at your laptop.
+
 ---
 
 ## After deploy: turn on Cloudflare for free 10× scale on public endpoints

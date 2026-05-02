@@ -1277,9 +1277,9 @@
 
     const order = ["legacy_signal", "protocol_ingest", "normalize", "policy_control", "ai_decision", "audit_cost"];
     // animate the first 2 nodes optimistically while the fetch is in flight
-    advanceTo("legacy_signal");
-    termPush("ingest", `scenario=${scenario} ? live=true`);
-    setTimeout(() => advanceTo("protocol_ingest"), 180);
+      advanceTo("legacy_signal");
+      termPush("ingest", `scenario=${scenario} ? requested_live=true`);
+      setTimeout(() => advanceTo("protocol_ingest"), 180);
 
     try {
       const res = await fetch(`${API_BASE}/edge/demo/infrastructure?scenario=${scenario}&live=true`, {
@@ -1288,10 +1288,19 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
 
-      const metric = (payload.normalized_event && Object.keys(payload.normalized_event)) || [];
-      termPush("protocol", `${payload.protocol || "?"} ? src=${payload.normalized_event?.source || payload.source || "demo"}`, "ok");
-      advanceTo("normalize");
-      await sleep(220);
+        const usingFallback = !!payload.fallback || payload.live === false;
+        const protocolClass = usingFallback ? "warn" : "ok";
+        termPush(
+          "protocol",
+          `${payload.protocol || "?"} ? src=${payload.normalized_event?.source || payload.source || "demo"}${usingFallback ? " ? fallback=true" : " ? live=true"}`,
+          protocolClass
+        );
+        chipProvider.className = "chip " + (usingFallback ? "warn" : "ok");
+        chipProvider.innerHTML = `<span class="dot"></span>Provider: ${usingFallback ? "fallback" : (payload.protocol || "live")}`;
+        chipCB.className = "chip " + (payload.status === "degraded" ? "warn" : "ok");
+        chipCB.innerHTML = `<span class="dot"></span>Circuit: ${payload.status || "closed"}`;
+        advanceTo("normalize");
+        await sleep(220);
 
       const decision = payload.decision || {};
       const severity = decision.severity || "info";
@@ -1305,8 +1314,8 @@
       const actions = decision.recommended_actions || [];
       termPush("decision", actions[0] || "review trace", "ok");
       advanceTo("ai_decision");
-      metProvider.textContent = payload.protocol || "edge";
-      metProvider.className = "m-value ok";
+        metProvider.textContent = usingFallback ? `${payload.protocol || "edge"} fallback` : (payload.protocol || "edge");
+        metProvider.className = "m-value " + (usingFallback ? "warn" : "ok");
       metTokens.textContent = "?";
       metPolicy.textContent = severity; metPolicy.className = "m-value " + (severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
       metBillable.textContent = payload.cost_control?.billable ? "yes" : "no";
@@ -1327,7 +1336,10 @@
       kvBillable.textContent = String(cost.billable ?? false); kvBillable.className = "v " + (cost.billable ? "warn" : "ok");
       kvCredits.textContent = cost.customer_route_cost_credits ?? 0;
       setNodeState("audit_cost", "done");
-      termPush("done", `trace=${payload.trace_id?.slice(0,8) || "?"}? ? ${(payload.trace || []).join(" ? ")}`, "ok");
+        if (usingFallback) {
+          termPush("degraded", "public demo fallback path verified; live upstream target was not used", "warn");
+        }
+        termPush("done", `trace=${payload.trace_id?.slice(0,8) || "?"}? ? ${(payload.trace || []).join(" ? ")}`, usingFallback ? "warn" : "ok");
     } catch (err) {
       termPush("edge?fail", String(err.message || err), "err");
       setNodeState("protocol_ingest", "err");

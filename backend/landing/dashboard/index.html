@@ -276,6 +276,7 @@ tr.clickable:hover { background: rgba(255,255,255,0.02); }
         <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-secondary" id="btn_github_connect">Connect GitHub</button>
           <button class="btn btn-secondary" id="btn_github_refresh" style="display:none;">Refresh repos</button>
+          <button class="btn btn-secondary" id="btn_github_disconnect" style="display:none;">Disconnect GitHub</button>
         </div>
       </div>
       <div class="app-card full">
@@ -683,16 +684,21 @@ async function refreshOverview() {
     const planKey = sub.plan || "starter";
     const planName = planLabels[planKey] || planKey;
     const dollars = sub.amount_cents ? "$" + (sub.amount_cents/100).toLocaleString() + "/" + (sub.billing_cycle === "yearly" ? "yr" : "mo") : "-";
+    const renewLabel = sub.status === "trialing" ? "Trial ends" : "Renews";
+    const renewValue = sub.trial_end
+      ? new Date(sub.trial_end).toLocaleDateString()
+      : (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "-");
     document.getElementById("subscription").innerHTML =
       '<div class="kv"><span class="k">Plan</span><span class="v">' + planName + ' <span class="tag ' + (isActive ? "live" : "") + '">' + sub.status + '</span></span></div>' +
       '<div class="kv"><span class="k">Billing</span><span class="v">' + (sub.billing_cycle || "-") + '</span></div>' +
       '<div class="kv"><span class="k">Amount</span><span class="v">' + dollars + '</span></div>' +
-      '<div class="kv"><span class="k">Renews</span><span class="v">' + (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "-") + '</span></div>';
+      '<div class="kv"><span class="k">' + renewLabel + '</span><span class="v">' + renewValue + '</span></div>';
 
     document.getElementById("btn_upgrade").style.display = "inline-flex";
     setAiMode((sub.plan || "free") === "free");
     renderHeroMetrics();
-    document.getElementById("live_feed").innerHTML = (overview.live_feed || []).map(item =>
+    const feed = overview.live_feed || [];
+    document.getElementById("live_feed").innerHTML = feed.length ? feed.map(item =>
       '<div class="feed-item">' +
         '<div>' +
           '<div class="feed-title">' + item.kind + '</div>' +
@@ -700,7 +706,7 @@ async function refreshOverview() {
         '</div>' +
         '<div class="feed-meta">' + (item.status || "-") + '<br>' + formatDate(item.created_at) + '</div>' +
       '</div>'
-    ).join("");
+    ).join("") : '<p class="muted">No live workspace activity yet. Run an AI request or call /v1/exec to populate this feed.</p>';
   } catch (err) {
     if (err.status === 401) { VK.clearTokens(); window.location.href = "/login/"; return; }
     showError(err.message || "Failed to load dashboard");
@@ -711,14 +717,24 @@ async function refreshGithubPanel() {
   const panel = document.getElementById("github_panel");
   const connectBtn = document.getElementById("btn_github_connect");
   const refreshBtn = document.getElementById("btn_github_refresh");
+  const disconnectBtn = document.getElementById("btn_github_disconnect");
   try {
+    const linked = await VK.getConnectedAccounts();
+    if (!linked.github_connected) {
+      panel.innerHTML = '<p class="muted">GitHub is not connected yet. Connect to sync repos for marketplace jobs.</p>';
+      connectBtn.textContent = "Connect GitHub";
+      refreshBtn.style.display = "none";
+      disconnectBtn.style.display = "none";
+      return;
+    }
     const out = await VK.getGithubRepos();
     const repos = (out && out.repos) ? out.repos : [];
+    const accountMeta = '<div class="kv"><span class="k">Connected account</span><span class="v">' + (linked.github_username || "GitHub") + (linked.github_connected_at ? (' · ' + formatDate(linked.github_connected_at)) : '') + '</span></div>';
     if (!repos.length) {
-      panel.innerHTML = '<p class="muted">GitHub connected, but no repositories were returned.</p>';
+      panel.innerHTML = accountMeta + '<p class="muted">GitHub connected, but no repositories were returned.</p>';
     } else {
       const top = repos.slice(0, 8);
-      panel.innerHTML = top.map(r =>
+      panel.innerHTML = accountMeta + top.map(r =>
         '<div class="kv">' +
           '<span class="k">' + r.full_name + '</span>' +
           '<span class="v"><a href="' + r.html_url + '" target="_blank" rel="noopener">open</a></span>' +
@@ -727,12 +743,14 @@ async function refreshGithubPanel() {
     }
     connectBtn.textContent = "Reconnect GitHub";
     refreshBtn.style.display = "inline-flex";
+    disconnectBtn.style.display = "inline-flex";
   } catch (err) {
     const msg = (err && err.message) ? err.message : "Unable to load GitHub repos";
     if ((err && err.status === 400) || /not connected/i.test(msg)) {
       panel.innerHTML = '<p class="muted">GitHub is not connected yet. Connect to sync repos for marketplace jobs.</p>';
       connectBtn.textContent = "Connect GitHub";
       refreshBtn.style.display = "none";
+      disconnectBtn.style.display = "none";
       return;
     }
     panel.innerHTML = '<p class="muted">Unable to load repos: ' + msg + '</p>';
@@ -1002,6 +1020,16 @@ document.getElementById("btn_github_connect").addEventListener("click", async ()
 });
 document.getElementById("btn_github_refresh").addEventListener("click", async () => {
   await refreshGithubPanel();
+});
+document.getElementById("btn_github_disconnect").addEventListener("click", async () => {
+  if (!confirm("Disconnect GitHub from this workspace?")) return;
+  try {
+    await VK.unlinkGithubAccount();
+    showOk("GitHub disconnected.");
+    await refreshGithubPanel();
+  } catch (err) {
+    showError(err.message || "GitHub disconnect failed");
+  }
 });
 document.getElementById("btn_upgrade").addEventListener("click", async () => {
   const currentPlan = (state.subscription && state.subscription.plan) || "free";

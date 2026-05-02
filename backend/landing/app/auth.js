@@ -236,6 +236,14 @@ const VK = {
     return this.request("/auth/github/repos");
   },
 
+  async getConnectedAccounts() {
+    return this.request("/auth/connected-accounts", { method: "GET" });
+  },
+
+  async unlinkGithubAccount() {
+    return this.request("/auth/connected-accounts/github", { method: "DELETE" });
+  },
+
   async marketplaceList(status_filter = null) {
     const qs = status_filter ? ("?status_filter=" + encodeURIComponent(status_filter)) : "";
     return this.request("/listings" + qs, { method: "GET" });

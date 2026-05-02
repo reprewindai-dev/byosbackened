@@ -1,4 +1,4 @@
-"""FastAPI application — BYOS AI + Security Suite."""
+"""FastAPI application - BYOS AI + Security Suite."""
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -55,6 +55,7 @@ from apps.api.routers.admin import router as admin_router
 from apps.api.routers.subscriptions import router as subscriptions_router
 from apps.api.routers.content_safety import router as content_safety_router
 from apps.api.routers.exec_router import router as exec_router
+from apps.api.routers.demo_pipeline import router as demo_pipeline_router
 from apps.api.routers.locker_security import router as locker_security_router
 from apps.api.routers.locker_monitoring import router as locker_monitoring_router
 from apps.api.routers.locker_users import router as locker_users_router
@@ -65,6 +66,7 @@ from apps.api.routers.ai import router as ai_router
 from apps.api.routers.workspace import router as workspace_router
 from apps.api.routers.workspace import public_router as public_status_router
 from apps.api.routers.marketplace_v1 import router as marketplace_v1_router
+from apps.api.routers.edge_canary import router as edge_canary_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from edge.routers.edge_ingest import router as edge_ingest_router
 from edge.routers.mqtt import router as edge_mqtt_router
@@ -86,7 +88,7 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description=(
-        "BYOS AI + Security Suite — Portable, secure, cost-intelligent AI backend. "
+        "BYOS AI + Security Suite - Portable, secure, cost-intelligent AI backend. "
         "No lock-in. Swap hosts in a weekend. Built for agencies, enterprises, and privacy-first platforms."
     ),
     openapi_url=None,  # Disabled - using protected custom route
@@ -105,20 +107,26 @@ async def startup_validation():
     import db.models  # noqa: F401 - ensure model metadata is registered before create_all
     try:
         result = validate_production_config()
-        logger.info("✅ Production configuration validated successfully")
+        logger.info("Production configuration validated successfully")
         if result.get("warnings"):
             logger.warning(f"Configuration warnings: {len(result['warnings'])}")
+        if settings.package_manifest_enforcement_enabled:
+            from pathlib import Path
+            from license.package_guard import verify_package_manifest
+
+            verify_package_manifest(Path.cwd())
+            logger.info("Package manifest integrity check completed")
         if settings.license_enforcement_enabled:
             await bootstrap_license_check()
         # Safety net: ensure core tables exist even if migrations were missed.
         Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database schema presence check completed")
+        logger.info("Database schema presence check completed")
     except ValueError as e:
-        logger.critical(f"❌ PRODUCTION CONFIGURATION INVALID: {e}")
+        logger.critical(f"PRODUCTION CONFIGURATION INVALID: {e}")
         raise
 
 
-# ── Middleware stack (outermost = first to run) ───────────────────────────────
+# Middleware stack (outermost = first to run)
 # 1. LockerPhycer Security (IDS, rate limiting, security headers) - First line of defense
 app.add_middleware(LockerSecurityMiddleware)
 # 2. Request security (request ID, IP blocking, brute force protection)
@@ -150,7 +158,7 @@ app.add_middleware(PerformanceMiddleware)  # Caching + keep-alive
 # Last add_middleware call = first executed.
 app.add_middleware(FastPathMiddleware)
 
-# ── Core AI + Cost Intelligence routers ──────────────────────────────────────
+# Core AI + Cost Intelligence routers
 app.include_router(upload.router, prefix=settings.api_prefix)
 app.include_router(transcribe.router, prefix=settings.api_prefix)
 app.include_router(extract.router, prefix=settings.api_prefix)
@@ -171,7 +179,7 @@ app.include_router(autonomous.router, prefix=settings.api_prefix)
 app.include_router(insights.router, prefix=settings.api_prefix)
 app.include_router(suggestions.router, prefix=settings.api_prefix)
 
-# ── Security Suite + new platform routers ────────────────────────────────────
+# Security Suite + new platform routers
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(security_router, prefix=settings.api_prefix)
 app.include_router(monitoring_router, prefix=settings.api_prefix)
@@ -180,13 +188,13 @@ app.include_router(subscriptions_router, prefix=settings.api_prefix)
 app.include_router(content_safety_router, prefix=settings.api_prefix)
 app.include_router(kill_switch_router, prefix=settings.api_prefix)
 
-# ── LockerPhycer Security Routers (now fully integrated into BYOS) ────────────
+# LockerPhycer Security Routers (now fully integrated into BYOS)
 app.include_router(locker_security_router, prefix=settings.api_prefix)
 app.include_router(locker_monitoring_router, prefix=settings.api_prefix)
 app.include_router(locker_users_router, prefix=settings.api_prefix)
 app.include_router(token_wallet_router, prefix=settings.api_prefix)
 
-# ── AI Support Bot ────────────────────────────────────────────────────────────
+# AI Support Bot
 app.include_router(support_bot_router, prefix=settings.api_prefix)
 app.include_router(ai_router, prefix=settings.api_prefix)
 app.include_router(workspace_router, prefix=settings.api_prefix)
@@ -197,9 +205,13 @@ app.include_router(edge_mqtt_router, prefix=settings.api_prefix)
 app.include_router(edge_control_router, prefix=settings.api_prefix)
 app.include_router(edge_modbus_router, prefix=settings.api_prefix)
 app.include_router(edge_snmp_router, prefix=settings.api_prefix)
+app.include_router(edge_canary_router, prefix=settings.api_prefix)
 
-# ── Ollama exec + status (no api_prefix — /v1/exec and /status are top-level) ─
+# Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)
+
+# Public Veklom Live Pipeline Theater SSE demo (no auth, IP rate-limited)
+app.include_router(demo_pipeline_router, prefix=settings.api_prefix)
 
 
 @app.get("/health")
@@ -210,7 +222,7 @@ async def health():
 
 @app.get("/", include_in_schema=False)
 async def root():
-    """Landing page — serves landing/index.html."""
+    """Landing page - serves landing/index.html."""
     html_path = os.path.join(os.path.dirname(__file__), "..", "..", "landing", "index.html")
     html_path = os.path.normpath(html_path)
     if os.path.exists(html_path):

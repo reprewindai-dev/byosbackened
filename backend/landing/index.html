@@ -338,6 +338,24 @@
       border-radius: var(--radius); padding: 14px;
       background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
     }
+    .protocol-card {
+      margin-top: 14px; border: 1px solid var(--rule);
+      border-radius: var(--radius); padding: 14px;
+      background: linear-gradient(180deg, rgba(196,146,91,0.04), rgba(255,255,255,0.02));
+    }
+    .protocol-card.locked { border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.12), 0 0 32px -10px var(--brass-glow); }
+    .protocol-meta { margin-top: 6px; font-size: 11px; color: var(--muted); font-family: "JetBrains Mono", monospace; }
+    .protocol-list { margin-top: 12px; display: grid; gap: 8px; }
+    .protocol-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; background: rgba(255,255,255,0.02); }
+    .protocol-row .name { font-family: "JetBrains Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--bone-2); }
+    .protocol-row .status { font-family: "JetBrains Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; }
+    .protocol-row .status.ok { color: var(--moss); }
+    .protocol-row .status.warn { color: var(--amber); }
+    .protocol-row .status.err { color: #ff8c8c; }
+    .protocol-card .h-right.ok { color: var(--moss); }
+    .protocol-card .h-right.warn { color: var(--amber); }
+    .protocol-card .h-right.err { color: #ff8c8c; }
+    .protocol-proof { margin-top: 12px; font-size: 11px; color: var(--bone-2); font-family: "JetBrains Mono", monospace; line-height: 1.6; }
     .audit-card.locked { border-color: var(--moss); box-shadow: 0 0 0 1px rgba(93,216,165,0.15), 0 0 32px -10px var(--moss-glow); }
     .cost-card.locked  { border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.18), 0 0 32px -10px var(--brass-glow); }
     .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -533,15 +551,15 @@
             <span class="chip" id="chipCB"><span class="dot"></span>Circuit: closed</span>
           </div>
           <div class="mode-toggle" role="tablist" aria-label="Theater mode">
-            <button role="tab" class="active" data-mode="ai">AI Request</button>
-            <button role="tab" data-mode="edge">Legacy Infrastructure</button>
+            <button role="tab" data-mode="ai">AI Request</button>
+            <button role="tab" class="active" data-mode="edge">Legacy Infrastructure</button>
           </div>
         </div>
 
         <div class="theater-body">
           <!-- ---- CONTROLS ---- -->
           <aside class="pane controls-pane" aria-label="Controls">
-            <div class="pane-title" id="ctrlTitle">AI Request · Vertical</div>
+            <div class="pane-title" id="ctrlTitle">Legacy Infrastructure · Scenario</div>
 
             <div class="verticals" id="verticals" role="tablist" data-visible="ai">
               <button class="vertical active" data-vertical="default">Default</button>
@@ -552,7 +570,7 @@
               <button class="vertical" data-vertical="infrastructure">Infrastructure</button>
             </div>
 
-            <div id="aiControls">
+            <div id="aiControls" hidden>
               <textarea
                 id="promptInput"
                 class="prompt"
@@ -577,7 +595,7 @@
               </div>
             </div>
 
-            <div id="edgeControls" hidden>
+            <div id="edgeControls">
               <div class="scenario-grid" style="grid-template-columns: 1fr;">
                 <button class="scenario-btn" id="btnNetwork">
                   <span class="sb-title">Network Instability</span>
@@ -591,13 +609,23 @@
             </div>
 
             <button class="run-btn" id="btnRun">
-              <span id="runLabel">Run pipeline</span>
+              <span id="runLabel">Run network scenario</span>
             </button>
 
             <div class="control-note">
               The request in front of you is <strong style="color:var(--bone);">real</strong>.
               It flows through Veklom's public demo endpoint, rate-limited to 5/min per IP,
               output capped at 250 tokens, no key exposure.
+            </div>
+
+            <div class="protocol-card" id="protocolCard">
+              <div class="card-head">
+                <span class="h-left">Protocol validation</span>
+                <span class="h-right" id="protocolStatus">cached</span>
+              </div>
+              <div class="protocol-meta" id="protocolLastChecked">Last checked: —</div>
+              <div class="protocol-list" id="protocolRows"></div>
+              <div class="protocol-proof" id="protocolProof">connect → normalize → decision → audit → cost control</div>
             </div>
           </aside>
 
@@ -893,12 +921,17 @@
   const kvDemo        = $("kvDemo");
   const kvBillable    = $("kvBillable");
   const kvCredits     = $("kvCredits");
+  const protocolCard  = $("protocolCard");
+  const protocolStatus = $("protocolStatus");
+  const protocolLastChecked = $("protocolLastChecked");
+  const protocolRows  = $("protocolRows");
+  const protocolProof = $("protocolProof");
   const aiControls    = $("aiControls");
   const edgeControls  = $("edgeControls");
   const verticalsBar  = $("verticals");
   const ctrlTitle     = $("ctrlTitle");
 
-  let mode = "ai";
+  let mode = "edge";
   let selectedVertical = "default";
   let currentES = null;
   let nodeEls = new Map();
@@ -1127,6 +1160,33 @@
     costCard.classList.remove("locked");
     costStatus.textContent = "pending";
     kvDemo.textContent = "—"; kvBillable.textContent = "—"; kvCredits.textContent = "—";
+  }
+
+  function renderProtocolCanary(summary) {
+    if (!protocolCard) return;
+    const rows = summary?.checks || {};
+    const status = String(summary?.status || "not_run");
+    protocolCard.classList.toggle("locked", status === "ok");
+    protocolStatus.textContent = status;
+    protocolStatus.className = "h-right " + (status === "ok" ? "ok" : status === "degraded" ? "warn" : "err");
+    protocolLastChecked.textContent = "Last checked: " + (summary?.last_checked_at || "—");
+    protocolRows.innerHTML = [
+      ["SNMP", rows.snmp],
+      ["Modbus TCP", rows.modbus_tcp],
+      ["MQTT", rows.mqtt],
+      ["Webhook", rows.webhook],
+    ].map(([label, value]) => {
+      const state = String(value || "not_run");
+      const cls = state === "passed" ? "ok" : state === "degraded" ? "warn" : "err";
+      return `<div class="protocol-row"><span class="name">${label}</span><span class="status ${cls}">${state}</span></div>`;
+    }).join("");
+    const proof = summary?.proof || {};
+    protocolProof.textContent = [
+      `normalized=${proof.normalized ? "true" : "false"}`,
+      `decision=${proof.decision ? "true" : "false"}`,
+      `audit=${proof.audit ? "true" : "false"}`,
+      `cost_control=${proof.cost_control ? "true" : "false"}`,
+    ].join(" · ");
   }
 
   function setRunning(on, label) {
@@ -1409,12 +1469,31 @@
     }
   }
 
+  async function probeProtocolValidation() {
+    try {
+      const r = await fetch(API_BASE + "/edge/canary/public", { cache: "no-store" });
+      if (!r.ok) throw new Error("down");
+      const summary = await r.json();
+      renderProtocolCanary(summary);
+    } catch (err) {
+      renderProtocolCanary({
+        status: "not_run",
+        last_checked_at: null,
+        checks: { snmp: "not_run", modbus_tcp: "not_run", mqtt: "not_run", webhook: "not_run" },
+        proof: { normalized: false, decision: false, audit: false, cost_control: false },
+      });
+    }
+  }
+
   // ---- Init ----
   renderPipeline();
   updatePromptCount();
   probeBackend();
+  probeProtocolValidation();
   setInterval(probeBackend, 15000);
+  setInterval(probeProtocolValidation, 60000);
 })();
 </script>
 </body>
 </html>
+

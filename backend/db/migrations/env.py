@@ -16,6 +16,7 @@ from db.models import (
     SecurityEvent, UserSession, APIKey,
     Subscription, LicenseKey, ContentFilterLog, AgeVerification,
     SystemMetrics, Alert, ExecutionLog,
+    EdgeCanaryReport,
 )
 
 settings = get_settings()

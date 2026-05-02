@@ -296,8 +296,8 @@ const VK = {
       body: JSON.stringify({
         plan,
         billing_cycle,
-        success_url: success_url || (window.location.origin + "/dashboard/?checkout=success"),
-        cancel_url: cancel_url || (window.location.origin + "/dashboard/?checkout=cancel")
+        success_url: success_url || (window.location.origin + "/playground?checkout=success"),
+        cancel_url: cancel_url || (window.location.origin + "/playground?checkout=cancel")
       })
     });
   },

@@ -31,6 +31,12 @@
 /*.woff2
   Cache-Control: public, max-age=31536000, immutable
 
+/workspace-assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/workspace-config.js
+  Cache-Control: public, max-age=300, must-revalidate
+
 # HTML gets short cache so updates propagate quickly
 /*.html
   Cache-Control: public, max-age=300, must-revalidate

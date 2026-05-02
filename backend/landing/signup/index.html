@@ -65,8 +65,8 @@ async function redirectToCheckout(plan) {
   const out = await VK.createCheckout({
     plan,
     billing_cycle: wantedBillingCycle,
-    success_url: window.location.origin + "/dashboard/?checkout=success&plan=" + encodeURIComponent(plan),
-    cancel_url: window.location.origin + "/dashboard/?checkout=cancel&plan=" + encodeURIComponent(plan)
+    success_url: window.location.origin + "/playground?checkout=success&plan=" + encodeURIComponent(plan),
+    cancel_url: window.location.origin + "/playground?checkout=cancel&plan=" + encodeURIComponent(plan)
   });
   window.location.href = out.checkout_url;
 }
@@ -77,10 +77,10 @@ async function afterAuthRedirect() {
     return;
   }
   if (wantedPlan === "enterprise") {
-    window.location.href = "/dashboard/?plan=enterprise";
+    window.location.href = "/playground?plan=enterprise";
     return;
   }
-  window.location.href = "/dashboard/?welcome=1";
+  window.location.href = "/playground?welcome=1";
 }
 
 if (VK.isLoggedIn()) {

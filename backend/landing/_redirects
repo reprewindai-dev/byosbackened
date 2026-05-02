@@ -4,6 +4,36 @@
 # Force apex (no www). Keeps SEO single-canonical, avoids duplicate-content.
 https://www.veklom.com/*  https://veklom.com/:splat  301
 
+# Workspace SPA routes
+/playground        /workspace-app.html  200
+/playground/*      /workspace-app.html  200
+/marketplace       /workspace-app.html  200
+/marketplace/*     /workspace-app.html  200
+/models            /workspace-app.html  200
+/models/*          /workspace-app.html  200
+/pipelines         /workspace-app.html  200
+/pipelines/*       /workspace-app.html  200
+/deployments       /workspace-app.html  200
+/deployments/*     /workspace-app.html  200
+/monitoring        /workspace-app.html  200
+/monitoring/*      /workspace-app.html  200
+/vault             /workspace-app.html  200
+/vault/*           /workspace-app.html  200
+/compliance        /workspace-app.html  200
+/compliance/*      /workspace-app.html  200
+/billing           /workspace-app.html  200
+/billing/*         /workspace-app.html  200
+/team              /workspace-app.html  200
+/team/*            /workspace-app.html  200
+/settings          /workspace-app.html  200
+/settings/*        /workspace-app.html  200
+/vendors           /workspace-app.html  200
+/vendors/*         /workspace-app.html  200
+
+# Legacy workspace shell aliases
+/dashboard         /playground  302
+/dashboard/*       /playground  302
+
 # Common typos / alternate paths land on real sections
 /contact   /#contact   302
 /pricing   /#pricing   302

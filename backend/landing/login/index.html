@@ -42,7 +42,7 @@ const $form  = document.getElementById("form");
 const $btn   = document.getElementById("submit");
 const $githubBtn = document.getElementById("github_signin");
 
-if (VK.isLoggedIn()) { window.location.href = "/dashboard/"; }
+if (VK.isLoggedIn()) { window.location.href = "/playground"; }
 
 $form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -54,7 +54,7 @@ $form.addEventListener("submit", async (e) => {
       email: document.getElementById("email").value.trim().toLowerCase(),
       password: document.getElementById("password").value
     });
-    window.location.href = "/dashboard/";
+    window.location.href = "/playground";
   } catch (err) {
     $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "Sign in failed") + '</div>';
     $btn.disabled = false;

@@ -267,7 +267,11 @@ tr.clickable:hover { background: rgba(255,255,255,0.02); }
         <div id="wallet_panel"><span class="spinner"></span> loading...</div>
       </div>
       <div class="app-card full">
-        <div class="section-h">Marketplace + GitHub</div>
+        <div class="section-h">System Health</div>
+        <div id="health_panel"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">GitHub Sync</div>
         <div id="github_panel"><span class="spinner"></span> loading...</div>
         <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-secondary" id="btn_github_connect">Connect GitHub</button>
@@ -558,6 +562,7 @@ let state = {
   subscription: null,
   wallet: null,
   overview: null,
+  monitoring: null,
   keys: [],
   models: [],
   observability: null,
@@ -731,6 +736,40 @@ async function refreshGithubPanel() {
       return;
     }
     panel.innerHTML = '<p class="muted">Unable to load repos: ' + msg + '</p>';
+  }
+}
+
+async function refreshMonitoring() {
+  const panel = document.getElementById("health_panel");
+  try {
+    const payload = await VK.getMonitoringDashboard();
+    state.monitoring = payload;
+    const health = payload.health || {};
+    const components = health.components || {};
+    const alerts = payload.open_alerts || [];
+    const jobs = payload.recent_jobs || [];
+    const componentRows = Object.entries(components).map(([name, info]) =>
+      '<div class="kv"><span class="k">' + name + '</span><span class="v">' + (info.status || "-") + (info.response_time_ms ? (' · ' + info.response_time_ms + 'ms') : '') + '</span></div>'
+    ).join("");
+    const alertRows = alerts.length
+      ? alerts.map(alert =>
+          '<div class="feed-item"><div><div class="feed-title">' + alert.title + '</div><div class="feed-meta">' + alert.type + ' · ' + alert.severity + '</div></div><div class="feed-meta">' + formatDate(alert.created_at) + '</div></div>'
+        ).join("")
+      : '<p class="muted">No open alerts.</p>';
+    const jobRows = jobs.length
+      ? jobs.map(job =>
+          '<div class="feed-item"><div><div class="feed-title">' + (job.type || "job") + '</div><div class="feed-meta">' + job.status + '</div></div><div class="feed-meta">' + formatDate(job.created_at) + '</div></div>'
+        ).join("")
+      : '<p class="muted">No recent jobs.</p>';
+
+    panel.innerHTML =
+      '<div class="kv"><span class="k">Overall</span><span class="v">' + (health.status || "-") + ' · score ' + (health.score ?? "-") + '</span></div>' +
+      '<div class="kv"><span class="k">Uptime</span><span class="v">' + Math.round(Number(health.uptime_seconds || 0)) + 's</span></div>' +
+      componentRows +
+      '<div style="margin-top:18px;"><div class="section-h">Open Alerts</div><div class="feed-list">' + alertRows + '</div></div>' +
+      '<div style="margin-top:18px;"><div class="section-h">Recent Jobs</div><div class="feed-list">' + jobRows + '</div></div>';
+  } catch (err) {
+    panel.innerHTML = '<p class="muted">Unable to load system health: ' + (err.message || "error") + '</p>';
   }
 }
 
@@ -939,7 +978,7 @@ async function refreshBudget() {
       '<div class="kv"><span class="k">' + row.model + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
     ).join("") || '<p class="muted">No model spend yet.</p>';
     document.getElementById("key_breakdown").innerHTML = (costs.cost_by_api_key || []).map(row =>
-      '<div class="kv"><span class="k">' + row.api_key_id + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
+      '<div class="kv"><span class="k">' + (row.label || row.api_key_name || row.api_key_id) + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
     ).join("") || '<p class="muted">No API key spend yet.</p>';
   } catch (err) {
     document.getElementById("budget_panel").innerHTML = '<p class="muted">Unable to load budget: ' + err.message + '</p>';
@@ -1066,6 +1105,7 @@ document.getElementById("btn_budget_export").addEventListener("click", async () 
 
   await refreshOverview();
   await refreshWallet();
+  await refreshMonitoring();
   await refreshGithubPanel();
   await refreshApiKeys();
   await refreshModels();

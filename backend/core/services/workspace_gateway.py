@@ -580,6 +580,10 @@ def fetch_cost_budget_payload(db: Session, *, workspace_id: str) -> dict:
     start = month_start()
     end = datetime.utcnow()
     rows, _ = fetch_normalized_logs(db, workspace_id=workspace_id, start_date=start, end_date=end, limit=5000)
+    key_name_map = {
+        row.id: row.name
+        for row in db.query(APIKey).filter(APIKey.workspace_id == workspace_id).all()
+    }
 
     total_cost = sum((row.cost_usd for row in rows), Decimal("0"))
     by_model: dict[str, Decimal] = {}
@@ -609,7 +613,12 @@ def fetch_cost_budget_payload(db: Session, *, workspace_id: str) -> dict:
             for model, cost in sorted(by_model.items(), key=lambda item: item[1], reverse=True)
         ],
         "cost_by_api_key": [
-            {"api_key_id": key_id, "cost_usd": float(cost.quantize(Decimal("0.000001")))}
+            {
+                "api_key_id": key_id,
+                "api_key_name": key_name_map.get(key_id),
+                "label": key_name_map.get(key_id) or key_id,
+                "cost_usd": float(cost.quantize(Decimal("0.000001"))),
+            }
             for key_id, cost in sorted(by_key.items(), key=lambda item: item[1], reverse=True)
         ],
         "budget": {

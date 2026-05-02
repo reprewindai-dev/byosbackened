@@ -221,6 +221,10 @@ const VK = {
     return this.request("/wallet/balance");
   },
 
+  async getMonitoringDashboard() {
+    return this.request("/monitoring/dashboard");
+  },
+
   async aiComplete({ model, prompt, max_tokens = 512 }) {
     return this.request("/ai/complete", {
       method: "POST",

@@ -23,6 +23,7 @@ _PUBLIC_PATHS = {
     "/api/v1/edge/demo/infrastructure",
     "/api/v1/demo/pipeline/stream",
     "/api/v1/demo/pipeline/health",
+    "/api/v1/edge/canary/public",
     "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
     f"{settings.api_prefix}/register",
     f"{settings.api_prefix}/login",

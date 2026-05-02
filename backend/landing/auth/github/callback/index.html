@@ -46,7 +46,7 @@ const $alert = document.getElementById("alert");
   try {
     const out = await VK.finishGithubLogin({ code, state });
     const isNew = !!(out && out.is_new_user);
-    window.location.href = isNew ? "/playground?welcome=1" : "/playground";
+    window.location.href = isNew ? "/dashboard/?welcome=1" : "/dashboard/";
   } catch (err) {
     $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "GitHub sign-in failed") + '</div>';
     setTimeout(() => { window.location.href = "/login/"; }, 2200);

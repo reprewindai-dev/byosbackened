@@ -26,10 +26,6 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /vendors           /playground/index.html  200
 /vendors/*         /playground/index.html  200
 
-# Legacy workspace shell aliases
-/dashboard         /playground  302
-/dashboard/*       /playground  302
-
 # Common typos / alternate paths land on real sections
 /contact   /#contact   302
 /pricing   /#pricing   302

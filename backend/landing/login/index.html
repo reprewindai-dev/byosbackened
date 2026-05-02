@@ -30,8 +30,6 @@
       </div>
       <button class="btn btn-primary btn-block" id="submit" type="submit">Sign in</button>
     </form>
-    <div class="oauth-divider"><span>or</span></div>
-    <button class="btn btn-secondary btn-block" id="github_signin" type="button">Sign in with GitHub</button>
     <p class="foot">No account yet? <a href="/signup/">Create a workspace</a></p>
   </div>
 </main>
@@ -40,9 +38,8 @@
 const $alert = document.getElementById("alert");
 const $form  = document.getElementById("form");
 const $btn   = document.getElementById("submit");
-const $githubBtn = document.getElementById("github_signin");
 
-if (VK.isLoggedIn()) { window.location.href = "/playground"; }
+if (VK.isLoggedIn()) { window.location.href = "/dashboard/"; }
 
 $form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -54,7 +51,7 @@ $form.addEventListener("submit", async (e) => {
       email: document.getElementById("email").value.trim().toLowerCase(),
       password: document.getElementById("password").value
     });
-    window.location.href = "/playground";
+    window.location.href = "/dashboard/";
   } catch (err) {
     $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "Sign in failed") + '</div>';
     $btn.disabled = false;
@@ -62,18 +59,6 @@ $form.addEventListener("submit", async (e) => {
   }
 });
 
-$githubBtn.addEventListener("click", async () => {
-  $alert.innerHTML = "";
-  $githubBtn.disabled = true;
-  $githubBtn.innerHTML = '<span class="spinner"></span> Redirecting...';
-  try {
-    await VK.startGithubLogin();
-  } catch (err) {
-    $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "GitHub sign-in failed") + '</div>';
-    $githubBtn.disabled = false;
-    $githubBtn.innerHTML = "Sign in with GitHub";
-  }
-});
 </script>
 </body>
 </html>

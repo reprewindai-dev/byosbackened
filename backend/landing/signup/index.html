@@ -39,8 +39,6 @@
       </div>
       <button class="btn btn-primary btn-block" id="submit" type="submit">Create workspace</button>
     </form>
-    <div class="oauth-divider"><span>or</span></div>
-    <button class="btn btn-secondary btn-block" id="github_signup" type="button">Continue with GitHub</button>
     <p class="foot">Already have a workspace? <a href="/login/">Sign in</a></p>
   </div>
   <p class="foot">By creating an account you accept the <a href="/legal/terms.html">Terms of Service</a> and <a href="/legal/privacy.html">Privacy Policy</a>.</p>
@@ -50,7 +48,6 @@
 const $alert = document.getElementById("alert");
 const $form  = document.getElementById("form");
 const $btn   = document.getElementById("submit");
-const $githubBtn = document.getElementById("github_signup");
 const SELF_SERVE_PLANS = ["starter", "pro"];
 
 function showError(msg) {
@@ -65,8 +62,8 @@ async function redirectToCheckout(plan) {
   const out = await VK.createCheckout({
     plan,
     billing_cycle: wantedBillingCycle,
-    success_url: window.location.origin + "/playground?checkout=success&plan=" + encodeURIComponent(plan),
-    cancel_url: window.location.origin + "/playground?checkout=cancel&plan=" + encodeURIComponent(plan)
+    success_url: window.location.origin + "/dashboard/?checkout=success&plan=" + encodeURIComponent(plan),
+    cancel_url: window.location.origin + "/dashboard/?checkout=cancel&plan=" + encodeURIComponent(plan)
   });
   window.location.href = out.checkout_url;
 }
@@ -77,10 +74,10 @@ async function afterAuthRedirect() {
     return;
   }
   if (wantedPlan === "enterprise") {
-    window.location.href = "/playground?plan=enterprise";
+    window.location.href = "/dashboard/?plan=enterprise";
     return;
   }
-  window.location.href = "/playground?welcome=1";
+  window.location.href = "/dashboard/?welcome=1";
 }
 
 if (VK.isLoggedIn()) {
@@ -111,18 +108,6 @@ $form.addEventListener("submit", async (e) => {
   }
 });
 
-$githubBtn.addEventListener("click", async () => {
-  $alert.innerHTML = "";
-  $githubBtn.disabled = true;
-  $githubBtn.innerHTML = '<span class="spinner"></span> Redirecting...';
-  try {
-    await VK.startGithubLogin();
-  } catch (err) {
-    showError(err.message || "GitHub sign-up failed");
-    $githubBtn.disabled = false;
-    $githubBtn.innerHTML = "Continue with GitHub";
-  }
-});
 </script>
 </body>
 </html>

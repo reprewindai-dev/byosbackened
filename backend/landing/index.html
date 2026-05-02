@@ -1165,10 +1165,15 @@
   function renderProtocolCanary(summary) {
     if (!protocolCard) return;
     const rows = summary?.checks || {};
-    const status = String(summary?.status || "not_run");
+    const status = String(summary?.status || "unavailable");
     protocolCard.classList.toggle("locked", status === "ok");
     protocolStatus.textContent = status;
-    protocolStatus.className = "h-right " + (status === "ok" ? "ok" : status === "degraded" ? "warn" : "err");
+    protocolStatus.className = "h-right " + (
+      status === "ok" ? "ok" :
+      status === "degraded" ? "warn" :
+      status === "not_run" ? "warn" :
+      "err"
+    );
     protocolLastChecked.textContent = "Last checked: " + (summary?.last_checked_at || "—");
     protocolRows.innerHTML = [
       ["SNMP", rows.snmp],
@@ -1176,11 +1181,15 @@
       ["MQTT", rows.mqtt],
       ["Webhook", rows.webhook],
     ].map(([label, value]) => {
-      const state = String(value || "not_run");
-      const cls = state === "passed" ? "ok" : state === "degraded" ? "warn" : "err";
+      const state = String(value || "unavailable");
+      const cls = state === "passed" ? "ok" : state === "degraded" || state === "not_run" ? "warn" : "err";
       return `<div class="protocol-row"><span class="name">${label}</span><span class="status ${cls}">${state}</span></div>`;
     }).join("");
     const proof = summary?.proof || {};
+    if (status === "unavailable") {
+      protocolProof.textContent = "Protocol proof endpoint unavailable in this deployment.";
+      return;
+    }
     protocolProof.textContent = [
       `normalized=${proof.normalized ? "true" : "false"}`,
       `decision=${proof.decision ? "true" : "false"}`,
@@ -1338,7 +1347,7 @@
     const order = ["legacy_signal", "protocol_ingest", "normalize", "policy_control", "ai_decision", "audit_cost"];
     // animate the first 2 nodes optimistically while the fetch is in flight
     advanceTo("legacy_signal");
-    termPush("ingest", `scenario=${scenario} · live=true`);
+    termPush("ingest", `scenario=${scenario} · awaiting backend state`);
     setTimeout(() => advanceTo("protocol_ingest"), 180);
 
     try {
@@ -1348,8 +1357,11 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
 
-      const metric = (payload.normalized_event && Object.keys(payload.normalized_event)) || [];
-      termPush("protocol", `${payload.protocol || "?"} · src=${payload.normalized_event?.source || payload.source || "demo"}`, "ok");
+      const source = payload.normalized_event?.source || payload.source || "demo";
+      const isLive = payload.live === true;
+      const isFallback = payload.fallback === true;
+      const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
+      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : "fallback"}`, protocolCls);
       advanceTo("normalize");
       await sleep(220);
 
@@ -1477,9 +1489,9 @@
       renderProtocolCanary(summary);
     } catch (err) {
       renderProtocolCanary({
-        status: "not_run",
+        status: "unavailable",
         last_checked_at: null,
-        checks: { snmp: "not_run", modbus_tcp: "not_run", mqtt: "not_run", webhook: "not_run" },
+        checks: { snmp: "unavailable", modbus_tcp: "unavailable", mqtt: "unavailable", webhook: "unavailable" },
         proof: { normalized: false, decision: false, audit: false, cost_control: false },
       });
     }

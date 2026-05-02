@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Veklom Status</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+<style>
+.status-shell { max-width: 980px; margin: 0 auto; padding: 64px 24px 96px; }
+.status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:20px; }
+.status-card { background:var(--ink-2); border:1px solid var(--rule); border-radius:6px; padding:20px; }
+.status-pill { display:inline-flex; padding:4px 10px; border:1px solid var(--ok); color:var(--ok); font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; border-radius:2px; }
+.status-row { display:flex; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--rule); }
+.status-row:last-child { border-bottom:0; }
+.status-title { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--mute); }
+.status-value { color:var(--bone); }
+.status-small { color:var(--bone-2); font-size:14px; line-height:1.6; }
+</style>
+</head>
+<body>
+<main class="status-shell">
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Status</div>
+  <div class="status-card">
+    <div class="status-pill" id="status-pill">Loading</div>
+    <h1 class="app-h1" style="margin-top:14px;">Service status and incident feed</h1>
+    <p class="app-sub">Production service health, component status, and recent incidents.</p>
+  </div>
+
+  <div class="status-grid" id="service-grid"></div>
+
+  <div class="status-card" style="margin-top:16px;">
+    <div class="section-h">Incidents</div>
+    <div id="incident-list" class="status-small">Loading…</div>
+  </div>
+</main>
+
+<script>
+const API = "https://api.veklom.com/api/v1/status/data";
+
+function fmtPct(value) {
+  return Number(value || 0).toFixed(2) + "%";
+}
+
+async function initStatus() {
+  const pill = document.getElementById("status-pill");
+  const grid = document.getElementById("service-grid");
+  const incidents = document.getElementById("incident-list");
+  try {
+    const res = await fetch(API, { headers: { "Accept": "application/json" } });
+    const data = await res.json();
+    const services = data.services || [];
+    const openIncidents = data.incidents || [];
+    pill.textContent = openIncidents.length ? "Degraded" : "Operational";
+    if (openIncidents.length) {
+      pill.style.borderColor = "var(--warn)";
+      pill.style.color = "var(--warn)";
+    }
+    grid.innerHTML = services.map(service => (
+      '<div class="status-card">' +
+        '<div class="status-title">' + service.name + '</div>' +
+        '<div class="status-row"><span class="status-small">Status</span><span class="status-value">' + service.status + '</span></div>' +
+        '<div class="status-row"><span class="status-small">90d uptime</span><span class="status-value">' + fmtPct(service.uptime_90d) + '</span></div>' +
+      '</div>'
+    )).join("");
+    incidents.innerHTML = openIncidents.length
+      ? openIncidents.map(incident => (
+          '<div class="status-row">' +
+            '<span class="status-small">' + incident.title + '</span>' +
+            '<span class="status-value">' + incident.status + '</span>' +
+          '</div>'
+        )).join("")
+      : 'No open incidents.';
+  } catch (err) {
+    pill.textContent = "Unavailable";
+    pill.style.borderColor = "var(--warn)";
+    pill.style.color = "var(--warn)";
+    incidents.textContent = "Unable to load status right now.";
+    grid.innerHTML = "";
+  }
+}
+
+initStatus();
+</script>
+</body>
+</html>

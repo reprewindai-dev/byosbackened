@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Billing - Veklom</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+<main class="app-shell">
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Billing</div>
+  <div class="app-card">
+    <h1 class="app-h1">Opening Cost &amp; Budget</h1>
+    <p class="app-sub">Routing to the live dashboard billing panel so spend, budget limits, and export controls stay on the real backend path.</p>
+    <div class="alert alert-ok"><span class="spinner"></span> Redirecting...</div>
+    <p class="foot" style="margin-top:18px;"><a id="fallback" href="/dashboard/?tab=budget">Continue manually</a></p>
+  </div>
+</main>
+<script>
+(function redirectToWorkspaceBudget() {
+  const params = new URLSearchParams(window.location.search);
+  params.set("tab", "budget");
+  const target = "/dashboard/?" + params.toString();
+  document.getElementById("fallback").setAttribute("href", target);
+  window.location.replace(target);
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-"""Amazon Bedrock AI playground and wallet-backed completion endpoint."""
+"""Workspace AI playground and wallet-backed completion endpoint."""
 from __future__ import annotations
 
 import hashlib
@@ -8,10 +8,8 @@ import logging
 import math
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Optional
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc
@@ -19,6 +17,9 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
 from core.config import get_settings
+from core.llm.circuit_breaker import is_open, record_failure, record_success
+from core.llm.groq_fallback import GroqFallbackError, call_groq
+from core.llm.ollama_client import OllamaClient, OllamaError
 from core.services.workspace_gateway import (
     TOKEN_USD_RATE,
     get_model_setting,
@@ -31,15 +32,8 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-MODEL_MAP = {
-    "claude-haiku": "anthropic.claude-3-haiku-20240307-v1:0",
-    "llama3": "meta.llama3-8b-instruct-v1:0",
-    "mistral": "mistral.mistral-7b-instruct-v0:2",
-}
-
-
 class AICompleteRequest(BaseModel):
-    model: Literal["claude-haiku", "llama3", "mistral"]
+    model: str = Field(min_length=1, max_length=128)
     prompt: str = Field(min_length=1, max_length=20000)
     max_tokens: int = Field(default=512, ge=1, le=8192)
 
@@ -74,24 +68,6 @@ def _build_log_hash(payload: dict, previous_log_hash: Optional[str]) -> str:
     return hmac.new(settings.secret_key.encode("utf-8"), digest.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _resolve_model(model_slug: str) -> str:
-    try:
-        return MODEL_MAP[model_slug]
-    except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported model") from exc
-
-
-def _get_bedrock_client():
-    client_kwargs = {}
-    region = settings.aws_default_region or "us-east-1"
-    if region:
-        client_kwargs["region_name"] = region
-    if settings.aws_access_key_id and settings.aws_secret_access_key:
-        client_kwargs["aws_access_key_id"] = settings.aws_access_key_id
-        client_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
-    return boto3.client("bedrock-runtime", **client_kwargs)
-
-
 def _get_or_create_wallet(db: Session, workspace_id: str) -> TokenWallet:
     wallet = db.query(TokenWallet).filter(TokenWallet.workspace_id == workspace_id).with_for_update().first()
     if wallet:
@@ -103,6 +79,45 @@ def _get_or_create_wallet(db: Session, workspace_id: str) -> TokenWallet:
     return wallet
 
 
+def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, str]:
+    if model_row.provider == "ollama":
+        client = OllamaClient(model=model_row.bedrock_model_id)
+        use_groq = is_open()
+        if not use_groq:
+            try:
+                result = client.generate(
+                    prompt=prompt,
+                    model=model_row.bedrock_model_id,
+                    options={"num_predict": max_tokens},
+                )
+                record_success()
+                return result, "ollama"
+            except OllamaError:
+                record_failure()
+                use_groq = True
+
+        if settings.llm_fallback != "groq" or not settings.groq_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="LLM unavailable: Ollama down and Groq fallback not configured.",
+            )
+        try:
+            return call_groq(prompt=prompt, max_tokens=max_tokens), "groq"
+        except GroqFallbackError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Both Ollama and Groq unavailable: {exc}",
+            ) from exc
+
+    if model_row.provider == "groq":
+        try:
+            return call_groq(prompt=prompt, model=model_row.bedrock_model_id, max_tokens=max_tokens), "groq"
+        except GroqFallbackError as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Selected model provider is not available")
+
+
 @router.post("/complete", response_model=AICompleteResponse)
 async def complete(
     payload: AICompleteRequest,
@@ -110,13 +125,12 @@ async def complete(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Run a wallet-backed Bedrock completion and record the audit trail."""
-    model_id = _resolve_model(payload.model)
+    """Run a wallet-backed completion through the configured production LLM stack."""
     model_row = get_model_setting(db, current_user.workspace_id, payload.model)
     if not model_row.enabled:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Model disabled for this workspace")
     if not model_row.connected:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model is not connected through Bedrock")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model is not connected")
     reservation_tokens = max(1, math.ceil(payload.max_tokens / 100))
 
     wallet = _get_or_create_wallet(db, current_user.workspace_id)
@@ -125,38 +139,16 @@ async def complete(
 
     request_id = getattr(request.state, "request_id", None) or f"ai-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
 
-    client = _get_bedrock_client()
     started_at = datetime.utcnow()
     try:
-        response = client.converse(
-            modelId=model_id,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "text": payload.prompt,
-                        }
-                    ],
-                }
-            ],
-            inferenceConfig={
-                "maxTokens": payload.max_tokens,
-            },
-        )
-    except (ClientError, BotoCoreError) as exc:
+        llm_result, provider = _call_runtime_model(model_row, payload.prompt, payload.max_tokens)
+    except HTTPException:
         db.rollback()
-        logger.exception("Bedrock completion failed for workspace %s model %s", current_user.workspace_id, model_id)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Bedrock request failed") from exc
+        raise
 
     try:
-        response_text = "".join(
-            item.get("text", "")
-            for item in response.get("output", {}).get("message", {}).get("content", [])
-            if isinstance(item, dict)
-        ).strip()
-        usage = response.get("usage", {}) or {}
-        output_tokens = int(usage.get("outputTokens") or 0)
+        response_text = (llm_result.get("response") or "").strip()
+        output_tokens = int(llm_result.get("completion_tokens") or 0)
         tokens_deducted = math.ceil(output_tokens / 100) if output_tokens > 0 else 0
         cost_usd = (Decimal(tokens_deducted) * TOKEN_USD_RATE).quantize(Decimal("0.000001"))
 
@@ -180,12 +172,12 @@ async def complete(
                 endpoint_path="/api/v1/ai/complete",
                 endpoint_method="POST",
                 request_id=request_id,
-                description=f"Bedrock AI completion via {payload.model}",
+                description=f"{provider.upper()} AI completion via {payload.model}",
                 metadata_json=json.dumps(
                     {
-                        "provider": "bedrock",
+                        "provider": provider,
                         "model": payload.model,
-                        "bedrock_model_id": model_id,
+                        "runtime_model_id": model_row.bedrock_model_id,
                         "output_tokens": output_tokens,
                         "tokens_deducted": tokens_deducted,
                     },
@@ -201,7 +193,7 @@ async def complete(
             "user_id": current_user.id,
             "workspace_id": current_user.workspace_id,
             "model": payload.model,
-            "bedrock_model_id": model_id,
+            "runtime_model_id": model_row.bedrock_model_id,
             "tokens_deducted": tokens_deducted,
             "output_tokens": output_tokens,
             "timestamp": started_at.isoformat(),
@@ -211,8 +203,8 @@ async def complete(
             workspace_id=current_user.workspace_id,
             user_id=current_user.id,
             operation_type="ai.complete",
-            provider="bedrock",
-            model=model_id,
+            provider=provider,
+            model=model_row.bedrock_model_id,
             input_hash=_sha256(payload.prompt),
             output_hash=_sha256(response_text),
             input_preview=payload.prompt[:500],
@@ -236,7 +228,7 @@ async def complete(
             request_kind="ai.complete",
             request_path="/api/v1/ai/complete",
             model=payload.model,
-            provider="bedrock",
+            provider=provider,
             status="success",
             prompt_preview=payload.prompt[:500],
             response_preview=response_text[:500],
@@ -247,12 +239,12 @@ async def complete(
             },
             response_json={
                 "response_text": response_text,
-                "bedrock_model_id": model_id,
+                "runtime_model_id": model_row.bedrock_model_id,
                 "output_tokens": output_tokens,
                 "tokens_deducted": tokens_deducted,
                 "wallet_balance": wallet.balance,
             },
-            tokens_in=0,
+            tokens_in=int(llm_result.get("prompt_tokens") or 0),
             tokens_out=output_tokens,
             latency_ms=int((datetime.utcnow() - started_at).total_seconds() * 1000),
             cost_usd=cost_usd,
@@ -281,7 +273,7 @@ async def complete(
     return AICompleteResponse(
         response_text=response_text,
         model=payload.model,
-        bedrock_model_id=model_id,
+        bedrock_model_id=model_row.bedrock_model_id,
         tokens_deducted=tokens_deducted,
         output_tokens=output_tokens,
         wallet_balance=wallet.balance,

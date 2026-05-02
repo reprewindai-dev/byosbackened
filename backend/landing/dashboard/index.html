@@ -298,7 +298,7 @@ curl -X POST https://api.veklom.com/v1/exec \
   <section id="panel_ai" class="tab-panel">
     <div class="app-card full" id="ai_playground_card">
       <div class="section-h">AI Playground</div>
-      <p class="muted" style="margin-bottom:16px;">Run Bedrock completions against your workspace wallet. Charges are deducted from your token balance after the response returns.</p>
+      <p class="muted" style="margin-bottom:16px;">Run completions through the production Veklom AI gateway. Charges are deducted from your token balance after the response returns.</p>
       <div class="ai-meta">
         <div class="kv ai-kv">
           <span class="k">Token balance</span>
@@ -309,14 +309,12 @@ curl -X POST https://api.veklom.com/v1/exec \
           <span class="v">1 token per 100 output tokens</span>
         </div>
       </div>
-      <div class="field">
-        <label for="ai_model">Model</label>
-        <select id="ai_model">
-          <option value="claude-haiku">Claude Haiku</option>
-          <option value="llama3">Llama 3</option>
-          <option value="mistral">Mistral</option>
-        </select>
-      </div>
+        <div class="field">
+          <label for="ai_model">Model</label>
+          <select id="ai_model">
+            <option value="">Loading runtime models...</option>
+          </select>
+        </div>
       <div class="field">
         <label for="ai_prompt">Prompt</label>
         <textarea id="ai_prompt" rows="8" placeholder="Ask the workspace AI to draft, summarize, or analyze something."></textarea>
@@ -448,7 +446,7 @@ curl -X POST https://api.veklom.com/v1/exec \
     <div class="panel-grid">
       <div class="app-card full">
         <div class="section-h">Models</div>
-        <p class="muted" style="margin-bottom:16px;">Enable or disable model access per workspace. Bedrock connectivity is shown per model.</p>
+        <p class="muted" style="margin-bottom:16px;">Enable or disable runtime routes per workspace. Connectivity is shown per configured provider.</p>
         <div id="models_list"><span class="spinner"></span> loading...</div>
       </div>
     </div>
@@ -571,19 +569,45 @@ let state = {
 
 const aiState = { freeTier: false };
 
+function populateAiModelOptions() {
+  const select = document.getElementById("ai_model");
+  const available = (state.models || []).filter(model => model.enabled && model.connected);
+  if (!available.length) {
+    select.innerHTML = '<option value="">No connected runtime models</option>';
+    select.disabled = true;
+    return;
+  }
+
+  const current = select.value;
+  select.innerHTML = available.map(model =>
+    '<option value="' + model.model_slug + '">' + model.display_name + '</option>'
+  ).join("");
+  select.disabled = false;
+  if (available.some(model => model.model_slug === current)) {
+    select.value = current;
+  }
+}
+
 function setAiMode(isFreeTier) {
   aiState.freeTier = isFreeTier;
   const submit = document.getElementById("ai_submit");
   const note = document.getElementById("ai_access_note");
+  const select = document.getElementById("ai_model");
+  const noConnectedModels = !((state.models || []).some(model => model.enabled && model.connected));
   if (isFreeTier) {
     submit.disabled = true;
     submit.textContent = "Upgrade to access AI features";
     note.textContent = "Upgrade to access AI features";
+  } else if (noConnectedModels) {
+    submit.disabled = true;
+    submit.textContent = "No runtime model available";
+    note.textContent = "No connected AI runtime is available for this workspace.";
   } else {
     submit.disabled = false;
     submit.textContent = "Submit";
     note.textContent = "Charged from your token wallet.";
   }
+  select.disabled = isFreeTier || noConnectedModels;
 }
 
 async function refreshWallet() {
@@ -717,7 +741,7 @@ async function refreshAiCompletion() {
 
   submit.disabled = true;
   submit.innerHTML = '<span class="spinner"></span> Running...';
-  responseNode.textContent = "Waiting for Bedrock...";
+  responseNode.textContent = "Waiting for runtime response...";
   costNode.textContent = "";
 
   try {
@@ -844,39 +868,43 @@ async function refreshObservability() {
 async function refreshModels() {
   try {
     const payload = await VK.workspaceModels();
-    state.models = payload.models || [];
-    const root = document.getElementById("models_list");
-    if (!state.models.length) {
-      root.innerHTML = '<p class="muted">No models configured for this workspace.</p>';
-      return;
-    }
-    root.innerHTML = state.models.map(model => (
-      '<div class="toggle-row">' +
-        '<div>' +
-          '<div style="font-family:var(--serif); font-size:22px;">' + model.display_name + '</div>' +
-          '<div class="subtle-note">' + model.bedrock_model_id + '</div>' +
-          '<div class="subtle-note">Workspace cost: $' + Number(model.workspace_cost_per_1k_output_tokens || 0).toFixed(4) + ' / 1K output tokens</div>' +
-        '</div>' +
-        '<div style="text-align:right;">' +
-          '<div class="subtle-note">' + (model.connected ? "Bedrock connected" : "Not connected") + '</div>' +
-          '<input type="checkbox" class="switch model-switch" data-model="' + model.model_slug + '"' + (model.enabled ? ' checked' : '') + ' />' +
-        '</div>' +
-      '</div>'
-    )).join("");
-    document.querySelectorAll(".model-switch").forEach(toggle => {
-      toggle.addEventListener("change", async () => {
-        toggle.disabled = true;
-        try {
-          await VK.workspaceToggleModel(toggle.dataset.model, toggle.checked);
-          showOk("Model updated.");
-        } catch (err) {
-          toggle.checked = !toggle.checked;
-          showError(err.message || "Model update failed");
-        } finally {
+      state.models = payload.models || [];
+      const root = document.getElementById("models_list");
+      if (!state.models.length) {
+        root.innerHTML = '<p class="muted">No models configured for this workspace.</p>';
+        populateAiModelOptions();
+        setAiMode(aiState.freeTier);
+        return;
+      }
+      root.innerHTML = state.models.map(model => (
+        '<div class="toggle-row">' +
+          '<div>' +
+            '<div style="font-family:var(--serif); font-size:22px;">' + model.display_name + '</div>' +
+            '<div class="subtle-note">' + model.provider.toUpperCase() + ' runtime · ' + model.bedrock_model_id + '</div>' +
+            '<div class="subtle-note">Workspace cost: $' + Number(model.workspace_cost_per_1k_output_tokens || 0).toFixed(4) + ' / 1K output tokens</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div class="subtle-note">' + (model.connected ? (model.provider.toUpperCase() + ' connected') : 'Not connected') + '</div>' +
+            '<input type="checkbox" class="switch model-switch" data-model="' + model.model_slug + '"' + (model.enabled ? ' checked' : '') + ' />' +
+          '</div>' +
+        '</div>'
+      )).join("");
+      populateAiModelOptions();
+      setAiMode(aiState.freeTier);
+      document.querySelectorAll(".model-switch").forEach(toggle => {
+        toggle.addEventListener("change", async () => {
+          toggle.disabled = true;
+          try {
+            await VK.workspaceToggleModel(toggle.dataset.model, toggle.checked);
+            showOk("Model updated.");
+            await refreshModels();
+          } catch (err) {
+            toggle.checked = !toggle.checked;
+            showError(err.message || "Model update failed");
+          }
           toggle.disabled = false;
-        }
+        });
       });
-    });
   } catch (err) {
     document.getElementById("models_list").innerHTML = '<p class="muted">Unable to load models: ' + err.message + '</p>';
   }

@@ -10,6 +10,8 @@ from typing import Iterable, Optional
 from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
 
+from core.config import get_settings
+from core.llm.ollama_client import OllamaClient
 from db.models import (
     APIKey,
     Alert,
@@ -25,32 +27,69 @@ from db.models import (
 
 
 TOKEN_USD_RATE = Decimal("0.00001")
-DEFAULT_MODELS = [
-    {
-        "model_slug": "claude-haiku",
-        "display_name": "Claude Haiku",
-        "bedrock_model_id": "anthropic.claude-3-haiku-20240307-v1:0",
-        "provider": "bedrock",
-        "input_cost_per_1m_tokens": Decimal("0.00"),
-        "output_cost_per_1m_tokens": Decimal("0.10"),
-    },
-    {
-        "model_slug": "llama3",
-        "display_name": "Llama 3",
-        "bedrock_model_id": "meta.llama3-8b-instruct-v1:0",
-        "provider": "bedrock",
-        "input_cost_per_1m_tokens": Decimal("0.00"),
-        "output_cost_per_1m_tokens": Decimal("0.10"),
-    },
-    {
-        "model_slug": "mistral",
-        "display_name": "Mistral",
-        "bedrock_model_id": "mistral.mistral-7b-instruct-v0:2",
-        "provider": "bedrock",
-        "input_cost_per_1m_tokens": Decimal("0.00"),
-        "output_cost_per_1m_tokens": Decimal("0.10"),
-    },
-]
+settings = get_settings()
+
+
+def _workspace_token_cost_per_1k_output_tokens() -> Decimal:
+    return (TOKEN_USD_RATE * Decimal(10)).quantize(Decimal("0.000001"))
+
+
+def _runtime_model_catalog() -> list[dict]:
+    try:
+        ollama_connected = OllamaClient().health_check()
+    except Exception:
+        ollama_connected = False
+
+    rows = [
+        {
+            "model_slug": "ollama-default",
+            "display_name": f"{settings.llm_model_default} (Ollama)",
+            "bedrock_model_id": settings.llm_model_default,
+            "provider": "ollama",
+            "connected": ollama_connected,
+            "input_cost_per_1m_tokens": Decimal("0.00"),
+            "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+        }
+    ]
+
+    if settings.groq_api_key and settings.llm_fallback == "groq":
+        rows.append(
+            {
+                "model_slug": "groq-fast",
+                "display_name": f"{settings.groq_model_fast} (Groq)",
+                "bedrock_model_id": settings.groq_model_fast,
+                "provider": "groq",
+                "connected": True,
+                "input_cost_per_1m_tokens": Decimal("0.00"),
+                "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+            }
+        )
+        rows.append(
+            {
+                "model_slug": "groq-smart",
+                "display_name": f"{settings.groq_model_smart} (Groq)",
+                "bedrock_model_id": settings.groq_model_smart,
+                "provider": "groq",
+                "connected": True,
+                "input_cost_per_1m_tokens": Decimal("0.00"),
+                "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+            }
+        )
+
+    if settings.aws_access_key_id and settings.aws_secret_access_key:
+        rows.append(
+            {
+                "model_slug": "bedrock-haiku",
+                "display_name": "anthropic.claude-3-haiku-20240307-v1:0 (Bedrock)",
+                "bedrock_model_id": "anthropic.claude-3-haiku-20240307-v1:0",
+                "provider": "bedrock",
+                "connected": True,
+                "input_cost_per_1m_tokens": Decimal("0.00"),
+                "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+            }
+        )
+
+    return rows
 
 
 @dataclass
@@ -90,29 +129,36 @@ def seed_workspace_models(db: Session, workspace_id: str) -> list[WorkspaceModel
         WorkspaceModelSetting.workspace_id == workspace_id
     )
     try:
-        existing = query.first()
+        existing_rows = query.all()
     except AttributeError:
-        existing = None
-    if existing:
-        try:
-            return query.order_by(WorkspaceModelSetting.model_slug.asc()).all()
-        except AttributeError:
-            return [existing]
+        first = query.first()
+        existing_rows = [first] if first else []
+
+    existing_by_slug = {row.model_slug: row for row in existing_rows if row}
 
     rows: list[WorkspaceModelSetting] = []
-    for model in DEFAULT_MODELS:
-        row = WorkspaceModelSetting(
-            workspace_id=workspace_id,
-            model_slug=model["model_slug"],
-            display_name=model["display_name"],
-            bedrock_model_id=model["bedrock_model_id"],
-            provider=model["provider"],
-            enabled=True,
-            connected=True,
-            input_cost_per_1m_tokens=model["input_cost_per_1m_tokens"],
-            output_cost_per_1m_tokens=model["output_cost_per_1m_tokens"],
-        )
-        db.add(row)
+    for model in _runtime_model_catalog():
+        row = existing_by_slug.get(model["model_slug"])
+        if row:
+            row.display_name = model["display_name"]
+            row.bedrock_model_id = model["bedrock_model_id"]
+            row.provider = model["provider"]
+            row.connected = model["connected"]
+            row.input_cost_per_1m_tokens = model["input_cost_per_1m_tokens"]
+            row.output_cost_per_1m_tokens = model["output_cost_per_1m_tokens"]
+        else:
+            row = WorkspaceModelSetting(
+                workspace_id=workspace_id,
+                model_slug=model["model_slug"],
+                display_name=model["display_name"],
+                bedrock_model_id=model["bedrock_model_id"],
+                provider=model["provider"],
+                enabled=True,
+                connected=model["connected"],
+                input_cost_per_1m_tokens=model["input_cost_per_1m_tokens"],
+                output_cost_per_1m_tokens=model["output_cost_per_1m_tokens"],
+            )
+            db.add(row)
         rows.append(row)
     db.flush()
     return rows
@@ -125,26 +171,15 @@ def get_model_settings(db: Session, workspace_id: str) -> list[WorkspaceModelSet
 
 
 def get_model_setting(db: Session, workspace_id: str, model_slug: str) -> WorkspaceModelSetting:
-    seed_workspace_models(db, workspace_id)
+    rows = seed_workspace_models(db, workspace_id)
     row = db.query(WorkspaceModelSetting).filter(
         WorkspaceModelSetting.workspace_id == workspace_id,
         WorkspaceModelSetting.model_slug == model_slug,
     ).first()
     if not row:
-        fallback = next((model for model in DEFAULT_MODELS if model["model_slug"] == model_slug), None)
-        if not fallback:
-            raise ValueError(f"Unknown model slug: {model_slug}")
-        row = WorkspaceModelSetting(
-            workspace_id=workspace_id,
-            model_slug=fallback["model_slug"],
-            display_name=fallback["display_name"],
-            bedrock_model_id=fallback["bedrock_model_id"],
-            provider=fallback["provider"],
-            enabled=True,
-            connected=True,
-            input_cost_per_1m_tokens=fallback["input_cost_per_1m_tokens"],
-            output_cost_per_1m_tokens=fallback["output_cost_per_1m_tokens"],
-        )
+        row = next((item for item in rows if item.model_slug == model_slug), None)
+    if not row:
+        raise ValueError(f"Unknown model slug: {model_slug}")
     return row
 
 

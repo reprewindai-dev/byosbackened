@@ -1,6 +1,32 @@
 """Configuration and environment settings."""
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 from functools import lru_cache
+
+
+def _default_ollama_base_url() -> str:
+    """Pick a sane Ollama default for local Windows and Dockerized runs."""
+    if os.getenv("LLM_BASE_URL"):
+        return os.getenv("LLM_BASE_URL", "").rstrip("/") or "http://127.0.0.1:11434"
+
+    inside_docker = Path("/.dockerenv").exists() or os.getenv("DOCKER_CONTAINER") == "true"
+    if inside_docker:
+        return "http://host.docker.internal:11434"
+    return "http://127.0.0.1:11434"
+
+
+def _normalize_ollama_base_url(value: str) -> str:
+    """Keep local Windows on localhost, preserve explicit production URLs."""
+    raw = (value or "").strip().rstrip("/")
+    if not raw:
+        return _default_ollama_base_url()
+
+    inside_docker = Path("/.dockerenv").exists() or os.getenv("DOCKER_CONTAINER") == "true"
+    if not inside_docker and "host.docker.internal" in raw:
+        return "http://127.0.0.1:11434"
+    return raw
 
 
 class Settings(BaseSettings):
@@ -40,8 +66,8 @@ class Settings(BaseSettings):
     encryption_key: str = ""  # For field encryption, defaults to secret_key if not set
 
     # â”€â”€ LLM â€” Local Ollama (primary, no external fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    llm_base_url: str = "http://host.docker.internal:11434"
-    llm_model_default: str = "qwen2.5:3b"
+    llm_base_url: str = _default_ollama_base_url()
+    llm_model_default: str = "qwen2.5:1.5b"
     llm_fallback: str = "groq"  # "off" | "groq" â€” groq enables self-healing fallback
     llm_timeout_seconds: int = 60
     llm_max_tokens: int = 2048
@@ -49,6 +75,8 @@ class Settings(BaseSettings):
     # â”€â”€ Groq fallback (self-healing circuit breaker) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"  # fast model for fallback
+    groq_model_fast: str = "llama-3.1-8b-instant"
+    groq_model_smart: str = "llama-3.3-70b-versatile"
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
     # Circuit breaker â€” opens after N failures, resets after cooldown_seconds
@@ -107,8 +135,15 @@ class Settings(BaseSettings):
     license_grace_hours: int = 72
     license_revalidation_seconds: int = 900
     license_cache_path: str = ""
+    license_public_key: str = ""
+    license_public_key_path: str = "license_public_key.pem"
+    license_heartbeat_url: str = "https://license.veklom.com/heartbeat"
+    license_heartbeat_backup_url: str = "https://license2.veklom.com/heartbeat"
     license_issue_url: str = "https://license.veklom.com/issue"
     license_issue_backup_url: str = "https://license2.veklom.com/issue"
+    package_name: str = "veklom-backend"
+    package_version: str = "0.1.0"
+    package_manifest_enforcement_enabled: bool = False
     buyer_download_base_url: str = ""
     buyer_download_version: str = ""
 
@@ -149,6 +184,11 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def _resolve_ollama_url(self) -> "Settings":
+        self.llm_base_url = _normalize_ollama_base_url(self.llm_base_url)
+        return self
 
 
 @lru_cache()

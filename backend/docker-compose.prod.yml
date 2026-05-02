@@ -69,6 +69,30 @@ services:
         limits:
           cpus: '1'
           memory: 1G
+  
+  ollama:
+    image: ollama/ollama:latest
+    container_name: byos_ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - byos_net
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
 
   minio:
     image: minio/minio:latest
@@ -110,8 +134,8 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
-      LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-qwen2.5:3b}
+      LLM_BASE_URL: http://ollama:11434
+      LLM_MODEL_DEFAULT: qwen2.5:1.5b
       LLM_FALLBACK: ${LLM_FALLBACK:-groq}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
@@ -127,6 +151,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -164,8 +190,8 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
-      LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-qwen2.5:3b}
+      LLM_BASE_URL: http://ollama:11434
+      LLM_MODEL_DEFAULT: qwen2.5:1.5b
       LLM_FALLBACK: ${LLM_FALLBACK:-groq}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
@@ -175,6 +201,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     networks:
       - byos_net
@@ -205,8 +233,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
-      LLM_BASE_URL: http://host.docker.internal:11434
-      LLM_MODEL_DEFAULT: ${LLM_MODEL_DEFAULT:-qwen2.5:3b}
+      LLM_BASE_URL: http://ollama:11434
+      LLM_MODEL_DEFAULT: qwen2.5:1.5b
       LLM_FALLBACK: ${LLM_FALLBACK:-groq}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
@@ -214,6 +242,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     networks:
       - byos_net
@@ -319,6 +349,7 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  ollama_data:
   prometheus_data:
   grafana_data:
   loki_data:

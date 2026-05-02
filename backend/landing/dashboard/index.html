@@ -1,379 +1,1051 @@
-<!doctype html>
-<html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Veklom Workspace — Sovereign AI Control Plane</title>
-    <meta name="description" content="The sovereign AI control plane. Watch every prompt routed, policed, and audited — on your perimeter, your keys, your region." />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
-      rel="stylesheet"
-    />
-    <script>
-      (function bootstrapWorkspaceRoute() {
-        if (window.location.hash) return;
-        const pathname = (window.location.pathname || "/").replace(/\/+$/, "") || "/";
-        const directRoutePaths = new Set([
-          "/",
-          "/playground",
-          "/models",
-          "/pipelines",
-          "/deployments",
-          "/monitoring",
-          "/vault",
-          "/compliance",
-          "/marketplace",
-          "/billing",
-          "/team",
-          "/settings",
-          "/onboarding",
-        ]);
-        let targetHash = "#/";
-        if (pathname === "/dashboard") {
-          targetHash = "#/";
-        } else if (directRoutePaths.has(pathname)) {
-          targetHash = `#${pathname}`;
-        } else if (pathname.startsWith("/marketplace/")) {
-          targetHash = `#${pathname}`;
-        }
-        window.location.hash = targetHash;
-      })();
-    </script>
-    <script src="/workspace-config.js"></script>
-    <script type="module" crossorigin src="/workspace-assets/index-EUKZeqk4.js"></script>
-    <link rel="stylesheet" crossorigin href="/workspace-assets/index-WqgIFi2m.css">
-  </head>
-  <body class="grid-bg">
-    <div id="root"></div>
-  <script data-pplx-inline-edit>
-(function () {
-  if (window === window.top) return;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workspace - Veklom</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+<style>
+.workspace-shell { max-width: 1240px; }
+.workspace-hero {
+  background:
+    radial-gradient(circle at top right, rgba(212, 176, 124, 0.16), transparent 35%),
+    radial-gradient(circle at left bottom, rgba(123, 179, 122, 0.08), transparent 28%),
+    var(--ink-2);
+}
+.workspace-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 24px 0 28px;
+}
+.tab-btn {
+  background: transparent;
+  color: var(--bone-2);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.tab-btn.active {
+  color: var(--ink);
+  background: var(--bone);
+  border-color: var(--bone);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+.stat-card {
+  background: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 18px;
+}
+.stat-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--mute);
+}
+.stat-value {
+  font-family: var(--serif);
+  font-size: 32px;
+  margin-top: 10px;
+  letter-spacing: -0.03em;
+}
+.stat-sub {
+  margin-top: 6px;
+  color: var(--bone-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.panel-grid {
+  display: grid;
+  gap: 18px;
+}
+.panel-grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.feed-list { display: grid; gap: 10px; }
+.feed-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.feed-item:last-child { border-bottom: 0; }
+.feed-meta { color: var(--bone-2); font-size: 13px; line-height: 1.5; }
+.feed-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--mute); }
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.metric-chip {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 12px 14px;
+  color: var(--bone-2);
+  font-size: 13px;
+}
+.metric-chip strong { color: var(--bone); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--ink-2); }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid var(--rule); padding: 12px 14px; text-align: left; font-size: 13px; vertical-align: top; }
+th {
+  color: var(--mute);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: 10px;
+}
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: rgba(255,255,255,0.02); }
+.chart {
+  display: grid;
+  gap: 10px;
+}
+.chart-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20px, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-height: 180px;
+}
+.bar {
+  background: linear-gradient(180deg, rgba(212,176,124,0.95), rgba(184,148,102,0.45));
+  border: 1px solid rgba(212,176,124,0.4);
+  border-radius: 4px 4px 2px 2px;
+  min-height: 16px;
+  position: relative;
+}
+.bar span {
+  position: absolute;
+  bottom: -22px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  color: var(--mute);
+  font-family: var(--mono);
+}
+.filter-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filter-row .field { margin-bottom: 0; min-width: 180px; flex: 1; }
+.split-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.toggle-row:last-child { border-bottom: 0; }
+.switch {
+  appearance: none;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--rule-2);
+  background: var(--ink);
+  position: relative;
+  cursor: pointer;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bone-2);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.switch:checked {
+  background: rgba(123,179,122,0.2);
+  border-color: var(--ok);
+}
+.switch:checked::after {
+  transform: translateX(20px);
+  background: var(--ok);
+}
+.detail-box {
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 16px;
+  color: var(--bone-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 180px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.subtle-note { color: var(--mute); font-size: 12px; }
+@media (max-width: 760px) {
+  .workspace-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+  .tab-btn { white-space: nowrap; }
+}
+</style>
+</head>
+<body>
+<main class="app-shell wide workspace-shell">
+  <div class="app-topnav">
+    <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Workspace</div>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="/marketplace/">Marketplace</a>
+      <a href="/vendor/">Vendors</a>
+      <a href="/status">Status</a>
+      <span id="user_email" class="muted"></span>
+      <a href="#" id="signout">Sign out</a>
+    </div>
+  </div>
 
-  const allowedParentOrigins = ["https://www.perplexity.ai","https://perplexity.ai","https://testing.perplexity.ai","https://staging.perplexity.ai","https://*.preview.i.perplexity.ai","http://localhost:3000","http://127.0.0.1:3000","http://localhost:5173","http://127.0.0.1:5173"];
-  const MAX_FONT_BYTES = 500 * 1024;
-  const MAX_TOTAL_FONT_BYTES = 2 * 1024 * 1024;
-  let scrollForwarding = false;
-  let scrollRaf = 0;
-  let trustedTopOrigin = null;
+  <div id="alert"></div>
 
-  // Allow entries like "https://*.preview.i.perplexity.ai" — the wildcard
-  // matches a single DNS label (no dots), so "https://*.foo" cannot stretch
-  // across multiple labels.
-  function matchesAllowedOrigin(origin) {
-    if (!origin) return false;
-    for (const entry of allowedParentOrigins) {
-      if (!entry.includes("*")) {
-        if (entry === origin) return true;
-        continue;
-      }
-      const pattern = new RegExp(
-        "^" +
-          entry.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^.]+") +
-          "$",
+  <section class="app-card workspace-hero">
+    <div class="section-h">Workspace Control Plane</div>
+    <h1 class="app-h1">AI gateway workspace</h1>
+    <p class="app-sub">Operate AI access, wallet spend, API keys, observability, model controls, and budget policy from one tenant boundary.</p>
+    <div class="metric-strip" id="hero_metrics"></div>
+  </section>
+
+  <nav class="workspace-tabs" id="tab_bar">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="ai">AI Playground</button>
+    <button class="tab-btn" data-tab="observability">Observability</button>
+    <button class="tab-btn" data-tab="api_keys">API Keys</button>
+    <button class="tab-btn" data-tab="models">Models</button>
+    <button class="tab-btn" data-tab="budget">Cost &amp; Budget</button>
+  </nav>
+
+  <section id="panel_overview" class="tab-panel active">
+    <div class="panel-grid two">
+      <div class="app-card">
+        <div class="section-h">Identity</div>
+        <div id="identity"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card">
+        <div class="section-h">Subscription</div>
+        <div id="subscription"><span class="spinner"></span> loading...</div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" id="btn_upgrade" style="display:none;">Upgrade plan</button>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Token Wallet</div>
+        <div id="wallet_panel"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Marketplace + GitHub</div>
+        <div id="github_panel"><span class="spinner"></span> loading...</div>
+        <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="btn_github_connect">Connect GitHub</button>
+          <button class="btn btn-secondary" id="btn_github_refresh" style="display:none;">Refresh repos</button>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Live Feed</div>
+        <div id="live_feed" class="feed-list"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Quickstart</div>
+        <ol style="padding-left:18px; line-height:1.9; color:var(--bone-2); font-size:14px;">
+          <li>Generate an API key above.</li>
+          <li>Use the API key in `X-API-Key` for `/v1/exec` requests.</li>
+          <li>Use JWT auth in the dashboard to manage AI and wallet controls.</li>
+        </ol>
+        <pre id="snippet" style="margin-top:14px; background:var(--ink); border:1px solid var(--rule); border-radius:3px; padding:16px; font-family:var(--mono); font-size:12px; color:var(--bone-2); overflow-x:auto;">
+curl -X POST https://api.veklom.com/v1/exec \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"summarize this audit log entry","use_memory":false}'
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel_ai" class="tab-panel">
+    <div class="app-card full" id="ai_playground_card">
+      <div class="section-h">AI Playground</div>
+      <p class="muted" style="margin-bottom:16px;">Run Bedrock completions against your workspace wallet. Charges are deducted from your token balance after the response returns.</p>
+      <div class="ai-meta">
+        <div class="kv ai-kv">
+          <span class="k">Token balance</span>
+          <span class="v" id="ai_balance"><span class="spinner"></span> loading...</span>
+        </div>
+        <div class="kv ai-kv">
+          <span class="k">Cost rule</span>
+          <span class="v">1 token per 100 output tokens</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="ai_model">Model</label>
+        <select id="ai_model">
+          <option value="claude-haiku">Claude Haiku</option>
+          <option value="llama3">Llama 3</option>
+          <option value="mistral">Mistral</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="ai_prompt">Prompt</label>
+        <textarea id="ai_prompt" rows="8" placeholder="Ask the workspace AI to draft, summarize, or analyze something."></textarea>
+      </div>
+      <div class="ai-footer">
+        <div>
+          <button class="btn btn-primary" id="ai_submit" disabled>Submit</button>
+          <div class="muted ai-note" id="ai_access_note">Loading access state...</div>
+        </div>
+        <div class="muted ai-cost" id="ai_cost"></div>
+      </div>
+      <div class="ai-response-wrap">
+        <div class="section-h" style="margin-top:0;">Response</div>
+        <pre id="ai_response" class="ai-response">No response yet.</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel_observability" class="tab-panel">
+    <div class="panel-grid">
+      <div class="app-card">
+        <div class="section-h">Filters</div>
+        <div class="filter-row">
+          <div class="field">
+            <label for="obs_model">Model</label>
+            <select id="obs_model">
+              <option value="">All models</option>
+              <option value="claude-haiku">Claude Haiku</option>
+              <option value="llama3">Llama 3</option>
+              <option value="mistral">Mistral</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="obs_status">Status</label>
+            <select id="obs_status">
+              <option value="">All statuses</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="obs_days">Window</label>
+            <select id="obs_days">
+              <option value="7">7 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </div>
+          <div class="field" style="display:flex; align-items:flex-end; gap:10px;">
+            <button class="btn btn-secondary" id="obs_refresh" type="button">Refresh</button>
+            <button class="btn btn-secondary" id="obs_reset" type="button">Reset</button>
+          </div>
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="app-card">
+          <div class="section-h">Error Rate</div>
+          <div class="chart">
+            <div id="error_chart" class="chart-bars"></div>
+          </div>
+        </div>
+        <div class="app-card">
+          <div class="section-h">Average Latency</div>
+          <div class="chart">
+            <div id="latency_chart" class="chart-bars"></div>
+          </div>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Request Log</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Model</th>
+                <th>Prompt Preview</th>
+                <th>Tokens In</th>
+                <th>Tokens Out</th>
+                <th>Latency</th>
+                <th>Cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="obs_body">
+              <tr><td colspan="8" class="muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Request / Response Trace</div>
+        <div id="obs_detail" class="detail-box">Select a row to inspect the full trace.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel_api_keys" class="tab-panel">
+    <div class="panel-grid">
+      <div class="app-card full">
+        <div class="section-h">API Keys</div>
+        <p class="muted" style="margin-bottom:16px;">Create and revoke workspace keys. Copy the raw key once at creation.</p>
+        <div style="margin-bottom:18px;">
+          <button class="btn btn-secondary" id="btn_new_key">Generate new API key</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Last Used</th>
+                <th>Total Calls</th>
+                <th>Total Cost</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="keys_body">
+              <tr><td colspan="7" class="muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel_models" class="tab-panel">
+    <div class="panel-grid">
+      <div class="app-card full">
+        <div class="section-h">Models</div>
+        <p class="muted" style="margin-bottom:16px;">Enable or disable model access per workspace. Bedrock connectivity is shown per model.</p>
+        <div id="models_list"><span class="spinner"></span> loading...</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel_budget" class="tab-panel">
+    <div class="panel-grid two">
+      <div class="app-card">
+        <div class="section-h">Monthly Spend</div>
+        <div id="budget_chart" class="chart-bars"></div>
+      </div>
+      <div class="app-card">
+        <div class="section-h">Budget Limit</div>
+        <div id="budget_panel"><span class="spinner"></span> loading...</div>
+      </div>
+      <div class="app-card full">
+        <div class="section-h">Cost Breakdown</div>
+        <div class="split-grid">
+          <div>
+            <div class="muted" style="margin-bottom:10px;">By model</div>
+            <div id="model_breakdown"></div>
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:10px;">By API key</div>
+            <div id="key_breakdown"></div>
+          </div>
+        </div>
+        <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="btn_budget_save">Save budget</button>
+          <button class="btn btn-secondary" id="btn_budget_export">Export CSV</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Need help? <a href="mailto:hello@veklom.com">hello@veklom.com</a> - <a href="/legal/">Legal</a></p>
+</main>
+
+<script src="/app/auth.js"></script>
+<script>
+if (!VK.isLoggedIn()) { window.location.href = "/login/"; }
+
+const runtimeApiBase = VK.apiBase || "https://api.veklom.com/api/v1";
+const runtimeExecBase = runtimeApiBase.replace(/\/api\/v1$/, "");
+document.getElementById("api_base_label") && (document.getElementById("api_base_label").textContent = runtimeApiBase + "/*");
+
+const $alert = document.getElementById("alert");
+function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }
+function showOk(msg)    { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
+function money(n) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n || 0));
+}
+function formatDate(v) {
+  if (!v) return "-";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString();
+}
+function setTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
+  document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
+  const target = document.getElementById("panel_" + tab);
+  if (target) target.classList.add("active");
+}
+
+function normalizeWorkspacePath(pathname) {
+  const clean = (pathname || "/").replace(/\/+$/, "");
+  return clean || "/";
+}
+
+function initialTabFromLocation() {
+  const params = new URLSearchParams(window.location.search);
+  const explicit = params.get("tab");
+  if (["overview", "ai", "observability", "api_keys", "models", "budget"].includes(explicit)) {
+    return explicit;
+  }
+
+  const routeMap = {
+    "/dashboard": "overview",
+    "/playground": "ai",
+    "/monitoring": "observability",
+    "/models": "models",
+    "/billing": "budget",
+  };
+  return routeMap[normalizeWorkspacePath(window.location.pathname)] || "overview";
+}
+
+function syncWorkspaceLocation(tab) {
+  const params = new URLSearchParams(window.location.search);
+  const routeByTab = {
+    overview: "/dashboard/",
+    ai: "/playground/",
+    observability: "/monitoring/",
+    models: "/models/",
+    budget: "/billing/",
+  };
+  const targetPath = routeByTab[tab] || "/dashboard/";
+
+  if (routeByTab[tab]) {
+    params.delete("tab");
+  } else {
+    params.set("tab", tab);
+  }
+
+  const next = targetPath + (params.toString() ? ("?" + params.toString()) : "");
+  if (next !== (window.location.pathname + window.location.search)) {
+    window.history.replaceState({}, "", next);
+  }
+}
+
+let state = {
+  me: null,
+  subscription: null,
+  wallet: null,
+  overview: null,
+  keys: [],
+  models: [],
+  observability: null,
+  budget: null,
+};
+
+const aiState = { freeTier: false };
+
+function setAiMode(isFreeTier) {
+  aiState.freeTier = isFreeTier;
+  const submit = document.getElementById("ai_submit");
+  const note = document.getElementById("ai_access_note");
+  if (isFreeTier) {
+    submit.disabled = true;
+    submit.textContent = "Upgrade to access AI features";
+    note.textContent = "Upgrade to access AI features";
+  } else {
+    submit.disabled = false;
+    submit.textContent = "Submit";
+    note.textContent = "Charged from your token wallet.";
+  }
+}
+
+async function refreshWallet() {
+  const node = document.getElementById("ai_balance");
+  try {
+    const wallet = await VK.getWalletBalance();
+    state.wallet = wallet;
+    node.textContent = (wallet.balance || 0).toLocaleString() + " tokens";
+    document.getElementById("wallet_panel").innerHTML =
+      '<div class="kv"><span class="k">Balance</span><span class="v">' + (wallet.balance || 0).toLocaleString() + ' tokens</span></div>' +
+      '<div class="kv"><span class="k">Monthly included</span><span class="v">' + (wallet.monthly_credits_included || 0).toLocaleString() + '</span></div>' +
+      '<div class="kv"><span class="k">Monthly used</span><span class="v">' + (wallet.monthly_credits_used || 0).toLocaleString() + '</span></div>' +
+      '<div class="kv"><span class="k">Lifetime purchased</span><span class="v">' + (wallet.total_credits_purchased || 0).toLocaleString() + '</span></div>' +
+      '<div class="kv"><span class="k">Lifetime used</span><span class="v">' + (wallet.total_credits_used || 0).toLocaleString() + '</span></div>';
+  } catch (err) {
+    node.textContent = "Unavailable";
+    document.getElementById("wallet_panel").innerHTML = '<p class="muted">Unable to load wallet: ' + (err.message || "error") + '</p>';
+  }
+}
+
+function renderHeroMetrics() {
+  const metrics = [
+    { label: "API calls this month", value: (state.overview && state.overview.total_api_calls) || 0 },
+    { label: "Tokens used this month", value: (state.overview && state.overview.total_tokens_used) || 0 },
+    { label: "Cost this month", value: money(state.overview && state.overview.total_cost_usd) },
+    { label: "Active models", value: (state.overview && state.overview.active_models && state.overview.active_models.length) || 0 },
+  ];
+  document.getElementById("hero_metrics").innerHTML = metrics.map(item =>
+    '<div class="metric-chip"><strong>' + item.value + '</strong><br>' + item.label + '</div>'
+  ).join("");
+}
+
+async function refreshOverview() {
+  try {
+    const [me, sub, overview] = await Promise.all([
+      VK.me(),
+      VK.getCurrentSubscription(),
+      VK.workspaceOverview(),
+    ]);
+    state.me = me;
+    state.subscription = sub;
+    state.overview = overview;
+
+    document.getElementById("user_email").textContent = me.email || "";
+    document.getElementById("identity").innerHTML =
+      '<div class="kv"><span class="k">Email</span><span class="v">' + (me.email || "") + '</span></div>' +
+      '<div class="kv"><span class="k">Role</span><span class="v">' + (me.role || "owner") + '</span></div>' +
+      '<div class="kv"><span class="k">Workspace</span><span class="v">' + (me.workspace_name || me.workspace_id || "-") + '</span></div>';
+
+    const isActive = sub.status === "active" || sub.status === "trialing";
+    const planLabels = {
+      free: "Free",
+      starter: "Team",
+      pro: "Business",
+      sovereign: "Sovereign",
+      enterprise: "Enterprise",
+    };
+    const planKey = sub.plan || "starter";
+    const planName = planLabels[planKey] || planKey;
+    const dollars = sub.amount_cents ? "$" + (sub.amount_cents/100).toLocaleString() + "/" + (sub.billing_cycle === "yearly" ? "yr" : "mo") : "-";
+    document.getElementById("subscription").innerHTML =
+      '<div class="kv"><span class="k">Plan</span><span class="v">' + planName + ' <span class="tag ' + (isActive ? "live" : "") + '">' + sub.status + '</span></span></div>' +
+      '<div class="kv"><span class="k">Billing</span><span class="v">' + (sub.billing_cycle || "-") + '</span></div>' +
+      '<div class="kv"><span class="k">Amount</span><span class="v">' + dollars + '</span></div>' +
+      '<div class="kv"><span class="k">Renews</span><span class="v">' + (sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "-") + '</span></div>';
+
+    document.getElementById("btn_upgrade").style.display = "inline-flex";
+    setAiMode((sub.plan || "free") === "free");
+    renderHeroMetrics();
+    document.getElementById("live_feed").innerHTML = (overview.live_feed || []).map(item =>
+      '<div class="feed-item">' +
+        '<div>' +
+          '<div class="feed-title">' + item.kind + '</div>' +
+          '<div class="feed-meta">' + (item.model || "-") + ' · ' + (item.latency_ms || 0) + 'ms · ' + (item.tokens || 0) + ' tokens</div>' +
+        '</div>' +
+        '<div class="feed-meta">' + (item.status || "-") + '<br>' + formatDate(item.created_at) + '</div>' +
+      '</div>'
+    ).join("");
+  } catch (err) {
+    if (err.status === 401) { VK.clearTokens(); window.location.href = "/login/"; return; }
+    showError(err.message || "Failed to load dashboard");
+  }
+}
+
+async function refreshGithubPanel() {
+  const panel = document.getElementById("github_panel");
+  const connectBtn = document.getElementById("btn_github_connect");
+  const refreshBtn = document.getElementById("btn_github_refresh");
+  try {
+    const out = await VK.getGithubRepos();
+    const repos = (out && out.repos) ? out.repos : [];
+    if (!repos.length) {
+      panel.innerHTML = '<p class="muted">GitHub connected, but no repositories were returned.</p>';
+    } else {
+      const top = repos.slice(0, 8);
+      panel.innerHTML = top.map(r =>
+        '<div class="kv">' +
+          '<span class="k">' + r.full_name + '</span>' +
+          '<span class="v"><a href="' + r.html_url + '" target="_blank" rel="noopener">open</a></span>' +
+        '</div>'
+      ).join("") + '<p class="muted" style="margin-top:10px;">Showing ' + top.length + ' of ' + repos.length + ' repos.</p>';
+    }
+    connectBtn.textContent = "Reconnect GitHub";
+    refreshBtn.style.display = "inline-flex";
+  } catch (err) {
+    const msg = (err && err.message) ? err.message : "Unable to load GitHub repos";
+    if ((err && err.status === 400) || /not connected/i.test(msg)) {
+      panel.innerHTML = '<p class="muted">GitHub is not connected yet. Connect to sync repos for marketplace jobs.</p>';
+      connectBtn.textContent = "Connect GitHub";
+      refreshBtn.style.display = "none";
+      return;
+    }
+    panel.innerHTML = '<p class="muted">Unable to load repos: ' + msg + '</p>';
+  }
+}
+
+async function refreshAiWallet() {
+  await refreshWallet();
+}
+
+async function refreshAiCompletion() {
+  const prompt = document.getElementById("ai_prompt").value.trim();
+  const model = document.getElementById("ai_model").value;
+  const responseNode = document.getElementById("ai_response");
+  const costNode = document.getElementById("ai_cost");
+  const submit = document.getElementById("ai_submit");
+  if (!prompt) {
+    showError("Enter a prompt");
+    return;
+  }
+
+  submit.disabled = true;
+  submit.innerHTML = '<span class="spinner"></span> Running...';
+  responseNode.textContent = "Waiting for Bedrock...";
+  costNode.textContent = "";
+
+  try {
+    const out = await VK.aiComplete({ model, prompt, max_tokens: 512 });
+    responseNode.textContent = out.response_text || "";
+    costNode.textContent = "Used " + (out.tokens_deducted || 0) + " tokens";
+    document.getElementById("ai_balance").textContent = (out.wallet_balance || 0).toLocaleString() + " tokens";
+    showOk("AI response ready.");
+  } catch (err) {
+    responseNode.textContent = "No response available.";
+    showError(err.message || "AI completion failed");
+  } finally {
+    submit.innerHTML = "Submit";
+    setAiMode(aiState.freeTier);
+  }
+}
+
+async function refreshApiKeys() {
+  try {
+    const payload = await VK.workspaceApiKeys();
+    state.keys = payload.keys || [];
+    const body = document.getElementById("keys_body");
+    if (!state.keys.length) {
+      body.innerHTML = '<tr><td colspan="7" class="muted">No API keys yet. Generate one to start.</td></tr>';
+      return;
+    }
+    body.innerHTML = state.keys.map(k => {
+      const status = k.is_active ? "active" : "revoked";
+      const actions = [
+        '<button class="btn btn-secondary copy-key" data-raw="' + (k.key_prefix || "") + '" style="padding:8px 10px; font-size:10px;">Copy prefix</button>',
+        k.is_active ? '<button class="btn btn-danger revoke-key" data-id="' + k.id + '" style="padding:8px 10px; font-size:10px;">Revoke</button>' : ''
+      ].join(" ");
+      return (
+        '<tr>' +
+          '<td>' + (k.name || "key") + '</td>' +
+          '<td>' + formatDate(k.created_at) + '</td>' +
+          '<td>' + formatDate(k.last_used_at) + '</td>' +
+          '<td>' + (k.total_calls || 0) + '</td>' +
+          '<td>' + money(k.total_cost_usd || 0) + '</td>' +
+          '<td><span class="tag ' + (k.is_active ? "live" : "") + '">' + status + '</span></td>' +
+          '<td style="display:flex; gap:8px; flex-wrap:wrap;">' + actions + '</td>' +
+        '</tr>'
       );
-      if (pattern.test(origin)) return true;
-    }
-    return false;
-  }
+    }).join("");
 
-  // Trust decision: when the sender is same-origin-visible (event.origin is a
-  // real origin like https://www.perplexity.ai) we trust event.origin directly.
-  // When event.origin is "null" (opaque broker srcdoc), we fall back to the
-  // broker's stamped `parentOrigin` to identify the top window. The fallback
-  // is claim-only — we rely on the browser's native `targetOrigin` enforcement
-  // on the response path (see postToTrustedTop) to ensure replies can't be
-  // delivered to anyone but the actual top window of that claimed origin.
-  function getTrustedParentOrigin(event) {
-    const forwardedParentOrigin =
-      typeof event.data.parentOrigin === "string" ? event.data.parentOrigin : null;
-    const parentOrigin = event.origin === "null" ? forwardedParentOrigin : event.origin;
-    return matchesAllowedOrigin(parentOrigin) ? parentOrigin : null;
-  }
-
-  // All responses go to window.top with targetOrigin = the allowlisted origin.
-  // An attacker that iframes us inside their own null-origin broker can claim
-  // any parentOrigin they like, but the browser will drop the reply whenever
-  // the real top's origin doesn't match — so the screenshot never leaves.
-  function postToTrustedTop(message) {
-    if (!trustedTopOrigin) return;
-    try {
-      window.top.postMessage(message, trustedTopOrigin);
-    } catch (_error) {}
-  }
-
-  function inlineAll(original, clone) {
-    if (original.nodeType !== 1 || clone.nodeType !== 1) return;
-
-    try {
-      const computedStyle = getComputedStyle(original);
-      // cssText on a computed style is the serialized declaration in modern
-      // Chromium/Safari — a single read beats enumerating ~400 longhand
-      // properties. Firefox returns "" here, so we fall back on empty.
-      const serialized = computedStyle.cssText;
-      if (serialized) {
-        clone.style.cssText = serialized;
-      } else {
-        const parts = new Array(computedStyle.length);
-        for (let index = 0; index < computedStyle.length; index += 1) {
-          const property = computedStyle[index];
-          parts[index] = `${property}:${computedStyle.getPropertyValue(property)};`;
-        }
-        clone.style.cssText = parts.join("");
-      }
-    } catch (_error) {}
-
-    const originalChildren = original.children;
-    const clonedChildren = clone.children;
-    for (
-      let index = 0;
-      index < originalChildren.length && index < clonedChildren.length;
-      index += 1
-    ) {
-      inlineAll(originalChildren[index], clonedChildren[index]);
-    }
-  }
-
-  function extractFontUrl(srcValue) {
-    const matches = [
-      ...srcValue.matchAll(
-        /url\(["']?([^"')]+)["']?\)(?:\s*format\(["']?([^"')]+)["']?\))?/gi,
-      ),
-    ];
-    if (matches.length === 0) return null;
-    const woff2 = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff2"));
-    if (woff2) return woff2[1];
-    const woff = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff"));
-    if (woff) return woff[1];
-    return matches[0][1];
-  }
-
-  // Cache resolved font URL -> data URI across captures. Fonts on a page
-  // essentially never change, and a batch run emits multiple captures back to
-  // back — without this we'd refetch + re-base64 every time.
-  const fontDataUriCache = new Map();
-  const SRC_DECLARATION_RE = /src\s*:\s*[^;}]+/i;
-
-  async function fetchAsDataUri(url) {
-    if (fontDataUriCache.has(url)) return fontDataUriCache.get(url);
-    let dataUri = null;
-    try {
-      const response = await fetch(url, { mode: "cors", credentials: "omit" });
-      if (response.ok) {
-        const blob = await response.blob();
-        if (blob.size <= MAX_FONT_BYTES) {
-          dataUri = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () =>
-              resolve(typeof reader.result === "string" ? reader.result : null);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(blob);
-          });
-        }
-      }
-    } catch (_error) {
-      dataUri = null;
-    }
-    fontDataUriCache.set(url, dataUri);
-    return dataUri;
-  }
-
-  function collectFontFaceRuleTexts() {
-    const rules = [];
-    for (const sheet of document.styleSheets) {
-      let cssRules;
-      try {
-        cssRules = sheet.cssRules;
-      } catch (_error) {
-        continue;
-      }
-      if (!cssRules) continue;
-      for (const rule of cssRules) {
-        const cssText = rule.cssText || "";
-        if (cssText.startsWith("@font-face")) rules.push(cssText);
-      }
-    }
-    return rules;
-  }
-
-  async function buildInlinedFontCss() {
-    const ruleTexts = collectFontFaceRuleTexts();
-    if (ruleTexts.length === 0) return null;
-
-    const resolved = ruleTexts.map((cssText) => {
-      if (!SRC_DECLARATION_RE.test(cssText)) return null;
-      const srcMatch = cssText.match(/src\s*:\s*([^;}]+)[;}]/i);
-      if (!srcMatch) return null;
-      const url = extractFontUrl(srcMatch[1]);
-      if (!url) return null;
-      try {
-        return { cssText, url: new URL(url, document.baseURI).href };
-      } catch (_error) {
-        return null;
-      }
-    });
-
-    const dataUris = await Promise.all(
-      resolved.map((entry) => (entry ? fetchAsDataUri(entry.url) : Promise.resolve(null))),
-    );
-
-    const inlined = [];
-    let totalBytes = 0;
-    for (let index = 0; index < resolved.length; index += 1) {
-      const entry = resolved[index];
-      const dataUri = dataUris[index];
-      if (!entry || !dataUri) continue;
-      const approxBytes = dataUri.length * 0.75;
-      if (totalBytes + approxBytes > MAX_TOTAL_FONT_BYTES) break;
-      totalBytes += approxBytes;
-      inlined.push(entry.cssText.replace(SRC_DECLARATION_RE, `src: url("${dataUri}")`));
-    }
-    return inlined.length > 0 ? inlined.join("\n") : null;
-  }
-
-  function stripExternal(clone) {
-    const images = clone.querySelectorAll("img");
-    for (let index = 0; index < images.length; index += 1) {
-      const src = images[index].getAttribute("src");
-      if (src && !src.startsWith("data:")) images[index].removeAttribute("src");
-    }
-
-    const elements = clone.querySelectorAll("*");
-    for (let index = 0; index < elements.length; index += 1) {
-      const style = elements[index].style.cssText;
-      if (style && style.includes("url(")) {
-        elements[index].style.cssText = style.replace(
-          /url\(["']?(?!data:)[^)"']*["']?\)/gi,
-          "none",
-        );
-      }
-    }
-  }
-
-  function emitScroll() {
-    scrollRaf = 0;
-    if (!scrollForwarding) return;
-    postToTrustedTop({
-      type: "INLINE_EDIT_SCROLL",
-      scrollX: window.scrollX,
-      scrollY: window.scrollY,
-    });
-  }
-
-  window.addEventListener(
-    "scroll",
-    function () {
-      if (!scrollForwarding || scrollRaf) return;
-      scrollRaf = requestAnimationFrame(emitScroll);
-    },
-    { passive: true, capture: true },
-  );
-
-  async function handleCaptureRequest(event) {
-    const requestId = event.data.requestId;
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    function postResult(dataUrl) {
-      postToTrustedTop({
-        type: "INLINE_EDIT_SCREENSHOT_RESULT",
-        requestId,
-        dataUrl,
-        scrollX,
-        scrollY,
-      });
-    }
-
-    try {
-      // Wait for any pending web fonts to resolve so both inline metrics and
-      // the @font-face inlining below see the same loaded faces.
-      if (document.fonts && document.fonts.ready) {
+    document.querySelectorAll(".revoke-key").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Revoke this API key? Any system using it will stop working.")) return;
         try {
-          await document.fonts.ready;
-        } catch (_error) {}
-      }
+          await VK.revokeApiKey(btn.dataset.id);
+          await refreshApiKeys();
+        } catch (err) {
+          showError(err.message || "Revoke failed");
+        }
+      });
+    });
 
-      const clone = document.documentElement.cloneNode(true);
-      inlineAll(document.documentElement, clone);
+    document.querySelectorAll(".copy-key").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.raw || "");
+          showOk("Key prefix copied.");
+        } catch (err) {
+          showError("Unable to copy prefix");
+        }
+      });
+    });
+  } catch (err) {
+    document.getElementById("keys_body").innerHTML = '<tr><td colspan="7" class="muted">Unable to load keys: ' + err.message + '</td></tr>';
+  }
+}
 
-      const removedNodes = clone.querySelectorAll("script,link[rel=\"stylesheet\"],style");
-      for (let index = 0; index < removedNodes.length; index += 1) {
-        removedNodes[index].remove();
-      }
+function renderChartBars(node, rows, valueKey, labelKey = "date", formatter = v => String(v)) {
+  const el = document.getElementById(node);
+  if (!rows || !rows.length) {
+    el.innerHTML = '<div class="muted">No data yet.</div>';
+    return;
+  }
+  const max = Math.max(...rows.map(row => Number(row[valueKey] || 0)), 1);
+  el.innerHTML = rows.map(row => {
+    const value = Number(row[valueKey] || 0);
+    const height = Math.max(16, Math.round((value / max) * 160));
+    return '<div class="bar" style="height:' + height + 'px;"><span>' + formatter(row[labelKey]) + '</span></div>';
+  }).join("");
+}
 
-      stripExternal(clone);
-
-      // Re-embed web fonts as data-URI @font-face rules so the SVG rasterizer
-      // can resolve them — external font URLs aren't fetched during
-      // foreignObject rendering, which would otherwise force a fallback face
-      // and change text metrics.
-      const inlinedFontCss = await buildInlinedFontCss();
-      if (inlinedFontCss) {
-        const styleEl = document.createElement("style");
-        styleEl.textContent = inlinedFontCss;
-        const head = clone.querySelector("head");
-        if (head) head.appendChild(styleEl);
-        else clone.insertBefore(styleEl, clone.firstChild);
-      }
-
-      const html = new XMLSerializer().serializeToString(clone);
-      const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
-        '<foreignObject width="100%" height="100%">' +
-        `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden">` +
-        `<div style="transform:translate(-${scrollX}px,-${scrollY}px);transform-origin:top left">` +
-        html +
-        "</div></div></foreignObject></svg>";
-      const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-      const image = new Image();
-      image.onload = function () {
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext("2d").drawImage(image, 0, 0);
-        postResult(canvas.toDataURL("image/png"));
-      };
-      image.onerror = function () {
-        postResult(null);
-      };
-      image.src = svgUrl;
-    } catch (_error) {
-      postResult(null);
+async function refreshObservability() {
+  const model = document.getElementById("obs_model").value || "";
+  const status = document.getElementById("obs_status").value || "";
+  const days = Number(document.getElementById("obs_days").value || 30);
+  try {
+    const payload = await VK.workspaceObservability({ model, status, days, limit: 100, offset: 0 });
+    state.observability = payload;
+    const body = document.getElementById("obs_body");
+    if (!payload.rows.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">No request logs found for the selected filters.</td></tr>';
+    } else {
+      body.innerHTML = payload.rows.map(row => (
+        '<tr class="clickable obs-row" data-row="' + row.id + '">' +
+          '<td>' + formatDate(row.timestamp) + '</td>' +
+          '<td>' + (row.model || "-") + '</td>' +
+          '<td>' + (row.prompt_preview || "-") + '</td>' +
+          '<td>' + (row.tokens_in || 0) + '</td>' +
+          '<td>' + (row.tokens_out || 0) + '</td>' +
+          '<td>' + (row.latency_ms || 0) + ' ms</td>' +
+          '<td>' + money(row.cost_usd || 0) + '</td>' +
+          '<td><span class="tag ' + (row.status === "success" ? "live" : "") + '">' + row.status + '</span></td>' +
+        '</tr>'
+      )).join("");
     }
+    renderChartBars("error_chart", payload.error_rate_chart || [], "error_rate", "date", v => v);
+    renderChartBars("latency_chart", payload.latency_chart || [], "avg_latency_ms", "date", v => Math.round(Number(v)).toString());
+    document.querySelectorAll(".obs-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const log = (payload.rows || []).find(x => x.id === row.dataset.row);
+        document.getElementById("obs_detail").textContent = JSON.stringify(log || {}, null, 2);
+      });
+    });
+  } catch (err) {
+    document.getElementById("obs_body").innerHTML = '<tr><td colspan="8" class="muted">Unable to load logs: ' + err.message + '</td></tr>';
+  }
+}
+
+async function refreshModels() {
+  try {
+    const payload = await VK.workspaceModels();
+    state.models = payload.models || [];
+    const root = document.getElementById("models_list");
+    if (!state.models.length) {
+      root.innerHTML = '<p class="muted">No models configured for this workspace.</p>';
+      return;
+    }
+    root.innerHTML = state.models.map(model => (
+      '<div class="toggle-row">' +
+        '<div>' +
+          '<div style="font-family:var(--serif); font-size:22px;">' + model.display_name + '</div>' +
+          '<div class="subtle-note">' + model.bedrock_model_id + '</div>' +
+          '<div class="subtle-note">Workspace cost: $' + Number(model.workspace_cost_per_1k_output_tokens || 0).toFixed(4) + ' / 1K output tokens</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<div class="subtle-note">' + (model.connected ? "Bedrock connected" : "Not connected") + '</div>' +
+          '<input type="checkbox" class="switch model-switch" data-model="' + model.model_slug + '"' + (model.enabled ? ' checked' : '') + ' />' +
+        '</div>' +
+      '</div>'
+    )).join("");
+    document.querySelectorAll(".model-switch").forEach(toggle => {
+      toggle.addEventListener("change", async () => {
+        toggle.disabled = true;
+        try {
+          await VK.workspaceToggleModel(toggle.dataset.model, toggle.checked);
+          showOk("Model updated.");
+        } catch (err) {
+          toggle.checked = !toggle.checked;
+          showError(err.message || "Model update failed");
+        } finally {
+          toggle.disabled = false;
+        }
+      });
+    });
+  } catch (err) {
+    document.getElementById("models_list").innerHTML = '<p class="muted">Unable to load models: ' + err.message + '</p>';
+  }
+}
+
+async function refreshBudget() {
+  try {
+    const [costs, budget] = await Promise.all([
+      VK.workspaceCostBudget(),
+      VK.workspaceBudget(),
+    ]);
+    state.budget = budget;
+    document.getElementById("budget_panel").innerHTML =
+      '<div class="kv"><span class="k">Budget limit</span><span class="v"><input id="budget_amount" type="number" min="0" step="0.01" value="' + ((budget[0] && budget[0].amount) || (costs.budget && costs.budget.amount) || 0) + '" style="width:160px; background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone); padding:8px 10px; border-radius:3px;" /></span></div>' +
+      '<div class="kv"><span class="k">Current spend</span><span class="v">' + money(costs.total_cost_usd || 0) + '</span></div>' +
+      '<div class="kv"><span class="k">Remaining</span><span class="v">' + (costs.budget && costs.budget.remaining ? money(costs.budget.remaining) : money(0)) + '</span></div>' +
+      '<div class="kv"><span class="k">Hard stop</span><span class="v">' + ((costs.budget && costs.budget.is_hard_stop) ? "Active" : "Inactive") + '</span></div>';
+    renderChartBars("budget_chart", costs.monthly_spend_chart || [], "cost_usd", "date", v => String(v).slice(5));
+    document.getElementById("model_breakdown").innerHTML = (costs.cost_by_model || []).map(row =>
+      '<div class="kv"><span class="k">' + row.model + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
+    ).join("") || '<p class="muted">No model spend yet.</p>';
+    document.getElementById("key_breakdown").innerHTML = (costs.cost_by_api_key || []).map(row =>
+      '<div class="kv"><span class="k">' + row.api_key_id + '</span><span class="v">' + money(row.cost_usd) + '</span></div>'
+    ).join("") || '<p class="muted">No API key spend yet.</p>';
+  } catch (err) {
+    document.getElementById("budget_panel").innerHTML = '<p class="muted">Unable to load budget: ' + err.message + '</p>';
+  }
+}
+
+document.getElementById("tab_bar").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  setTab(btn.dataset.tab);
+  syncWorkspaceLocation(btn.dataset.tab);
+  if (btn.dataset.tab === "observability" && !state.observability) refreshObservability();
+  if (btn.dataset.tab === "api_keys" && (!state.keys || !state.keys.length)) refreshApiKeys();
+  if (btn.dataset.tab === "models" && (!state.models || !state.models.length)) refreshModels();
+  if (btn.dataset.tab === "budget" && !state.budget) refreshBudget();
+});
+
+document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
+document.getElementById("btn_github_connect").addEventListener("click", async () => {
+  try { await VK.startGithubLogin(); } catch (err) { showError(err.message || "GitHub connect failed"); }
+});
+document.getElementById("btn_github_refresh").addEventListener("click", async () => {
+  await refreshGithubPanel();
+});
+document.getElementById("btn_upgrade").addEventListener("click", async () => {
+  const currentPlan = (state.subscription && state.subscription.plan) || "free";
+  const targetPlan = currentPlan === "free"
+    ? "starter"
+    : currentPlan === "starter"
+      ? "pro"
+      : currentPlan === "pro"
+        ? "sovereign"
+        : "enterprise";
+
+  if (targetPlan === "enterprise") {
+    window.location.href = "/dashboard/?plan=enterprise";
+    return;
   }
 
-  window.addEventListener("message", function (event) {
-    if (!event.data) return;
-    // Only accept messages from the direct parent frame. Blocks sibling /
-    // unrelated-window postMessage senders that could otherwise reach us.
-    if (event.source !== window.parent) return;
-
-    const trustedParentOrigin = getTrustedParentOrigin(event);
-    if (!trustedParentOrigin) return;
-    trustedTopOrigin = trustedParentOrigin;
-
-    if (event.data.type === "INLINE_EDIT_SCROLL_START") {
-      scrollForwarding = true;
-      emitScroll();
-      return;
+  const button = document.getElementById("btn_upgrade");
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> Redirecting...';
+  try {
+    const out = await VK.createCheckout({
+      plan: targetPlan,
+      success_url: window.location.origin + "/dashboard/?checkout=success&plan=" + encodeURIComponent(targetPlan),
+      cancel_url: window.location.origin + "/dashboard/?checkout=cancel&plan=" + encodeURIComponent(targetPlan),
+    });
+    window.location.href = out.checkout_url;
+  } catch (err) {
+    showError(err.message || "Unable to start checkout");
+    button.disabled = false;
+    button.textContent = "Upgrade plan";
+  }
+});
+document.getElementById("ai_submit").addEventListener("click", refreshAiCompletion);
+document.getElementById("obs_refresh").addEventListener("click", refreshObservability);
+document.getElementById("obs_reset").addEventListener("click", () => {
+  document.getElementById("obs_model").value = "";
+  document.getElementById("obs_status").value = "";
+  document.getElementById("obs_days").value = "30";
+  refreshObservability();
+});
+document.getElementById("btn_new_key").addEventListener("click", async () => {
+  const name = prompt("Name this key (e.g. staging or prod-server-1):", "default");
+  if (!name) return;
+  try {
+    const k = await VK.createApiKey({ name });
+    const raw = k.raw_key || k.api_key || k.key;
+    if (raw) {
+      $alert.innerHTML =
+        '<div class="alert alert-ok"><strong>Save this key now - it will not be shown again.</strong>' +
+        '<div class="code-box" style="margin-top:8px;">' +
+          '<span style="flex:1;">' + raw + '</span>' +
+          '<button class="copy" onclick="navigator.clipboard.writeText(\'' + raw + '\').then(() => this.textContent=\'copied\')">copy</button>' +
+        '</div></div>';
+    } else {
+      showOk("Key created.");
     }
+    await refreshApiKeys();
+  } catch (err) { showError(err.message); }
+});
+document.getElementById("btn_budget_save").addEventListener("click", async () => {
+  try {
+    const amount = Number(document.getElementById("budget_amount").value || 0);
+    await VK.workspaceBudgetUpdate({
+      budget_type: "monthly",
+      amount,
+      alert_thresholds: [50, 80, 95],
+    });
+    showOk("Budget saved.");
+    state.budget = null;
+    await refreshBudget();
+  } catch (err) {
+    showError(err.message || "Budget update failed");
+  }
+});
+document.getElementById("btn_budget_export").addEventListener("click", async () => {
+  try {
+    const csv = await VK.workspaceCostCsv();
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "veklom-costs.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showError(err.message || "Export failed");
+  }
+});
 
-    if (event.data.type === "INLINE_EDIT_SCROLL_STOP") {
-      scrollForwarding = false;
-      if (scrollRaf) cancelAnimationFrame(scrollRaf);
-      scrollRaf = 0;
-      return;
-    }
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const initialTab = initialTabFromLocation();
+  if (params.get("welcome") === "1") showOk("Workspace ready. Generate an API key to start.");
+  if (params.get("checkout") === "success") showOk("Subscription activated.");
+  if (params.get("checkout") === "cancel") showError("Checkout canceled - no charge was made.");
 
-    if (event.data.type !== "INLINE_EDIT_CAPTURE_REQUEST") return;
+  setTab(initialTab);
+  syncWorkspaceLocation(initialTab);
 
-    handleCaptureRequest(event);
-  });
+  await refreshOverview();
+  await refreshWallet();
+  await refreshGithubPanel();
+  await refreshApiKeys();
+  await refreshModels();
+  await refreshBudget();
+  await refreshObservability();
+
+  document.getElementById("btn_upgrade").style.display = "inline-flex";
+
+  const wantedPlan = params.get("plan");
+  if (wantedPlan && ["free","starter","pro","sovereign","enterprise"].includes(wantedPlan)) {
+    const planLabels = {
+      free: "Free",
+      starter: "Team",
+      pro: "Business",
+      sovereign: "Sovereign",
+      enterprise: "Enterprise",
+    };
+    showOk("Plan selected: " + (planLabels[wantedPlan] || wantedPlan));
+  }
 })();
-
-</script></body>
+</script>
+</body>
 </html>

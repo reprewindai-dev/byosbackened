@@ -342,9 +342,6 @@ curl -X POST https://api.veklom.com/v1/exec \
             <label for="obs_model">Model</label>
             <select id="obs_model">
               <option value="">All models</option>
-              <option value="claude-haiku">Claude Haiku</option>
-              <option value="llama3">Llama 3</option>
-              <option value="mistral">Mistral</option>
             </select>
           </div>
           <div class="field">
@@ -584,6 +581,19 @@ function populateAiModelOptions() {
   ).join("");
   select.disabled = false;
   if (available.some(model => model.model_slug === current)) {
+    select.value = current;
+  }
+}
+
+function populateObservabilityModelOptions() {
+  const select = document.getElementById("obs_model");
+  const current = select.value;
+  const models = state.models || [];
+  select.innerHTML = '<option value="">All models</option>' +
+    models.map(model =>
+      '<option value="' + model.model_slug + '">' + model.display_name + '</option>'
+    ).join("");
+  if (models.some(model => model.model_slug === current)) {
     select.value = current;
   }
 }
@@ -873,6 +883,7 @@ async function refreshModels() {
       if (!state.models.length) {
         root.innerHTML = '<p class="muted">No models configured for this workspace.</p>';
         populateAiModelOptions();
+        populateObservabilityModelOptions();
         setAiMode(aiState.freeTier);
         return;
       }
@@ -888,9 +899,10 @@ async function refreshModels() {
             '<input type="checkbox" class="switch model-switch" data-model="' + model.model_slug + '"' + (model.enabled ? ' checked' : '') + ' />' +
           '</div>' +
         '</div>'
-      )).join("");
-      populateAiModelOptions();
-      setAiMode(aiState.freeTier);
+        )).join("");
+        populateAiModelOptions();
+        populateObservabilityModelOptions();
+        setAiMode(aiState.freeTier);
       document.querySelectorAll(".model-switch").forEach(toggle => {
         toggle.addEventListener("change", async () => {
           toggle.disabled = true;

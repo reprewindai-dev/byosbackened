@@ -187,6 +187,12 @@
         document.getElementById("root")?.prepend(gate);
       }
     }
+    const renderKey = `${location.pathname}${location.hash}`;
+    if (gate.dataset.veklomRenderKey === renderKey) {
+      setProtectedGate(true);
+      return;
+    }
+    gate.dataset.veklomRenderKey = renderKey;
     gate.innerHTML = `
       <div style="border:1px solid rgba(148,163,184,.2);background:radial-gradient(circle at top left,rgba(34,197,94,.16),transparent 38%),rgba(2,6,23,.94);box-shadow:0 24px 70px rgba(0,0,0,.38);border-radius:16px;padding:28px;color:#e5e7eb">
         <div style="max-width:760px">
@@ -469,7 +475,7 @@
       `;
     }
 
-    panel.innerHTML = `
+    const nextPanelHtml = `
       <div style="border:1px solid rgba(34,197,94,.22);background:linear-gradient(135deg,rgba(2,6,23,.94),rgba(15,23,42,.88));box-shadow:0 18px 50px rgba(0,0,0,.32);border-radius:14px;padding:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
           <div>
@@ -481,6 +487,9 @@
         ${body}
       </div>
     `;
+    if (panel.innerHTML !== nextPanelHtml) {
+      panel.innerHTML = nextPanelHtml;
+    }
   };
 
   const applyState = (state) => {

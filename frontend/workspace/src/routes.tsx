@@ -3,6 +3,8 @@ import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { PlaygroundPage } from "./pages/PlaygroundPage";
+import { MarketplacePage } from "./pages/MarketplacePage";
 
 export function AppRoutes() {
   return (
@@ -12,14 +14,8 @@ export function AppRoutes() {
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/overview" replace />} />
         <Route path="/overview" element={<OverviewPage />} />
-        <Route
-          path="/playground"
-          element={<PlaceholderPage title="Playground" subtitle="Production-grade prompt theater. Every call policed, routed, costed, and audit-stamped." />}
-        />
-        <Route
-          path="/marketplace"
-          element={<PlaceholderPage title="Marketplace" subtitle="Sovereign-ready assets, governed distribution." />}
-        />
+        <Route path="/playground" element={<PlaygroundPage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
         <Route
           path="/models"
           element={<PlaceholderPage title="Models" subtitle="Deployed models across Hetzner primary and AWS burst." />}

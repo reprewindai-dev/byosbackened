@@ -23,14 +23,32 @@ interface ModelsResp {
 }
 
 async function fetchModels(): Promise<ModelEntry[]> {
-  const resp = await api.get<ModelsResp | ModelEntry[]>("/workspace/models");
+  const resp = await api.get<ModelsResp | ModelEntry[] | { models?: unknown[]; items?: unknown[] }>("/workspace/models");
   const d = resp.data;
-  if (Array.isArray(d)) return d;
-  return d.models ?? d.items ?? [];
+  const raw = Array.isArray(d) ? d : d.models ?? d.items ?? [];
+  return raw.map(normalizeModel).filter((model) => Boolean(model.slug));
 }
 
 async function toggleModel({ slug, enabled }: { slug: string; enabled: boolean }) {
   await api.patch(`/workspace/models/${encodeURIComponent(slug)}`, { enabled });
+}
+
+function normalizeModel(raw: unknown): ModelEntry {
+  const row = raw as Record<string, unknown>;
+  const costIn = Number(row.input_cost_per_1k ?? row.input_cost_per_1m_tokens ?? 0);
+  const costOut = Number(row.output_cost_per_1k ?? row.output_cost_per_1m_tokens ?? 0);
+  return {
+    slug: String(row.slug ?? row.model_slug ?? row.bedrock_model_id ?? ""),
+    name: String(row.name ?? row.display_name ?? row.model_slug ?? row.slug ?? ""),
+    provider: row.provider ? String(row.provider) : undefined,
+    enabled: row.enabled !== false,
+    context_window: Number(row.context_window ?? 0) || undefined,
+    input_cost_per_1k: costIn > 1 ? costIn / 1000 : costIn,
+    output_cost_per_1k: costOut > 1 ? costOut / 1000 : costOut,
+    quantization: row.quantization ? String(row.quantization) : undefined,
+    host: row.host ? String(row.host) : row.connected === false ? "not connected" : "connected",
+    region: row.region ? String(row.region) : undefined,
+  };
 }
 
 export function ModelsPage() {

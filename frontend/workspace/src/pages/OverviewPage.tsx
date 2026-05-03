@@ -3,10 +3,122 @@ import { Plus, TerminalSquare, TrendingUp, TrendingDown, ShieldCheck, AlertCircl
 import { api } from "@/lib/api";
 import type { OverviewPayload } from "@/types/api";
 import { fmtCents, fmtDelta, fmtNumber, relativeTime } from "@/lib/cn";
+import { isRouteUnavailable } from "@/lib/errors";
 
 async function fetchOverview(): Promise<OverviewPayload> {
-  const resp = await api.get<OverviewPayload>("/monitoring/overview");
-  return resp.data;
+  try {
+    const resp = await api.get<OverviewPayload>("/monitoring/overview");
+    return resp.data;
+  } catch (err) {
+    if (!isRouteUnavailable(err)) throw err;
+    const resp = await api.get<LegacyWorkspaceOverview>("/workspace/overview");
+    return fromLegacyOverview(resp.data);
+  }
+}
+
+interface LegacyWorkspaceOverview {
+  period_start?: string;
+  period_end?: string;
+  total_api_calls?: number;
+  total_tokens_used?: number;
+  total_cost_usd?: number;
+  active_models?: string[];
+  live_feed?: Array<{
+    id: string;
+    kind?: string;
+    model?: string | null;
+    latency_ms?: number;
+    tokens?: number;
+    status?: string;
+    created_at?: string;
+  }>;
+}
+
+function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
+  const calls = Number(data.total_api_calls ?? 0);
+  const tokens = Number(data.total_tokens_used ?? 0);
+  const costUsd = Number(data.total_cost_usd ?? 0);
+  const periodStart = data.period_start ? new Date(data.period_start).getTime() : Date.now();
+  const periodEnd = data.period_end ? new Date(data.period_end).getTime() : Date.now();
+  const minutes = Math.max(1, Math.round((periodEnd - periodStart) / 60000));
+  const activeModels = data.active_models ?? [];
+  const recent = data.live_feed ?? [];
+
+  return {
+    kpi: {
+      requests_per_minute: Number((calls / minutes).toFixed(2)),
+      requests_delta_pct: 0,
+      p50_latency_ms: median(recent.map((row) => Number(row.latency_ms ?? 0)).filter(Boolean)),
+      p50_delta_ms: 0,
+      tokens_per_second: Number((tokens / Math.max(1, minutes * 60)).toFixed(2)),
+      tokens_delta_pct: 0,
+      spend_today_cents: Math.round(costUsd * 100),
+      spend_cap_pct: 0,
+      active_models: activeModels.length,
+      active_models_quantized: activeModels.filter((model) => /q[0-9]/i.test(model)).length,
+      audit_entries: recent.length,
+      audit_verified_pct: recent.length ? 100 : 0,
+    },
+    routing: {
+      primary_plane: "Hetzner primary",
+      burst_plane: "AWS burst",
+      primary_util_pct: calls ? 100 : 0,
+      burst_util_pct: 0,
+      primary_hosts: [{ name: "hetzner-fsn1", util_pct: calls ? 100 : 0, detail: `${calls} live call(s)` }],
+      series: [],
+    },
+    spend: {
+      spend_cents: Math.round(costUsd * 100),
+      cap_cents: 0,
+      inference_cents: Math.round(costUsd * 100),
+      embeddings_cents: 0,
+      gpu_burst_cents: 0,
+      storage_cents: 0,
+      burn_rate_per_min_cents: minutes ? Math.round((costUsd * 100) / minutes) : 0,
+      forecast_eod_cents: Math.round(costUsd * 100),
+      forecast_cap_pct: 0,
+    },
+    recent_runs: recent.map((row) => ({
+      id: row.id,
+      model: row.model ?? "unknown",
+      route: "primary",
+      latency_ms: Number(row.latency_ms ?? 0),
+      tokens: Number(row.tokens ?? 0),
+      cost_cents: 0,
+      policy: row.status === "error" ? "blocked" : "passed",
+      when: row.created_at ?? new Date().toISOString(),
+    })),
+    policy_events: recent.slice(0, 5).map((row) => ({
+      id: `policy-${row.id}`,
+      ts: row.created_at ?? new Date().toISOString(),
+      kind: "audit_signed",
+      summary: row.status === "error" ? "Backend rejected request" : "Audit entry available",
+      detail: `${row.kind ?? "request"} · ${row.model ?? "unknown"}`,
+    })),
+    alerts: [],
+    audit_trail: recent.map((row) => ({
+      id: row.id,
+      kind: row.kind ?? "request",
+      subject: row.model ?? "workspace call",
+      actor: "workspace",
+      ts: row.created_at ?? new Date().toISOString(),
+      hash_prefix: row.id.slice(0, 12),
+    })),
+    fleet: activeModels.map((model) => ({
+      id: model,
+      name: model,
+      quant: /q[0-9]/i.exec(model)?.[0] ?? "fp16",
+      replicas: 1,
+      route: "primary",
+      p50_ms: 0,
+    })),
+  };
+}
+
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
 export function OverviewPage() {

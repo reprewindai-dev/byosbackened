@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     
     # SERP API (optional, non-AI)
     serpapi_key: str = ""
+    resend_api_key: str = ""
     resend_webhook_secret: str = ""
 
     # Worker

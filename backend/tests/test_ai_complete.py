@@ -56,28 +56,30 @@ class _FakeDB:
         self.rolled_back = True
 
 
-class _FakeBedrockClient:
-    def __init__(self, output_text="hello from bedrock", output_tokens=151):
+class _RuntimeCall:
+    def __init__(self, output_text="hello from ollama", output_tokens=151):
         self.output_text = output_text
         self.output_tokens = output_tokens
         self.called = False
 
-    def converse(self, **kwargs):
+    def __call__(self, model_row, prompt, max_tokens):
         self.called = True
         return {
-            "output": {
-                "message": {
-                    "content": [
-                        {"text": self.output_text},
-                    ]
-                }
-            },
-            "usage": {
-                "outputTokens": self.output_tokens,
-                "inputTokens": 17,
-                "totalTokens": 168,
-            },
-        }
+            "response": self.output_text,
+            "completion_tokens": self.output_tokens,
+            "prompt_tokens": 17,
+        }, model_row.provider
+
+
+def _model_row():
+    return SimpleNamespace(
+        model_slug="ollama-default",
+        display_name="qwen2.5:1.5b (Ollama)",
+        bedrock_model_id="qwen2.5:1.5b",
+        provider="ollama",
+        enabled=True,
+        connected=True,
+    )
 
 
 def test_complete_deducts_wallet_and_logs_call(monkeypatch):
@@ -89,16 +91,17 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
         updated_at=None,
     )
     fake_db = _FakeDB(wallet=wallet)
-    fake_client = _FakeBedrockClient(output_text="response text", output_tokens=151)
-    monkeypatch.setattr("apps.api.routers.ai._get_bedrock_client", lambda: fake_client)
+    runtime = _RuntimeCall(output_text="response text", output_tokens=151)
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
 
     current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
     request = SimpleNamespace(state=SimpleNamespace(request_id="req-1"))
-    payload = AICompleteRequest(model="claude-haiku", prompt="Summarize the contract", max_tokens=512)
+    payload = AICompleteRequest(model="ollama-default", prompt="Summarize the contract", max_tokens=512)
 
     result = asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
 
-    assert fake_client.called is True
+    assert runtime.called is True
     assert result.response_text == "response text"
     assert result.tokens_deducted == 2
     assert result.wallet_balance == 8
@@ -118,16 +121,17 @@ def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
         updated_at=None,
     )
     fake_db = _FakeDB(wallet=wallet)
-    fake_client = _FakeBedrockClient()
-    monkeypatch.setattr("apps.api.routers.ai._get_bedrock_client", lambda: fake_client)
+    runtime = _RuntimeCall()
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
     current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
     request = SimpleNamespace(state=SimpleNamespace(request_id="req-1"))
-    payload = AICompleteRequest(model="llama3", prompt="Write a line", max_tokens=512)
+    payload = AICompleteRequest(model="ollama-default", prompt="Write a line", max_tokens=512)
 
     with pytest.raises(HTTPException) as exc:
         asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
 
     assert exc.value.status_code == 402
     assert exc.value.detail == "Insufficient tokens"
-    assert fake_client.called is False
+    assert runtime.called is False
     assert fake_db.committed is False

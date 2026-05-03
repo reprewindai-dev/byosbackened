@@ -621,6 +621,25 @@ async def github_callback(
             github_access_token=gh_access_token,
         )
         db.add(user)
+        wallet = TokenWallet(
+            workspace_id=workspace.id,
+            balance=FREE_TRIAL_CREDITS,
+            monthly_credits_included=FREE_TRIAL_CREDITS,
+            monthly_credits_used=0,
+            total_credits_purchased=0,
+            total_credits_used=0,
+        )
+        db.add(wallet)
+        db.flush()
+        db.add(TokenTransaction(
+            wallet_id=wallet.id,
+            workspace_id=workspace.id,
+            transaction_type="monthly_allotment",
+            amount=FREE_TRIAL_CREDITS,
+            balance_before=0,
+            balance_after=FREE_TRIAL_CREDITS,
+            description="Free GitHub workspace trial credits",
+        ))
         db.commit()
         db.refresh(user)
     else:

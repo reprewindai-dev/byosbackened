@@ -1,0 +1,322 @@
+import { useQuery } from "@tanstack/react-query";
+import { Plus, TerminalSquare, TrendingUp, TrendingDown, ShieldCheck, AlertCircle } from "lucide-react";
+import { api } from "@/lib/api";
+import type { OverviewPayload } from "@/types/api";
+import { fmtCents, fmtDelta, fmtNumber, relativeTime } from "@/lib/cn";
+
+async function fetchOverview(): Promise<OverviewPayload> {
+  const resp = await api.get<OverviewPayload>("/monitoring/overview");
+  return resp.data;
+}
+
+export function OverviewPage() {
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["overview"],
+    queryFn: fetchOverview,
+    refetchInterval: 15_000,
+  });
+
+  return (
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
+            Workspace · Overview
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Sovereign control plane</h1>
+          <p className="mt-2 max-w-2xl text-sm text-bone-2">
+            Every prompt routed, policed, and audited — across Hetzner primary and AWS burst — without leaving your
+            perimeter.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="v-chip v-chip-ok">● live backend connected</span>
+            <span className="v-chip">SOC2-ready</span>
+            <span className="v-chip">HIPAA-aware</span>
+            <span className="v-chip v-chip-brass">EU-sovereign</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button className="v-btn-ghost">
+            <Plus className="h-4 w-4" /> New deployment
+          </button>
+          <button className="v-btn-primary">
+            <TerminalSquare className="h-4 w-4" /> Open Playground
+          </button>
+        </div>
+      </header>
+
+      {isError && (
+        <div className="v-card flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <div>
+            <div className="font-semibold">Failed to load overview</div>
+            <div className="mt-1 text-xs opacity-80">
+              {(error as Error)?.message ?? "Unknown error"} · the backend endpoint{" "}
+              <span className="font-mono">/api/v1/monitoring/overview</span> may not be implemented yet.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <KpiCard
+          label="Requests / min"
+          value={data ? fmtNumber(data.kpi.requests_per_minute) : "—"}
+          delta={data ? fmtDelta(data.kpi.requests_delta_pct, "%") : undefined}
+          positive={!!data && data.kpi.requests_delta_pct >= 0}
+          loading={isLoading}
+        />
+        <KpiCard
+          label="P50 latency"
+          value={data ? `${data.kpi.p50_latency_ms} ms` : "—"}
+          delta={data ? fmtDelta(data.kpi.p50_delta_ms, " ms") : undefined}
+          positive={!!data && data.kpi.p50_delta_ms <= 0}
+          loading={isLoading}
+        />
+        <KpiCard
+          label="Tokens / sec"
+          value={data ? fmtNumber(data.kpi.tokens_per_second) : "—"}
+          delta={data ? fmtDelta(data.kpi.tokens_delta_pct, "%") : undefined}
+          positive={!!data && data.kpi.tokens_delta_pct >= 0}
+          loading={isLoading}
+        />
+        <KpiCard
+          label="Spend today"
+          value={data ? fmtCents(data.kpi.spend_today_cents) : "—"}
+          delta={data ? `${data.kpi.spend_cap_pct}% cap` : undefined}
+          positive={!!data && data.kpi.spend_cap_pct < 80}
+          loading={isLoading}
+        />
+        <KpiCard
+          label="Active models"
+          value={data ? String(data.kpi.active_models) : "—"}
+          delta={data ? `${data.kpi.active_models_quantized} quantized` : undefined}
+          positive
+          loading={isLoading}
+        />
+        <KpiCard
+          label="Audit entries"
+          value={data ? fmtNumber(data.kpi.audit_entries) : "—"}
+          delta={data ? `${data.kpi.audit_verified_pct}% verified` : undefined}
+          positive
+          loading={isLoading}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="v-card p-5 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Routing · last 24h</div>
+              <h3 className="mt-1 text-lg font-semibold">Hetzner primary · AWS burst</h3>
+            </div>
+            <div className="flex gap-2">
+              <span className="v-chip v-chip-brass">Hetzner {data?.routing.primary_util_pct ?? "—"}%</span>
+              <span className="v-chip">AWS {data?.routing.burst_util_pct ?? "—"}%</span>
+            </div>
+          </div>
+          <div className="flex h-48 items-center justify-center rounded-lg border border-rule bg-ink-2/40 font-mono text-[11px] text-muted">
+            {isLoading ? "Loading chart…" : "Recharts line-chart wires here in next commit"}
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-[11px]">
+            {data?.routing.primary_hosts?.slice(0, 3).map((h) => (
+              <div key={h.name} className="rounded-lg border border-rule p-2">
+                <div className="text-muted">{h.name}</div>
+                <div className="text-bone">{h.util_pct}% util</div>
+                <div className="text-[10px] text-muted-2">{h.detail}</div>
+              </div>
+            )) ?? (
+              <>
+                <SkeletonCell />
+                <SkeletonCell />
+                <SkeletonCell />
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="v-card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Spend · today</div>
+            <span className="v-chip v-chip-ok">
+              <ShieldCheck className="h-3 w-3" /> on-pace
+            </span>
+          </div>
+          <div className="mb-1 text-2xl font-semibold">
+            {data ? fmtCents(data.spend.spend_cents) : "—"}
+            <span className="ml-1 text-sm font-normal text-muted">
+              of {data ? fmtCents(data.spend.cap_cents) : "—"}
+            </span>
+          </div>
+          <div className="mb-4 h-1.5 w-full overflow-hidden rounded bg-rule">
+            <div
+              className="h-full rounded bg-brass"
+              style={{ width: `${Math.min(100, data?.kpi.spend_cap_pct ?? 0)}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <SpendRow label="Inference" cents={data?.spend.inference_cents} />
+            <SpendRow label="Embeddings" cents={data?.spend.embeddings_cents} />
+            <SpendRow label="GPU burst" cents={data?.spend.gpu_burst_cents} />
+            <SpendRow label="Storage" cents={data?.spend.storage_cents} />
+          </div>
+          <div className="mt-4 space-y-1 font-mono text-[11px] text-muted">
+            <div className="flex justify-between">
+              <span>Burn rate</span>
+              <span className="text-bone">
+                {data ? fmtCents(data.spend.burn_rate_per_min_cents) : "—"} / min
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Forecast EOD</span>
+              <span className="text-bone">
+                {data ? fmtCents(data.spend.forecast_eod_cents) : "—"} ({data?.spend.forecast_cap_pct ?? "—"}% cap)
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="v-card p-0 lg:col-span-2">
+          <header className="flex items-center justify-between border-b border-rule px-5 py-3">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Recent runs · live</div>
+              <h3 className="mt-1 text-sm font-semibold">Per-call routing, latency, cost</h3>
+            </div>
+            <a href="/playground" className="v-chip hover:text-bone">Playground →</a>
+          </header>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-rule font-mono text-[10px] uppercase tracking-wider text-muted">
+                <th className="px-5 py-2 text-left font-medium">Model</th>
+                <th className="px-5 py-2 text-left font-medium">Route</th>
+                <th className="px-5 py-2 text-right font-medium">Latency</th>
+                <th className="px-5 py-2 text-right font-medium">Tokens</th>
+                <th className="px-5 py-2 text-right font-medium">Cost</th>
+                <th className="px-5 py-2 text-left font-medium">Policy</th>
+                <th className="px-5 py-2 text-right font-medium">When</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono">
+              {(data?.recent_runs ?? []).slice(0, 5).map((r) => (
+                <tr key={r.id} className="border-b border-rule/60 last:border-0">
+                  <td className="px-5 py-2.5 text-bone">{r.model}</td>
+                  <td className="px-5 py-2.5">
+                    <span className={r.route === "burst" ? "v-chip text-electric" : "v-chip v-chip-brass"}>
+                      {r.route === "burst" ? "AWS burst" : "HTZ primary"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-2.5 text-right text-bone">{r.latency_ms} ms</td>
+                  <td className="px-5 py-2.5 text-right">{r.tokens}</td>
+                  <td className="px-5 py-2.5 text-right text-bone">{fmtCents(r.cost_cents)}</td>
+                  <td className="px-5 py-2.5">
+                    <span
+                      className={
+                        r.policy === "passed"
+                          ? "v-chip v-chip-ok"
+                          : r.policy === "redacted"
+                          ? "v-chip v-chip-warn"
+                          : "v-chip v-chip-err"
+                      }
+                    >
+                      ● {r.policy}
+                    </span>
+                  </td>
+                  <td className="px-5 py-2.5 text-right text-muted">{relativeTime(r.when)}</td>
+                </tr>
+              ))}
+              {!data?.recent_runs?.length && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-6 text-center text-muted">
+                    {isLoading ? "Loading runs…" : "No runs yet. Open the Playground to generate the first one."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="v-card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+                Policy interception · live
+              </div>
+              <h3 className="mt-1 text-sm font-semibold">Decision before execution</h3>
+            </div>
+            <span className="v-chip v-chip-ok">● live</span>
+          </div>
+          <ul className="space-y-3 font-mono text-[11px]">
+            {(data?.policy_events ?? []).map((e) => (
+              <li key={e.id} className="flex gap-3">
+                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-brass" />
+                <div className="flex-1">
+                  <div className="flex justify-between text-bone">
+                    <span>{e.summary}</span>
+                    <span className="text-muted">{new Date(e.ts).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="text-muted">{e.detail}</div>
+                </div>
+              </li>
+            ))}
+            {!data?.policy_events?.length && (
+              <li className="text-muted">{isLoading ? "Waiting on policy engine…" : "No events in window."}</li>
+            )}
+          </ul>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  delta,
+  positive,
+  loading,
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  positive?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <div className="v-card p-4">
+      <div className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+        ⚙ {label}
+      </div>
+      <div className="mt-1.5 flex items-baseline justify-between">
+        <div className="text-xl font-semibold text-bone">
+          {loading ? <span className="inline-block h-4 w-14 animate-pulse rounded bg-rule" /> : value}
+        </div>
+        {delta && (
+          <div
+            className={
+              "flex items-center gap-0.5 font-mono text-[10px] " + (positive ? "text-moss" : "text-crimson")
+            }
+          >
+            {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {delta}
+          </div>
+        )}
+      </div>
+      <div className="mt-2 h-6 w-full rounded bg-gradient-to-r from-brass/20 to-transparent opacity-60" />
+    </div>
+  );
+}
+
+function SpendRow({ label, cents }: { label: string; cents?: number }) {
+  return (
+    <div className="flex items-center justify-between rounded border border-rule px-2 py-1.5">
+      <span className="text-muted">{label}</span>
+      <span className="text-bone">{cents !== undefined ? fmtCents(cents) : "—"}</span>
+    </div>
+  );
+}
+
+function SkeletonCell() {
+  return <div className="h-14 animate-pulse rounded-lg border border-rule bg-ink-2" />;
+}

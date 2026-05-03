@@ -1344,12 +1344,12 @@
   }
 
   // ---- Edge mode: one-shot REST ----
-  async function runEdge(scenario) {
-    if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
-    mode = "edge"; renderPipeline();
-    resetPipelineState();
-    setRunning(true, scenario === "network" ? "Ingesting SNMP…" : "Ingesting Modbus…");
-    startLatency();
+    async function runEdge(scenario) {
+      if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
+      mode = "edge"; renderPipeline();
+      resetPipelineState();
+      setRunning(true, scenario === "network" ? "Ingesting SNMP…" : "Ingesting Modbus…");
+      startLatency();
 
     const order = ["legacy_signal", "protocol_ingest", "normalize", "policy_control", "ai_decision", "audit_cost"];
     // animate the first 2 nodes optimistically while the fetch is in flight
@@ -1364,15 +1364,37 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
 
-      const source = payload.normalized_event?.source || payload.source || "demo";
-      const isFallback = payload.fallback === true;
-      const isLive = payload.live === true && !isFallback;
-      const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
-      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
-      chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
-      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
-      advanceTo("normalize");
-      await sleep(220);
+        const source = payload.normalized_event?.source || payload.source || "demo";
+        const isFallback = payload.fallback === true;
+        const isLive = payload.live === true && !isFallback;
+        const isDegraded = payload.status === "degraded" || isFallback || payload.error;
+        const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
+        termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
+        chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
+        chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
+
+        if (isDegraded) {
+          const faultText = payload.error || (isFallback ? "upstream instability detected" : "protocol ingest degraded");
+          termPush("alarm", `${payload.protocol || "legacy"} · ${faultText}`, "err");
+          setNodeState("protocol_ingest", "err");
+          setEdgeState(1, "err");
+          chipCB.className = "chip err";
+          chipCB.innerHTML = '<span class="dot"></span>Circuit: alarm';
+          setRunning(true, "Containing incident…");
+          await sleep(850);
+
+          termPush("self-heal", isFallback ? "governed fallback engaged" : "stabilizing governed route", "warn");
+          chipCB.className = "chip warn";
+          chipCB.innerHTML = '<span class="dot"></span>Circuit: rerouting';
+          await sleep(650);
+
+          termPush("resume", "continuing through normalized governed path", "ok");
+        }
+
+        advanceTo("normalize");
+        chipCB.className = "chip ok";
+        chipCB.innerHTML = '<span class="dot"></span>Circuit: closed';
+        await sleep(isDegraded ? 420 : 220);
 
       const decision = payload.decision || {};
       const severity = decision.severity || "info";

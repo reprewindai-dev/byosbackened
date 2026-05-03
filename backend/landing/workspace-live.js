@@ -121,8 +121,8 @@
         <span style="width:7px;height:7px;border-radius:999px;background:#22c55e;display:inline-block"></span>
         <strong>Live tenant connected</strong>
       </div>
-      <div>${state.workspaceName} · ${safe(state.userEmail, "authenticated user")}</div>
-      <div style="color:#94a3b8;margin-top:2px;">${repos} · ${models} · ${wallet}</div>
+      <div>${state.workspaceName} - ${safe(state.userEmail, "authenticated user")}</div>
+      <div style="color:#94a3b8;margin-top:2px;">${repos} - ${models} - ${wallet}</div>
     `;
   };
 
@@ -277,7 +277,7 @@
     const slug = safe(state.workspaceSlug, workspace.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
     const init = initials(name, email);
     const shortName = name.includes(" ") ? name.split(/\s+/).slice(0, 2).join(" ") : name;
-    const connected = state.githubConnected ? `GitHub · ${state.githubUsername}` : "GitHub · connect";
+    const connected = state.githubConnected ? `GitHub - ${state.githubUsername}` : "GitHub - connect";
 
     replaceText(document.body, [
       ["Elliot Jurić", name],
@@ -297,10 +297,118 @@
       ["acme-prod", workspace],
       ["acme.veklom.app", `${slug}.veklom.app`],
       ["Okta · active", connected],
-      ["GitHub · enabled", state.githubConnected ? connected : "GitHub · available"],
+      ["GitHub · enabled", state.githubConnected ? connected : "GitHub - available"],
     ]);
     setInputPlaceholders(workspace);
     injectStatus(state);
+    wireVisibleActions();
+  };
+
+  const showActionNotice = (message, tone = "info") => {
+    let el = document.getElementById("veklom-action-truth-notice");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "veklom-action-truth-notice";
+      el.style.cssText = "position:fixed;left:14px;bottom:14px;z-index:90;max-width:420px;border:1px solid rgba(148,163,184,.25);background:rgba(2,6,23,.92);color:#e5e7eb;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-sans-serif,system-ui;box-shadow:0 18px 40px rgba(0,0,0,.35)";
+      document.body.appendChild(el);
+    }
+    el.style.borderColor = tone === "warn" ? "rgba(245,158,11,.45)" : tone === "error" ? "rgba(239,68,68,.45)" : "rgba(34,197,94,.35)";
+    el.textContent = message;
+    window.clearTimeout(showActionNotice._timer);
+    showActionNotice._timer = window.setTimeout(() => {
+      if (el) el.remove();
+    }, 5200);
+  };
+
+  const visibleText = (el) => (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+
+  const setButtonUnavailable = (el, reason) => {
+    el.dataset.veklomActionTruth = "disabled";
+    el.setAttribute("aria-disabled", "true");
+    el.setAttribute("title", reason);
+    el.style.opacity = "0.58";
+    el.style.cursor = "not-allowed";
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showActionNotice(reason, "warn");
+    }, true);
+  };
+
+  const wireButton = (el, handler, title = "Live action") => {
+    el.dataset.veklomActionTruth = "wired";
+    el.setAttribute("title", title);
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handler();
+    }, true);
+  };
+
+  const sourceForCurrentMarketplaceItem = () => {
+    const state = window.__VEKLOM_WORKSPACE_STATE__ || {};
+    const slug = (location.hash.split("/marketplace/")[1] || location.pathname.split("/marketplace/")[1] || "").replace(/^\/+|\/+$/g, "");
+    if (!slug) return null;
+    const item = (state.marketplaceListings || []).find((listing) => listing.id === slug);
+    return item && (item.use_url || item.source_url);
+  };
+
+  const connectGithub = async () => {
+    try {
+      const out = await api("/auth/github/login");
+      if (!out || !out.auth_url) throw new Error("GitHub OAuth did not return an auth URL");
+      if (out.state) sessionStorage.setItem("vk_github_oauth_state", out.state);
+      location.href = out.auth_url;
+    } catch (error) {
+      showActionNotice(error.message || "GitHub OAuth is not available", "error");
+    }
+  };
+
+  const wireVisibleActions = () => {
+    const unavailable = new Map([
+      ["New deployment", "Deployment creation is not available in the current stabilized shell. Existing model/runtime state is live."],
+      ["Deploy first model", "One-click deployment is not enabled in this shell yet. Runtime models are read from the live backend."],
+      ["SSO settings", "SSO administration is not self-serve in this shell yet."],
+      ["Invite member", "Team invitations are not enabled in this shell yet."],
+      ["Pause all deployments", "Global deployment pause is not exposed in this shell yet."],
+      ["Pause", "This destructive control is disabled in the public workspace shell."],
+      ["Rotate workspace secrets", "Secret rotation is not exposed in this shell yet."],
+      ["Rotate", "Secret/key rotation is disabled unless a backend-backed row action is present."],
+      ["Export", "Export requires a backend-backed export endpoint for this panel; no fake export generated."],
+      ["Create listing", "Use the Vendor Console for listing creation; this compiled marketplace card is read-only."],
+      ["Create Draft", "Use the Vendor Console authenticated flow for listing creation."],
+      ["Save Vendor Profile", "Use the Vendor Console authenticated flow for vendor profile updates."],
+    ]);
+
+    for (const el of document.querySelectorAll("button, a[role='button']")) {
+      if (el.dataset.veklomActionTruth) continue;
+      const text = visibleText(el);
+      if (!text) continue;
+
+      if (text === "Open Playground") {
+        wireButton(el, () => { location.href = "/playground/"; }, "Open the real playground route");
+      } else if (text === "Sign out") {
+        wireButton(el, () => {
+          localStorage.removeItem("vk_access");
+          localStorage.removeItem("vk_refresh");
+          localStorage.removeItem("vk_expires_at");
+          location.href = "/login/";
+        }, "Sign out of this browser session");
+      } else if (text.includes("Connect GitHub") || text === "GitHub - connect" || text === "GitHub · connect") {
+        wireButton(el, connectGithub, "Start real GitHub OAuth");
+      } else if (["Install", "Use now", "Docs"].includes(text)) {
+        wireButton(el, () => {
+          const url = sourceForCurrentMarketplaceItem();
+          if (url) {
+            window.open(url, "_blank", "noopener,noreferrer");
+          } else {
+            showActionNotice("No source URL is available for this listing.", "warn");
+          }
+        }, "Open the real source/use URL for this listing");
+      } else if (unavailable.has(text)) {
+        setButtonUnavailable(el, unavailable.get(text));
+      }
+    }
   };
 
   const loadLiveState = async () => {
@@ -353,11 +461,12 @@
     if (state) {
       applyState(state);
       renderTruthPanel(state);
+      wireVisibleActions();
     }
     if (lastPath !== location.hash + location.pathname) {
       lastPath = location.hash + location.pathname;
-      setTimeout(() => state && (applyState(state), renderTruthPanel(state)), 150);
-      setTimeout(() => state && (applyState(state), renderTruthPanel(state)), 600);
+      setTimeout(() => state && (applyState(state), renderTruthPanel(state), wireVisibleActions()), 150);
+      setTimeout(() => state && (applyState(state), renderTruthPanel(state), wireVisibleActions()), 600);
     }
   };
 
@@ -369,6 +478,7 @@
     const observer = new MutationObserver(scheduleApply);
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("hashchange", scheduleApply);
+    wireVisibleActions();
   };
 
   if (document.readyState === "loading") {

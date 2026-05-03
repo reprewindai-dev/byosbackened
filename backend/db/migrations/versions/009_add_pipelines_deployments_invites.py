@@ -137,7 +137,7 @@ def upgrade():
             ("previous_version", sa.Column("previous_version", sa.String(), nullable=True)),
             ("strategy", sa.Column("strategy", sa.String(), nullable=True, server_default="direct")),
             ("traffic_percent", sa.Column("traffic_percent", sa.Integer(), nullable=True, server_default="100")),
-            ("is_primary", sa.Column("is_primary", sa.Boolean(), nullable=True, server_default=sa.text("1"))),
+            ("is_primary", sa.Column("is_primary", sa.Boolean(), nullable=True, server_default=sa.text("true"))),
             ("health_metrics", sa.Column("health_metrics", sa.JSON(), nullable=True)),
             ("created_by", sa.Column("created_by", sa.String(), nullable=True)),
             ("promoted_at", sa.Column("promoted_at", sa.DateTime(), nullable=True)),

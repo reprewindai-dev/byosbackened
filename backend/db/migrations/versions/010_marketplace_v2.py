@@ -58,11 +58,11 @@ def upgrade():
         ("summary", sa.Column("summary", sa.Text(), nullable=True)),
         ("compliance_badges", sa.Column("compliance_badges", sa.JSON(), nullable=True)),
         ("predicted_cost_per_run", sa.Column("predicted_cost_per_run", sa.Numeric(10, 6), nullable=True)),
-        ("auto_classified", sa.Column("auto_classified", sa.Boolean(), nullable=True, server_default=sa.text("0"))),
-        ("auto_validated", sa.Column("auto_validated", sa.Boolean(), nullable=True, server_default=sa.text("0"))),
+        ("auto_classified", sa.Column("auto_classified", sa.Boolean(), nullable=True, server_default=sa.text("false"))),
+        ("auto_validated", sa.Column("auto_validated", sa.Boolean(), nullable=True, server_default=sa.text("false"))),
         ("validation_report", sa.Column("validation_report", sa.JSON(), nullable=True)),
         ("source_url", sa.Column("source_url", sa.String(), nullable=True)),
-        ("is_featured", sa.Column("is_featured", sa.Boolean(), nullable=True, server_default=sa.text("0"))),
+        ("is_featured", sa.Column("is_featured", sa.Boolean(), nullable=True, server_default=sa.text("false"))),
     ]
 
     for name, col in cols:

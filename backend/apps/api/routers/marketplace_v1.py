@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
 from core.config import get_settings
+from core.services.marketplace_catalog import real_marketplace_catalog
 from db.models import (
     User,
     Vendor,
@@ -43,6 +44,33 @@ def _vendor_has_paid_marketplace_access(vendor: Vendor) -> bool:
         (vendor.subscription_status or "").lower() == "active"
         and (vendor.plan or "").lower() in _PAID_VENDOR_PLANS
     )
+
+
+def _db_listing_payload(x: Listing) -> dict:
+    return {
+        "id": x.id,
+        "vendor_id": x.vendor_id,
+        "title": x.title,
+        "provider": "Veklom",
+        "category": "Managed Services",
+        "description": x.description,
+        "positioning": x.description,
+        "price": "Free" if not x.price_cents else f"${x.price_cents / 100:,.0f}",
+        "price_cents": x.price_cents,
+        "currency": x.currency,
+        "billing": "free" if not x.price_cents else "external",
+        "install": "Veklom account",
+        "target": ["veklom"],
+        "rating": 5.0,
+        "installs": 1,
+        "badges": ["First-party", "Live backend", "Governed API"],
+        "featured": True,
+        "compliance": ["SOC2"],
+        "source_url": "https://veklom.com/marketplace/",
+        "use_url": "https://veklom.com/signup/",
+        "status": x.status,
+        "created_at": x.created_at.isoformat(),
+    }
 
 
 def _require_vendor(db: Session, user: User) -> Vendor:
@@ -199,36 +227,41 @@ async def listings_list(
     else:
         q = q.filter(Listing.status.in_(_LISTING_PUBLIC_STATUSES))
     rows = q.order_by(Listing.created_at.desc()).all()
-    return [
-        {
-            "id": x.id,
-            "vendor_id": x.vendor_id,
-            "title": x.title,
-            "description": x.description,
-            "price_cents": x.price_cents,
-            "currency": x.currency,
-            "status": x.status,
-            "created_at": x.created_at.isoformat(),
-        }
-        for x in rows
-    ]
+    catalog_rows = real_marketplace_catalog()
+    db_rows = [_db_listing_payload(x) for x in rows]
+    return catalog_rows + db_rows
 
 
 @router.get("/categories")
 async def listings_categories(db: Session = Depends(get_db)):
-    rows = db.query(Listing).filter(Listing.status.in_(_LISTING_PUBLIC_STATUSES)).all()
+    rows = real_marketplace_catalog()
+    rows.extend(
+        _db_listing_payload(row)
+        for row in db.query(Listing).filter(Listing.status.in_(_LISTING_PUBLIC_STATUSES)).all()
+    )
     total = len(rows)
-    paid = sum(1 for row in rows if row.price_cents and row.price_cents > 0)
+    paid = sum(1 for row in rows if row.get("price_cents") and row["price_cents"] > 0)
     free = total - paid
+    categories: dict[str, int] = {}
+    for row in rows:
+        category = row.get("category") or "Other"
+        categories[category] = categories.get(category, 0) + 1
     return [
         {"id": "all", "label": "All", "count": total},
         {"id": "paid", "label": "Paid", "count": paid},
         {"id": "free", "label": "Free", "count": free},
+        *[
+            {"id": key.lower().replace(" ", "-"), "label": key, "count": value}
+            for key, value in sorted(categories.items())
+        ],
     ]
 
 
 @router.get("/listings/{listing_id}")
 async def listings_get(listing_id: str, db: Session = Depends(get_db)):
+    for listing in real_marketplace_catalog():
+        if listing["id"] == listing_id:
+            return listing
     x = db.query(Listing).filter(Listing.id == listing_id).first()
     if not x:
         raise HTTPException(status_code=404, detail="Listing not found")

@@ -80,6 +80,18 @@ async function listInvites(): Promise<Invite[]> {
   }
 }
 
+async function probeInviteRoute(): Promise<"available" | "forbidden" | "unavailable"> {
+  try {
+    await api.get<{ items: Invite[] }>("/workspace/members/invites");
+    return "available";
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 403) return "forbidden";
+    if (isRouteUnavailable(err)) return "unavailable";
+    throw err;
+  }
+}
+
 const ROLE_STYLE: Record<string, string> = {
   owner: "v-chip-brass",
   admin: "v-chip-brass",
@@ -100,6 +112,8 @@ export function TeamPage() {
     queryFn: listMembers,
   });
   const invitesQ = useQuery({ queryKey: ["team-invites"], queryFn: listInvites });
+  const inviteRouteQ = useQuery({ queryKey: ["team-invite-route"], queryFn: probeInviteRoute, retry: false });
+  const inviteRouteUnavailable = inviteRouteQ.data === "unavailable";
 
   const inviteMut = useMutation({
     mutationFn: async (payload: { email: string; role: string }) => {
@@ -158,10 +172,17 @@ export function TeamPage() {
             <span className="v-chip">SAML / SCIM (coming)</span>
           </div>
         </div>
-        <button className="v-btn-primary" onClick={() => setShowInvite(true)}>
+        <button className="v-btn-primary" disabled={inviteRouteUnavailable} onClick={() => setShowInvite(true)}>
           <Mail className="h-4 w-4" /> Invite member
         </button>
       </header>
+
+      {inviteRouteUnavailable && (
+        <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          Team invite delivery is not enabled on the live backend yet. Current signed-in identity is shown from{" "}
+          <span className="font-mono">/api/v1/auth/me</span> instead of placeholder members.
+        </div>
+      )}
 
       {adminOnly && (
         <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">

@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 SITE_BASE = os.getenv("VEKLOM_SMOKE_SITE_BASE", "https://veklom.com").rstrip("/")
 API_BASE = os.getenv("VEKLOM_SMOKE_API_BASE", "https://api.veklom.com/api/v1").rstrip("/")
 ACCESS_TOKEN = os.getenv("VEKLOM_SMOKE_ACCESS_TOKEN")
+RUN_AI = os.getenv("VEKLOM_SMOKE_RUN_AI") == "1"
 
 
 @dataclass
@@ -101,6 +102,25 @@ def main() -> int:
         )
         repo_status, repo_text = _request(f"{API_BASE}/auth/github/repos", token=ACCESS_TOKEN)
         checks.append(Check("github repos authenticated", repo_status in (200, 400), f"status={repo_status} {repo_text[:120]}"))
+        if RUN_AI:
+            status, text = _request(
+                f"{API_BASE}/ai/complete",
+                method="POST",
+                token=ACCESS_TOKEN,
+                body={
+                    "model": "ollama-default",
+                    "prompt": "Reply with one short sentence confirming the playground is live.",
+                    "max_tokens": 16,
+                },
+            )
+            ok = status == 200
+            detail = f"status={status}"
+            if ok:
+                data = json.loads(text)
+                detail += f" model={data.get('model')} tokens={data.get('output_tokens')} wallet={data.get('wallet_balance')}"
+            else:
+                detail += f" {text[:160]}"
+            checks.append(Check("playground authenticated AI call", ok, detail))
     else:
         checks.append(Check("authenticated tenant checks", True, "skipped: set VEKLOM_SMOKE_ACCESS_TOKEN"))
 

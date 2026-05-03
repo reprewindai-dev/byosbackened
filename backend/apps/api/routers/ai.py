@@ -186,6 +186,7 @@ async def complete(
             )
             db.add(transaction)
             wallet.balance = balance_before - tokens_deducted
+            wallet.monthly_credits_used = (wallet.monthly_credits_used or 0) + tokens_deducted
             wallet.total_credits_used = (wallet.total_credits_used or 0) + tokens_deducted
             wallet.updated_at = datetime.utcnow()
 

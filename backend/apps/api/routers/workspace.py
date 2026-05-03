@@ -118,11 +118,13 @@ async def workspace_analytics_requests(
     offset: int = Query(0, ge=0),
     include_rows: bool = Query(False),
 ):
+    parsed_end = _parse_datetime_param(end_date, "end_date") or datetime.utcnow()
+    parsed_start = _parse_datetime_param(start_date, "start_date") or (parsed_end - timedelta(days=30))
     return fetch_workspace_request_metrics(
         db=db,
         workspace_id=current_user.workspace_id,
-        start_date=_parse_datetime_param(start_date, "start_date"),
-        end_date=_parse_datetime_param(end_date, "end_date"),
+        start_date=parsed_start,
+        end_date=parsed_end,
         model=model,
         request_path=request_path,
         status=status,

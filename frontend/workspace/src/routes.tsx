@@ -8,6 +8,8 @@ import { MarketplacePage } from "./pages/MarketplacePage";
 import { BillingPage } from "./pages/BillingPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { MonitoringPage } from "./pages/MonitoringPage";
+import { VaultPage } from "./pages/VaultPage";
+import { TeamPage } from "./pages/TeamPage";
 
 export function AppRoutes() {
   return (
@@ -31,20 +33,14 @@ export function AppRoutes() {
           path="/deployments"
           element={<PlaceholderPage title="Deployments" subtitle="Active deployments and canary status." />}
         />
-        <Route
-          path="/vault"
-          element={<PlaceholderPage title="Sovereign secret store" subtitle="AES-256 at rest, TLS in transit, runtime injection only." />}
-        />
+        <Route path="/vault" element={<VaultPage />} />
         <Route
           path="/compliance"
           element={<PlaceholderPage title="Compliance" subtitle="Framework coverage, evidence schedules, signed exports." />}
         />
         <Route path="/monitoring" element={<MonitoringPage />} />
         <Route path="/billing" element={<BillingPage />} />
-        <Route
-          path="/team"
-          element={<PlaceholderPage title="Team & access" subtitle="Roles, MFA, sessions, SAML / SCIM." />}
-        />
+        <Route path="/team" element={<TeamPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

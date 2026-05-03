@@ -26,7 +26,8 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    assetsDir: "workspace-assets",
+    sourcemap: false,
     target: "es2022",
     rollupOptions: {
       output: {

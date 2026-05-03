@@ -460,10 +460,33 @@
       ["Audit trail anchored · root.7d00…", "Audit trail is created by real Playground/API calls"],
       ["Okta · active", connected],
       ["GitHub · enabled", state.githubConnected ? connected : "GitHub - available"],
+      ["Sovereign trial Â· 14 d", state.subscription ? `${state.subscription.plan} / ${state.subscription.status}` : "Live workspace"],
+      ["Sovereign trial · 14 d", state.subscription ? `${state.subscription.plan} / ${state.subscription.status}` : "Live workspace"],
+      ["$799 / mo", "Live plan price"],
+      ["$299 / mo", "Live plan price"],
+      ["Choose tier", "Open billing"],
+      ["Pick a plan that matches your perimeter.", "Plans and checkout are read from the live backend."],
+      ["Existing clients work unchanged â€” flip one base URL and everything you ship is governed.", "Create a real workspace API key and call the authenticated backend."],
+      ["Existing clients work unchanged — flip one base URL and everything you ship is governed.", "Create a real workspace API key and call the authenticated backend."],
+      ["Live at", "Backend route"],
+      ["https://api.veklom.com/v1/chat/completions", `${apiBase}/ai/complete`],
+      ["Hetzner FSN1", "backend runtime"],
+      ["Hetzner (FSN1, FRA1)", "backend runtime region"],
+      ["AWS (us-east-1, eu-west-1)", "burst plane not self-serve"],
+      ["20% traffic Â· $3,000 spend", "not configured in this shell"],
+      ["20% traffic · $3,000 spend", "not configured in this shell"],
+      ["12 hosts Â· enforced", "backend policy controlled"],
+      ["12 hosts · enforced", "backend policy controlled"],
+      ["org-wide Â· TOTP + WebAuthn", "user MFA endpoint available"],
+      ["org-wide · TOTP + WebAuthn", "user MFA endpoint available"],
+      ["1.3 Â· mTLS internal", "TLS terminated by production infrastructure"],
+      ["1.3 · mTLS internal", "TLS terminated by production infrastructure"],
+      ["FIPS 140-2 L3 HSM", "not exposed in this shell"],
     ]);
     setInputPlaceholders(workspace);
     injectStatus(state);
     wireVisibleActions();
+    markStaticSurfaceRows();
   };
 
   const showActionNotice = (message, tone = "info") => {
@@ -505,6 +528,38 @@
       event.stopPropagation();
       handler();
     }, true);
+  };
+
+  const markStaticSurfaceRows = () => {
+    const markers = [
+      "Slack",
+      "PagerDuty",
+      "Datadog",
+      "Jira",
+      "Vercel",
+      "MFA enforcement",
+      "Session timeout",
+      "Vault seal",
+      "Default region",
+      "Primary plane",
+      "Burst plane",
+      "Burst ceiling",
+      "Egress allowlist",
+      "Pre-wired control mappings",
+    ];
+    for (const node of document.querySelectorAll("div, li")) {
+      if (node.dataset.veklomStaticMarked) continue;
+      const text = visibleText(node);
+      if (!text || text.length > 220) continue;
+      if (!markers.some((marker) => text.includes(marker))) continue;
+      const badge = document.createElement("span");
+      badge.dataset.veklomStaticBadge = "true";
+      badge.textContent = "backend-labeled";
+      badge.style.cssText = "margin-left:8px;display:inline-flex;align-items:center;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.1);color:#fde68a;border-radius:999px;padding:2px 6px;font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em";
+      node.appendChild(badge);
+      node.dataset.veklomStaticMarked = "true";
+      node.setAttribute("title", "This compiled row is labeled by the stabilization layer; live connection state is shown in the backend truth panel above.");
+    }
   };
 
   const sourceForCurrentMarketplaceItem = () => {
@@ -637,6 +692,8 @@
         wireButton(el, connectGithub, "Start real GitHub OAuth");
       } else if (text === "Open Playground") {
         wireButton(el, () => { location.href = "/playground/"; }, "Open the real playground route");
+      } else if (text === "Open billing") {
+        wireButton(el, () => { location.href = "/billing/"; }, "Open the real billing route");
       } else if (text === "Open workspace" || text === "Skip to workspace") {
         wireButton(el, () => { location.href = "/dashboard/"; }, "Open the real dashboard route");
       } else if (text === "Email + password (org policy)") {

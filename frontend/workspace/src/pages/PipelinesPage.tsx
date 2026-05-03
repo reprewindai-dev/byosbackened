@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
+import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
 
 interface PipelineSummary {
   id: string;
@@ -75,6 +76,7 @@ export function PipelinesPage() {
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
+  const pipelineRoutesUnavailable = isRouteUnavailable(pipelines.error) || isRouteUnavailable(runs.error);
 
   const createMut = useMutation({
     mutationFn: async (payload: { name: string; description?: string }) => {
@@ -127,10 +129,17 @@ export function PipelinesPage() {
             </span>
           </div>
         </div>
-        <button className="v-btn-primary" onClick={() => setShowNew(true)}>
+        <button className="v-btn-primary" disabled={pipelineRoutesUnavailable} onClick={() => setShowNew(true)}>
           <Plus className="h-4 w-4" /> New pipeline
         </button>
       </header>
+
+      {pipelineRoutesUnavailable && (
+        <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          Pipeline creation is disabled because the live backend is not serving the pipeline write routes yet.
+          Existing pipeline data will appear here automatically once the backend route is available.
+        </div>
+      )}
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <PillarCard icon={<CircuitBoard className="h-5 w-5" />} title="Policy before execution"
@@ -156,7 +165,7 @@ export function PipelinesPage() {
           <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
             <Workflow className="h-8 w-8 text-brass-2" />
             <div className="text-sm text-bone-2">No pipelines yet. Create one to get started.</div>
-            <button className="v-btn-primary" onClick={() => setShowNew(true)}>
+            <button className="v-btn-primary" disabled={pipelineRoutesUnavailable} onClick={() => setShowNew(true)}>
               <Plus className="h-4 w-4" /> New pipeline
             </button>
           </div>
@@ -295,7 +304,7 @@ export function PipelinesPage() {
               </div>
               {createMut.isError && (
                 <div className="text-[12px] text-crimson">
-                  {(createMut.error as Error)?.message ?? "Failed to create"}
+                  {actionUnavailableMessage(createMut.error, "Pipeline creation")}
                 </div>
               )}
               <div className="flex justify-end gap-2">

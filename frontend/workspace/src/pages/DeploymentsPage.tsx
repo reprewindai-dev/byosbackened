@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, fmtNumber, relativeTime } from "@/lib/cn";
+import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
 
 interface Deployment {
   id: string;
@@ -49,7 +50,7 @@ async function fetchDeployments(): Promise<DeploymentsResp> {
 
 export function DeploymentsPage() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["deployments"],
     queryFn: fetchDeployments,
     refetchInterval: 20_000,
@@ -97,6 +98,7 @@ export function DeploymentsPage() {
   const total = data?.total ?? 0;
   const active = data?.items.filter((d) => d.status === "active").length ?? 0;
   const zones = data?.zones ?? [];
+  const deploymentsUnavailable = isRouteUnavailable(error) || isRouteUnavailable(createMut.error);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -118,10 +120,16 @@ export function DeploymentsPage() {
             <span className="v-chip v-chip-brass">{active} / {total} active</span>
           </div>
         </div>
-        <button className="v-btn-primary" onClick={() => setShowNew(true)}>
+        <button className="v-btn-primary" disabled={deploymentsUnavailable} onClick={() => setShowNew(true)}>
           <Plus className="h-4 w-4" /> New deployment
         </button>
       </header>
+
+      {deploymentsUnavailable && (
+        <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          Deployment creation is not enabled on the live backend yet. Existing deployments and health status remain readable.
+        </div>
+      )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi icon={<Box className="h-3 w-3" />} label="Deployments" value={fmtNumber(total)} />
@@ -147,7 +155,7 @@ export function DeploymentsPage() {
           <p className="max-w-md text-sm text-bone-2">
             Spin up your first deployment to register a model in a zone with a chosen rollout strategy.
           </p>
-          <button className="v-btn-primary" onClick={() => setShowNew(true)}>
+          <button className="v-btn-primary" disabled={deploymentsUnavailable} onClick={() => setShowNew(true)}>
             <Plus className="h-4 w-4" /> New deployment
           </button>
         </div>
@@ -291,7 +299,7 @@ export function DeploymentsPage() {
               </div>
               {createMut.isError && (
                 <div className="text-[12px] text-crimson">
-                  {(createMut.error as Error)?.message ?? "Failed to create"}
+                  {actionUnavailableMessage(createMut.error, "Deployment creation")}
                 </div>
               )}
               <div className="flex justify-end gap-2">

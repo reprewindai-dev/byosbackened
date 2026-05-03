@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
+import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
 
 interface TeamUser {
   id: string;
@@ -37,8 +38,35 @@ interface Invite {
 }
 
 async function listMembers(): Promise<TeamUser[]> {
-  const resp = await api.get<{ items: TeamUser[] }>("/workspace/members");
-  return resp.data.items ?? [];
+  try {
+    const resp = await api.get<{ items: TeamUser[] }>("/workspace/members");
+    return resp.data.items ?? [];
+  } catch (err) {
+    if (!isRouteUnavailable(err)) throw err;
+    const me = await api.get<{
+      id: string;
+      email: string;
+      full_name?: string | null;
+      role: string;
+      status: string;
+      mfa_enabled: boolean;
+      last_login?: string | null;
+      created_at: string;
+    }>("/auth/me");
+    return [
+      {
+        id: me.data.id,
+        email: me.data.email,
+        full_name: me.data.full_name ?? null,
+        role: me.data.role,
+        status: me.data.status,
+        is_active: me.data.status === "active",
+        mfa_enabled: me.data.mfa_enabled,
+        last_login: me.data.last_login ?? null,
+        created_at: me.data.created_at,
+      },
+    ];
+  }
 }
 
 async function listInvites(): Promise<Invite[]> {
@@ -377,9 +405,7 @@ export function TeamPage() {
                 </label>
                 {inviteMut.isError && (
                   <div className="text-[12px] text-crimson">
-                    {(inviteMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-                      ?? (inviteMut.error as Error)?.message
-                      ?? "Invite failed"}
+                    {actionUnavailableMessage(inviteMut.error, "Team invites")}
                   </div>
                 )}
                 <div className="flex justify-end gap-2 pt-2">

@@ -6,39 +6,39 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 
 # Truthful workspace routes. The workspace shell is generated from
 # frontend/workspace so all app routes use the same maintainable React build.
-/dashboard         /workspace-app.html      200
-/dashboard/        /workspace-app.html      200
-/overview          /workspace-app.html      200
-/overview/         /workspace-app.html      200
-/playground        /workspace-app.html      200
-/playground/       /workspace-app.html      200
-/monitoring        /workspace-app.html      200
-/monitoring/       /workspace-app.html      200
-/models            /workspace-app.html      200
-/models/           /workspace-app.html      200
-/billing           /workspace-app.html      200
-/billing/          /workspace-app.html      200
-/marketplace       /workspace-app.html      200
-/marketplace/      /workspace-app.html      200
-/marketplace/*     /workspace-app.html      200
+/dashboard         /workspace-app#/overview      302
+/dashboard/        /workspace-app#/overview      302
+/overview          /workspace-app#/overview      302
+/overview/         /workspace-app#/overview      302
+/playground        /workspace-app#/playground      302
+/playground/       /workspace-app#/playground      302
+/monitoring        /workspace-app#/monitoring      302
+/monitoring/       /workspace-app#/monitoring      302
+/models            /workspace-app#/models      302
+/models/           /workspace-app#/models      302
+/billing           /workspace-app#/billing      302
+/billing/          /workspace-app#/billing      302
+/marketplace       /workspace-app#/marketplace      302
+/marketplace/      /workspace-app#/marketplace      302
+/marketplace/*     /workspace-app#/marketplace/:splat      302
 /vendors           /vendor/index.html       200
 /vendors/          /vendor/index.html       200
 
 # Legacy / compiled-shell aliases land on truthful surfaces
-/pipelines         /workspace-app.html      200
-/pipelines/*       /workspace-app.html      200
-/deployments       /workspace-app.html      200
-/deployments/*     /workspace-app.html      200
-/vault             /workspace-app.html      200
-/vault/*           /workspace-app.html      200
-/compliance        /workspace-app.html      200
-/compliance/*      /workspace-app.html      200
-/team              /workspace-app.html      200
-/team/*            /workspace-app.html      200
-/settings          /workspace-app.html      200
-/settings/*        /workspace-app.html      200
-/onboarding        /workspace-app.html      200
-/onboarding/*      /workspace-app.html      200
+/pipelines         /workspace-app#/pipelines      302
+/pipelines/*       /workspace-app#/pipelines      302
+/deployments       /workspace-app#/deployments      302
+/deployments/*     /workspace-app#/deployments      302
+/vault             /workspace-app#/vault      302
+/vault/*           /workspace-app#/vault      302
+/compliance        /workspace-app#/compliance      302
+/compliance/*      /workspace-app#/compliance      302
+/team              /workspace-app#/team      302
+/team/*            /workspace-app#/team      302
+/settings          /workspace-app#/settings      302
+/settings/*        /workspace-app#/settings      302
+/onboarding        /workspace-app#/overview      302
+/onboarding/*      /workspace-app#/overview      302
 
 # Common typos / alternate paths land on real sections
 /contact   /#contact   302

@@ -35,6 +35,8 @@ interface ListingCard {
   rating_count: number;
   install_count: number;
   is_featured: boolean;
+  source_url?: string | null;
+  use_url?: string | null;
 }
 
 interface FeaturedResp {
@@ -79,21 +81,121 @@ const CATEGORY_LABEL: Record<string, string> = {
   edge_industrial: "Edge / Industrial",
   agency: "Agency",
   general: "General",
+  "sdk-extensions": "SDK Extensions",
+  connectors: "Connectors",
+  "compliance-packs": "Compliance Packs",
+  "deployment-images": "Deployment Images",
+  "managed-services": "Managed Services",
+  pipelines: "Pipelines",
 };
 
 async function fetchFeatured(): Promise<FeaturedResp> {
-  const r = await api.get<FeaturedResp>("/marketplace/featured", { params: { limit: 8 } });
-  return r.data;
+  const r = await api.get<unknown>("/marketplace/listings", { params: { limit: 50 } });
+  const cards = normalizeListings(r.data);
+  const featured = cards.filter((card) => card.is_featured).slice(0, 8);
+  const trending = [...cards]
+    .sort((a, b) => b.install_count - a.install_count || b.rating_avg - a.rating_avg)
+    .slice(0, 8);
+  return {
+    featured: featured.length ? featured : cards.slice(0, 4),
+    trending,
+    new: cards.slice(0, 8),
+  };
 }
 
 async function fetchCategories(): Promise<CategoriesResp> {
-  const r = await api.get<CategoriesResp>("/marketplace/categories");
-  return r.data;
+  const r = await api.get<unknown>("/marketplace/categories");
+  return normalizeCategories(r.data);
 }
 
 async function fetchPreflight(listingId: string): Promise<Preflight> {
   const r = await api.get<Preflight>(`/marketplace/listings/${listingId}/preflight`);
   return r.data;
+}
+
+function normalizeListings(data: unknown): ListingCard[] {
+  const raw = Array.isArray(data)
+    ? data
+    : ((data as { items?: unknown[]; listings?: unknown[] })?.items ??
+      (data as { items?: unknown[]; listings?: unknown[] })?.listings ??
+      []);
+  return raw.map(normalizeListing).filter((listing) => listing.id && listing.title);
+}
+
+function normalizeListing(raw: unknown): ListingCard {
+  const row = raw as Record<string, unknown>;
+  const category = slugify(String(row.category ?? "general"));
+  const inferredType = inferListingType(category, String(row.install ?? ""));
+  const tags = arrayOfStrings(row.tags ?? row.target ?? []);
+  const badges = arrayOfStrings(row.compliance_badges ?? row.compliance ?? row.badges ?? []);
+  const rating = Number(row.rating_avg ?? row.rating ?? 0);
+  const installs = Number(row.install_count ?? row.installs ?? 0);
+
+  return {
+    id: String(row.id ?? row.slug ?? row.title ?? ""),
+    slug: row.slug ? String(row.slug) : String(row.id ?? ""),
+    title: String(row.title ?? row.name ?? ""),
+    summary: row.summary ? String(row.summary) : String(row.description ?? row.positioning ?? ""),
+    listing_type: String(row.listing_type ?? inferredType),
+    category,
+    tags,
+    compliance_badges: badges,
+    price_cents: Number(row.price_cents ?? 0),
+    currency: String(row.currency ?? "usd"),
+    predicted_cost_per_run_usd: row.predicted_cost_per_run_usd != null ? Number(row.predicted_cost_per_run_usd) : null,
+    rating_avg: rating,
+    rating_count: Number(row.rating_count ?? (rating ? 1 : 0)),
+    install_count: installs,
+    is_featured: Boolean(row.is_featured ?? row.featured),
+    source_url: row.source_url ? String(row.source_url) : null,
+    use_url: row.use_url ? String(row.use_url) : row.source_url ? String(row.source_url) : null,
+  };
+}
+
+function normalizeCategories(data: unknown): CategoriesResp {
+  if (!Array.isArray(data)) {
+    const shaped = data as Partial<CategoriesResp> | undefined;
+    return {
+      categories: shaped?.categories ?? [],
+      types: shaped?.types ?? [],
+    };
+  }
+  const categories = data
+    .filter((row) => {
+      const id = String((row as { id?: unknown }).id ?? "");
+      return id !== "all" && id !== "paid" && id !== "free";
+    })
+    .map((row) => ({
+      slug: String((row as { id?: unknown }).id ?? (row as { slug?: unknown }).slug ?? ""),
+      count: Number((row as { count?: unknown }).count ?? 0),
+    }))
+    .filter((row) => row.slug);
+  return {
+    categories,
+    types: [
+      { slug: "connector", count: categories.reduce((sum, row) => sum + row.count, 0) },
+      { slug: "pipeline", count: 0 },
+      { slug: "tool", count: 0 },
+    ],
+  };
+}
+
+function inferListingType(category: string, install: string): string {
+  const c = category.toLowerCase();
+  const i = install.toLowerCase();
+  if (c.includes("pipeline")) return "pipeline";
+  if (c.includes("connector") || i.includes("docker") || i.includes("github")) return "connector";
+  if (c.includes("compliance")) return "evidence_pack";
+  if (c.includes("deployment")) return "tool";
+  return "tool";
+}
+
+function arrayOfStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "general";
 }
 
 export function MarketplacePage() {
@@ -365,6 +467,11 @@ export function MarketplacePage() {
               {preflightQ.isLoading && (
                 <div className="font-mono text-[12px] text-muted">predicting…</div>
               )}
+              {preflightQ.isError && (
+                <div className="font-mono text-[12px] text-muted">
+                  Pre-flight unavailable for this external listing. The listing itself is still live and source-linked.
+                </div>
+              )}
               {preflightQ.data && (
                 <div className="grid grid-cols-3 gap-3 font-mono text-[12px]">
                   <PreflightCell
@@ -470,10 +577,20 @@ export function MarketplacePage() {
                 >
                   {checkoutMut.isPending ? "Redirecting…" : "Purchase"}
                 </button>
+              ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" ? (
+                <a
+                  className="v-btn-primary"
+                  href={selected.use_url ?? selected.source_url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Download className="h-4 w-4" />
+                  Open product
+                </a>
               ) : (
                 <button
                   className="v-btn-primary"
-                  disabled={installMut.isPending || (selected.listing_type !== "pipeline" && selected.listing_type !== "agent")}
+                  disabled={installMut.isPending}
                   onClick={() => installMut.mutate(selected.id)}
                 >
                   <Download className="h-4 w-4" />

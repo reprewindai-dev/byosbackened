@@ -122,7 +122,7 @@
     const wallet = state.wallet && typeof state.wallet.balance !== "undefined" ? `${state.wallet.balance} credits` : "wallet protected";
     const models = state.models ? `${state.models.length} models` : "models protected";
     const signedOut = !token();
-    el.innerHTML = `
+    const nextStatusHtml = `
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
         <span style="width:7px;height:7px;border-radius:999px;background:${signedOut ? "#f59e0b" : "#22c55e"};display:inline-block"></span>
         <strong>${signedOut ? "Workspace auth required" : "Live tenant connected"}</strong>
@@ -130,6 +130,9 @@
       <div>${state.workspaceName} - ${safe(state.userEmail, "authenticated user")}</div>
       <div style="color:#94a3b8;margin-top:2px;">${repos} - ${models} - ${wallet}</div>
     `;
+    if (el.innerHTML !== nextStatusHtml) {
+      el.innerHTML = nextStatusHtml;
+    }
   };
 
   const fmtMoney = (value) => `$${Number(value || 0).toFixed(6)}`;

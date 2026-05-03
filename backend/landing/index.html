@@ -1365,16 +1365,18 @@
       const payload = await res.json();
 
         const source = payload.normalized_event?.source || payload.source || "demo";
+        const decision = payload.decision || {};
+        const severity = decision.severity || "info";
         const isFallback = payload.fallback === true;
         const isLive = payload.live === true && !isFallback;
-        const isDegraded = payload.status === "degraded" || isFallback || payload.error;
+        const incidentDetected = payload.status === "degraded" || isFallback || payload.error || severity === "critical";
         const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
         termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
         chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
         chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
 
-        if (isDegraded) {
-          const faultText = payload.error || (isFallback ? "upstream instability detected" : "protocol ingest degraded");
+        if (incidentDetected) {
+          const faultText = payload.error || decision.summary || (isFallback ? "upstream instability detected" : "protocol ingest degraded");
           termPush("alarm", `${payload.protocol || "legacy"} · ${faultText}`, "err");
           setNodeState("protocol_ingest", "err");
           setEdgeState(1, "err");
@@ -1383,7 +1385,7 @@
           setRunning(true, "Containing incident…");
           await sleep(850);
 
-          termPush("self-heal", isFallback ? "governed fallback engaged" : "stabilizing governed route", "warn");
+          termPush("self-heal", isFallback ? "governed fallback engaged" : "containment and governed routing engaged", "warn");
           chipCB.className = "chip warn";
           chipCB.innerHTML = '<span class="dot"></span>Circuit: rerouting';
           await sleep(650);
@@ -1394,11 +1396,9 @@
         advanceTo("normalize");
         chipCB.className = "chip ok";
         chipCB.innerHTML = '<span class="dot"></span>Circuit: closed';
-        await sleep(isDegraded ? 420 : 220);
+        await sleep(incidentDetected ? 420 : 220);
 
-      const decision = payload.decision || {};
-      const severity = decision.severity || "info";
-      termPush("policy", `severity=${severity} · ${decision.summary || "—"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
+        termPush("policy", `severity=${severity} · ${decision.summary || "—"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
       // Paint policy_control node severity-tinted
       advanceTo("policy_control");
       if (severity === "critical") setNodeState("policy_control", "err");

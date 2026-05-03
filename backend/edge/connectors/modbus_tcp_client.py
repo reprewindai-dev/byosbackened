@@ -1,7 +1,6 @@
 """Modbus TCP connector for live protocol canaries."""
 from __future__ import annotations
 
-import inspect
 import logging
 
 logger = logging.getLogger(__name__)
@@ -43,16 +42,12 @@ class ModbusTCPClient:
             if not client.connect():
                 raise ModbusTCPReadError(f"Failed to connect to Modbus TCP device on {self.host}:{self.port}")
 
-            read_kwargs = {"address": address, "count": count}
-            parameters = inspect.signature(client.read_holding_registers).parameters
-            if "slave" in parameters:
-                read_kwargs["slave"] = slave
-            elif "unit" in parameters:
-                read_kwargs["unit"] = slave
-            else:  # pragma: no cover - defensive compatibility fallback
-                read_kwargs["slave"] = slave
-
-            result = client.read_holding_registers(**read_kwargs)
+            try:
+                result = client.read_holding_registers(address=address, count=count, slave=slave)
+            except TypeError as exc:
+                if "unexpected keyword argument 'slave'" not in str(exc):
+                    raise
+                result = client.read_holding_registers(address=address, count=count, unit=slave)
             if result.isError():
                 raise ModbusTCPReadError(f"Modbus TCP read error on address {address}, slave {slave}")
             if not hasattr(result, "registers") or not result.registers:

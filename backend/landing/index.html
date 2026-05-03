@@ -250,9 +250,9 @@
       transition: all .15s;
     }
     .scenario-btn:hover { border-color: var(--brass); transform: translateY(-1px); }
+    .scenario-btn.selected { border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.35); }
     .scenario-btn .sb-title { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
     .scenario-btn .sb-sub { font-size: 10px; color: var(--muted); font-family: "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; }
-    .scenario-btn.active { background: linear-gradient(180deg, rgba(229,177,110,0.15), rgba(196,146,91,0.08)); border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.12); }
     .scenario-btn.primary { background: linear-gradient(180deg, rgba(229,177,110,0.15), rgba(196,146,91,0.08)); border-color: var(--brass); }
     .scenario-btn.danger  { background: linear-gradient(180deg, rgba(255,107,107,0.10), rgba(255,107,107,0.03)); border-color: rgba(255,107,107,0.4); }
     .scenario-btn[disabled] { opacity: .5; pointer-events: none; }
@@ -452,6 +452,24 @@
     .plan ul li { padding: 6px 0; border-top: 1px dashed var(--rule); display: flex; gap: 8px; }
     .plan ul li::before { content: "→"; color: var(--brass-2); }
 
+    /* detailed pricing table */
+    .price-table-wrap { margin-top: 32px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
+    .price-table-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+    .price-table-head h4 { margin: 0; font-size: 14px; letter-spacing: .04em; }
+    .price-table-head .eyebrow { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .price-table th, .price-table td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--rule); }
+    .price-table thead th { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 500; background: rgba(255,255,255,0.015); }
+    .price-table tbody tr:last-child td { border-bottom: 0; }
+    .price-table tbody tr:hover { background: rgba(255,255,255,0.015); }
+    .price-table td.num { font-family: "JetBrains Mono", monospace; color: var(--bone); }
+    .price-table td.event { color: var(--bone-2); }
+    .price-table .col-founding { color: var(--brass-2); }
+    @media (max-width: 860px) {
+      .price-table-wrap { overflow-x: auto; }
+      .price-table { min-width: 640px; }
+    }
+
     /* cta band */
     .cta-band {
       margin-top: 40px;
@@ -527,7 +545,7 @@
       </p>
       <div class="actions">
         <a class="cta-primary" href="#theater">Run the live demo ↓</a>
-        <a class="cta-ghost" href="/signup/">Start 14-day trial</a>
+        <a class="cta-ghost" href="/signup/">Start Free Evaluation</a>
         <a class="cta-ghost" href="#pricing">View pricing</a>
       </div>
       <div class="trust-row" role="status" aria-live="polite">
@@ -547,9 +565,9 @@
         <div class="theater-head">
           <div class="left">
             <span class="title">Live Pipeline Theater</span>
-            <span class="chip" id="chipBackend"><span class="dot"></span>Backend: checking</span>
-            <span class="chip" id="chipProvider"><span class="dot"></span>Provider: awaiting protocol</span>
-            <span class="chip" id="chipCB"><span class="dot"></span>Circuit: checking</span>
+            <span class="chip ok" id="chipBackend"><span class="dot"></span>Backend: live</span>
+            <span class="chip" id="chipProvider"><span class="dot"></span>Provider: idle</span>
+            <span class="chip" id="chipCB"><span class="dot"></span>Circuit: closed</span>
           </div>
           <div class="mode-toggle" role="tablist" aria-label="Theater mode">
             <button role="tab" data-mode="ai">AI Request</button>
@@ -772,42 +790,126 @@
   <section class="section" id="pricing">
     <div class="container">
       <span class="section-eyebrow">Pricing</span>
-      <h2 class="section-title">Non-negotiable bands. Procurement-friendly.</h2>
-      <p class="section-copy">Simple published bands for paid tiers. Sovereign trial includes 14-day access. Yearly is monthly × 10. Enterprise and Strategic Transfer are private-only.</p>
+      <h2 class="section-title">Activate once. Fund your reserve. Pay for governed execution.</h2>
+      <p class="section-copy">No subscriptions. No tokens. No surprise invoices. Activate a sovereign workspace, fund an Operating Reserve, and pay per governed run, governance call, or signed evidence package. Reserve balances are USD-denominated and never expire.</p>
       <div class="pricing-grid">
         <article class="plan">
-          <span class="tier">Starter</span><h4>Team</h4>
-          <div class="value">$12,000 <span class="muted-small">/ mo</span></div>
-          <div class="muted-small">$120,000 / yr</div>
-          <ul><li>5 API keys</li><li>Basic governance logs</li><li>Wallet + base spend caps</li></ul>
+          <span class="tier">Free Evaluation</span><h4>Evaluate</h4>
+          <div class="value">$0</div>
+          <div class="muted-small">No production routing</div>
+          <ul>
+            <li>15 governed Playground runs</li>
+            <li>3 compare runs · 20 policy tests</li>
+            <li>2 watermarked exports</li>
+            <li>BYOK provider testing</li>
+            <li>Marketplace browsing</li>
+          </ul>
         </article>
         <article class="plan highlight">
-          <span class="tier">Pro · most chosen</span><h4>Business</h4>
-          <div class="value">$35,000 <span class="muted-small">/ mo</span></div>
-          <div class="muted-small">$350,000 / yr</div>
-          <ul><li>20 API keys</li><li>Advanced routing controls</li><li>Budget telemetry + insights</li><li>Legacy edge ingest</li></ul>
+          <span class="tier">Founding · most chosen</span><h4>Founding Activation</h4>
+          <div class="value">$395 <span class="muted-small">one-time</span></div>
+          <div class="muted-small">+ $150 minimum Operating Reserve</div>
+          <ul>
+            <li>Playground run — $0.25</li>
+            <li>Compare run — $0.75</li>
+            <li>BYOK Governance Calls — $6 / 1,000</li>
+            <li>Managed Governance Calls — $12 / 1,000</li>
+          </ul>
         </article>
         <article class="plan">
-          <span class="tier">Enterprise</span><h4>Enterprise</h4>
-          <div class="value">Custom</div>
-          <div class="muted-small">Private agreements</div>
-          <ul><li>Sales-led deployment</li><li>Custom onboarding + controls</li><li>Procurement-friendly engagement</li></ul>
+          <span class="tier">Standard</span><h4>Standard</h4>
+          <div class="value">$795 <span class="muted-small">one-time</span></div>
+          <div class="muted-small">+ $300 minimum Operating Reserve</div>
+          <ul>
+            <li>Playground run — $0.40</li>
+            <li>Compare run — $1.20</li>
+            <li>BYOK Governance Calls — $8 / 1,000</li>
+            <li>Managed Governance Calls — $16 / 1,000</li>
+          </ul>
         </article>
         <article class="plan">
-          <span class="tier">Sovereign Trial</span><h4>Included</h4>
-          <div class="value">14 days</div>
-          <div class="muted-small">Auto trial gating to Workspace</div>
-          <ul><li>Private AI gateway sandbox</li><li>Trial-tier key unlocking</li><li>Upgrade to Business</li></ul>
+          <span class="tier">Regulated / Enterprise</span><h4>Regulated</h4>
+          <div class="value">From $2,500 <span class="muted-small">activation</span></div>
+          <div class="muted-small">+ $2,500 minimum reserve · private terms</div>
+          <ul>
+            <li>BYOK Governance Calls — $10 / 1,000</li>
+            <li>Managed Governance Calls — $20 / 1,000</li>
+            <li>Private deployment</li>
+            <li>Procurement & security review</li>
+          </ul>
         </article>
       </div>
+
+      <div class="price-table-wrap" aria-label="Detailed pricing ladder">
+        <div class="price-table-head">
+          <h4>Full pricing ladder</h4>
+          <span class="eyebrow">Per event · versioned · v1_public</span>
+        </div>
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th class="col-founding">Founding</th>
+              <th>Standard</th>
+              <th>Regulated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="event">Playground governed run</td>
+              <td class="num col-founding">$0.25</td>
+              <td class="num">$0.40</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">Compare run</td>
+              <td class="num col-founding">$0.75</td>
+              <td class="num">$1.20</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">Signed Playground export</td>
+              <td class="num col-founding">$3</td>
+              <td class="num">$4</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">BYOK Governance Calls (per 1,000)</td>
+              <td class="num col-founding">$6</td>
+              <td class="num">$8</td>
+              <td class="num">$10</td>
+            </tr>
+            <tr>
+              <td class="event">Managed Governance Calls (per 1,000)</td>
+              <td class="num col-founding">$12</td>
+              <td class="num">$16</td>
+              <td class="num">$20</td>
+            </tr>
+            <tr>
+              <td class="event">Signed Evidence Package</td>
+              <td class="num col-founding">$99</td>
+              <td class="num">$149</td>
+              <td class="num">$199</td>
+            </tr>
+            <tr>
+              <td class="event">Auditor Bundle</td>
+              <td class="num col-founding">$249</td>
+              <td class="num">$349</td>
+              <td class="num">$499</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Marketplace vendors monetize through a 12% standard take (8% for preferred partners). Founding vendors keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
 
       <div class="cta-band">
         <div>
           <h3>You just watched it work. Now run it on your data.</h3>
-          <p>14 days free. No key exposure. Cancel anytime. Keep the audit artifacts.</p>
+          <p>Free Evaluation — 15 governed runs, no card, no key exposure. Keep every audit artifact you generate.</p>
         </div>
         <div style="display:flex; gap:12px;">
-          <a class="cta-primary" href="/signup/">Start free trial</a>
+          <a class="cta-primary" href="/signup/">Start Free Evaluation</a>
           <a class="cta-ghost" href="/marketplace/">Talk to sales</a>
         </div>
       </div>
@@ -931,12 +1033,10 @@
   const edgeControls  = $("edgeControls");
   const verticalsBar  = $("verticals");
   const ctrlTitle     = $("ctrlTitle");
-  const btnNetwork    = $("btnNetwork");
-  const btnMachine    = $("btnMachine");
 
   let mode = "edge";
-  let selectedVertical = "default";
   let selectedEdgeScenario = "network";
+  let selectedVertical = "default";
   let currentES = null;
   let nodeEls = new Map();
   let edgeEls = [];
@@ -1344,12 +1444,12 @@
   }
 
   // ---- Edge mode: one-shot REST ----
-    async function runEdge(scenario) {
-      if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
-      mode = "edge"; renderPipeline();
-      resetPipelineState();
-      setRunning(true, scenario === "network" ? "Ingesting SNMP…" : "Ingesting Modbus…");
-      startLatency();
+  async function runEdge(scenario) {
+    if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
+    mode = "edge"; renderPipeline();
+    resetPipelineState();
+    setRunning(true, scenario === "network" ? "Ingesting SNMP…" : "Ingesting Modbus…");
+    startLatency();
 
     const order = ["legacy_signal", "protocol_ingest", "normalize", "policy_control", "ai_decision", "audit_cost"];
     // animate the first 2 nodes optimistically while the fetch is in flight
@@ -1364,41 +1464,19 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
 
-        const source = payload.normalized_event?.source || payload.source || "demo";
-        const decision = payload.decision || {};
-        const severity = decision.severity || "info";
-        const isFallback = payload.fallback === true;
-        const isLive = payload.live === true && !isFallback;
-        const incidentDetected = payload.status === "degraded" || isFallback || payload.error || severity === "critical";
-        const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
-        termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
-        chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
-        chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
+      const source = payload.normalized_event?.source || payload.source || "demo";
+      const isFallback = payload.fallback === true;
+      const isLive = payload.live === true && !isFallback;
+      const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
+      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
+      chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
+      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
+      advanceTo("normalize");
+      await sleep(220);
 
-        if (incidentDetected) {
-          const faultText = payload.error || decision.summary || (isFallback ? "upstream instability detected" : "protocol ingest degraded");
-          termPush("alarm", `${payload.protocol || "legacy"} · ${faultText}`, "err");
-          setNodeState("protocol_ingest", "err");
-          setEdgeState(1, "err");
-          chipCB.className = "chip err";
-          chipCB.innerHTML = '<span class="dot"></span>Circuit: alarm';
-          setRunning(true, "Containing incident…");
-          await sleep(850);
-
-          termPush("self-heal", isFallback ? "governed fallback engaged" : "containment and governed routing engaged", "warn");
-          chipCB.className = "chip warn";
-          chipCB.innerHTML = '<span class="dot"></span>Circuit: rerouting';
-          await sleep(650);
-
-          termPush("resume", "continuing through normalized governed path", "ok");
-        }
-
-        advanceTo("normalize");
-        chipCB.className = "chip ok";
-        chipCB.innerHTML = '<span class="dot"></span>Circuit: closed';
-        await sleep(incidentDetected ? 420 : 220);
-
-        termPush("policy", `severity=${severity} · ${decision.summary || "—"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
+      const decision = payload.decision || {};
+      const severity = decision.severity || "info";
+      termPush("policy", `severity=${severity} · ${decision.summary || "—"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
       // Paint policy_control node severity-tinted
       advanceTo("policy_control");
       if (severity === "critical") setNodeState("policy_control", "err");
@@ -1458,7 +1536,7 @@
         aiControls.hidden = true; edgeControls.hidden = false;
         verticalsBar.style.display = "none";
         ctrlTitle.textContent = "Legacy Infrastructure · Scenario";
-        runLabel.textContent = "Run network scenario";
+        setSelectedEdgeScenario(selectedEdgeScenario);
       }
     });
   });
@@ -1483,23 +1561,26 @@
   function updatePromptCount() { promptCount.textContent = `${promptInput.value.length} / 800`; }
   promptInput.addEventListener("input", updatePromptCount);
 
-  function applySelectedEdgeScenario() {
-    btnNetwork.classList.toggle("active", selectedEdgeScenario === "network");
-    btnMachine.classList.toggle("active", selectedEdgeScenario === "machine");
-    runLabel.textContent = selectedEdgeScenario === "machine" ? "Run machine scenario" : "Run network scenario";
+  function setSelectedEdgeScenario(scenario) {
+    if (!edgeControls || !scenario) return;
+    selectedEdgeScenario = scenario;
+    const buttonMap = {
+      network: $("btnNetwork"),
+      machine: $("btnMachine"),
+    };
+    Object.entries(buttonMap).forEach(([key, btn]) => {
+      if (!btn) return;
+      btn.classList.toggle("selected", key === scenario);
+      btn.setAttribute("aria-pressed", String(key === scenario));
+    });
+    runLabel.textContent = scenario === "network" ? "Run network scenario" : "Run machine scenario";
   }
 
   // ---- Button wiring ----
   $("btnAI").addEventListener("click", () => runAI({ forceFallback: false }));
   $("btnChaos").addEventListener("click", () => runAI({ forceFallback: true }));
-  btnNetwork.addEventListener("click", () => {
-    selectedEdgeScenario = "network";
-    applySelectedEdgeScenario();
-  });
-  btnMachine.addEventListener("click", () => {
-    selectedEdgeScenario = "machine";
-    applySelectedEdgeScenario();
-  });
+  $("btnNetwork").addEventListener("click", () => setSelectedEdgeScenario("network"));
+  $("btnMachine").addEventListener("click", () => setSelectedEdgeScenario("machine"));
   runBtn.addEventListener("click", () => {
     if (mode === "ai") runAI({ forceFallback: false });
     else runEdge(selectedEdgeScenario);
@@ -1511,14 +1592,14 @@
       const r = await fetch(API_BASE + "/demo/pipeline/health", { cache: "no-store" });
       if (!r.ok) throw new Error("down");
       const d = await r.json();
-      const llmReady = d.llm_ok === true;
-      chipBackend.className = "chip " + (llmReady ? "ok" : "warn");
-      chipBackend.innerHTML = `<span class="dot"></span>Backend: ${llmReady ? "connected" : "partial"}`;
-      chipProvider.className = "chip " + (llmReady ? "ok" : "warn");
-      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${llmReady ? "ollama" : "unavailable"}`;
+      chipBackend.className = "chip ok";
+      chipBackend.innerHTML = '<span class="dot"></span>Backend: connected';
+      chipProvider.className = "chip";
+      chipProvider.innerHTML = '<span class="dot"></span>Provider: idle';
       const cb = d.circuit_breaker || {};
       chipCB.className = "chip " + (cb.state === "open" ? "err" : cb.state === "half_open" ? "warn" : "ok");
       chipCB.innerHTML = `<span class="dot"></span>Circuit: ${cb.state || "closed"}`;
+      $("heroLive").textContent = "Live backend connected";
     } catch (err) {
       chipBackend.className = "chip warn";
       chipBackend.innerHTML = '<span class="dot"></span>Backend: reconnecting';
@@ -1545,7 +1626,7 @@
   // ---- Init ----
   renderPipeline();
   updatePromptCount();
-  applySelectedEdgeScenario();
+  setSelectedEdgeScenario(selectedEdgeScenario);
   probeBackend();
   probeProtocolValidation();
   setInterval(probeBackend, 15000);

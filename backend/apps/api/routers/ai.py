@@ -10,6 +10,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc
@@ -49,8 +51,16 @@ class AICompleteResponse(BaseModel):
     response_text: str
     model: str
     bedrock_model_id: str
+    provider: str
+    request_id: str
+    audit_log_id: str
+    audit_hash: str
+    prompt_tokens: int
     tokens_deducted: int
     output_tokens: int
+    total_tokens: int
+    latency_ms: int
+    cost_usd: str
     wallet_balance: int
     timestamp: str
 
@@ -115,6 +125,51 @@ def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, 
         except GroqFallbackError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
+    if model_row.provider == "bedrock":
+        if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AWS Bedrock is not configured for this workspace runtime.",
+            )
+        kwargs = {"region_name": settings.aws_default_region}
+        if settings.aws_access_key_id and settings.aws_secret_access_key:
+            kwargs["aws_access_key_id"] = settings.aws_access_key_id
+            kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+        try:
+            client = boto3.client("bedrock-runtime", **kwargs)
+            response = client.converse(
+                modelId=model_row.bedrock_model_id,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [{"text": prompt}],
+                    }
+                ],
+                inferenceConfig={"maxTokens": max_tokens, "temperature": 0.5},
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"AWS Bedrock request failed: {str(exc)[:240]}",
+            ) from exc
+
+        response_text = "".join(
+            item.get("text", "")
+            for item in response.get("output", {}).get("message", {}).get("content", [])
+            if isinstance(item, dict)
+        ).strip()
+        usage = response.get("usage", {}) or {}
+        prompt_tokens = int(usage.get("inputTokens", 0) or 0)
+        completion_tokens = int(usage.get("outputTokens", 0) or 0)
+        total_tokens = int(usage.get("totalTokens", 0) or (prompt_tokens + completion_tokens))
+        return {
+            "response": response_text,
+            "model": model_row.bedrock_model_id,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }, "bedrock"
+
     raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Selected model provider is not available")
 
 
@@ -126,7 +181,10 @@ async def complete(
     db: Session = Depends(get_db),
 ):
     """Run a wallet-backed completion through the configured production LLM stack."""
-    model_row = get_model_setting(db, current_user.workspace_id, payload.model)
+    try:
+        model_row = get_model_setting(db, current_user.workspace_id, payload.model)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if not model_row.enabled:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Model disabled for this workspace")
     if not model_row.connected:
@@ -148,9 +206,12 @@ async def complete(
 
     try:
         response_text = (llm_result.get("response") or "").strip()
+        prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
+        total_tokens = int(llm_result.get("total_tokens") or (prompt_tokens + output_tokens))
         tokens_deducted = math.ceil(output_tokens / 100) if output_tokens > 0 else 0
         cost_usd = (Decimal(tokens_deducted) * TOKEN_USD_RATE).quantize(Decimal("0.000001"))
+        latency_ms = int((datetime.utcnow() - started_at).total_seconds() * 1000)
 
         balance_before = wallet.balance
         if tokens_deducted > balance_before:
@@ -196,7 +257,11 @@ async def complete(
             "model": payload.model,
             "runtime_model_id": model_row.bedrock_model_id,
             "tokens_deducted": tokens_deducted,
+            "prompt_tokens": prompt_tokens,
             "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "provider": provider,
+            "latency_ms": latency_ms,
             "timestamp": started_at.isoformat(),
             "request_id": request_id,
         }
@@ -211,7 +276,7 @@ async def complete(
             input_preview=payload.prompt[:500],
             output_preview=response_text[:500],
             cost=cost_usd,
-            tokens_input=None,
+            tokens_input=prompt_tokens,
             tokens_output=output_tokens,
             routing_decision_id=None,
             routing_reasoning=None,
@@ -241,13 +306,17 @@ async def complete(
             response_json={
                 "response_text": response_text,
                 "runtime_model_id": model_row.bedrock_model_id,
+                "provider": provider,
+                "prompt_tokens": prompt_tokens,
                 "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
                 "tokens_deducted": tokens_deducted,
                 "wallet_balance": wallet.balance,
+                "audit_hash": audit_entry.log_hash,
             },
-            tokens_in=int(llm_result.get("prompt_tokens") or 0),
+            tokens_in=prompt_tokens,
             tokens_out=output_tokens,
-            latency_ms=int((datetime.utcnow() - started_at).total_seconds() * 1000),
+            latency_ms=latency_ms,
             cost_usd=cost_usd,
             source_table="ai_audit_logs",
             source_id=audit_entry.id,
@@ -275,8 +344,16 @@ async def complete(
         response_text=response_text,
         model=payload.model,
         bedrock_model_id=model_row.bedrock_model_id,
+        provider=provider,
+        request_id=request_id,
+        audit_log_id=str(audit_entry.id),
+        audit_hash=audit_entry.log_hash,
+        prompt_tokens=prompt_tokens,
         tokens_deducted=tokens_deducted,
         output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        latency_ms=latency_ms,
+        cost_usd=str(cost_usd),
         wallet_balance=wallet.balance,
         timestamp=started_at.isoformat(),
     )

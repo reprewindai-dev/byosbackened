@@ -136,8 +136,8 @@ export function PipelinesPage() {
 
       {pipelineRoutesUnavailable && (
         <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
-          Pipeline creation is disabled because the live backend is not serving the pipeline write routes yet.
-          Existing pipeline data will appear here automatically once the backend route is available.
+          Pipeline write routes are currently unavailable from the live API. Existing pipeline data remains readable,
+          and creation will re-enable automatically when the backend route responds.
         </div>
       )}
 

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
   CircleStop,
+  Cpu,
   Download,
   Gauge,
   GitBranch,
+  Loader2,
   Play,
   Save,
   Shield,
@@ -14,8 +17,9 @@ import {
   TrendingDown,
   Zap,
 } from "lucide-react";
-import { api, resolveApiBase } from "@/lib/api";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { responseDetail } from "@/lib/errors";
 
 interface PreflightState {
   predicted_cost?: number;
@@ -37,8 +41,35 @@ interface PipelineEvent {
   ts: number;
 }
 
+interface WorkspaceModel {
+  slug: string;
+  name: string;
+  provider: string;
+  runtime_model_id: string;
+  enabled: boolean;
+  connected: boolean;
+}
+
+interface AICompleteResponse {
+  response_text: string;
+  model: string;
+  bedrock_model_id: string;
+  provider?: string;
+  request_id?: string;
+  audit_log_id?: string;
+  audit_hash?: string;
+  prompt_tokens?: number;
+  tokens_deducted: number;
+  output_tokens: number;
+  total_tokens?: number;
+  latency_ms?: number;
+  cost_usd?: string;
+  wallet_balance: number;
+  timestamp: string;
+}
+
 const VERTICALS: { value: Vertical; label: string; hint: string }[] = [
-  { value: "default", label: "General", hint: "Broad control-plane demo" },
+  { value: "default", label: "General", hint: "Broad control-plane request" },
   { value: "legal", label: "Legal", hint: "Privacy-first legal ops" },
   { value: "medical", label: "Medical", hint: "HIPAA-aware clinical ops" },
   { value: "finance", label: "Finance", hint: "SOC2 / PCI-aware" },
@@ -49,56 +80,105 @@ const VERTICALS: { value: Vertical; label: string; hint: string }[] = [
 const SAMPLE_PROMPTS: Record<Vertical, string> = {
   default: "Summarize why sovereignty matters for regulated AI workloads in three bullets.",
   legal: "Draft a privacy-first intake workflow for handling PII in client matters.",
-  medical: "Explain the PHI controls you'd enforce on an intake chatbot.",
-  finance: "Outline the SOC2 audit artifacts you'd generate for each AI decision.",
+  medical: "Explain the PHI controls you would enforce on an intake chatbot.",
+  finance: "Outline the SOC2 audit artifacts you would generate for each AI decision.",
   agency: "Describe tenant isolation for a 50-client agency running shared models.",
   infrastructure: "Translate a stream of SNMP traps into a governed AI incident triage.",
 };
 
 const EVENT_META: Record<string, { label: string; color: string; icon: string }> = {
-  request_received: { label: "Request received", color: "text-bone", icon: "◆" },
-  zero_trust_check: { label: "Zero-trust check", color: "text-electric", icon: "🛡" },
-  rate_limit_check: { label: "Rate limit", color: "text-electric", icon: "⏱" },
-  token_budget_check: { label: "Token budget", color: "text-electric", icon: "◉" },
-  circuit_breaker_check: { label: "Circuit breaker", color: "text-amber", icon: "↯" },
-  provider_selected: { label: "Provider chosen", color: "text-brass-2", icon: "⇨" },
-  ollama_attempt: { label: "Ollama attempt", color: "text-brass-2", icon: "▶" },
-  ollama_unavailable: { label: "Ollama unavailable", color: "text-crimson", icon: "✕" },
-  circuit_breaker_opened: { label: "Breaker opened", color: "text-crimson", icon: "⚠" },
-  groq_fallback: { label: "Groq fallback", color: "text-violet", icon: "↪" },
-  redis_memory_check: { label: "Memory check", color: "text-electric", icon: "◎" },
-  token_delta: { label: "Token", color: "text-moss", icon: "·" },
-  response_complete: { label: "Response complete", color: "text-moss", icon: "✓" },
-  audit_written: { label: "Audit written", color: "text-moss", icon: "✓" },
-  cost_recorded: { label: "Cost recorded", color: "text-moss", icon: "✓" },
-  done: { label: "Done", color: "text-moss", icon: "●" },
-  error: { label: "Error", color: "text-crimson", icon: "✕" },
+  workspace_request: { label: "Workspace request", color: "text-bone", icon: "*" },
+  auth_check: { label: "Auth check", color: "text-electric", icon: ">" },
+  wallet_check: { label: "Wallet check", color: "text-electric", icon: "$" },
+  provider_selected: { label: "Provider chosen", color: "text-brass-2", icon: ">" },
+  response_complete: { label: "Response complete", color: "text-moss", icon: "+" },
+  audit_written: { label: "Audit written", color: "text-moss", icon: "+" },
+  cost_recorded: { label: "Cost recorded", color: "text-moss", icon: "+" },
+  done: { label: "Done", color: "text-moss", icon: "*" },
+  error: { label: "Error", color: "text-crimson", icon: "!" },
 };
+
+const DEFAULT_MAX_TOKENS = 64;
+const REQUEST_TIMEOUT_MS = 90_000;
+
+function normalizeModel(raw: unknown): WorkspaceModel {
+  const row = raw as Record<string, unknown>;
+  const slug = String(row.slug ?? row.model_slug ?? "");
+  const runtime = String(row.bedrock_model_id ?? row.runtime_model_id ?? row.model ?? slug);
+  return {
+    slug,
+    name: String(row.name ?? row.display_name ?? row.model_slug ?? slug),
+    provider: String(row.provider ?? "local"),
+    runtime_model_id: runtime,
+    enabled: row.enabled !== false,
+    connected: row.connected !== false,
+  };
+}
+
+async function fetchWorkspaceModels(): Promise<WorkspaceModel[]> {
+  const resp = await api.get<{ models?: unknown[]; items?: unknown[] } | unknown[]>("/workspace/models");
+  const body = resp.data;
+  const raw = Array.isArray(body) ? body : body.models ?? body.items ?? [];
+  return raw.map(normalizeModel).filter((model) => Boolean(model.slug));
+}
 
 export function PlaygroundPage() {
   const [vertical, setVertical] = useState<Vertical>("default");
   const [prompt, setPrompt] = useState(SAMPLE_PROMPTS.default);
-  const [forceFallback, setForceFallback] = useState(false);
+  const [maxTokens, setMaxTokens] = useState(DEFAULT_MAX_TOKENS);
+  const [selectedModelSlug, setSelectedModelSlug] = useState("");
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
   const [stats, setStats] = useState<{
     provider?: string;
     model?: string;
+    runtime_model_id?: string;
     prompt_tokens?: number;
     completion_tokens?: number;
+    total_tokens?: number;
     latency_ms?: number;
-    trace_id?: string;
+    request_id?: string;
     audit_hash?: string;
+    tokens_deducted?: number;
+    wallet_balance?: number;
+    cost_usd?: string;
   }>({});
   const [error, setError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<PreflightState>({});
   const [savedPipelineSlug, setSavedPipelineSlug] = useState<string | null>(null);
   const [savingPipeline, setSavingPipeline] = useState(false);
-  const eventSrcRef = useRef<EventSource | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
-  const apiBase = resolveApiBase();
+  const models = useQuery({
+    queryKey: ["playground-models"],
+    queryFn: fetchWorkspaceModels,
+    refetchInterval: 30_000,
+  });
+
+  const runnableModels = useMemo(
+    () => (models.data ?? []).filter((model) => model.enabled && model.connected),
+    [models.data],
+  );
+
+  useEffect(() => {
+    if (!selectedModelSlug && runnableModels.length > 0) {
+      setSelectedModelSlug(runnableModels[0]!.slug);
+    }
+  }, [runnableModels, selectedModelSlug]);
+
+  const selectedModel = useMemo(
+    () => runnableModels.find((model) => model.slug === selectedModelSlug) ?? runnableModels[0],
+    [runnableModels, selectedModelSlug],
+  );
+
+  const appendEvent = useCallback((event: string, data: Record<string, unknown> = {}) => {
+    setEvents((prev) => [
+      ...prev,
+      { id: `${event}-${Date.now()}-${prev.length}`, event, data, ts: Date.now() },
+    ]);
+  }, []);
 
   const handleVerticalChange = (v: Vertical) => {
     setVertical(v);
@@ -106,83 +186,100 @@ export function PlaygroundPage() {
   };
 
   const stop = useCallback(() => {
-    eventSrcRef.current?.close();
-    eventSrcRef.current = null;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setRunning(false);
   }, []);
 
-  const run = useCallback(() => {
-    if (running) return;
+  const run = useCallback(async () => {
+    if (running || !selectedModel || !prompt.trim()) return;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const startedAt = performance.now();
+
     setEvents([]);
     setResponseText("");
     setStats({});
     setError(null);
+    setSavedPipelineSlug(null);
     setRunning(true);
 
-    const url = new URL(`${apiBase}/api/v1/demo/pipeline/stream`, window.location.origin);
-    url.searchParams.set("prompt", prompt.slice(0, 800));
-    url.searchParams.set("vertical", vertical);
-    if (forceFallback) url.searchParams.set("force_fallback", "true");
+    appendEvent("workspace_request", {
+      endpoint: "/api/v1/ai/complete",
+      model: selectedModel.slug,
+      max_tokens: maxTokens,
+    });
+    appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace" });
+    appendEvent("wallet_check", { status: "reservation requested", model: selectedModel.slug });
+    appendEvent("provider_selected", {
+      provider: selectedModel.provider,
+      model: selectedModel.slug,
+      runtime_model_id: selectedModel.runtime_model_id,
+    });
 
-    const es = new EventSource(url.toString());
-    eventSrcRef.current = es;
+    try {
+      const resp = await api.post<AICompleteResponse>(
+        "/ai/complete",
+        {
+          model: selectedModel.slug,
+          prompt: prompt.slice(0, 800),
+          max_tokens: maxTokens,
+        },
+        { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS },
+      );
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      const payload = resp.data;
+      const provider = payload.provider ?? selectedModel.provider;
+      const latency = payload.latency_ms ?? elapsedMs;
 
-    const handle = (evt: MessageEvent, name: string) => {
-      try {
-        const data = JSON.parse(evt.data);
-        setEvents((prev) => [
-          ...prev,
-          { id: `${name}-${prev.length}`, event: name, data, ts: Date.now() },
-        ]);
-        if (name === "request_received" && typeof data.trace_id === "string") {
-          setStats((s) => ({ ...s, trace_id: data.trace_id as string }));
-        }
-        if (name === "token_delta") {
-          const delta = data.delta ?? data.text ?? data.token ?? data.content;
-          if (typeof delta === "string") setResponseText((t) => t + delta);
-        }
-        if (name === "provider_selected" || name === "groq_fallback") {
-          setStats((s) => ({
-            ...s,
-            provider: String(data.provider ?? s.provider ?? ""),
-            model: String(data.model ?? s.model ?? ""),
-            trace_id: String(data.trace_id ?? s.trace_id ?? ""),
-          }));
-        }
-        if (name === "response_complete") {
-          const finalText = data.response ?? data.text ?? data.completion;
-          if (typeof finalText === "string") {
-            setResponseText((t) => t || finalText);
-          }
-          setStats((s) => ({
-            ...s,
-            prompt_tokens: Number(data.prompt_tokens ?? s.prompt_tokens ?? 0),
-            completion_tokens: Number(data.completion_tokens ?? s.completion_tokens ?? 0),
-            latency_ms: Number(data.latency_ms ?? s.latency_ms ?? 0),
-          }));
-        }
-        if (name === "audit_written" && typeof data.audit_hash === "string") {
-          setStats((s) => ({ ...s, audit_hash: data.audit_hash as string }));
-        }
-        if (name === "done" || name === "error") {
-          stop();
-          if (name === "error") setError(String(data.detail ?? data.message ?? "Stream failed"));
-        }
-      } catch (e) {
-        console.warn("malformed SSE frame", name, evt.data, e);
-      }
-    };
-
-    const names = Object.keys(EVENT_META);
-    for (const n of names) es.addEventListener(n, (e) => handle(e as MessageEvent, n));
-
-    es.onerror = () => {
-      if (es.readyState === EventSource.CLOSED) {
-        setError((prev) => prev ?? "Stream closed unexpectedly. The backend may be offline or rate-limiting.");
-      }
-      stop();
-    };
-  }, [apiBase, forceFallback, prompt, running, stop, vertical]);
+      setResponseText(payload.response_text);
+      setStats({
+        provider,
+        model: payload.model,
+        runtime_model_id: payload.bedrock_model_id,
+        prompt_tokens: payload.prompt_tokens,
+        completion_tokens: payload.output_tokens,
+        total_tokens: payload.total_tokens,
+        latency_ms: latency,
+        request_id: payload.request_id,
+        audit_hash: payload.audit_hash,
+        tokens_deducted: payload.tokens_deducted,
+        wallet_balance: payload.wallet_balance,
+        cost_usd: payload.cost_usd,
+      });
+      appendEvent("response_complete", {
+        provider,
+        model: payload.model,
+        output_tokens: payload.output_tokens,
+        latency_ms: latency,
+      });
+      appendEvent("audit_written", {
+        audit_log_id: payload.audit_log_id,
+        audit_hash: payload.audit_hash,
+      });
+      appendEvent("cost_recorded", {
+        credits_charged: payload.tokens_deducted,
+        wallet_balance: payload.wallet_balance,
+        cost_usd: payload.cost_usd,
+      });
+      appendEvent("done", {
+        request_id: payload.request_id,
+        total_latency_ms: latency,
+      });
+    } catch (err) {
+      const aborted = (err as { code?: string })?.code === "ERR_CANCELED";
+      const message = aborted ? "Request cancelled before completion." : responseDetail(err);
+      setError(message);
+      appendEvent("error", {
+        endpoint: "/api/v1/ai/complete",
+        message,
+      });
+    } finally {
+      abortRef.current = null;
+      setRunning(false);
+    }
+  }, [appendEvent, maxTokens, prompt, running, selectedModel]);
 
   useEffect(() => {
     return () => stop();
@@ -196,12 +293,11 @@ export function PlaygroundPage() {
     if (!prompt.trim()) return;
     setPreflight({ loading: true });
     try {
-      // Cost prediction — always available, server-side, ML when warm.
       const costResp = await api.post("/cost/predict", {
         operation_type: "generation",
-        provider: "local",
+        provider: selectedModel?.provider ?? "local",
         input_text: prompt.slice(0, 4000),
-        model: "qwen2.5:3b",
+        model: selectedModel?.runtime_model_id ?? selectedModelSlug,
       });
       const cost = costResp.data as {
         predicted_cost: string;
@@ -218,14 +314,17 @@ export function PlaygroundPage() {
         loading: false,
       };
 
-      // Quality + failure risk — best-effort; ML may be cold for new workspaces.
-      const params = { operation_type: "generation", provider: "local", input_text: prompt.slice(0, 2000) };
+      const params = {
+        operation_type: "generation",
+        provider: selectedModel?.provider ?? "local",
+        input_text: prompt.slice(0, 2000),
+      };
       try {
         const qResp = await api.post("/autonomous/quality/predict", null, { params });
         const q = qResp.data as { predicted_quality?: number };
         if (q?.predicted_quality != null) next.predicted_quality = q.predicted_quality;
       } catch {
-        /* ML cold — skip */
+        /* ML may still be warming for a fresh workspace. */
       }
       try {
         const rResp = await api.post("/autonomous/quality/failure-risk", null, { params });
@@ -233,23 +332,20 @@ export function PlaygroundPage() {
         const risk = r?.failure_risk ?? r?.risk;
         if (risk != null) next.failure_risk = risk;
       } catch {
-        /* ML cold — skip */
+        /* ML may still be warming for a fresh workspace. */
       }
 
       setPreflight(next);
     } catch (err) {
-      setPreflight({
-        loading: false,
-        error: (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Pre-flight unavailable",
-      });
+      setPreflight({ loading: false, error: responseDetail(err) });
     }
-  }, [prompt]);
+  }, [prompt, selectedModel, selectedModelSlug]);
 
   const saveAsPipeline = useCallback(async () => {
     if (!prompt.trim() || savingPipeline) return;
     setSavingPipeline(true);
     try {
-      const name = `Playground · ${vertical} · ${new Date().toLocaleDateString()}`;
+      const name = `Playground - ${vertical} - ${new Date().toLocaleDateString()}`;
       const resp = await api.post<{ slug: string }>("/pipelines", {
         name,
         description: `Saved from Playground (${vertical}). Original prompt preserved as input node.`,
@@ -257,7 +353,7 @@ export function PlaygroundPage() {
           nodes: [
             { id: "input", type: "prompt", label: "User input", prompt },
             { id: "policy", type: "gate", label: "Policy gate", policy: "default" },
-            { id: "llm", type: "model", label: "LLM step", model: stats.model || "qwen2.5:3b" },
+            { id: "llm", type: "model", label: "LLM step", model: stats.model || selectedModelSlug },
           ],
           edges: [
             { from: "input", to: "policy" },
@@ -267,17 +363,15 @@ export function PlaygroundPage() {
       });
       setSavedPipelineSlug(resp.data.slug);
     } catch (err) {
-      setError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-          ?? "Failed to save pipeline",
-      );
+      setError(responseDetail(err));
     } finally {
       setSavingPipeline(false);
     }
-  }, [prompt, savingPipeline, stats.model, vertical]);
+  }, [prompt, savingPipeline, selectedModelSlug, stats.model, vertical]);
 
   const eventCount = events.length;
-  const tokenCount = useMemo(() => events.filter((e) => e.event === "token_delta").length, [events]);
+  const tokenCount = stats.completion_tokens ?? 0;
+  const canRun = Boolean(prompt.trim() && selectedModel && !models.isLoading && !models.isError);
 
   const exportAudit = () => {
     const blob = new Blob(
@@ -285,7 +379,7 @@ export function PlaygroundPage() {
         JSON.stringify(
           {
             exported_at: new Date().toISOString(),
-            trace_id: stats.trace_id,
+            request_id: stats.request_id,
             vertical,
             prompt,
             response: responseText,
@@ -301,7 +395,7 @@ export function PlaygroundPage() {
     const href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    a.download = `veklom-audit-${stats.trace_id ?? Date.now()}.json`;
+    a.download = `veklom-audit-${stats.request_id ?? Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(href);
   };
@@ -311,20 +405,20 @@ export function PlaygroundPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-            Workspace · Playground
+            Workspace - Playground
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Governed execution theater</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Authenticated AI execution</h1>
           <p className="mt-2 max-w-2xl text-sm text-bone-2">
-            Every prompt passes through zero-trust, rate limits, token budget, circuit breaker, provider selection,
-            memory, audit, and cost recording — before a single token leaves your perimeter. Watch it happen.
+            Send a real workspace request through Veklom's wallet-backed completion endpoint. The backend selects the
+            runtime, enforces model availability, records the cost entry, and writes the audit artifact.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              live SSE · <span className="font-mono">/api/v1/demo/pipeline/stream</span>
+              authenticated - <span className="font-mono">/api/v1/ai/complete</span>
             </span>
-            <span className="v-chip">no auth required</span>
-            <span className="v-chip">rate-limited 5/min</span>
+            <span className="v-chip">wallet metered</span>
+            <span className="v-chip">audit logged</span>
           </div>
         </div>
       </header>
@@ -354,23 +448,70 @@ export function PlaygroundPage() {
           </div>
 
           <div className="v-card p-4">
+            <div className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+              <Cpu className="h-3 w-3" /> Runtime model
+            </div>
+            {models.isLoading ? (
+              <div className="flex items-center gap-2 font-mono text-[12px] text-muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading live models...
+              </div>
+            ) : models.isError ? (
+              <div className="rounded-md border border-crimson/30 bg-crimson/10 px-3 py-2 text-[12px] text-crimson">
+                {responseDetail(models.error)}
+              </div>
+            ) : runnableModels.length ? (
+              <div className="space-y-3">
+                <select
+                  className="v-input w-full"
+                  value={selectedModel?.slug ?? ""}
+                  disabled={running}
+                  onChange={(e) => setSelectedModelSlug(e.target.value)}
+                >
+                  {runnableModels.map((model) => (
+                    <option key={model.slug} value={model.slug}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedModel && (
+                  <div className="space-y-1 font-mono text-[11px] text-muted">
+                    <div>slug: <span className="text-bone">{selectedModel.slug}</span></div>
+                    <div>provider: <span className="text-bone">{selectedModel.provider}</span></div>
+                    <div>runtime: <span className="text-bone">{selectedModel.runtime_model_id}</span></div>
+                  </div>
+                )}
+                <label className="block">
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Max tokens</div>
+                  <select
+                    className="v-input w-full"
+                    value={maxTokens}
+                    disabled={running}
+                    onChange={(e) => setMaxTokens(Number(e.target.value))}
+                  >
+                    {[16, 32, 64, 128].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[12px] text-brass-2">
+                No connected models are enabled for this workspace.
+              </div>
+            )}
+          </div>
+
+          <div className="v-card p-4">
             <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
               Circuit breaker
             </div>
-            <label className="flex items-start gap-3 rounded-lg border border-rule-2 bg-white/[0.02] p-3">
-              <input
-                type="checkbox"
-                checked={forceFallback}
-                onChange={(e) => setForceFallback(e.target.checked)}
-                className="mt-0.5 accent-brass"
-              />
-              <div className="flex-1">
-                <div className="text-[13px] font-medium text-bone">Force fallback</div>
-                <div className="mt-1 text-[11px] leading-relaxed text-muted">
-                  Simulate Ollama outage — exercises the circuit breaker and routes through Groq fallback.
-                </div>
+            <div className="rounded-lg border border-rule-2 bg-white/[0.02] p-3">
+              <div className="text-[13px] font-medium text-bone">Automatic failover</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-muted">
+                The backend tries the selected model path and applies the configured circuit breaker/fallback route
+                if the runtime is unavailable.
               </div>
-            </label>
+            </div>
           </div>
 
           <div className="v-card p-4">
@@ -379,16 +520,15 @@ export function PlaygroundPage() {
             </div>
             <ul className="space-y-1.5 font-mono text-[11px]">
               {[
-                "Zero-trust verification",
-                "IP rate-limit (5 / 60s)",
-                "Token budget guard",
-                "Circuit breaker w/ Groq fallback",
-                "Ephemeral Redis memory (60s TTL)",
+                "Bearer auth verification",
+                "Tenant-scoped workspace model",
+                "Wallet/reserve metering",
+                "Circuit breaker fallback",
                 "Tamper-evident audit write",
-                "Cost ledger entry",
+                "Request ledger entry",
               ].map((s) => (
                 <li key={s} className="flex items-start gap-2 text-bone-2">
-                  <span className="mt-0.5 text-moss">✓</span>
+                  <span className="mt-0.5 text-moss">+</span>
                   {s}
                 </li>
               ))}
@@ -410,18 +550,18 @@ export function PlaygroundPage() {
               onChange={(e) => setPrompt(e.target.value.slice(0, 800))}
               rows={4}
               className="v-input min-h-[96px] resize-y font-mono text-[13px] leading-relaxed"
-              placeholder="What would you like the governed control plane to answer…"
+              placeholder="What would you like the governed control plane to answer?"
               disabled={running}
             />
-            <div className="mt-3 flex items-center justify-between">
-              <div className="flex gap-2">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
                 {!running ? (
-                  <button className="v-btn-primary" onClick={run} disabled={!prompt.trim()}>
-                    <Play className="h-4 w-4" /> Run through pipeline
+                  <button className="v-btn-primary" onClick={run} disabled={!canRun}>
+                    <Play className="h-4 w-4" /> Run workspace request
                   </button>
                 ) : (
                   <button className="v-btn-ghost text-crimson" onClick={stop}>
-                    <CircleStop className="h-4 w-4" /> Stop stream
+                    <CircleStop className="h-4 w-4" /> Stop request
                   </button>
                 )}
                 <button
@@ -439,7 +579,7 @@ export function PlaygroundPage() {
                   title="Save this run as a governed pipeline"
                 >
                   <Save className="h-4 w-4" />
-                  {savingPipeline ? "Saving…" : savedPipelineSlug ? "Saved✓" : "Save as Pipeline"}
+                  {savingPipeline ? "Saving..." : savedPipelineSlug ? "Saved" : "Save as Pipeline"}
                 </button>
                 <button
                   className="v-btn-ghost"
@@ -448,7 +588,7 @@ export function PlaygroundPage() {
                   title="Predict cost, quality, and failure risk before running"
                 >
                   <TrendingDown className="h-4 w-4" />
-                  {preflight.loading ? "Predicting…" : "Pre-flight"}
+                  {preflight.loading ? "Predicting..." : "Pre-flight"}
                 </button>
               </div>
               <div className="flex gap-2 font-mono text-[11px]">
@@ -486,10 +626,10 @@ export function PlaygroundPage() {
                   <div className="grid grid-cols-3 gap-3 font-mono text-[12px]">
                     <PreflightCell
                       label="cost / run"
-                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "—"}
+                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "-"}
                       sub={
                         preflight.cost_confidence_upper != null && preflight.predicted_cost != null
-                          ? `±$${(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}`
+                          ? `+/-$${Math.abs(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}`
                           : "server-side ml"
                       }
                       tone="ok"
@@ -499,26 +639,20 @@ export function PlaygroundPage() {
                       value={
                         preflight.predicted_quality != null
                           ? `${(preflight.predicted_quality * 100).toFixed(0)}%`
-                          : "—"
+                          : "-"
                       }
                       sub={preflight.predicted_quality != null ? "predicted" : "ml warming"}
-                      tone={
-                        preflight.predicted_quality != null && preflight.predicted_quality > 0.8
-                          ? "ok"
-                          : "warn"
-                      }
+                      tone={preflight.predicted_quality != null && preflight.predicted_quality > 0.8 ? "ok" : "warn"}
                     />
                     <PreflightCell
                       label="failure risk"
                       value={
                         preflight.failure_risk != null
                           ? `${(preflight.failure_risk * 100).toFixed(0)}%`
-                          : "—"
+                          : "-"
                       }
                       sub={preflight.failure_risk != null ? "before run" : "ml warming"}
-                      tone={
-                        preflight.failure_risk != null && preflight.failure_risk < 0.2 ? "ok" : "warn"
-                      }
+                      tone={preflight.failure_risk != null && preflight.failure_risk < 0.2 ? "ok" : "warn"}
                     />
                   </div>
                 )}
@@ -526,9 +660,9 @@ export function PlaygroundPage() {
                   <div className="mt-2 flex flex-wrap gap-1.5 font-mono text-[10px]">
                     {preflight.alternatives.slice(0, 3).map((alt) => (
                       <span key={alt.provider} className="v-chip">
-                        via {alt.provider} → ${parseFloat(alt.cost).toFixed(4)}
+                        via {alt.provider} - ${parseFloat(alt.cost).toFixed(4)}
                         {alt.savings_percent > 0 && (
-                          <span className="text-moss"> · save {alt.savings_percent.toFixed(0)}%</span>
+                          <span className="text-moss"> - save {alt.savings_percent.toFixed(0)}%</span>
                         )}
                       </span>
                     ))}
@@ -543,14 +677,14 @@ export function PlaygroundPage() {
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Response</div>
               {stats.provider && (
                 <span className="v-chip v-chip-brass font-mono">
-                  {stats.provider} · {stats.model ?? "—"}
+                  {stats.provider} - {stats.model ?? "-"}
                 </span>
               )}
             </header>
             <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
               {responseText || (
                 <span className="text-muted">
-                  {running ? "Streaming…" : "Click “Run through pipeline” to stream a response."}
+                  {running ? "Waiting for /api/v1/ai/complete..." : "Click Run workspace request to call the backend."}
                 </span>
               )}
               {running && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-brass" />}
@@ -564,13 +698,17 @@ export function PlaygroundPage() {
               <Gauge className="h-3 w-3" /> Telemetry
             </div>
             <dl className="space-y-2.5 font-mono text-[12px]">
-              <Stat label="trace_id" value={stats.trace_id ?? "—"} mono />
-              <Stat label="provider" value={stats.provider ?? "—"} />
-              <Stat label="model" value={stats.model ?? "—"} />
-              <Stat label="prompt tokens" value={stats.prompt_tokens?.toString() ?? "—"} />
-              <Stat label="completion tokens" value={stats.completion_tokens?.toString() ?? "—"} />
-              <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "—"} />
-              <Stat label="audit hash" value={stats.audit_hash ? stats.audit_hash.slice(0, 12) + "…" : "—"} mono />
+              <Stat label="request id" value={stats.request_id ?? "-"} mono />
+              <Stat label="provider" value={stats.provider ?? "-"} />
+              <Stat label="model" value={stats.model ?? "-"} />
+              <Stat label="runtime" value={stats.runtime_model_id ?? "-"} mono />
+              <Stat label="prompt tokens" value={stats.prompt_tokens?.toString() ?? "-"} />
+              <Stat label="completion tokens" value={stats.completion_tokens?.toString() ?? "-"} />
+              <Stat label="total tokens" value={stats.total_tokens?.toString() ?? "-"} />
+              <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "-"} />
+              <Stat label="credits" value={stats.tokens_deducted?.toString() ?? "-"} />
+              <Stat label="wallet" value={stats.wallet_balance?.toString() ?? "-"} />
+              <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash.slice(0, 12)}...` : "-"} mono />
             </dl>
           </div>
 
@@ -581,28 +719,20 @@ export function PlaygroundPage() {
               </div>
               <span className="v-chip font-mono">{eventCount}</span>
             </header>
-            <div
-              ref={feedRef}
-              className="max-h-[520px] overflow-y-auto p-3 font-mono text-[11px]"
-            >
+            <div ref={feedRef} className="max-h-[520px] overflow-y-auto p-3 font-mono text-[11px]">
               {events.length === 0 ? (
                 <div className="py-8 text-center text-muted">
-                  {running ? "Waiting on first event…" : "No events yet."}
+                  {running ? "Waiting on backend..." : "No events yet."}
                 </div>
               ) : (
                 <ul className="space-y-1.5">
                   {events.map((e) => {
-                    const meta = EVENT_META[e.event] ?? { label: e.event, color: "text-bone-2", icon: "·" };
-                    const isToken = e.event === "token_delta";
+                    const meta = EVENT_META[e.event] ?? { label: e.event, color: "text-bone-2", icon: "-" };
                     return (
-                      <li key={e.id} className={cn("flex items-start gap-2", isToken && "opacity-60")}>
+                      <li key={e.id} className="flex items-start gap-2">
                         <span className={cn("w-3 shrink-0 text-center", meta.color)}>{meta.icon}</span>
                         <span className={cn("shrink-0 font-semibold", meta.color)}>{meta.label}</span>
-                        {!isToken && (
-                          <span className="ml-auto truncate text-muted">
-                            {compactPayload(e.data)}
-                          </span>
-                        )}
+                        <span className="ml-auto truncate text-muted">{compactPayload(e.data)}</span>
                       </li>
                     );
                   })}
@@ -639,12 +769,7 @@ function PreflightCell({
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
-      <div
-        className={cn(
-          "mt-0.5 text-base font-semibold",
-          tone === "ok" ? "text-moss" : "text-brass-2",
-        )}
-      >
+      <div className={cn("mt-0.5 text-base font-semibold", tone === "ok" ? "text-moss" : "text-brass-2")}>
         {value}
       </div>
       <div className="text-[10px] text-muted">{sub}</div>
@@ -655,10 +780,21 @@ function PreflightCell({
 function compactPayload(data: Record<string, unknown>): string {
   const keys = Object.keys(data);
   if (!keys.length) return "";
-  const preferred = ["provider", "model", "state", "hits", "tokens", "latency_ms", "detail", "message"];
+  const preferred = [
+    "endpoint",
+    "status",
+    "provider",
+    "model",
+    "runtime_model_id",
+    "output_tokens",
+    "latency_ms",
+    "credits_charged",
+    "request_id",
+    "message",
+  ];
   for (const k of preferred) {
-    if (k in data) return `${k}=${String(data[k]).slice(0, 40)}`;
+    if (k in data && data[k] != null) return `${k}=${String(data[k]).slice(0, 56)}`;
   }
   const first = keys[0]!;
-  return `${first}=${String(data[first]).slice(0, 40)}`;
+  return `${first}=${String(data[first]).slice(0, 56)}`;
 }

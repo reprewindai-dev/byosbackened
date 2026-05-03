@@ -180,7 +180,7 @@ export function TeamPage() {
       {inviteRouteUnavailable && (
         <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
           Team invite delivery is not enabled on the live backend yet. Current signed-in identity is shown from{" "}
-          <span className="font-mono">/api/v1/auth/me</span> instead of placeholder members.
+          <span className="font-mono">/api/v1/auth/me</span> until the member directory route is available.
         </div>
       )}
 

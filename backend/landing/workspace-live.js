@@ -464,7 +464,6 @@
       ["Sovereign trial · 14 d", state.subscription ? `${state.subscription.plan} / ${state.subscription.status}` : "Live workspace"],
       ["$799 / mo", "Live plan price"],
       ["$299 / mo", "Live plan price"],
-      ["Choose tier", "Open billing"],
       ["Pick a plan that matches your perimeter.", "Plans and checkout are read from the live backend."],
       ["Existing clients work unchanged â€” flip one base URL and everything you ship is governed.", "Create a real workspace API key and call the authenticated backend."],
       ["Existing clients work unchanged — flip one base URL and everything you ship is governed.", "Create a real workspace API key and call the authenticated backend."],
@@ -524,10 +523,11 @@
     el.dataset.veklomActionTruth = "wired";
     el.setAttribute("title", title);
     el.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+      if (el.tagName === "A") {
+        event.preventDefault();
+      }
       handler();
-    }, true);
+    });
   };
 
   const markStaticSurfaceRows = () => {
@@ -692,8 +692,6 @@
         wireButton(el, connectGithub, "Start real GitHub OAuth");
       } else if (text === "Open Playground") {
         wireButton(el, () => { location.href = "/playground/"; }, "Open the real playground route");
-      } else if (text === "Open billing") {
-        wireButton(el, () => { location.href = "/billing/"; }, "Open the real billing route");
       } else if (text === "Open workspace" || text === "Skip to workspace") {
         wireButton(el, () => { location.href = "/dashboard/"; }, "Open the real dashboard route");
       } else if (text === "Email + password (org policy)") {

@@ -17,7 +17,7 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /billing/          /billing/index.html      200
 /marketplace       /marketplace/index.html  200
 /marketplace/      /marketplace/index.html  200
-/marketplace/*     /workspace-app.html      200
+/marketplace/*     /marketplace/index.html  200
 /vendors           /vendor/index.html       200
 /vendors/          /vendor/index.html       200
 

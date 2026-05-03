@@ -10,6 +10,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { MonitoringPage } from "./pages/MonitoringPage";
 import { VaultPage } from "./pages/VaultPage";
 import { TeamPage } from "./pages/TeamPage";
+import { CompliancePage } from "./pages/CompliancePage";
+import { ModelsPage } from "./pages/ModelsPage";
 
 export function AppRoutes() {
   return (
@@ -21,10 +23,7 @@ export function AppRoutes() {
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
-        <Route
-          path="/models"
-          element={<PlaceholderPage title="Models" subtitle="Deployed models across Hetzner primary and AWS burst." />}
-        />
+        <Route path="/models" element={<ModelsPage />} />
         <Route
           path="/pipelines"
           element={<PlaceholderPage title="Pipelines" subtitle="Governed execution pipelines." />}
@@ -34,10 +33,7 @@ export function AppRoutes() {
           element={<PlaceholderPage title="Deployments" subtitle="Active deployments and canary status." />}
         />
         <Route path="/vault" element={<VaultPage />} />
-        <Route
-          path="/compliance"
-          element={<PlaceholderPage title="Compliance" subtitle="Framework coverage, evidence schedules, signed exports." />}
-        />
+        <Route path="/compliance" element={<CompliancePage />} />
         <Route path="/monitoring" element={<MonitoringPage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/team" element={<TeamPage />} />

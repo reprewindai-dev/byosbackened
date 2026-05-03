@@ -1,35 +1,57 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Models - Veklom</title>
-<meta name="robots" content="noindex, nofollow" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="icon" type="image/x-icon" href="/favicon.ico" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app/app.css">
-</head>
-<body>
-<main class="app-shell">
-  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Models</div>
-  <div class="app-card">
-    <h1 class="app-h1">Opening Model Controls</h1>
-    <p class="app-sub">Routing to the live dashboard model panel so provider connectivity and workspace toggles stay on the real backend path.</p>
-    <div class="alert alert-ok"><span class="spinner"></span> Redirecting...</div>
-    <p class="foot" style="margin-top:18px;"><a id="fallback" href="/dashboard/?tab=models">Continue manually</a></p>
-  </div>
-</main>
-<script>
-(function redirectToWorkspaceModels() {
-  const params = new URLSearchParams(window.location.search);
-  params.set("tab", "models");
-  const target = "/dashboard/?" + params.toString();
-  document.getElementById("fallback").setAttribute("href", target);
-  window.location.replace(target);
-})();
-</script>
-</body>
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Veklom Workspace — Sovereign AI Control Plane</title>
+    <meta
+      name="description"
+      content="The sovereign AI control plane. Watch every prompt routed, policed, and audited — on your perimeter, your keys, your region."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function bootstrapWorkspaceRoute() {
+        const path = (window.location.pathname || "/").replace(/\/+$/, "") || "/";
+        const routeMap = {
+          "/dashboard": "#/",
+          "/playground": "#/playground",
+          "/marketplace": "#/marketplace",
+          "/models": "#/models",
+          "/pipelines": "#/pipelines",
+          "/deployments": "#/deployments",
+          "/monitoring": "#/monitoring",
+          "/vault": "#/vault",
+          "/compliance": "#/compliance",
+          "/billing": "#/billing",
+          "/team": "#/team",
+          "/settings": "#/settings",
+          "/onboarding": "#/onboarding"
+        };
+        if (path.startsWith("/marketplace/")) {
+          const slug = path.slice("/marketplace/".length);
+          const target = slug ? "#/marketplace/" + slug : "#/marketplace";
+          if (window.location.hash !== target) {
+            window.location.hash = target;
+          }
+          return;
+        }
+        const targetHash = routeMap[path] || "#/";
+        if (window.location.hash !== targetHash) {
+          window.location.hash = targetHash;
+        }
+      })();
+    </script>
+    <script src="/workspace-config.js"></script>
+    <script type="module" crossorigin src="/workspace-assets/index-EUKZeqk4.js"></script>
+    <link rel="stylesheet" crossorigin href="/workspace-assets/index-WqgIFi2m.css" />
+  </head>
+  <body class="grid-bg">
+    <div id="root"></div>
+  </body>
 </html>

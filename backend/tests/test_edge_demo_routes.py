@@ -19,6 +19,8 @@ def test_route_paths_exposed():
     assert ("/api/v1/edge/demo/infrastructure", "GET") in paths
     assert ("/api/v1/demo/pipeline/health", "GET") in paths
     assert ("/api/v1/demo/pipeline/stream", "GET") in paths
+    assert ("/api/v1/marketplace/listings", "GET") in paths
+    assert ("/api/v1/marketplace/categories", "GET") in paths
 
 
 def test_protocol_aliases_work():

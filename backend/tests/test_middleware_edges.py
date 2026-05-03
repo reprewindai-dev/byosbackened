@@ -59,6 +59,22 @@ def test_workspace_shell_routes_are_public_html_surfaces():
     assert expected_prefixes.issubset(set(ZERO_TRUST_PUBLIC_PREFIXES))
 
 
+def test_marketplace_read_routes_are_public_browsing_surfaces():
+    from core.config import get_settings
+
+    api_prefix = get_settings().api_prefix
+    public_marketplace_bases = {
+        f"{api_prefix}/listings",
+        f"{api_prefix}/categories",
+        f"{api_prefix}/evidence",
+        f"{api_prefix}/marketplace/listings",
+        f"{api_prefix}/marketplace/categories",
+        f"{api_prefix}/marketplace/evidence",
+    }
+
+    assert public_marketplace_bases
+
+
 def test_edge_protocol_routes_are_not_public():
     protected_paths = {
         "/api/v1/edge/snmp",

@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-feature-settings: "cv11", "ss01", "ss03";
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(196, 146, 91, 0.05), transparent 60%),
+      radial-gradient(900px 700px at 110% 10%, rgba(110, 168, 254, 0.04), transparent 55%),
+      radial-gradient(800px 500px at 50% 120%, rgba(93, 216, 165, 0.03), transparent 60%),
+      linear-gradient(180deg, #05060b 0%, #070810 30%, #05060b 100%);
+    background-attachment: fixed;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(1200px 800px at 50% 20%, #000 50%, transparent 100%);
+  }
+
+  ::selection {
+    background: #c4925b;
+    color: #18120a;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #272c3e;
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a4057;
+  }
+}
+
+@layer components {
+  .v-card {
+    @apply rounded-xl border border-rule bg-ink-2/60 backdrop-blur-sm;
+  }
+
+  .v-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-rule-2 bg-white/[0.02] px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-bone-2;
+  }
+
+  .v-chip-ok {
+    @apply border-moss/30 bg-moss/5 text-moss;
+  }
+
+  .v-chip-warn {
+    @apply border-amber/30 bg-amber/5 text-amber;
+  }
+
+  .v-chip-err {
+    @apply border-crimson/30 bg-crimson/5 text-crimson;
+  }
+
+  .v-chip-brass {
+    @apply border-brass/40 bg-brass/5 text-brass-2;
+  }
+
+  .v-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brass px-4 py-2 text-sm font-semibold text-ink shadow-soft transition hover:bg-brass-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .v-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-rule-2 bg-white/[0.02] px-4 py-2 text-sm font-medium text-bone transition hover:border-rule-2 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .v-input {
+    @apply w-full rounded-lg border border-rule-2 bg-ink-1 px-3 py-2 text-sm text-bone placeholder:text-muted focus:border-brass/60 focus:outline-none focus:ring-2 focus:ring-brass/20;
+  }
+
+  .v-label {
+    @apply mb-1.5 block font-mono text-[11px] uppercase tracking-[0.1em] text-muted;
+  }
+
+  .v-sidebar-section {
+    @apply px-3 pb-2 pt-4 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-2;
+  }
+
+  .v-sidebar-item {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-bone-2 transition hover:bg-white/[0.03] hover:text-bone;
+  }
+
+  .v-sidebar-item-active {
+    @apply bg-brass/10 text-brass-2;
+  }
+
+  .v-metric {
+    @apply font-mono text-[13px];
+  }
+}

@@ -121,6 +121,79 @@ function median(values: number[]): number {
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
+function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="flex h-48 items-center justify-center rounded-lg border border-rule bg-ink-2/40 font-mono text-[11px] text-muted">
+        Loading routing telemetry...
+      </div>
+    );
+  }
+
+  const series = data?.routing.series ?? [];
+  const hosts = data?.routing.primary_hosts ?? [];
+  const hasActivity =
+    series.some((point) => point.primary > 0 || point.burst > 0) ||
+    hosts.some((host) => host.util_pct > 0) ||
+    (data?.recent_runs?.length ?? 0) > 0;
+
+  if (!hasActivity) {
+    return (
+      <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-rule bg-ink-2/40 px-6 text-center font-mono text-[11px] text-muted">
+        <div>No routing events in this workspace yet.</div>
+        <div className="mt-1 text-[10px] text-muted-2">Run the Playground or execute a pipeline to populate live routing telemetry.</div>
+      </div>
+    );
+  }
+
+  if (series.length) {
+    const points = series.slice(-24);
+    return (
+      <div className="h-48 rounded-lg border border-rule bg-ink-2/40 p-4">
+        <div className="flex h-32 items-end gap-1">
+          {points.map((point, index) => {
+            const primary = Math.max(0, Math.min(100, point.primary));
+            const burst = Math.max(0, Math.min(100, point.burst));
+            return (
+              <div key={`${point.t}-${index}`} className="flex min-w-0 flex-1 flex-col justify-end overflow-hidden rounded-sm bg-rule/40">
+                <div className="bg-electric/80" style={{ height: `${burst}%` }} title={`AWS burst ${burst}%`} />
+                <div className="bg-brass/90" style={{ height: `${primary}%` }} title={`Hetzner primary ${primary}%`} />
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-muted">
+          <span>{points[0]?.t ?? "start"}</span>
+          <span className="flex items-center gap-3">
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-brass" />Hetzner</span>
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-electric" />AWS burst</span>
+          </span>
+          <span>{points.at(-1)?.t ?? "now"}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-48 rounded-lg border border-rule bg-ink-2/40 p-4">
+      <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">Live host utilization</div>
+      <div className="space-y-3">
+        {hosts.slice(0, 4).map((host) => (
+          <div key={host.name}>
+            <div className="mb-1 flex justify-between font-mono text-[11px]">
+              <span className="text-bone">{host.name}</span>
+              <span className="text-muted">{host.util_pct}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-rule">
+              <div className="h-full rounded-full bg-brass" style={{ width: `${Math.max(0, Math.min(100, host.util_pct))}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function OverviewPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["overview"],
@@ -148,12 +221,12 @@ export function OverviewPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost">
+          <a href="#/deployments" className="v-btn-ghost">
             <Plus className="h-4 w-4" /> New deployment
-          </button>
-          <button className="v-btn-primary">
+          </a>
+          <a href="#/playground" className="v-btn-primary">
             <TerminalSquare className="h-4 w-4" /> Open Playground
-          </button>
+          </a>
         </div>
       </header>
 
@@ -227,9 +300,7 @@ export function OverviewPage() {
               <span className="v-chip">AWS {data?.routing.burst_util_pct ?? "—"}%</span>
             </div>
           </div>
-          <div className="flex h-48 items-center justify-center rounded-lg border border-rule bg-ink-2/40 font-mono text-[11px] text-muted">
-            {isLoading ? "Loading chart…" : "Recharts line-chart wires here in next commit"}
-          </div>
+          <RoutingChart data={data} isLoading={isLoading} />
           <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-[11px]">
             {data?.routing.primary_hosts?.slice(0, 3).map((h) => (
               <div key={h.name} className="rounded-lg border border-rule p-2">

@@ -16,8 +16,13 @@ _PUBLIC_PATHS = {
     "/health",
     "/",
     "/metrics",
-    "/status",      # system health — no auth required
+    "/status",      # system health - no auth required
+    "/status.html",
     "/status/data", # public demo status payload
+    "/api/v1/edge/demo/summary",
+    "/api/v1/edge/demo/infrastructure",
+    "/api/v1/demo/pipeline/stream",
+    "/api/v1/demo/pipeline/health",
     "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
     f"{settings.api_prefix}/register",
     f"{settings.api_prefix}/login",
@@ -31,6 +36,7 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/auth/github/callback",
     f"{settings.api_prefix}/support/chat",
     f"{settings.api_prefix}/payments/webhook",
+    f"{settings.api_prefix}/webhooks/resend",
     # Docs now require auth + tokens (100 per view)
     # f"{settings.api_prefix}/docs",      # LOCKED - requires auth + 100 tokens
     # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth + 100 tokens
@@ -44,6 +50,17 @@ _PUBLIC_PREFIXES = (
     "/signup",
     "/login",
     "/dashboard",
+    "/playground",
+    "/models",
+    "/pipelines",
+    "/deployments",
+    "/monitoring",
+    "/vault",
+    "/compliance",
+    "/billing",
+    "/team",
+    "/settings",
+    "/onboarding",
     "/blog",
     "/legal",
     "/app",
@@ -66,7 +83,7 @@ _PUBLIC_STATIC_SUFFIXES = (
 
 class ZeroTrustMiddleware(BaseHTTPMiddleware):
     """
-    Zero-trust middleware — verify every request.
+    Zero-trust middleware - verify every request.
     Supports both JWT Bearer tokens and API keys (byos_ prefix).
     Public paths skip authentication entirely.
     """
@@ -74,7 +91,7 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         method = request.method.upper()
-        # Normalize trailing slash — but preserve "/" as-is so it matches
+        # Normalize trailing slash - but preserve "/" as-is so it matches
         # _PUBLIC_PATHS. rstrip("/") would turn "/" into "" (empty string).
         if len(path) > 1:
             path = path.rstrip("/")
@@ -129,7 +146,7 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Invalid authorization header format"},
             )
 
-        # API key path (byos_ prefix) — resolve workspace from DB
+        # API key path (byos_ prefix) - resolve workspace from DB
         if token.startswith("byos_"):
             try:
                 workspace_id = await self._resolve_api_key(request, token)

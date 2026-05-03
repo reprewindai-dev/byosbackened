@@ -5,6 +5,7 @@ from apps.api.middleware.entitlement_check import PUBLIC_ENDPOINTS as ENTITLEMEN
 from apps.api.middleware.token_deduction import DEFAULT_ENDPOINT_COSTS
 from apps.api.middleware.token_deduction import PUBLIC_ENDPOINTS as TOKEN_PUBLIC_ENDPOINTS
 from core.security.zero_trust import _PUBLIC_PATHS as ZERO_TRUST_PUBLIC_PATHS
+from core.security.zero_trust import _PUBLIC_PREFIXES as ZERO_TRUST_PUBLIC_PREFIXES
 
 
 def test_edge_entitlement_paths_requirements():
@@ -36,6 +37,26 @@ def test_public_demo_and_pipeline_routes_are_free_and_public():
     assert public_paths.issubset(ZERO_TRUST_PUBLIC_PATHS)
     assert public_paths.issubset(ENTITLEMENT_PUBLIC_ENDPOINTS)
     assert public_paths.issubset(TOKEN_PUBLIC_ENDPOINTS)
+
+
+def test_workspace_shell_routes_are_public_html_surfaces():
+    expected_prefixes = {
+        "/dashboard",
+        "/playground",
+        "/marketplace",
+        "/models",
+        "/pipelines",
+        "/deployments",
+        "/monitoring",
+        "/vault",
+        "/compliance",
+        "/billing",
+        "/team",
+        "/settings",
+        "/onboarding",
+    }
+
+    assert expected_prefixes.issubset(set(ZERO_TRUST_PUBLIC_PREFIXES))
 
 
 def test_edge_protocol_routes_are_not_public():

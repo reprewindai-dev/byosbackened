@@ -530,14 +530,24 @@ async def github_login():
 
 @router.post("/github/callback")
 async def github_callback(
-    code: str,
     request: Request,
+    code: Optional[str] = None,
     state: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Exchange GitHub auth code for tokens. Creates account if needed."""
+    if not code or not state:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        code = code or body.get("code")
+        state = state or body.get("state")
+
     if not settings.github_client_id or not settings.github_client_secret:
         raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing GitHub OAuth code")
     if not state or not _validate_github_state(state):
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 

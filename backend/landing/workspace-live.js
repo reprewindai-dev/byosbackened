@@ -67,6 +67,11 @@
     return data;
   };
 
+  const postJson = (path, body) => api(path, {
+    method: "POST",
+    body: JSON.stringify(body || {}),
+  });
+
   const safe = (value, fallback = "") => value === null || value === undefined || value === "" ? fallback : String(value);
   const initials = (name, email) => {
     const basis = (name || email || "Veklom User").trim();
@@ -137,6 +142,13 @@
     if (hash.includes("/billing") || path.startsWith("/billing")) return "billing";
     if (hash.includes("/models") || path.startsWith("/models")) return "models";
     if (hash.includes("/monitoring") || path.startsWith("/monitoring")) return "monitoring";
+    if (hash.includes("/pipelines") || path.startsWith("/pipelines")) return "pipelines";
+    if (hash.includes("/deployments") || path.startsWith("/deployments")) return "deployments";
+    if (hash.includes("/vault") || path.startsWith("/vault")) return "vault";
+    if (hash.includes("/compliance") || path.startsWith("/compliance")) return "compliance";
+    if (hash.includes("/team") || path.startsWith("/team")) return "team";
+    if (hash.includes("/settings") || path.startsWith("/settings")) return "settings";
+    if (hash.includes("/onboarding") || path.startsWith("/onboarding")) return "onboarding";
     return "dashboard";
   };
 
@@ -152,6 +164,19 @@
     <div style="border:1px dashed rgba(148,163,184,.25);border-radius:10px;padding:14px;color:#94a3b8;font:13px/1.5 ui-sans-serif,system-ui">
       ${text}
     </div>
+  `;
+
+  const truthRow = (label, value) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid rgba(148,163,184,.12);padding:9px 0;font:12px/1.35 ui-sans-serif,system-ui">
+      <span style="color:#94a3b8">${label}</span>
+      <span style="color:#e5e7eb;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right">${value}</span>
+    </div>
+  `;
+
+  const actionLink = (label, href) => `
+    <a href="${href}" style="display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.1);color:#bbf7d0;border-radius:8px;padding:8px 10px;font:12px/1 ui-sans-serif,system-ui;text-decoration:none">
+      ${label}
+    </a>
   `;
 
   const renderTruthPanel = (state) => {
@@ -177,6 +202,9 @@
     const repos = state.repos || [];
     const recent = (state.observability && state.observability.rows) || overview.live_feed || [];
     const listings = state.marketplaceListings || [];
+    const usage = state.walletUsage || {};
+    const analytics = state.requestAnalytics || {};
+    const apiKeys = state.apiKeys || [];
     const connectedModels = models.filter((model) => model.connected);
     const enabledModels = models.filter((model) => model.enabled);
     let title = "Live workspace state";
@@ -225,6 +253,127 @@
           ${liveCard("Enabled", fmtInt(enabledModels.length), "allowed for playground")}
           ${liveCard("Primary", connectedModels[0] ? connectedModels[0].provider : "none", connectedModels[0] ? connectedModels[0].bedrock_model_id : "No model connected")}
         </div>
+      `;
+    } else if (route === "monitoring") {
+      title = "Monitoring from live request logs";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("Observed calls", fmtInt((state.observability && state.observability.total) || recent.length), "from /workspace/observability")}
+          ${liveCard("Usage events", fmtInt(usage.transaction_count), "wallet usage transactions")}
+          ${liveCard("Tokens", fmtInt(overview.total_tokens_used), "tenant-scoped")}
+          ${liveCard("Cost", fmtMoney(overview.total_cost_usd || cost.total_cost_usd), "calculated from logs")}
+        </div>
+        <div style="margin-top:12px">
+          ${recent.length ? `
+            <div style="overflow:auto;border:1px solid rgba(148,163,184,.18);border-radius:10px">
+              <table style="width:100%;border-collapse:collapse;font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#cbd5e1">
+                <thead><tr style="color:#94a3b8;text-align:left"><th style="padding:9px">Time</th><th>Kind</th><th>Model</th><th>Status</th><th>Trace</th></tr></thead>
+                <tbody>${recent.slice(0, 8).map((row) => `
+                  <tr style="border-top:1px solid rgba(148,163,184,.12)">
+                    <td style="padding:9px">${safe(row.created_at || row.timestamp, "-")}</td>
+                    <td>${safe(row.kind || row.request_kind, "-")}</td>
+                    <td>${safe(row.model, "-")}</td>
+                    <td>${safe(row.status, "-")}</td>
+                    <td>${safe(row.trace_id || row.request_id, "-")}</td>
+                  </tr>
+                `).join("")}</tbody>
+              </table>
+            </div>
+          ` : emptyState("No monitoring events exist yet for this workspace. Run the Playground or call the API to create real rows.")}
+        </div>
+      `;
+    } else if (route === "pipelines") {
+      title = "Pipeline state is request-derived";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("Pipeline source", "request logs", "/workspace/analytics/requests")}
+          ${liveCard("Rows", fmtInt(analytics.total || recent.length), "live tenant scope")}
+          ${liveCard("Status", recent.length ? "active" : "empty", recent.length ? "recent executions found" : "no executions yet")}
+          ${liveCard("Audit", "enabled", "successful playground calls write audit/run rows")}
+        </div>
+        <div style="margin-top:12px">${recent.length ? emptyState("Pipeline execution history is visible in Monitoring and Dashboard from the same live backend logs.") : emptyState("No real pipeline rows yet. Static pipeline diagrams are explanatory only until a user creates executions.")}</div>
+      `;
+    } else if (route === "deployments") {
+      title = "Deployment controls are read-only in this shell";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("Runtime models", fmtInt(models.length), "from /workspace/models")}
+          ${liveCard("Connected", fmtInt(connectedModels.length), "backend health state")}
+          ${liveCard("Self-serve deploy", "disabled", "no fake one-click GPU deployment")}
+          ${liveCard("Primary route", connectedModels[0] ? connectedModels[0].model_slug : "none", connectedModels[0] ? "live model route" : "not connected")}
+        </div>
+        <div style="margin-top:12px">${connectedModels.length ? emptyState("Deployment-like controls below are disabled unless backed by a production deployment endpoint. The model/runtime inventory above is live.") : emptyState("No connected model runtime is available for this workspace.")}</div>
+      `;
+    } else if (route === "vault") {
+      title = "Vault/API key truth";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("API keys", fmtInt(apiKeys.length), "from /workspace/api-keys")}
+          ${liveCard("Secrets", "protected", "raw keys shown only once on creation")}
+          ${liveCard("Rotation", "manual disabled", "no fake rotation")}
+          ${liveCard("Tenant", safe(state.workspaceSlug, state.workspaceName), "workspace scoped")}
+        </div>
+        <div style="margin-top:12px">${apiKeys.length ? `
+          <div style="overflow:auto;border:1px solid rgba(148,163,184,.18);border-radius:10px">
+            <table style="width:100%;border-collapse:collapse;font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#cbd5e1">
+              <thead><tr style="color:#94a3b8;text-align:left"><th style="padding:9px">Name</th><th>Prefix</th><th>Scopes</th><th>Last used</th></tr></thead>
+              <tbody>${apiKeys.slice(0, 8).map((key) => `
+                <tr style="border-top:1px solid rgba(148,163,184,.12)">
+                  <td style="padding:9px">${safe(key.name, "-")}</td>
+                  <td>${safe(key.key_prefix, "-")}</td>
+                  <td>${Array.isArray(key.scopes) ? key.scopes.join(", ") : safe(key.scopes, "-")}</td>
+                  <td>${safe(key.last_used_at, "never")}</td>
+                </tr>
+              `).join("")}</tbody>
+            </table>
+          </div>
+        ` : emptyState("No API keys yet. Use Get API key to create a real workspace-scoped key; it will be shown once.")}</div>
+      `;
+    } else if (route === "compliance") {
+      title = "Compliance evidence from live controls";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("Audit trail", recent.length ? "active" : "empty", "request log backed")}
+          ${liveCard("Cost control", wallet.balance !== undefined ? "active" : "unknown", "wallet/reserve backed")}
+          ${liveCard("Marketplace", fmtInt(listings.length), "source verified listings")}
+          ${liveCard("Protocol canary", state.edgeCanary ? state.edgeCanary.status : "unknown", "cached public proof report")}
+        </div>
+        <div style="margin-top:12px">${emptyState("Compliance toggles below are presentation controls unless backed by tenant policy APIs. Live proof comes from audit rows, wallet controls, marketplace source verification, and protocol canary status above.")}</div>
+      `;
+    } else if (route === "team") {
+      title = "Team state is tenant identity only";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("Signed-in user", safe(state.fullName, state.userEmail), safe(state.userEmail, "active"))}
+          ${liveCard("Role", safe(state.role, "member"), "from /auth/me")}
+          ${liveCard("Workspace", safe(state.workspaceName, "-"), "tenant scoped")}
+          ${liveCard("Invitations", "disabled", "no fake teammates")}
+        </div>
+        <div style="margin-top:12px">${emptyState("Team invitations and sample members are disabled until a backend team-management endpoint is exposed. No Acme/demo users are treated as real.")}</div>
+      `;
+    } else if (route === "settings") {
+      title = "Workspace settings from live account state";
+      body = `
+        <div style="border:1px solid rgba(148,163,184,.18);border-radius:10px;padding:2px 12px">
+          ${truthRow("Workspace name", safe(state.workspaceName, "-"))}
+          ${truthRow("Workspace slug", safe(state.workspaceSlug, "-"))}
+          ${truthRow("Signed-in user", safe(state.userEmail, "-"))}
+          ${truthRow("GitHub", state.githubConnected ? safe(state.githubUsername, "connected") : "not connected")}
+          ${truthRow("Plan", state.subscription ? `${state.subscription.plan} / ${state.subscription.status}` : "unknown")}
+          ${truthRow("Wallet", `${fmtInt(wallet.balance)} credits`)}
+        </div>
+        <div style="margin-top:12px">${emptyState("Static integration toggles below are not treated as real connections. GitHub is the only self-serve integration currently wired in this shell.")}</div>
+      `;
+    } else if (route === "onboarding") {
+      title = "Onboarding actions mapped to real routes";
+      body = `
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${actionLink("Open Playground", "/playground/")}
+          ${actionLink("Open Marketplace", "/marketplace/")}
+          ${actionLink("Open Billing", "/billing/")}
+          ${actionLink("Connect GitHub", "#connect-github")}
+        </div>
+        <div style="margin-top:12px">${emptyState("One-click model deployment, SSO setup, and invite-team steps are disabled unless the current backend exposes those self-serve endpoints. Account, playground, wallet, marketplace, and GitHub OAuth are live.")}</div>
       `;
     } else {
       title = "Dashboard live backend state";
@@ -281,6 +430,7 @@
 
     replaceText(document.body, [
       ["Elliot Jurić", name],
+      ["Elliot Jurić", name],
       ["Elliot J.", shortName],
       ["EJ", init],
       ["elliot@acme.io", email],
@@ -293,9 +443,21 @@
       ["Alex Tran", name],
       ["Sara Olin", name],
       ["Tomás Reyes", name],
+      ["Tomás Reyes", name],
       ["Lin Park", name],
       ["acme-prod", workspace],
       ["acme.veklom.app", `${slug}.veklom.app`],
+      ["Okta · active", connected],
+      ["GitHub · enabled", state.githubConnected ? connected : "GitHub - available"],
+      ["vk_live_8h2x_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "Create a real key with Get API key"],
+      ["One-click Llama 3.1 70B · Hetzner FSN1", "Live runtime model state"],
+      ["One-click Llama 3.1 70B on Hetzner.", "Runtime state comes from the backend."],
+      ["4× A100", "backend reported"],
+      ["4x A100", "backend reported"],
+      ["Reserved 4× A100 in pool fsn1-gpu-a", "Deployment creation is not self-serve in this shell"],
+      ["Reserved 4x A100 in pool fsn1-gpu-a", "Deployment creation is not self-serve in this shell"],
+      ["Loaded weights · warm replicas online", "Runtime model state is read from /workspace/models"],
+      ["Audit trail anchored · root.7d00…", "Audit trail is created by real Playground/API calls"],
       ["Okta · active", connected],
       ["GitHub · enabled", state.githubConnected ? connected : "GitHub - available"],
     ]);
@@ -364,6 +526,88 @@
     }
   };
 
+  const showSecretModal = (title, secret, note) => {
+    let el = document.getElementById("veklom-secret-modal");
+    if (el) el.remove();
+    el = document.createElement("div");
+    el.id = "veklom-secret-modal";
+    el.style.cssText = "position:fixed;inset:0;z-index:120;background:rgba(2,6,23,.72);display:grid;place-items:center;padding:20px";
+    el.innerHTML = `
+      <div style="width:min(620px,100%);border:1px solid rgba(34,197,94,.28);background:#020617;color:#e5e7eb;border-radius:14px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.5)">
+        <div style="font:700 18px/1.2 ui-sans-serif,system-ui">${title}</div>
+        <div style="margin-top:8px;color:#94a3b8;font:13px/1.5 ui-sans-serif,system-ui">${note}</div>
+        <textarea readonly style="margin-top:12px;width:100%;min-height:86px;border:1px solid rgba(148,163,184,.25);border-radius:10px;background:#0f172a;color:#bbf7d0;padding:10px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace">${secret}</textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button data-copy-secret style="border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.14);color:#bbf7d0;border-radius:8px;padding:8px 10px">Copy</button>
+          <button data-close-secret style="border:1px solid rgba(148,163,184,.25);background:#111827;color:#e5e7eb;border-radius:8px;padding:8px 10px">Close</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
+    el.querySelector("[data-close-secret]").addEventListener("click", () => el.remove());
+    el.querySelector("[data-copy-secret]").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(secret);
+        showActionNotice("Secret copied. Store it now; it will not be shown again.");
+      } catch {
+        showActionNotice("Copy failed. Select the key manually and store it now.", "warn");
+      }
+    });
+  };
+
+  const createWorkspaceApiKey = async () => {
+    try {
+      const out = await postJson("/auth/api-keys", {
+        name: `Workspace key ${new Date().toISOString().slice(0, 10)}`,
+        scopes: ["read", "write"],
+        rate_limit_per_minute: 60,
+      });
+      showSecretModal("Real workspace API key created", out.raw_key, "This key is tenant-scoped and returned by the backend only once. Store it before closing this dialog.");
+      await loadLiveState();
+    } catch (error) {
+      showActionNotice(error.message || "Could not create API key", "error");
+    }
+  };
+
+  const startSubscriptionCheckout = async (plan = "starter") => {
+    try {
+      const out = await postJson("/subscriptions/checkout", {
+        plan,
+        billing_cycle: "monthly",
+        success_url: `${location.origin}/billing/`,
+        cancel_url: `${location.origin}/billing/`,
+      });
+      if (!out.checkout_url) throw new Error("Checkout URL was not returned");
+      location.href = out.checkout_url;
+    } catch (error) {
+      showActionNotice(error.message || "Checkout is not available", "error");
+    }
+  };
+
+  const startTopupCheckout = async () => {
+    try {
+      const out = await postJson("/wallet/topup/checkout", {
+        pack_name: "starter",
+        success_url: `${location.origin}/billing/`,
+        cancel_url: `${location.origin}/billing/`,
+      });
+      if (!out.checkout_url) throw new Error("Top-up checkout URL was not returned");
+      location.href = out.checkout_url;
+    } catch (error) {
+      showActionNotice(error.message || "Token top-up checkout is not available", "error");
+    }
+  };
+
+  const openBillingPortal = async () => {
+    try {
+      const out = await api(`/subscriptions/portal?return_url=${encodeURIComponent(`${location.origin}/billing/`)}`, { method: "POST" });
+      if (!out.portal_url) throw new Error("Billing portal URL was not returned");
+      location.href = out.portal_url;
+    } catch (error) {
+      showActionNotice(error.message || "Billing portal is available after checkout creates a billing account.", "warn");
+    }
+  };
+
   const wireVisibleActions = () => {
     const unavailable = new Map([
       ["New deployment", "Deployment creation is not available in the current stabilized shell. Existing model/runtime state is live."],
@@ -378,15 +622,25 @@
       ["Create listing", "Use the Vendor Console for listing creation; this compiled marketplace card is read-only."],
       ["Create Draft", "Use the Vendor Console authenticated flow for listing creation."],
       ["Save Vendor Profile", "Use the Vendor Console authenticated flow for vendor profile updates."],
+      ["Invite team", "Team invitations are not enabled in this shell yet."],
+      ["Enable compliance", "Compliance controls are visible as product doctrine; self-serve policy toggles are not exposed in this shell yet."],
+      ["SSO - Okta / Google / GitHub", "Okta/Google SSO is not self-serve in this shell. Use GitHub OAuth or email/password."],
+      ["SSO · Okta / Google / GitHub", "Okta/Google SSO is not self-serve in this shell. Use GitHub OAuth or email/password."],
     ]);
 
-    for (const el of document.querySelectorAll("button, a[role='button']")) {
+    for (const el of document.querySelectorAll("button, a[role='button'], a[href='#connect-github']")) {
       if (el.dataset.veklomActionTruth) continue;
       const text = visibleText(el);
-      if (!text) continue;
+      if (!text && el.getAttribute("href") !== "#connect-github") continue;
 
-      if (text === "Open Playground") {
+      if (el.getAttribute("href") === "#connect-github") {
+        wireButton(el, connectGithub, "Start real GitHub OAuth");
+      } else if (text === "Open Playground") {
         wireButton(el, () => { location.href = "/playground/"; }, "Open the real playground route");
+      } else if (text === "Open workspace" || text === "Skip to workspace") {
+        wireButton(el, () => { location.href = "/dashboard/"; }, "Open the real dashboard route");
+      } else if (text === "Email + password (org policy)") {
+        wireButton(el, () => { location.href = "/signup/"; }, "Open real signup route");
       } else if (text === "Sign out") {
         wireButton(el, () => {
           localStorage.removeItem("vk_access");
@@ -396,6 +650,14 @@
         }, "Sign out of this browser session");
       } else if (text.includes("Connect GitHub") || text === "GitHub - connect" || text === "GitHub · connect") {
         wireButton(el, connectGithub, "Start real GitHub OAuth");
+      } else if (text === "Get API key") {
+        wireButton(el, createWorkspaceApiKey, "Create a real workspace-scoped API key");
+      } else if (["Upgrade", "Upgrade plan", "Choose tier", "Start Team", "Start Business"].includes(text)) {
+        wireButton(el, () => startSubscriptionCheckout(text.includes("Business") ? "pro" : "starter"), "Start real Stripe checkout");
+      } else if (["Top up", "Buy credits", "Add credits", "Reserve top-up"].includes(text)) {
+        wireButton(el, startTopupCheckout, "Start real token top-up checkout");
+      } else if (["Manage billing", "Billing portal", "Customer portal"].includes(text)) {
+        wireButton(el, openBillingPortal, "Open real Stripe billing portal");
       } else if (["Install", "Use now", "Docs"].includes(text)) {
         wireButton(el, () => {
           const url = sourceForCurrentMarketplaceItem();
@@ -413,7 +675,9 @@
 
   const loadLiveState = async () => {
     if (!token()) {
-      injectStatus({ workspaceName: "Signed out", userEmail: "login required" });
+      const signedOut = { workspaceName: "Signed out", userEmail: "login required" };
+      injectStatus(signedOut);
+      renderTruthPanel(signedOut);
       return;
     }
     const state = {};
@@ -423,33 +687,46 @@
     state.workspaceName = me.workspace_name || "Veklom Workspace";
     state.workspaceSlug = me.workspace_slug;
     state.licenseTier = me.license_tier;
+    state.role = me.role;
 
     const optionalCalls = await Promise.allSettled([
       api("/auth/connected-accounts"),
       api("/workspace/overview"),
       api("/workspace/observability?limit=25&days=30"),
+      api("/workspace/analytics/requests?limit=25&include_rows=true"),
       api("/workspace/cost-budget"),
       api("/workspace/models"),
       api("/workspace/api-keys"),
       api("/wallet/balance"),
+      api("/wallet/transactions?limit=10"),
+      api("/wallet/stats/usage"),
+      api("/wallet/topup/options"),
       api("/subscriptions/current"),
+      api("/subscriptions/plans"),
       api("/auth/github/repos"),
       api("/marketplace/listings"),
+      api("/edge/canary/public"),
     ]);
-    const [connected, overview, observability, costBudget, models, keys, wallet, subscription, repos, marketplaceListings] = optionalCalls;
+    const [connected, overview, observability, requestAnalytics, costBudget, models, keys, wallet, walletTransactions, walletUsage, topupOptions, subscription, plans, repos, marketplaceListings, edgeCanary] = optionalCalls;
     if (connected.status === "fulfilled") {
       state.githubConnected = !!connected.value.github_connected;
       state.githubUsername = connected.value.github_username;
     }
     if (overview.status === "fulfilled") state.overview = overview.value;
     if (observability.status === "fulfilled") state.observability = observability.value;
+    if (requestAnalytics.status === "fulfilled") state.requestAnalytics = requestAnalytics.value;
     if (costBudget.status === "fulfilled") state.costBudget = costBudget.value;
     if (models.status === "fulfilled") state.models = models.value.models || [];
     if (keys.status === "fulfilled") state.apiKeys = keys.value.keys || [];
     if (wallet.status === "fulfilled") state.wallet = wallet.value;
+    if (walletTransactions.status === "fulfilled") state.walletTransactions = walletTransactions.value;
+    if (walletUsage.status === "fulfilled") state.walletUsage = walletUsage.value;
+    if (topupOptions.status === "fulfilled") state.topupOptions = topupOptions.value.options || [];
     if (subscription.status === "fulfilled") state.subscription = subscription.value;
+    if (plans.status === "fulfilled") state.plans = plans.value.plans || [];
     if (repos.status === "fulfilled") state.repos = repos.value.repos || [];
     if (marketplaceListings.status === "fulfilled") state.marketplaceListings = marketplaceListings.value || [];
+    if (edgeCanary.status === "fulfilled") state.edgeCanary = edgeCanary.value;
     window.__VEKLOM_WORKSPACE_STATE__ = state;
     applyState(state);
     renderTruthPanel(state);
@@ -473,7 +750,9 @@
   const start = () => {
     loadLiveState().catch((error) => {
       const status = error.status === 401 ? "Signed out" : "Live state degraded";
-      injectStatus({ workspaceName: status, userEmail: error.message || "backend unavailable" });
+      const degraded = { workspaceName: status, userEmail: error.message || "backend unavailable" };
+      injectStatus(degraded);
+      renderTruthPanel(degraded);
     });
     const observer = new MutationObserver(scheduleApply);
     observer.observe(document.body, { childList: true, subtree: true });

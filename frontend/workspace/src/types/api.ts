@@ -6,6 +6,11 @@ export interface User {
   mfa_enabled: boolean;
   created_at: string;
   avatar_url?: string | null;
+  workspace_id?: string;
+  workspace_name?: string;
+  plan?: string;
+  region?: string;
+  last_login_at?: string | null;
 }
 
 export interface Workspace {

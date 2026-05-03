@@ -6,6 +6,7 @@ import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { BillingPage } from "./pages/BillingPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export function AppRoutes() {
   return (
@@ -46,10 +47,7 @@ export function AppRoutes() {
           path="/team"
           element={<PlaceholderPage title="Team & access" subtitle="Roles, MFA, sessions, SAML / SCIM." />}
         />
-        <Route
-          path="/settings"
-          element={<PlaceholderPage title="Workspace administration" subtitle="Identity, routing posture, security defaults, branding, integrations." />}
-        />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/overview" replace />} />

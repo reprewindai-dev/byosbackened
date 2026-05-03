@@ -252,6 +252,7 @@
     .scenario-btn:hover { border-color: var(--brass); transform: translateY(-1px); }
     .scenario-btn .sb-title { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
     .scenario-btn .sb-sub { font-size: 10px; color: var(--muted); font-family: "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; }
+    .scenario-btn.active { background: linear-gradient(180deg, rgba(229,177,110,0.15), rgba(196,146,91,0.08)); border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.12); }
     .scenario-btn.primary { background: linear-gradient(180deg, rgba(229,177,110,0.15), rgba(196,146,91,0.08)); border-color: var(--brass); }
     .scenario-btn.danger  { background: linear-gradient(180deg, rgba(255,107,107,0.10), rgba(255,107,107,0.03)); border-color: rgba(255,107,107,0.4); }
     .scenario-btn[disabled] { opacity: .5; pointer-events: none; }
@@ -930,9 +931,12 @@
   const edgeControls  = $("edgeControls");
   const verticalsBar  = $("verticals");
   const ctrlTitle     = $("ctrlTitle");
+  const btnNetwork    = $("btnNetwork");
+  const btnMachine    = $("btnMachine");
 
   let mode = "edge";
   let selectedVertical = "default";
+  let selectedEdgeScenario = "network";
   let currentES = null;
   let nodeEls = new Map();
   let edgeEls = [];
@@ -1457,14 +1461,26 @@
   function updatePromptCount() { promptCount.textContent = `${promptInput.value.length} / 800`; }
   promptInput.addEventListener("input", updatePromptCount);
 
+  function applySelectedEdgeScenario() {
+    btnNetwork.classList.toggle("active", selectedEdgeScenario === "network");
+    btnMachine.classList.toggle("active", selectedEdgeScenario === "machine");
+    runLabel.textContent = selectedEdgeScenario === "machine" ? "Run machine scenario" : "Run network scenario";
+  }
+
   // ---- Button wiring ----
   $("btnAI").addEventListener("click", () => runAI({ forceFallback: false }));
   $("btnChaos").addEventListener("click", () => runAI({ forceFallback: true }));
-  $("btnNetwork").addEventListener("click", () => runEdge("network"));
-  $("btnMachine").addEventListener("click", () => runEdge("machine"));
+  btnNetwork.addEventListener("click", () => {
+    selectedEdgeScenario = "network";
+    applySelectedEdgeScenario();
+  });
+  btnMachine.addEventListener("click", () => {
+    selectedEdgeScenario = "machine";
+    applySelectedEdgeScenario();
+  });
   runBtn.addEventListener("click", () => {
     if (mode === "ai") runAI({ forceFallback: false });
-    else runEdge("network");
+    else runEdge(selectedEdgeScenario);
   });
 
   // ---- Backend health pill (hero + nav chip) ----
@@ -1507,6 +1523,7 @@
   // ---- Init ----
   renderPipeline();
   updatePromptCount();
+  applySelectedEdgeScenario();
   probeBackend();
   probeProtocolValidation();
   setInterval(probeBackend, 15000);

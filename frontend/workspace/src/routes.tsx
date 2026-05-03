@@ -5,6 +5,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
+import { BillingPage } from "./pages/BillingPage";
 
 export function AppRoutes() {
   return (
@@ -40,10 +41,7 @@ export function AppRoutes() {
           path="/monitoring"
           element={<PlaceholderPage title="Monitoring" subtitle="Metrics, alerts, security events." />}
         />
-        <Route
-          path="/billing"
-          element={<PlaceholderPage title="Billing" subtitle="Operating reserve, invoices, token wallet, pricing tier." />}
-        />
+        <Route path="/billing" element={<BillingPage />} />
         <Route
           path="/team"
           element={<PlaceholderPage title="Team & access" subtitle="Roles, MFA, sessions, SAML / SCIM." />}

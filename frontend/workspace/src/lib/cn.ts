@@ -5,9 +5,17 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-export function fmtCents(cents: number): string {
-  const dollars = cents / 100;
-  return dollars.toLocaleString(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+export function fmtCents(cents: number, currency: string = "USD"): string {
+  const amount = cents / 100;
+  try {
+    return amount.toLocaleString(undefined, {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      minimumFractionDigits: 2,
+    });
+  } catch {
+    return `${amount.toFixed(2)} ${currency.toUpperCase()}`;
+  }
 }
 
 export function fmtNumber(n: number): string {

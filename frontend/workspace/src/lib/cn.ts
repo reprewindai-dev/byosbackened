@@ -32,14 +32,18 @@ export function fmtDelta(n: number, suffix = ""): string {
 export function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "—";
-  const diff = Math.max(0, Date.now() - then);
+  const rawDiff = Date.now() - then;
+  const future = rawDiff < 0;
+  const diff = Math.abs(rawDiff);
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
+  const prefix = future ? "in " : "";
+  const suffix = future ? "" : " ago";
+  if (s < 60) return `${prefix}${s}s${suffix}`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${prefix}${m}m${suffix}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${prefix}${h}h${suffix}`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
+  if (d < 7) return `${prefix}${d}d${suffix}`;
   return new Date(iso).toLocaleDateString();
 }

@@ -296,7 +296,7 @@ export function OverviewPage() {
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Recent runs · live</div>
               <h3 className="mt-1 text-sm font-semibold">Per-call routing, latency, cost</h3>
             </div>
-            <a href="/playground" className="v-chip hover:text-bone">Playground →</a>
+            <a href="#/playground" className="v-chip hover:text-bone">Playground →</a>
           </header>
           <table className="w-full text-[13px]">
             <thead>

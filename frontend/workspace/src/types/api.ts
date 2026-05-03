@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  full_name?: string | null;
   role: "owner" | "admin" | "developer" | "viewer" | "billing";
   mfa_enabled: boolean;
   created_at: string;

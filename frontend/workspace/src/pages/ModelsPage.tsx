@@ -98,7 +98,7 @@ export function ModelsPage() {
         <p className="mt-2 max-w-2xl text-sm text-bone-2">
           Governed inventory across Hetzner primary and AWS burst. Toggle availability, inspect unit economics,
           review quantization. All decisions flow through the router in{" "}
-          <a href="/overview" className="text-brass-2 hover:underline">Overview</a>.
+          <a href="#/overview" className="text-brass-2 hover:underline">Overview</a>.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="v-chip v-chip-ok">

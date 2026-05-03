@@ -145,7 +145,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       {!collapsed && (
         <div className="border-t border-rule px-3 py-2 text-[10px] text-muted">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
-          mTLS internal · v1.42.0
+          tenant-scoped session
         </div>
       )}
     </aside>

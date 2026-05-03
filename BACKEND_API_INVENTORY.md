@@ -80,17 +80,39 @@ POST /api/v1/auth/logout         (Bearer)           → { ok }
 - `VITE_SENTRY_DSN` — client error reporting
 - `VITE_ENABLE_DEMO_MODE` — toggles demo-only features
 
-## Frontend → backend endpoint map (progressively expanded)
+## Frontend → backend endpoint map (as shipped, PR #19)
 
-| Screen | Read endpoints | Write endpoints |
-|---|---|---|
-| Login | — | `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` |
-| Overview | `GET /workspace/current`, `GET /cost/summary`, `GET /audit/recent`, `GET /routing/status`, `GET /monitoring/overview` | — |
-| Playground | `GET /workspace/models`, `GET /workspace/sessions`, `GET /policy/active` | `POST /v1/exec` (SSE), `POST /audit/export` |
-| Vault | `GET /workspace/secrets`, `GET /workspace/api-keys` | `POST /workspace/secrets`, `POST /workspace/secrets/{id}/rotate`, `DELETE /workspace/secrets/{id}` |
-| Marketplace | `GET /marketplace/listings`, `GET /marketplace/categories`, `GET /marketplace/featured`, `GET /marketplace/trending`, `GET /marketplace/listings/{slug}` | `POST /marketplace/checkout`, `POST /marketplace/installs` |
-| Team | `GET /workspace/members`, `GET /auth/mfa/status`, `GET /audit/access` | `POST /workspace/members/invite`, `PATCH /workspace/members/{id}/role`, `POST /auth/mfa/enable` |
-| Compliance | `GET /compliance/frameworks`, `GET /compliance/evidence`, `GET /compliance/packs` | `POST /compliance/evidence/export` |
-| Monitoring | `GET /monitoring/metrics`, `GET /monitoring/alerts`, `GET /security/events` | `POST /monitoring/alerts/{id}/ack` |
-| Billing | `GET /billing/invoices`, `GET /subscriptions/current`, `GET /token-wallet/balance`, `GET /token-wallet/ledger` | `POST /token-wallet/topup`, `POST /subscriptions/cancel` |
-| Settings | `GET /workspace/current`, `GET /workspace/integrations` | `PATCH /workspace/current`, `POST /workspace/integrations/{provider}/connect` |
+All 13 workspace routes now wired to real backend endpoints. Legend: ✅ live and wired · ⚠ endpoint gap (frontend degrades gracefully) · 🟡 inspection-only (authoring/write flow ships next).
+
+| Route | Status | Read endpoints | Write endpoints |
+|---|---|---|---|
+| `/login` | ✅ | — | `POST /auth/login` (JWT), `POST /auth/refresh` auto-rotation |
+| `/overview` | ✅ ⚠ | `GET /monitoring/overview` (may need shaping on backend — frontend handles 404 cleanly) | — |
+| `/playground` | ✅ | `GET /demo/pipeline/stream` (SSE, public, rate-limited) | — |
+| `/marketplace` | ✅ | `GET /marketplace/listings`, `GET /marketplace/listings/{id}` | `POST /marketplace/payments/create-checkout` (wired, stripe-gated) |
+| `/models` | ✅ | `GET /workspace/models` | `PATCH /workspace/models/{slug}` (toggle) |
+| `/pipelines` | 🟡 | `GET /audit/logs` (framed as "pipeline runs") | — · authoring UI + `/pipelines` CRUD ship in paired PR |
+| `/deployments` | 🟡 | `GET /workspace/models` (grouped by zone) | — · `/deployments` CRUD + promote/rollback ship next |
+| `/vault` | ✅ | `GET /auth/api-keys` | `POST /auth/api-keys`, `DELETE /auth/api-keys/{id}` |
+| `/compliance` | ✅ | `GET /compliance/regulations` | `POST /compliance/check` |
+| `/monitoring` | ✅ | `GET /audit/logs` (filters by op_type) | `GET /audit/verify/{log_id}` (per-row hash verify) |
+| `/billing` | ✅ | `GET /wallet/balance`, `GET /wallet/transactions`, `GET /wallet/topup/options` | `POST /wallet/topup/checkout` (redirects to Stripe) |
+| `/team` | ✅ | `GET /admin/users` (403-aware — shows upgrade hint for non-admins) | — · invite flow ships with `/workspace/members/invite` next |
+| `/settings` | ✅ | `GET /workspace/api-keys`, `GET /workspace/models`, `/auth/me` (via store) | `PATCH /workspace/models/{slug}` |
+
+### Known backend gaps to address in paired PR
+- `GET /api/v1/monitoring/overview` — should return the `OverviewPayload` shape in `frontend/workspace/src/types/api.ts` (KPIs, routing utilization, spend rollup, recent runs, policy events). Frontend currently handles absence via a clear error banner.
+- `/api/v1/pipelines/*` — CRUD + `/execute` + `/versions`. Authoring UI is specced in `PipelinesPage.tsx`; flip from audit-ledger view to real pipeline objects when these land.
+- `/api/v1/deployments/*` — CRUD + `/promote` + `/rollback`. `DeploymentsPage.tsx` shows fleet grouped by cloud zone; swap to real deployment records when available.
+- `/api/v1/workspace/members/invite` — Team invite flow. Page is read-live today; invite button is disabled pending endpoint.
+
+### Shipped commits (PR #19 — `codex/workspace-frontend`)
+1. `feat(frontend): workspace scaffold` — Vite/React/TS/Tailwind + auth + Overview
+2. `fix(frontend): typecheck script` — tsc --noEmit (verified: npm install + build + dev server all pass)
+3. `feat(frontend): Playground SSE theater + Marketplace catalog`
+4. `feat(frontend): Billing page — wallet, top-up packs, transactions`
+5. `feat(frontend): Settings page — identity, API keys, model toggles`
+6. `feat(frontend): Monitoring page — audit trail with per-entry hash verify`
+7. `feat(frontend): Vault (API key issue/revoke) + Team (members list)`
+8. `feat(frontend): Compliance (regs + check) + Models (fleet grouped by provider)`
+9. `feat(frontend): Pipelines + Deployments pages — final 2 routes wired`

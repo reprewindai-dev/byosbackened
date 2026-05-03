@@ -121,10 +121,11 @@
     const repos = state.repos ? `${state.repos.length} repos` : "repos protected";
     const wallet = state.wallet && typeof state.wallet.balance !== "undefined" ? `${state.wallet.balance} credits` : "wallet protected";
     const models = state.models ? `${state.models.length} models` : "models protected";
+    const signedOut = !token();
     el.innerHTML = `
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
-        <span style="width:7px;height:7px;border-radius:999px;background:#22c55e;display:inline-block"></span>
-        <strong>Live tenant connected</strong>
+        <span style="width:7px;height:7px;border-radius:999px;background:${signedOut ? "#f59e0b" : "#22c55e"};display:inline-block"></span>
+        <strong>${signedOut ? "Workspace auth required" : "Live tenant connected"}</strong>
       </div>
       <div>${state.workspaceName} - ${safe(state.userEmail, "authenticated user")}</div>
       <div style="color:#94a3b8;margin-top:2px;">${repos} - ${models} - ${wallet}</div>
@@ -150,6 +151,57 @@
     if (hash.includes("/settings") || path.startsWith("/settings")) return "settings";
     if (hash.includes("/onboarding") || path.startsWith("/onboarding")) return "onboarding";
     return "dashboard";
+  };
+
+  const isPublicRoute = (route = routeName()) => route === "marketplace";
+
+  const setProtectedGate = (active) => {
+    document.documentElement.toggleAttribute("data-veklom-protected-gate", !!active);
+    let style = document.getElementById("veklom-protected-gate-style");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "veklom-protected-gate-style";
+      style.textContent = `
+        html[data-veklom-protected-gate] #root main { display: none !important; }
+        html[data-veklom-protected-gate] #veklom-live-auth-gate { display: block !important; }
+      `;
+      document.head.appendChild(style);
+    }
+  };
+
+  const renderAuthGate = (active) => {
+    let gate = document.getElementById("veklom-live-auth-gate");
+    if (!active) {
+      if (gate) gate.remove();
+      setProtectedGate(false);
+      return;
+    }
+    if (!gate) {
+      gate = document.createElement("section");
+      gate.id = "veklom-live-auth-gate";
+      gate.style.cssText = "max-width:1400px;margin:16px auto 48px;padding:0 24px;position:relative;z-index:16";
+      const panel = document.getElementById("veklom-live-route-panel");
+      if (panel && panel.parentElement) {
+        panel.parentElement.insertBefore(gate, panel.nextSibling);
+      } else {
+        document.getElementById("root")?.prepend(gate);
+      }
+    }
+    gate.innerHTML = `
+      <div style="border:1px solid rgba(148,163,184,.2);background:radial-gradient(circle at top left,rgba(34,197,94,.16),transparent 38%),rgba(2,6,23,.94);box-shadow:0 24px 70px rgba(0,0,0,.38);border-radius:16px;padding:28px;color:#e5e7eb">
+        <div style="max-width:760px">
+          <div style="color:#22c55e;font:10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.16em">Protected workspace</div>
+          <h1 style="margin:8px 0 8px;color:#f8fafc;font:700 30px/1.05 ui-sans-serif,system-ui">Sign in to use the live Veklom workspace</h1>
+          <p style="margin:0;color:#94a3b8;font:14px/1.65 ui-sans-serif,system-ui">Dashboard, Playground, API keys, wallet, billing, GitHub repos, and tenant analytics are real backend-backed surfaces. They require an authenticated workspace so visitors do not see fake customer data.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">
+            ${actionLink("Sign in", `/login/?next=${encodeURIComponent(location.pathname + location.hash)}`)}
+            ${actionLink("Create workspace", "/signup/")}
+            ${actionLink("Browse marketplace", "/marketplace/")}
+          </div>
+        </div>
+      </div>
+    `;
+    setProtectedGate(true);
   };
 
   const liveCard = (label, value, sub = "") => `
@@ -195,6 +247,8 @@
       }
     }
     const route = routeName();
+    const signedOutProtected = !token() && !isPublicRoute(route);
+    renderAuthGate(signedOutProtected);
     const overview = state.overview || {};
     const wallet = state.wallet || {};
     const cost = state.costBudget || {};
@@ -210,9 +264,19 @@
     let title = "Live workspace state";
     let body = "";
 
-    if (!token()) {
+    if (!token() && !isPublicRoute(route)) {
       title = "Workspace requires sign in";
-      body = emptyState("This workspace is protected. Sign in to load tenant-scoped dashboard, wallet, model, repo, and playground data.");
+      body = emptyState("This protected workspace route is gated until sign in. No tenant dashboard, wallet, model, repo, or playground data is shown without an authenticated workspace.");
+    } else if (!token() && route === "marketplace") {
+      title = "Marketplace live catalog";
+      body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ${liveCard("Listings", fmtInt(listings.length), "public backend catalog")}
+          ${liveCard("Access", "public", "source-verified products")}
+          ${liveCard("Checkout", "auth required", "sign in before purchase")}
+          ${liveCard("GitHub", "connect after sign in", "repo data is protected")}
+        </div>
+      `;
     } else if (route === "playground") {
       title = "Playground readiness";
       body = `
@@ -731,6 +795,14 @@
   const loadLiveState = async () => {
     if (!token()) {
       const signedOut = { workspaceName: "Signed out", userEmail: "login required" };
+      const publicCalls = await Promise.allSettled([
+        api("/marketplace/listings"),
+        api("/edge/canary/public"),
+      ]);
+      if (publicCalls[0].status === "fulfilled") signedOut.marketplaceListings = publicCalls[0].value || [];
+      if (publicCalls[1].status === "fulfilled") signedOut.edgeCanary = publicCalls[1].value;
+      window.__VEKLOM_WORKSPACE_STATE__ = signedOut;
+      applyState(signedOut);
       injectStatus(signedOut);
       renderTruthPanel(signedOut);
       return;

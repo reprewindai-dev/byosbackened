@@ -503,6 +503,110 @@
     const init = initials(name, email);
     const shortName = name.includes(" ") ? name.split(/\s+/).slice(0, 2).join(" ") : name;
     const connected = state.githubConnected ? `GitHub - ${state.githubUsername}` : "GitHub - connect";
+    const overview = state.overview || {};
+    const observability = state.observability || {};
+    const analytics = state.requestAnalytics || {};
+    const cost = state.costBudget || {};
+    const wallet = state.wallet || {};
+    const models = state.models || [];
+    const connectedModels = models.filter((model) => model.connected);
+    const recent = observability.rows || overview.live_feed || [];
+    const latestRun = recent[0] || {};
+    const primaryModel = connectedModels[0] || models[0] || {};
+    const modelLabel = safe(primaryModel.display_name, primaryModel.model_slug || "No connected model");
+    const modelSlug = safe(primaryModel.model_slug, modelLabel);
+    const providerRoute = primaryModel.provider ? `${primaryModel.provider} - live` : "backend route";
+    const totalCalls = fmtInt(overview.total_api_calls || analytics.totals?.total_requests || 0);
+    const totalTokens = fmtInt(overview.total_tokens_used || latestRun.tokens || latestRun.tokens_out || 0);
+    const latestTokens = fmtInt(latestRun.tokens || latestRun.tokens_out || latestRun.tokens_in || 0);
+    const latestLatency = latestRun.latency_ms !== undefined ? `${fmtInt(latestRun.latency_ms)} ms` : "no runs";
+    const liveCost = fmtMoney(overview.total_cost_usd || cost.total_cost_usd || analytics.totals?.total_cost_usd || 0);
+    const observedRows = fmtInt(observability.total || recent.length || 0);
+    const walletBalance = wallet.balance !== undefined ? `${fmtInt(wallet.balance)} credits` : "wallet live";
+    const protectedShellReplacements = token() && routeName() !== "marketplace" ? [
+      ["Requests / min", "API calls"],
+      ["2,418", totalCalls],
+      ["+8.4%", "live tenant"],
+      ["P50 latency", "Latest latency"],
+      ["112 ms", latestLatency],
+      ["−14 ms", latestRun.status || "live"],
+      ["Tokens / sec", "Tokens used"],
+      ["184k", totalTokens],
+      ["+22%", "tenant scoped"],
+      ["Spend today", "Cost logged"],
+      ["$1,284", liveCost],
+      ["68% cap", walletBalance],
+      ["Active models", "Models"],
+      ["4 quantized", `${fmtInt(connectedModels.length)} connected`],
+      ["Audit entries", "Run rows"],
+      ["9,412", observedRows],
+      ["100% verified", recent.length ? "audit-backed" : "empty"],
+      ["Routing · last 24h", "Usage · live"],
+      ["Hetzner primary · AWS burst", "from workspace request logs"],
+      ["Hetzner 88%", modelSlug],
+      ["AWS 12%", "fallback governed"],
+      ["Spend · today", "Cost · live"],
+      ["$1,284.80 of $1,900 cap", `${liveCost} logged`],
+      ["on-pace", walletBalance],
+      ["Inference", "AI complete"],
+      ["Embeddings", "Usage rows"],
+      ["GPU burst", "Fallback"],
+      ["Storage", "Wallet"],
+      ["$842.10", liveCost],
+      ["$211.00", "0.000000"],
+      ["$148.20", "0.000000"],
+      ["$83.50", walletBalance],
+      ["$0.0184 / min", liveCost],
+      ["$1,802 (94% cap)", walletBalance],
+      ["Llama 3.1 70B Instruct", modelLabel],
+      ["Llama 3.1 70B", modelLabel],
+      ["Mixtral 8x22B", modelLabel],
+      ["Claude 3.5 Haiku (proxy)", modelLabel],
+      ["Claude 3.5 Haiku", modelLabel],
+      ["Qwen 2.5 72B", modelLabel],
+      ["BGE-M3", modelLabel],
+      ["FP16 · 4 replicas", primaryModel.connected ? "connected runtime" : "not connected"],
+      ["INT8 · 6 replicas", "backend model row"],
+      ["INT4 · 8 replicas", "backend model row"],
+      ["FP16 · 2 replicas", "backend model row"],
+      ["Hetzner • Primary", providerRoute],
+      ["AWS • Burst", "fallback - policy"],
+      ["142 ms", latestLatency],
+      ["121 ms", latestLatency],
+      ["220 ms", latestLatency],
+      ["96 ms", latestLatency],
+      ["14 ms", latestLatency],
+      ["1240", latestTokens],
+      ["980", latestTokens],
+      ["2100", latestTokens],
+      ["720", latestTokens],
+      ["480", latestTokens],
+      ["$0.00091", liveCost],
+      ["$0.00057", liveCost],
+      ["$0.00880", liveCost],
+      ["$0.00021", liveCost],
+      ["$0.00001", liveCost],
+      ["12s ago", latestRun.timestamp || latestRun.created_at || "no runs"],
+      ["44s ago", latestRun.timestamp || latestRun.created_at || "no runs"],
+      ["1m ago", latestRun.timestamp || latestRun.created_at || "no runs"],
+      ["2m ago", latestRun.timestamp || latestRun.created_at || "no runs"],
+      ["user · session prj_421 · 384 tokens", `${email} - ${fmtInt(latestRun.tokens_in || 0)} tokens in`],
+      ["outbound.public.v3 · PHI scan run · 0 hits", "policy checked by backend"],
+      ["Hetzner FSN1 · llama3-70b · circuit closed", `${providerRoute} - ${modelSlug}`],
+      ["1,240 tokens · 142 ms · $0.00091", `${latestTokens} tokens - ${latestLatency} - ${liveCost}`],
+      ["SHA-256 9f4e…ac21 · evidence appended", latestRun.id ? `run ${safe(latestRun.id).slice(0, 8)}...` : "audit rows empty"],
+      ["P95 latency above 600 ms on chat-prod (2 spikes)", recent.length ? "Monitoring rows come from live request logs" : "No live monitoring alerts yet"],
+      ["AWS burst engaged (12% of traffic)", "Fallback state is backend controlled"],
+      ["Egress allowlist updated — 1 rule needs review", "No live alert rows exposed in this shell"],
+      ["3 open", recent.length ? `${fmtInt(recent.length)} live rows` : "0 open"],
+      ["chat-prod", workspace],
+      ["session#prj_421", latestRun.id ? `run#${safe(latestRun.id).slice(0, 8)}` : "no runs"],
+      ["system/router", "backend router"],
+      ["deploy.update", "workspace.update"],
+      ["policy.intercept", "ai.complete"],
+      ["vault.rotate", "api-key.create"],
+      ["evidence.export", "audit.ready"],
+    ] : [];
 
     replaceText(document.body, [
       ["Elliot Jurić", name],
@@ -557,6 +661,7 @@
       ["1.3 Â· mTLS internal", "TLS terminated by production infrastructure"],
       ["1.3 · mTLS internal", "TLS terminated by production infrastructure"],
       ["FIPS 140-2 L3 HSM", "not exposed in this shell"],
+      ...protectedShellReplacements,
     ]);
     setInputPlaceholders(workspace);
     injectStatus(state);

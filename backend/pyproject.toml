@@ -48,6 +48,7 @@ dependencies = [
     "python-slugify>=8.0.0",
     "pymodbus>=3.6.1,<4.0.0",
     "pysnmp==4.4.12",
+    "pyasn1<0.5",
 ]
 
 [project.optional-dependencies]

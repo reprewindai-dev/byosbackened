@@ -134,8 +134,12 @@ export function PlaygroundPage() {
           ...prev,
           { id: `${name}-${prev.length}`, event: name, data, ts: Date.now() },
         ]);
-        if (name === "token_delta" && typeof data.text === "string") {
-          setResponseText((t) => t + data.text);
+        if (name === "request_received" && typeof data.trace_id === "string") {
+          setStats((s) => ({ ...s, trace_id: data.trace_id as string }));
+        }
+        if (name === "token_delta") {
+          const delta = data.delta ?? data.text ?? data.token ?? data.content;
+          if (typeof delta === "string") setResponseText((t) => t + delta);
         }
         if (name === "provider_selected" || name === "groq_fallback") {
           setStats((s) => ({
@@ -146,6 +150,10 @@ export function PlaygroundPage() {
           }));
         }
         if (name === "response_complete") {
+          const finalText = data.response ?? data.text ?? data.completion;
+          if (typeof finalText === "string") {
+            setResponseText((t) => t || finalText);
+          }
           setStats((s) => ({
             ...s,
             prompt_tokens: Number(data.prompt_tokens ?? s.prompt_tokens ?? 0),
@@ -462,7 +470,7 @@ export function PlaygroundPage() {
               <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Saved as pipeline <span className="font-mono">{savedPipelineSlug}</span>.
-                <a href="/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
+                <a href="#/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
                   Open Pipelines <GitBranch className="h-3 w-3" />
                 </a>
               </div>

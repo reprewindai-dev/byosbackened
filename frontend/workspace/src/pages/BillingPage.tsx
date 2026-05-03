@@ -207,12 +207,12 @@ export function BillingPage() {
           >
             <Sparkles className="h-4 w-4" /> Top up credits
           </button>
-          <a href="/settings" className="v-btn-ghost mt-2 w-full justify-center">
+          <a href="#/settings" className="v-btn-ghost mt-2 w-full justify-center">
             <CreditCard className="h-4 w-4" /> Manage payment method
           </a>
           <div className="mt-4 rounded-lg border border-rule p-3 text-[11px] text-bone-2">
             <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Burn-rate guard</div>
-            <div>Spend caps, alerts, and auto-throttle live in <a href="/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
+            <div>Spend caps, alerts, and auto-throttle live in <a href="#/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
           </div>
         </div>
       </section>

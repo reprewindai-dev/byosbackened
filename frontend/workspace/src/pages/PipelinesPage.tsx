@@ -214,7 +214,7 @@ export function PipelinesPage() {
             <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Recent runs</div>
             <h3 className="mt-0.5 text-sm font-semibold">Cross-pipeline execution feed</h3>
           </div>
-          <a href="/monitoring" className="v-btn-ghost"><Activity className="h-4 w-4" /> Full audit trail →</a>
+          <a href="#/monitoring" className="v-btn-ghost"><Activity className="h-4 w-4" /> Full audit trail →</a>
         </header>
         <ul className="divide-y divide-rule/50">
           {runs.isLoading && (

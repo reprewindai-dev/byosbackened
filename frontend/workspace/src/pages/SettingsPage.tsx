@@ -153,7 +153,7 @@ function IdentityTab() {
         <Field label="HIPAA posture" value="BAA-ready" ok />
         <div className="mt-4 rounded-lg border border-rule p-3 text-[12px] text-bone-2">
           Full posture report lives in{" "}
-          <a className="text-brass-2 hover:underline" href="/compliance">
+          <a className="text-brass-2 hover:underline" href="#/compliance">
             Compliance
           </a>
           .

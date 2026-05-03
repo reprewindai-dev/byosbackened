@@ -2,16 +2,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  CheckCircle2,
   CircleStop,
   Download,
   Gauge,
+  GitBranch,
   Play,
+  Save,
   Shield,
   Sparkles,
+  TrendingDown,
   Zap,
 } from "lucide-react";
-import { resolveApiBase } from "@/lib/api";
+import { api, resolveApiBase } from "@/lib/api";
 import { cn } from "@/lib/cn";
+
+interface PreflightState {
+  predicted_cost?: number;
+  cost_confidence_lower?: number;
+  cost_confidence_upper?: number;
+  alternatives?: { provider: string; cost: string; savings_percent: number }[];
+  predicted_quality?: number;
+  failure_risk?: number;
+  loading?: boolean;
+  error?: string;
+}
 
 type Vertical = "default" | "legal" | "medical" | "finance" | "agency" | "infrastructure";
 
@@ -77,6 +92,9 @@ export function PlaygroundPage() {
     audit_hash?: string;
   }>({});
   const [error, setError] = useState<string | null>(null);
+  const [preflight, setPreflight] = useState<PreflightState>({});
+  const [savedPipelineSlug, setSavedPipelineSlug] = useState<string | null>(null);
+  const [savingPipeline, setSavingPipeline] = useState(false);
   const eventSrcRef = useRef<EventSource | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
@@ -165,6 +183,90 @@ export function PlaygroundPage() {
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
   }, [events.length]);
+
+  const runPreflight = useCallback(async () => {
+    if (!prompt.trim()) return;
+    setPreflight({ loading: true });
+    try {
+      // Cost prediction — always available, server-side, ML when warm.
+      const costResp = await api.post("/cost/predict", {
+        operation_type: "generation",
+        provider: "local",
+        input_text: prompt.slice(0, 4000),
+        model: "qwen2.5:3b",
+      });
+      const cost = costResp.data as {
+        predicted_cost: string;
+        confidence_lower: string;
+        confidence_upper: string;
+        alternative_providers: { provider: string; cost: string; savings_percent: number }[];
+      };
+
+      const next: PreflightState = {
+        predicted_cost: parseFloat(cost.predicted_cost),
+        cost_confidence_lower: parseFloat(cost.confidence_lower),
+        cost_confidence_upper: parseFloat(cost.confidence_upper),
+        alternatives: cost.alternative_providers,
+        loading: false,
+      };
+
+      // Quality + failure risk — best-effort; ML may be cold for new workspaces.
+      const params = { operation_type: "generation", provider: "local", input_text: prompt.slice(0, 2000) };
+      try {
+        const qResp = await api.post("/autonomous/quality/predict", null, { params });
+        const q = qResp.data as { predicted_quality?: number };
+        if (q?.predicted_quality != null) next.predicted_quality = q.predicted_quality;
+      } catch {
+        /* ML cold — skip */
+      }
+      try {
+        const rResp = await api.post("/autonomous/quality/failure-risk", null, { params });
+        const r = rResp.data as { failure_risk?: number; risk?: number };
+        const risk = r?.failure_risk ?? r?.risk;
+        if (risk != null) next.failure_risk = risk;
+      } catch {
+        /* ML cold — skip */
+      }
+
+      setPreflight(next);
+    } catch (err) {
+      setPreflight({
+        loading: false,
+        error: (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Pre-flight unavailable",
+      });
+    }
+  }, [prompt]);
+
+  const saveAsPipeline = useCallback(async () => {
+    if (!prompt.trim() || savingPipeline) return;
+    setSavingPipeline(true);
+    try {
+      const name = `Playground · ${vertical} · ${new Date().toLocaleDateString()}`;
+      const resp = await api.post<{ slug: string }>("/pipelines", {
+        name,
+        description: `Saved from Playground (${vertical}). Original prompt preserved as input node.`,
+        graph: {
+          nodes: [
+            { id: "input", type: "prompt", label: "User input", prompt },
+            { id: "policy", type: "gate", label: "Policy gate", policy: "default" },
+            { id: "llm", type: "model", label: "LLM step", model: stats.model || "qwen2.5:3b" },
+          ],
+          edges: [
+            { from: "input", to: "policy" },
+            { from: "policy", to: "llm" },
+          ],
+        },
+      });
+      setSavedPipelineSlug(resp.data.slug);
+    } catch (err) {
+      setError(
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          ?? "Failed to save pipeline",
+      );
+    } finally {
+      setSavingPipeline(false);
+    }
+  }, [prompt, savingPipeline, stats.model, vertical]);
 
   const eventCount = events.length;
   const tokenCount = useMemo(() => events.filter((e) => e.event === "token_delta").length, [events]);
@@ -322,6 +424,24 @@ export function PlaygroundPage() {
                 >
                   <Download className="h-4 w-4" /> Export audit
                 </button>
+                <button
+                  className="v-btn-ghost"
+                  onClick={saveAsPipeline}
+                  disabled={!responseText || running || savingPipeline}
+                  title="Save this run as a governed pipeline"
+                >
+                  <Save className="h-4 w-4" />
+                  {savingPipeline ? "Saving…" : savedPipelineSlug ? "Saved✓" : "Save as Pipeline"}
+                </button>
+                <button
+                  className="v-btn-ghost"
+                  onClick={runPreflight}
+                  disabled={!prompt.trim() || preflight.loading}
+                  title="Predict cost, quality, and failure risk before running"
+                >
+                  <TrendingDown className="h-4 w-4" />
+                  {preflight.loading ? "Predicting…" : "Pre-flight"}
+                </button>
               </div>
               <div className="flex gap-2 font-mono text-[11px]">
                 <span className="v-chip">
@@ -336,6 +456,76 @@ export function PlaygroundPage() {
               <div className="mt-3 flex items-start gap-2 rounded-md border border-crimson/30 bg-crimson/10 px-3 py-2 text-[12px] text-crimson">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{error}</span>
+              </div>
+            )}
+            {savedPipelineSlug && (
+              <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Saved as pipeline <span className="font-mono">{savedPipelineSlug}</span>.
+                <a href="/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
+                  Open Pipelines <GitBranch className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+            {(preflight.predicted_cost != null || preflight.error) && (
+              <div className="mt-3 rounded-md border border-rule/70 bg-ink-2 p-3">
+                <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <Zap className="h-3 w-3 text-brass-2" /> Pre-flight intelligence
+                </div>
+                {preflight.error ? (
+                  <div className="font-mono text-[12px] text-crimson">{preflight.error}</div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 font-mono text-[12px]">
+                    <PreflightCell
+                      label="cost / run"
+                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "—"}
+                      sub={
+                        preflight.cost_confidence_upper != null && preflight.predicted_cost != null
+                          ? `±$${(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}`
+                          : "server-side ml"
+                      }
+                      tone="ok"
+                    />
+                    <PreflightCell
+                      label="quality"
+                      value={
+                        preflight.predicted_quality != null
+                          ? `${(preflight.predicted_quality * 100).toFixed(0)}%`
+                          : "—"
+                      }
+                      sub={preflight.predicted_quality != null ? "predicted" : "ml warming"}
+                      tone={
+                        preflight.predicted_quality != null && preflight.predicted_quality > 0.8
+                          ? "ok"
+                          : "warn"
+                      }
+                    />
+                    <PreflightCell
+                      label="failure risk"
+                      value={
+                        preflight.failure_risk != null
+                          ? `${(preflight.failure_risk * 100).toFixed(0)}%`
+                          : "—"
+                      }
+                      sub={preflight.failure_risk != null ? "before run" : "ml warming"}
+                      tone={
+                        preflight.failure_risk != null && preflight.failure_risk < 0.2 ? "ok" : "warn"
+                      }
+                    />
+                  </div>
+                )}
+                {preflight.alternatives?.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5 font-mono text-[10px]">
+                    {preflight.alternatives.slice(0, 3).map((alt) => (
+                      <span key={alt.provider} className="v-chip">
+                        via {alt.provider} → ${parseFloat(alt.cost).toFixed(4)}
+                        {alt.savings_percent > 0 && (
+                          <span className="text-moss"> · save {alt.savings_percent.toFixed(0)}%</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -423,6 +613,33 @@ function Stat({ label, value, mono }: { label: string; value: string; mono?: boo
     <div className="flex items-center justify-between gap-3">
       <dt className="text-muted">{label}</dt>
       <dd className={cn("truncate text-right text-bone", mono && "font-mono")}>{value}</dd>
+    </div>
+  );
+}
+
+function PreflightCell({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone: "ok" | "warn";
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
+      <div
+        className={cn(
+          "mt-0.5 text-base font-semibold",
+          tone === "ok" ? "text-moss" : "text-brass-2",
+        )}
+      >
+        {value}
+      </div>
+      <div className="text-[10px] text-muted">{sub}</div>
     </div>
   );
 }

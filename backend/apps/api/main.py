@@ -70,6 +70,7 @@ from apps.api.routers.edge_canary import router as edge_canary_router
 from apps.api.routers.resend_webhooks import router as resend_webhooks_router
 from apps.api.routers.pipelines import router as pipelines_router
 from apps.api.routers.deployments import router as deployments_router
+from apps.api.routers.marketplace_automation import router as marketplace_automation_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from edge.routers.edge_ingest import router as edge_ingest_router
 from edge.routers.mqtt import router as edge_mqtt_router
@@ -213,6 +214,7 @@ app.include_router(edge_canary_router, prefix=settings.api_prefix)
 app.include_router(resend_webhooks_router, prefix=settings.api_prefix)
 app.include_router(pipelines_router, prefix=settings.api_prefix)
 app.include_router(deployments_router, prefix=settings.api_prefix)
+app.include_router(marketplace_automation_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)

@@ -452,6 +452,24 @@
     .plan ul li { padding: 6px 0; border-top: 1px dashed var(--rule); display: flex; gap: 8px; }
     .plan ul li::before { content: "→"; color: var(--brass-2); }
 
+    /* detailed pricing table */
+    .price-table-wrap { margin-top: 32px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
+    .price-table-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+    .price-table-head h4 { margin: 0; font-size: 14px; letter-spacing: .04em; }
+    .price-table-head .eyebrow { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .price-table th, .price-table td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--rule); }
+    .price-table thead th { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 500; background: rgba(255,255,255,0.015); }
+    .price-table tbody tr:last-child td { border-bottom: 0; }
+    .price-table tbody tr:hover { background: rgba(255,255,255,0.015); }
+    .price-table td.num { font-family: "JetBrains Mono", monospace; color: var(--bone); }
+    .price-table td.event { color: var(--bone-2); }
+    .price-table .col-founding { color: var(--brass-2); }
+    @media (max-width: 860px) {
+      .price-table-wrap { overflow-x: auto; }
+      .price-table { min-width: 640px; }
+    }
+
     /* cta band */
     .cta-band {
       margin-top: 40px;
@@ -792,12 +810,10 @@
           <div class="value">$395 <span class="muted-small">one-time</span></div>
           <div class="muted-small">+ $150 minimum Operating Reserve</div>
           <ul>
-            <li>Playground governed run — $0.25</li>
+            <li>Playground run — $0.25</li>
             <li>Compare run — $0.75</li>
             <li>BYOK Governance Calls — $6 / 1,000</li>
             <li>Managed Governance Calls — $12 / 1,000</li>
-            <li>Signed Evidence Package — $99</li>
-            <li>Auditor Bundle — $249</li>
           </ul>
         </article>
         <article class="plan">
@@ -805,12 +821,10 @@
           <div class="value">$795 <span class="muted-small">one-time</span></div>
           <div class="muted-small">+ $300 minimum Operating Reserve</div>
           <ul>
-            <li>Playground governed run — $0.40</li>
+            <li>Playground run — $0.40</li>
             <li>Compare run — $1.20</li>
             <li>BYOK Governance Calls — $8 / 1,000</li>
             <li>Managed Governance Calls — $16 / 1,000</li>
-            <li>Signed Evidence Package — $149</li>
-            <li>Auditor Bundle — $349</li>
           </ul>
         </article>
         <article class="plan">
@@ -820,13 +834,74 @@
           <ul>
             <li>BYOK Governance Calls — $10 / 1,000</li>
             <li>Managed Governance Calls — $20 / 1,000</li>
-            <li>Signed Evidence Package — $199</li>
-            <li>Auditor Bundle — $499</li>
-            <li>Private deployment, procurement & security review</li>
+            <li>Private deployment</li>
+            <li>Procurement & security review</li>
           </ul>
         </article>
       </div>
-      <p class="section-copy" style="margin-top:28px; font-size:13px; color:var(--muted);">Marketplace vendors monetize through a 12% standard take (8% for preferred partners). Founding vendors keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
+
+      <div class="price-table-wrap" aria-label="Detailed pricing ladder">
+        <div class="price-table-head">
+          <h4>Full pricing ladder</h4>
+          <span class="eyebrow">Per event · versioned · v1_public</span>
+        </div>
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th class="col-founding">Founding</th>
+              <th>Standard</th>
+              <th>Regulated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="event">Playground governed run</td>
+              <td class="num col-founding">$0.25</td>
+              <td class="num">$0.40</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">Compare run</td>
+              <td class="num col-founding">$0.75</td>
+              <td class="num">$1.20</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">Signed Playground export</td>
+              <td class="num col-founding">$3</td>
+              <td class="num">$4</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">BYOK Governance Calls (per 1,000)</td>
+              <td class="num col-founding">$6</td>
+              <td class="num">$8</td>
+              <td class="num">$10</td>
+            </tr>
+            <tr>
+              <td class="event">Managed Governance Calls (per 1,000)</td>
+              <td class="num col-founding">$12</td>
+              <td class="num">$16</td>
+              <td class="num">$20</td>
+            </tr>
+            <tr>
+              <td class="event">Signed Evidence Package</td>
+              <td class="num col-founding">$99</td>
+              <td class="num">$149</td>
+              <td class="num">$199</td>
+            </tr>
+            <tr>
+              <td class="event">Auditor Bundle</td>
+              <td class="num col-founding">$249</td>
+              <td class="num">$349</td>
+              <td class="num">$499</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Marketplace vendors monetize through a 12% standard take (8% for preferred partners). Founding vendors keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
 
       <div class="cta-band">
         <div>

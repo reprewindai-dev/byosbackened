@@ -257,7 +257,7 @@ def fetch_workspace_request_metrics(
     daily_buckets = {bucket: {"requests": 0, "cost_usd": Decimal("0")} for bucket in _build_time_buckets(start_date, end_date)}
     request_rows = (
         db.query(
-            WorkspaceRequestLog.created_at.label("created_at"),
+            func.date(WorkspaceRequestLog.created_at).label("bucket_date"),
             func.count().label("requests"),
             func.coalesce(func.sum(WorkspaceRequestLog.cost_usd), 0).label("cost_usd"),
         )
@@ -270,7 +270,7 @@ def fetch_workspace_request_metrics(
         .all()
     )
     for row in request_rows:
-        key = row.created_at.date().isoformat()
+        key = row.bucket_date.isoformat() if hasattr(row.bucket_date, "isoformat") else str(row.bucket_date)
         if key in daily_buckets:
             daily_buckets[key]["requests"] = int(row.requests or 0)
             daily_buckets[key]["cost_usd"] = _to_decimal(row.cost_usd)

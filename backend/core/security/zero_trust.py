@@ -37,6 +37,7 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/auth/github/callback",
     f"{settings.api_prefix}/support/chat",
     f"{settings.api_prefix}/payments/webhook",
+    f"{settings.api_prefix}/webhooks/resend",
     # Docs now require auth + tokens (100 per view)
     # f"{settings.api_prefix}/docs",      # LOCKED - requires auth + 100 tokens
     # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth + 100 tokens

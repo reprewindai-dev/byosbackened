@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     
     # SERP API (optional, non-AI)
     serpapi_key: str = ""
+    resend_webhook_secret: str = ""
 
     # Worker
     celery_broker_url: str = "redis://redis:6379/0"

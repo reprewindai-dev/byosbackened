@@ -37,6 +37,7 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/refresh",
     "/api/v1/subscriptions/plans",
     "/api/v1/subscriptions/webhook",
+    "/api/v1/webhooks/resend",
     "/api/v1/edge/demo/summary",
     "/api/v1/edge/demo/infrastructure",
     "/api/v1/demo/pipeline/stream",

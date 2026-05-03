@@ -1,13 +1,15 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Copy,
   KeyRound,
   Mail,
   ShieldCheck,
   ShieldX,
   UserCog,
   Users as UsersIcon,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
@@ -18,16 +20,36 @@ interface TeamUser {
   full_name: string | null;
   role: string;
   status: string;
-  is_superuser: boolean;
+  is_active: boolean;
   mfa_enabled: boolean;
-  workspace_id: string;
   last_login: string | null;
   created_at: string;
 }
 
-async function listUsers(): Promise<TeamUser[]> {
-  const resp = await api.get<TeamUser[]>("/admin/users", { params: { skip: 0, limit: 100 } });
-  return resp.data;
+interface Invite {
+  id: string;
+  email: string;
+  role: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  expires_at: string;
+  created_at: string;
+  token?: string;
+}
+
+async function listMembers(): Promise<TeamUser[]> {
+  const resp = await api.get<{ items: TeamUser[] }>("/workspace/members");
+  return resp.data.items ?? [];
+}
+
+async function listInvites(): Promise<Invite[]> {
+  try {
+    const resp = await api.get<{ items: Invite[] }>("/workspace/members/invites");
+    return resp.data.items ?? [];
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 403) return [];
+    throw err;
+  }
 }
 
 const ROLE_STYLE: Record<string, string> = {
@@ -39,9 +61,35 @@ const ROLE_STYLE: Record<string, string> = {
 };
 
 export function TeamPage() {
+  const qc = useQueryClient();
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("user");
+  const [issuedInvite, setIssuedInvite] = useState<Invite | null>(null);
+
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["team-users"],
-    queryFn: listUsers,
+    queryKey: ["team-members"],
+    queryFn: listMembers,
+  });
+  const invitesQ = useQuery({ queryKey: ["team-invites"], queryFn: listInvites });
+
+  const inviteMut = useMutation({
+    mutationFn: async (payload: { email: string; role: string }) => {
+      const r = await api.post<Invite>("/workspace/members/invite", payload);
+      return r.data;
+    },
+    onSuccess: (data) => {
+      setIssuedInvite(data);
+      setInviteEmail("");
+      qc.invalidateQueries({ queryKey: ["team-invites"] });
+    },
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: async (id: string) => {
+      await api.post(`/workspace/members/invites/${id}/revoke`, {});
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["team-invites"] }),
   });
 
   const stats = useMemo(() => {
@@ -60,6 +108,8 @@ export function TeamPage() {
     return status === 403;
   }, [isError, error]);
 
+  const pendingInvites = (invitesQ.data ?? []).filter((i) => i.status === "pending");
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -75,12 +125,12 @@ export function TeamPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              live · <span className="font-mono">/api/v1/admin/users</span>
+              live · <span className="font-mono">/api/v1/workspace/members</span>
             </span>
             <span className="v-chip">SAML / SCIM (coming)</span>
           </div>
         </div>
-        <button className="v-btn-primary" disabled title="Invite flow ships in the next commit">
+        <button className="v-btn-primary" onClick={() => setShowInvite(true)}>
           <Mail className="h-4 w-4" /> Invite member
         </button>
       </header>
@@ -172,7 +222,7 @@ export function TeamPage() {
                 </td>
                 <td className="px-5 py-2.5">
                   <span className={cn("v-chip font-mono", ROLE_STYLE[u.role] ?? "")}>
-                    {u.is_superuser ? "superuser" : u.role}
+                    {u.role}
                   </span>
                 </td>
                 <td className="px-5 py-2.5">
@@ -205,6 +255,150 @@ export function TeamPage() {
           </tbody>
         </table>
       </section>
+
+      {pendingInvites.length > 0 && (
+        <section className="v-card p-0">
+          <header className="flex items-center justify-between border-b border-rule px-5 py-3">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Pending invites</div>
+              <h3 className="mt-0.5 text-sm font-semibold">Awaiting acceptance</h3>
+            </div>
+            <span className="v-chip font-mono">{pendingInvites.length}</span>
+          </header>
+          <ul className="divide-y divide-rule/50">
+            {pendingInvites.map((i) => (
+              <li key={i.id} className="flex items-center gap-3 px-5 py-2.5 font-mono text-[12px]">
+                <Mail className="h-3.5 w-3.5 text-brass-2" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-bone">{i.email}</div>
+                  <div className="text-[10px] text-muted">role={i.role} · expires {relativeTime(i.expires_at)}</div>
+                </div>
+                <button
+                  className="v-btn-ghost"
+                  disabled={revokeMut.isPending}
+                  onClick={() => revokeMut.mutate(i.id)}
+                >
+                  Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {showInvite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 backdrop-blur-sm">
+          <div className="v-card w-full max-w-md p-5">
+            <header className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Invite team member</h3>
+              <button
+                className="text-muted hover:text-bone"
+                onClick={() => {
+                  setShowInvite(false);
+                  setIssuedInvite(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            {issuedInvite ? (
+              <div className="space-y-3">
+                <div className="text-sm text-bone-2">
+                  Invite created for <span className="font-mono text-bone">{issuedInvite.email}</span>.
+                  Share this acceptance link — it will not be shown again.
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    className="v-input w-full font-mono text-[11px]"
+                    value={`${window.location.origin}/accept-invite?token=${issuedInvite.token ?? ""}`}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <button
+                    className="v-btn-ghost"
+                    onClick={() =>
+                      navigator.clipboard?.writeText(
+                        `${window.location.origin}/accept-invite?token=${issuedInvite.token ?? ""}`,
+                      )
+                    }
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copy
+                  </button>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    className="v-btn-ghost"
+                    onClick={() => {
+                      setIssuedInvite(null);
+                    }}
+                  >
+                    Invite another
+                  </button>
+                  <button
+                    className="v-btn-primary"
+                    onClick={() => {
+                      setShowInvite(false);
+                      setIssuedInvite(null);
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="block">
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+                    Email
+                  </div>
+                  <input
+                    className="v-input w-full"
+                    type="email"
+                    autoFocus
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="colleague@company.com"
+                  />
+                </label>
+                <label className="block">
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+                    Role
+                  </div>
+                  <select
+                    className="v-input w-full"
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                  >
+                    <option value="user">user</option>
+                    <option value="analyst">analyst</option>
+                    <option value="admin">admin</option>
+                    <option value="readonly">readonly</option>
+                  </select>
+                </label>
+                {inviteMut.isError && (
+                  <div className="text-[12px] text-crimson">
+                    {(inviteMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+                      ?? (inviteMut.error as Error)?.message
+                      ?? "Invite failed"}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <button className="v-btn-ghost" onClick={() => setShowInvite(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    className="v-btn-primary"
+                    disabled={!inviteEmail || inviteMut.isPending}
+                    onClick={() => inviteMut.mutate({ email: inviteEmail, role: inviteRole })}
+                  >
+                    {inviteMut.isPending ? "Inviting…" : "Send invite"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,123 +1,132 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  ArrowUpRight,
   Box,
   CheckCircle2,
   Cloud,
-  Gauge,
+  Plus,
+  RotateCcw,
   Server,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { cn, fmtNumber } from "@/lib/cn";
+import { cn, fmtNumber, relativeTime } from "@/lib/cn";
 
-interface ModelEntry {
-  slug: string;
-  name?: string;
-  provider?: string;
-  enabled?: boolean;
-  host?: string;
-  region?: string;
-  quantization?: string;
-  context_window?: number;
+interface Deployment {
+  id: string;
+  name?: string | null;
+  slug?: string | null;
+  region: string;
+  service_type: string;
+  model_slug?: string | null;
+  provider?: string | null;
+  version?: string | null;
+  previous_version?: string | null;
+  strategy: "direct" | "blue_green" | "canary";
+  status: "active" | "inactive" | "failed" | "promoting" | "rolling_back";
+  traffic_percent: number;
+  is_primary: boolean;
+  health_metrics: Record<string, number>;
+  deployed_at?: string | null;
+  promoted_at?: string | null;
+  rolled_back_at?: string | null;
+  last_health_check?: string | null;
 }
 
-interface ModelsResp {
-  models?: ModelEntry[];
-  items?: ModelEntry[];
+interface DeploymentsResp {
+  total: number;
+  items: Deployment[];
+  zones: Array<{ region: string; deployments: Deployment[]; active_count: number }>;
 }
 
-async function fetchModels(): Promise<ModelEntry[]> {
-  const resp = await api.get<ModelsResp | ModelEntry[]>("/workspace/models");
-  const d = resp.data;
-  if (Array.isArray(d)) return d;
-  return d.models ?? d.items ?? [];
-}
-
-const CLOUD_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  hetzner: {
-    label: "Hetzner primary",
-    color: "v-chip-brass",
-    icon: <Server className="h-4 w-4" />,
-  },
-  aws: {
-    label: "AWS burst",
-    color: "v-chip",
-    icon: <Cloud className="h-4 w-4" />,
-  },
-  local: {
-    label: "Local / on-prem",
-    color: "v-chip-ok",
-    icon: <Server className="h-4 w-4" />,
-  },
-  ollama: {
-    label: "Ollama (local)",
-    color: "v-chip-ok",
-    icon: <Server className="h-4 w-4" />,
-  },
-  groq: {
-    label: "Groq burst",
-    color: "v-chip",
-    icon: <Cloud className="h-4 w-4" />,
-  },
-};
-
-function cloudFor(m: ModelEntry): string {
-  const h = (m.host ?? m.provider ?? "local").toLowerCase();
-  if (h.includes("hetzner")) return "hetzner";
-  if (h.includes("aws")) return "aws";
-  if (h.includes("groq")) return "groq";
-  if (h.includes("ollama")) return "ollama";
-  return "local";
+async function fetchDeployments(): Promise<DeploymentsResp> {
+  const r = await api.get<DeploymentsResp>("/deployments");
+  return r.data;
 }
 
 export function DeploymentsPage() {
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ["deployments-models"],
-    queryFn: fetchModels,
-    refetchInterval: 30_000,
+    queryKey: ["deployments"],
+    queryFn: fetchDeployments,
+    refetchInterval: 20_000,
   });
 
-  const zones = useMemo(() => {
-    const map = new Map<string, ModelEntry[]>();
-    for (const m of data ?? []) {
-      const z = cloudFor(m);
-      const list = map.get(z) ?? [];
-      list.push(m);
-      map.set(z, list);
-    }
-    return Array.from(map.entries());
-  }, [data]);
+  const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    region: "hetzner-fsn1",
+    model_slug: "qwen2.5:3b",
+    provider: "ollama",
+    version: "v1",
+    strategy: "direct" as "direct" | "blue_green" | "canary",
+    traffic_percent: 100,
+  });
 
-  const total = data?.length ?? 0;
-  const enabled = data?.filter((m) => m.enabled).length ?? 0;
+  const createMut = useMutation({
+    mutationFn: async (payload: typeof form) => {
+      const r = await api.post<Deployment>("/deployments", payload);
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["deployments"] });
+      setShowNew(false);
+      setForm({ ...form, name: "" });
+    },
+  });
+
+  const promoteMut = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await api.post(`/deployments/${id}/promote`, { target_traffic_percent: 100 });
+      return r.data;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["deployments"] }),
+  });
+
+  const rollbackMut = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await api.post(`/deployments/${id}/rollback`, {});
+      return r.data;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["deployments"] }),
+  });
+
+  const total = data?.total ?? 0;
+  const active = data?.items.filter((d) => d.status === "active").length ?? 0;
+  const zones = data?.zones ?? [];
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header>
-        <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-          Workspace · Deployments
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
+            Workspace · Deployments
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Fleet, traffic &amp; rollouts</h1>
+          <p className="mt-2 max-w-2xl text-sm text-bone-2">
+            Model deployments grouped by zone. Blue/green and canary strategies with one-click promote
+            and rollback. Each transition writes to the audit ledger.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="v-chip v-chip-ok">
+              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
+              live · <span className="font-mono">/api/v1/deployments</span>
+            </span>
+            <span className="v-chip v-chip-brass">{active} / {total} active</span>
+          </div>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight">Fleet &amp; routing posture</h1>
-        <p className="mt-2 max-w-2xl text-sm text-bone-2">
-          Models active across your sovereign Hetzner primary and AWS burst zones. Canary status, health, and
-          per-zone controls. Full deploy orchestration (rollout, rollback, blue/green) ships next.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="v-chip v-chip-ok">
-            <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-            live · <span className="font-mono">/api/v1/workspace/models</span>
-          </span>
-          <span className="v-chip v-chip-brass">Hetzner primary</span>
-          <span className="v-chip">AWS burst</span>
-        </div>
+        <button className="v-btn-primary" onClick={() => setShowNew(true)}>
+          <Plus className="h-4 w-4" /> New deployment
+        </button>
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi icon={<Box className="h-3 w-3" />} label="Deployed models" value={fmtNumber(total)} />
-        <Kpi icon={<CheckCircle2 className="h-3 w-3" />} label="Healthy / serving" value={fmtNumber(enabled)} />
-        <Kpi icon={<Server className="h-3 w-3" />} label="Zones active" value={String(zones.length)} />
+        <Kpi icon={<Box className="h-3 w-3" />} label="Deployments" value={fmtNumber(total)} />
+        <Kpi icon={<CheckCircle2 className="h-3 w-3" />} label="Active" value={fmtNumber(active)} />
+        <Kpi icon={<Server className="h-3 w-3" />} label="Zones" value={String(zones.length)} />
         <Kpi icon={<ShieldCheck className="h-3 w-3" />} label="mTLS" value="enforced" />
       </section>
 
@@ -134,90 +143,169 @@ export function DeploymentsPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brass/10 text-brass-2">
             <Cloud className="h-6 w-6" />
           </div>
-          <div className="text-lg font-semibold">No deployments visible</div>
+          <div className="text-lg font-semibold">No deployments yet</div>
           <p className="max-w-md text-sm text-bone-2">
-            Bind a provider in <a href="/settings" className="text-brass-2 hover:underline">Settings</a> to see
-            this workspace's fleet.
+            Spin up your first deployment to register a model in a zone with a chosen rollout strategy.
           </p>
+          <button className="v-btn-primary" onClick={() => setShowNew(true)}>
+            <Plus className="h-4 w-4" /> New deployment
+          </button>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {zones.map(([zone, models]) => {
-          const meta = CLOUD_META[zone] ?? CLOUD_META.local;
-          const zoneEnabled = models.filter((m) => m.enabled).length;
-          return (
-            <section key={zone} className="v-card p-0">
-              <header className="flex items-center justify-between border-b border-rule px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <div className={cn("flex h-9 w-9 items-center justify-center rounded-md", meta.color === "v-chip-brass" ? "bg-brass/10 text-brass-2" : meta.color === "v-chip-ok" ? "bg-moss/10 text-moss" : "bg-electric/10 text-electric")}>
-                    {meta.icon}
-                  </div>
-                  <div>
-                    <div className="text-[15px] font-semibold text-bone">{meta.label}</div>
-                    <div className="font-mono text-[11px] text-muted">
-                      {zoneEnabled} / {models.length} serving
-                    </div>
+        {zones.map((zone) => (
+          <section key={zone.region} className="v-card p-0">
+            <header className="flex items-center justify-between border-b border-rule px-5 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brass/10 text-brass-2">
+                  <Server className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-[15px] font-semibold text-bone">{zone.region}</div>
+                  <div className="font-mono text-[11px] text-muted">
+                    {zone.active_count} / {zone.deployments.length} active
                   </div>
                 </div>
-                <span className={cn("v-chip font-mono text-[10px]", zoneEnabled > 0 ? "v-chip-ok" : "v-chip-warn")}>
-                  <Activity className="h-3 w-3" />
-                  {zoneEnabled > 0 ? "healthy" : "idle"}
-                </span>
-              </header>
-
-              <ul className="divide-y divide-rule/50">
-                {models.map((m) => (
-                  <li key={m.slug} className="flex items-center gap-3 px-5 py-2.5">
-                    <div
-                      className={cn(
-                        "h-1.5 w-1.5 shrink-0 rounded-full",
-                        m.enabled ? "bg-moss" : "bg-rule",
-                      )}
-                    />
+              </div>
+              <span className={cn(
+                "v-chip font-mono text-[10px]",
+                zone.active_count > 0 ? "v-chip-ok" : "v-chip-warn",
+              )}>
+                <Activity className="h-3 w-3" />
+                {zone.active_count > 0 ? "healthy" : "idle"}
+              </span>
+            </header>
+            <ul className="divide-y divide-rule/50">
+              {zone.deployments.map((d) => (
+                <li key={d.id} className="px-5 py-3">
+                  <div className="flex items-start gap-3">
+                    <div className={cn(
+                      "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
+                      d.status === "active" ? "bg-moss"
+                        : d.status === "failed" ? "bg-crimson"
+                        : d.status === "promoting" || d.status === "rolling_back" ? "bg-brass"
+                        : "bg-rule",
+                    )} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] text-bone">{m.name ?? m.slug}</div>
-                      <div className="truncate font-mono text-[10px] text-muted">
-                        {m.slug}
-                        {m.context_window ? ` · ${fmtNumber(m.context_window)} ctx` : ""}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[13px] font-semibold text-bone">{d.name ?? d.slug ?? d.id}</span>
+                        <span className="v-chip font-mono text-[10px]">{d.strategy}</span>
+                        <span className="v-chip font-mono text-[10px]">{d.status}</span>
+                        {d.is_primary && <span className="v-chip v-chip-ok font-mono text-[10px]">primary</span>}
+                      </div>
+                      <div className="mt-1 truncate font-mono text-[11px] text-muted">
+                        {d.model_slug ?? "—"}
+                        {d.version ? ` · ${d.version}` : ""}
+                        {d.previous_version ? ` (← ${d.previous_version})` : ""}
+                        {" · "}
+                        {d.traffic_percent}% traffic
+                        {d.deployed_at && ` · deployed ${relativeTime(d.deployed_at)}`}
                       </div>
                     </div>
-                    {m.quantization && (
-                      <span className="v-chip font-mono text-[10px]">{m.quantization}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+                    <div className="flex shrink-0 gap-1">
+                      {d.status !== "active" || d.traffic_percent < 100 ? (
+                        <button
+                          className="v-btn-ghost"
+                          disabled={promoteMut.isPending}
+                          onClick={() => promoteMut.mutate(d.id)}
+                          title="Promote to 100%"
+                        >
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                      {d.is_primary && d.previous_version ? (
+                        <button
+                          className="v-btn-ghost"
+                          disabled={rollbackMut.isPending}
+                          onClick={() => rollbackMut.mutate(d.id)}
+                          title="Rollback"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
       </div>
 
-      <section className="v-card border-brass/30 bg-brass/[0.03] p-5">
-        <div className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-brass-2">
-          <Gauge className="h-3 w-3" /> Deploy orchestration roadmap
+      {/* New deployment modal */}
+      {showNew && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 backdrop-blur-sm">
+          <div className="v-card w-full max-w-md p-5">
+            <header className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">New deployment</h3>
+              <button className="text-muted hover:text-bone" onClick={() => setShowNew(false)}>
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            <div className="space-y-3">
+              <Field label="Name">
+                <input className="v-input w-full" value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="qwen-prod-fsn1" autoFocus />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Region">
+                  <input className="v-input w-full" value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })} />
+                </Field>
+                <Field label="Provider">
+                  <select className="v-input w-full" value={form.provider}
+                    onChange={(e) => setForm({ ...form, provider: e.target.value })}>
+                    <option value="ollama">ollama</option>
+                    <option value="groq">groq</option>
+                    <option value="hetzner">hetzner</option>
+                    <option value="aws">aws</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Model slug">
+                  <input className="v-input w-full" value={form.model_slug}
+                    onChange={(e) => setForm({ ...form, model_slug: e.target.value })} />
+                </Field>
+                <Field label="Version">
+                  <input className="v-input w-full" value={form.version}
+                    onChange={(e) => setForm({ ...form, version: e.target.value })} />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Strategy">
+                  <select className="v-input w-full" value={form.strategy}
+                    onChange={(e) => setForm({ ...form, strategy: e.target.value as typeof form.strategy })}>
+                    <option value="direct">direct</option>
+                    <option value="blue_green">blue/green</option>
+                    <option value="canary">canary</option>
+                  </select>
+                </Field>
+                <Field label="Initial traffic %">
+                  <input type="number" min={0} max={100} className="v-input w-full"
+                    value={form.traffic_percent}
+                    onChange={(e) => setForm({ ...form, traffic_percent: Math.max(0, Math.min(100, +e.target.value)) })} />
+                </Field>
+              </div>
+              {createMut.isError && (
+                <div className="text-[12px] text-crimson">
+                  {(createMut.error as Error)?.message ?? "Failed to create"}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button className="v-btn-ghost" onClick={() => setShowNew(false)}>Cancel</button>
+                <button className="v-btn-primary"
+                  disabled={!form.name || createMut.isPending}
+                  onClick={() => createMut.mutate(form)}>
+                  {createMut.isPending ? "Creating…" : "Create"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <Roadmap stage="Next" title="Blue/green rollout">
-            Stage new model versions alongside current, shift traffic in percentage steps, auto-rollback on
-            error-rate or latency regression.
-          </Roadmap>
-          <Roadmap stage="After" title="Canary + SLO gates">
-            Gate promotion on P95 latency, cost-per-call, and quality-vs-canary scores held in the audit
-            ledger.
-          </Roadmap>
-          <Roadmap stage="Then" title="Zone failover automation">
-            Auto-drain Hetzner to AWS burst on zone-level anomaly, enforce budget cap, return to primary on
-            recovery.
-          </Roadmap>
-        </div>
-        <div className="mt-4 font-mono text-[11px] text-muted">
-          Endpoints consumed when this ships: <span className="text-bone">/api/v1/deployments</span>,{" "}
-          <span className="text-bone">/api/v1/deployments/{"{id}"}/promote</span>,{" "}
-          <span className="text-bone">/api/v1/deployments/{"{id}"}/rollback</span>. Not yet implemented on
-          backend — paired PR will land alongside.
-        </div>
-      </section>
+      )}
     </div>
   );
 }
@@ -226,28 +314,18 @@ function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; val
   return (
     <div className="v-card p-4">
       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
-        {icon}
-        {label}
+        {icon}{label}
       </div>
       <div className="mt-1.5 text-xl font-semibold text-bone">{value}</div>
     </div>
   );
 }
 
-function Roadmap({
-  stage,
-  title,
-  children,
-}: {
-  stage: string;
-  title: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-rule p-4">
-      <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-brass-2">{stage}</div>
-      <div className="text-[14px] font-semibold text-bone">{title}</div>
-      <div className="mt-1.5 text-[12px] leading-relaxed text-bone-2">{children}</div>
-    </div>
+    <label className="block">
+      <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">{label}</div>
+      {children}
+    </label>
   );
 }

@@ -15,7 +15,15 @@ from db.models.abuse_log import AbuseLog
 from db.models.incident_log import IncidentLog
 from db.models.routing_policy import RoutingPolicy
 from db.models.ml_model import MLModel
-from db.models.deployment import Deployment, DeploymentStatus
+from db.models.deployment import Deployment, DeploymentStatus, DeploymentStrategy
+from db.models.pipeline import (
+    Pipeline,
+    PipelineVersion,
+    PipelineRun,
+    PipelineStatus,
+    PipelineRunStatus,
+)
+from db.models.workspace_invite import WorkspaceInvite, InviteStatus
 from db.models.routing_strategy import RoutingStrategy
 from db.models.traffic_pattern import TrafficPattern
 from db.models.anomaly import Anomaly
@@ -74,7 +82,9 @@ __all__ = [
     "IncidentLog",
     "RoutingPolicy",
     "MLModel",
-    "Deployment", "DeploymentStatus",
+    "Deployment", "DeploymentStatus", "DeploymentStrategy",
+    "Pipeline", "PipelineVersion", "PipelineRun", "PipelineStatus", "PipelineRunStatus",
+    "WorkspaceInvite", "InviteStatus",
     "RoutingStrategy",
     "TrafficPattern",
     "Anomaly",

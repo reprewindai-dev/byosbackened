@@ -31,6 +31,7 @@ try:
     from db.models.license_key import LicenseKey
 except ImportError:  # buyer package excludes the server-side license service model
     LicenseKey = None
+from db.models.edge_canary_report import EdgeCanaryReport
 from db.models.content_filter import ContentFilterLog, AgeVerification, ContentCategory, AgeVerificationStatus
 from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
@@ -85,6 +86,7 @@ __all__ = [
     "WorkspaceModelSetting",
     "Subscription", "PlanTier", "SubscriptionStatus",
     "LicenseTier",
+    "EdgeCanaryReport",
     "ContentFilterLog", "AgeVerification", "ContentCategory", "AgeVerificationStatus",
     "SystemMetrics",
     "Alert", "AlertSeverity",

@@ -6,7 +6,14 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from svix.webhooks import Webhook, WebhookVerificationError
+
+try:
+    from svix.webhooks import Webhook, WebhookVerificationError
+except ImportError:  # optional in local/test environments
+    Webhook = None
+
+    class WebhookVerificationError(Exception):
+        pass
 
 from core.config import get_settings
 from core.redis_pool import get_redis
@@ -39,6 +46,8 @@ async def resend_webhook(request: Request) -> dict[str, Any]:
 
     event: dict[str, Any]
     if settings.resend_webhook_secret:
+        if Webhook is None:
+            raise HTTPException(status_code=503, detail="Resend signature verification dependency unavailable")
         headers = {
             "svix-id": request.headers.get("svix-id", ""),
             "svix-timestamp": request.headers.get("svix-timestamp", ""),

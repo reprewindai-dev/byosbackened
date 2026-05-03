@@ -1153,7 +1153,10 @@
     metProvider.textContent = "—";
     metPolicy.textContent = "—"; metPolicy.className = "m-value";
     metBillable.textContent = "—"; metBillable.className = "m-value";
-    chipProvider.className = "chip"; chipProvider.innerHTML = '<span class="dot"></span>Provider: idle';
+    chipProvider.className = "chip";
+    chipProvider.innerHTML = mode === "edge"
+      ? '<span class="dot"></span>Provider: awaiting protocol'
+      : '<span class="dot"></span>Provider: awaiting model';
     chipCB.className = "chip"; chipCB.innerHTML = '<span class="dot"></span>Circuit: —';
     auditCard.classList.remove("locked");
     auditStatus.textContent = "pending"; auditHash.textContent = "—";
@@ -1358,10 +1361,12 @@
       const payload = await res.json();
 
       const source = payload.normalized_event?.source || payload.source || "demo";
-      const isLive = payload.live === true;
       const isFallback = payload.fallback === true;
+      const isLive = payload.live === true && !isFallback;
       const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
-      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : "fallback"}`, protocolCls);
+      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
+      chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
+      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
       advanceTo("normalize");
       await sleep(220);
 
@@ -1468,9 +1473,11 @@
       const r = await fetch(API_BASE + "/demo/pipeline/health", { cache: "no-store" });
       if (!r.ok) throw new Error("down");
       const d = await r.json();
-      const backendConnected = d.backend_connected !== false;
-      chipBackend.className = "chip " + (backendConnected ? "ok" : "warn");
-      chipBackend.innerHTML = `<span class="dot"></span>Backend: ${backendConnected ? "connected" : "reconnecting"}`;
+      const llmReady = d.llm_ok === true;
+      chipBackend.className = "chip " + (llmReady ? "ok" : "warn");
+      chipBackend.innerHTML = `<span class="dot"></span>Backend: ${llmReady ? "connected" : "partial"}`;
+      chipProvider.className = "chip " + (llmReady ? "ok" : "warn");
+      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${llmReady ? "ollama" : "unavailable"}`;
       const cb = d.circuit_breaker || {};
       chipCB.className = "chip " + (cb.state === "open" ? "err" : cb.state === "half_open" ? "warn" : "ok");
       chipCB.innerHTML = `<span class="dot"></span>Circuit: ${cb.state || "closed"}`;

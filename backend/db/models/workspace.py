@@ -42,3 +42,6 @@ class Workspace(Base):
     savings_reports = relationship("SavingsReport", back_populates="workspace", cascade="all, delete-orphan")
     subscription = relationship("Subscription", back_populates="workspace", uselist=False, cascade="all, delete-orphan")
     api_keys = relationship("APIKey", back_populates="workspace", cascade="all, delete-orphan")
+    pipelines = relationship("Pipeline", cascade="all, delete-orphan", foreign_keys="Pipeline.workspace_id")
+    pipeline_runs = relationship("PipelineRun", cascade="all, delete-orphan", foreign_keys="PipelineRun.workspace_id")
+    invites = relationship("WorkspaceInvite", cascade="all, delete-orphan", foreign_keys="WorkspaceInvite.workspace_id")

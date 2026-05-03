@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
-from db.models import User
+from db.models import InviteStatus, User, UserRole, UserStatus, WorkspaceInvite
 from db.session import get_db
 from core.services.financial_analytics import (
     fetch_workspace_request_metrics,
@@ -221,6 +221,164 @@ async def workspace_cost_budget_csv(
         lines.append(f"{row['date']},{row['cost_usd']}")
     csv = "\n".join(lines) + "\n"
     return Response(content=csv, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="veklom-costs.csv"'})
+
+
+# ── Members + invites ──────────────────────────────────────────────────────────
+
+class InviteRequest(BaseModel):
+    email: str
+    role: str = "user"
+
+
+class InviteAcceptRequest(BaseModel):
+    token: str
+
+
+def _is_admin(user: User) -> bool:
+    return user.role in (UserRole.OWNER, UserRole.ADMIN) or user.is_superuser
+
+
+@router.get("/members")
+async def list_members(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    members = (
+        db.query(User)
+        .filter(User.workspace_id == current_user.workspace_id)
+        .order_by(User.created_at.asc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": u.full_name,
+                "role": u.role.value if hasattr(u.role, "value") else u.role,
+                "status": u.status.value if hasattr(u.status, "value") else u.status,
+                "is_active": u.is_active,
+                "mfa_enabled": u.mfa_enabled,
+                "last_login": u.last_login.isoformat() if u.last_login else None,
+                "created_at": u.created_at.isoformat(),
+            }
+            for u in members
+        ]
+    }
+
+
+@router.get("/members/invites")
+async def list_invites(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not _is_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    rows = (
+        db.query(WorkspaceInvite)
+        .filter(WorkspaceInvite.workspace_id == current_user.workspace_id)
+        .order_by(WorkspaceInvite.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": i.id,
+                "email": i.email,
+                "role": i.role,
+                "status": i.status.value if hasattr(i.status, "value") else i.status,
+                "expires_at": i.expires_at.isoformat() if i.expires_at else None,
+                "created_at": i.created_at.isoformat(),
+            }
+            for i in rows
+        ]
+    }
+
+
+@router.post("/members/invite", status_code=201)
+async def invite_member(
+    payload: InviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not _is_admin(current_user):
+        raise HTTPException(403, "Only admins can invite team members")
+
+    email = (payload.email or "").strip().lower()
+    if not email or "@" not in email or len(email) > 200:
+        raise HTTPException(400, "Invalid email address")
+
+    role = payload.role.lower()
+    valid_roles = {r.value for r in UserRole}
+    if role not in valid_roles:
+        raise HTTPException(400, f"Invalid role. Must be one of {sorted(valid_roles)}")
+    if role == UserRole.OWNER.value and not current_user.is_superuser:
+        raise HTTPException(403, "Only superusers can invite owners")
+
+    existing_user = (
+        db.query(User)
+        .filter(User.email == email, User.workspace_id == current_user.workspace_id)
+        .first()
+    )
+    if existing_user:
+        raise HTTPException(409, "User with this email is already a workspace member")
+
+    pending = (
+        db.query(WorkspaceInvite)
+        .filter(
+            WorkspaceInvite.workspace_id == current_user.workspace_id,
+            WorkspaceInvite.email == email,
+            WorkspaceInvite.status == InviteStatus.PENDING,
+        )
+        .first()
+    )
+    if pending:
+        raise HTTPException(409, "Pending invite already exists for this email")
+
+    invite = WorkspaceInvite(
+        workspace_id=current_user.workspace_id,
+        email=email,
+        role=role,
+        invited_by=current_user.id,
+    )
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+    return {
+        "id": invite.id,
+        "email": invite.email,
+        "role": invite.role,
+        "status": invite.status.value,
+        "token": invite.token,  # one-shot — caller is responsible for delivering
+        "expires_at": invite.expires_at.isoformat(),
+        "created_at": invite.created_at.isoformat(),
+    }
+
+
+@router.post("/members/invites/{invite_id}/revoke")
+async def revoke_invite(
+    invite_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not _is_admin(current_user):
+        raise HTTPException(403, "Admin access required")
+    invite = (
+        db.query(WorkspaceInvite)
+        .filter(
+            WorkspaceInvite.id == invite_id,
+            WorkspaceInvite.workspace_id == current_user.workspace_id,
+        )
+        .first()
+    )
+    if not invite:
+        raise HTTPException(404, "Invite not found")
+    if invite.status != InviteStatus.PENDING:
+        raise HTTPException(409, f"Cannot revoke invite with status {invite.status}")
+    invite.status = InviteStatus.REVOKED
+    invite.revoked_at = datetime.utcnow()
+    db.commit()
+    return {"id": invite.id, "status": invite.status.value}
 
 
 @public_router.get("/status/data")

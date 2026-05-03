@@ -10,8 +10,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc
@@ -131,6 +129,14 @@ def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, 
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="AWS Bedrock is not configured for this workspace runtime.",
             )
+        try:
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AWS Bedrock runtime dependency is not installed in this deployment.",
+            ) from exc
         kwargs = {"region_name": settings.aws_default_region}
         if settings.aws_access_key_id and settings.aws_secret_access_key:
             kwargs["aws_access_key_id"] = settings.aws_access_key_id

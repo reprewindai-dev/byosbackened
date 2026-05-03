@@ -214,6 +214,19 @@ async def listings_list(
     ]
 
 
+@router.get("/categories")
+async def listings_categories(db: Session = Depends(get_db)):
+    rows = db.query(Listing).filter(Listing.status.in_(_LISTING_PUBLIC_STATUSES)).all()
+    total = len(rows)
+    paid = sum(1 for row in rows if row.price_cents and row.price_cents > 0)
+    free = total - paid
+    return [
+        {"id": "all", "label": "All", "count": total},
+        {"id": "paid", "label": "Paid", "count": paid},
+        {"id": "free", "label": "Free", "count": free},
+    ]
+
+
 @router.get("/listings/{listing_id}")
 async def listings_get(listing_id: str, db: Session = Depends(get_db)):
     x = db.query(Listing).filter(Listing.id == listing_id).first()

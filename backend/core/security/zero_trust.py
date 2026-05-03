@@ -110,9 +110,17 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
 
         # Public marketplace browsing endpoints (read-only)
         if method == "GET":
-            listings_base = f"{settings.api_prefix}/listings"
-            if path == listings_base or path.startswith(listings_base + "/"):
-                return await call_next(request)
+            public_marketplace_bases = (
+                f"{settings.api_prefix}/listings",
+                f"{settings.api_prefix}/categories",
+                f"{settings.api_prefix}/evidence",
+                f"{settings.api_prefix}/marketplace/listings",
+                f"{settings.api_prefix}/marketplace/categories",
+                f"{settings.api_prefix}/marketplace/evidence",
+            )
+            for base in public_marketplace_bases:
+                if path == base or path.startswith(base + "/"):
+                    return await call_next(request)
 
         if path.endswith(_PUBLIC_STATIC_SUFFIXES):
             return await call_next(request)

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -97,6 +98,7 @@ async function fetchPreflight(listingId: string): Promise<Preflight> {
 
 export function MarketplacePage() {
   const qc = useQueryClient();
+  const { slug } = useParams();
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -165,6 +167,14 @@ export function MarketplacePage() {
       return true;
     });
   }, [allCards, selectedType, selectedCategory, query]);
+
+  useEffect(() => {
+    if (!slug || !allCards.length) return;
+    const match = allCards.find((card) => card.slug === slug || card.id === slug);
+    if (match && selected?.id !== match.id) {
+      setSelected(match);
+    }
+  }, [allCards, selected?.id, slug]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">

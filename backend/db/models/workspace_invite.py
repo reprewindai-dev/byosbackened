@@ -49,4 +49,4 @@ class WorkspaceInvite(Base):
     revoked_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
-    workspace = relationship("Workspace")
+    workspace = relationship("Workspace", back_populates="invites")

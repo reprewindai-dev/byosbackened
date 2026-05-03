@@ -21,9 +21,11 @@ export function AppRoutes() {
 
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/overview" replace />} />
+        <Route path="/dashboard" element={<OverviewPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/marketplace/:slug" element={<MarketplacePage />} />
         <Route path="/models" element={<ModelsPage />} />
         <Route path="/pipelines" element={<PipelinesPage />} />
         <Route path="/deployments" element={<DeploymentsPage />} />

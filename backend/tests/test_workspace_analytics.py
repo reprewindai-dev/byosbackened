@@ -5,6 +5,14 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 from apps.api.routers import workspace
+from core.services import financial_analytics
+
+
+def test_workspace_request_metrics_daily_query_groups_by_bucket_date():
+    source_names = financial_analytics.fetch_workspace_request_metrics.__code__.co_names
+
+    assert "bucket_date" in source_names
+    assert "created_at" in source_names
 
 
 def test_workspace_analytics_defaults_to_last_30_days(monkeypatch):
@@ -32,4 +40,3 @@ def test_workspace_analytics_defaults_to_last_30_days(monkeypatch):
     assert isinstance(captured["end_date"], datetime)
     assert timedelta(days=29, hours=23) <= captured["end_date"] - captured["start_date"] <= timedelta(days=30, minutes=1)
     assert captured["include_rows"] is True
-

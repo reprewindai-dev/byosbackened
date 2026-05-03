@@ -87,6 +87,7 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
         id="wallet-1",
         workspace_id="workspace-1",
         balance=10,
+        monthly_credits_used=0,
         total_credits_used=0,
         updated_at=None,
     )
@@ -106,6 +107,7 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
     assert result.tokens_deducted == 2
     assert result.wallet_balance == 8
     assert wallet.balance == 8
+    assert wallet.monthly_credits_used == 2
     assert wallet.total_credits_used == 2
     assert fake_db.committed is True
     assert any(obj.__class__.__name__ == "TokenTransaction" for obj in fake_db.added)
@@ -117,6 +119,7 @@ def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
         id="wallet-1",
         workspace_id="workspace-1",
         balance=1,
+        monthly_credits_used=0,
         total_credits_used=0,
         updated_at=None,
     )

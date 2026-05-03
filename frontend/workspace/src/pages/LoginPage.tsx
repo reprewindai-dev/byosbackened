@@ -56,7 +56,7 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="v-input"
-              placeholder="you@acme.io"
+              placeholder="you@company.com"
             />
           </div>
           <div className="mb-4">

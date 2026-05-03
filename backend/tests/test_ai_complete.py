@@ -104,6 +104,13 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
 
     assert runtime.called is True
     assert result.response_text == "response text"
+    assert result.provider == "ollama"
+    assert result.request_id == "req-1"
+    assert result.audit_hash
+    assert result.prompt_tokens == 17
+    assert result.output_tokens == 151
+    assert result.total_tokens == 168
+    assert result.cost_usd == "0.000020"
     assert result.tokens_deducted == 2
     assert result.wallet_balance == 8
     assert wallet.balance == 8
@@ -138,3 +145,21 @@ def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
     assert exc.value.detail == "Insufficient tokens"
     assert runtime.called is False
     assert fake_db.committed is False
+
+
+def test_complete_rejects_unknown_model_slug(monkeypatch):
+    fake_db = _FakeDB(wallet=None)
+    monkeypatch.setattr(
+        "apps.api.routers.ai.get_model_setting",
+        lambda db, workspace_id, model: (_ for _ in ()).throw(ValueError("Unknown model slug: bad-model")),
+    )
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-1"))
+    payload = AICompleteRequest(model="bad-model", prompt="Write a line", max_tokens=16)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert exc.value.status_code == 404
+    assert "Unknown model slug" in exc.value.detail

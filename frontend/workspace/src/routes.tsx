@@ -7,6 +7,7 @@ import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { BillingPage } from "./pages/BillingPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { MonitoringPage } from "./pages/MonitoringPage";
 
 export function AppRoutes() {
   return (
@@ -38,10 +39,7 @@ export function AppRoutes() {
           path="/compliance"
           element={<PlaceholderPage title="Compliance" subtitle="Framework coverage, evidence schedules, signed exports." />}
         />
-        <Route
-          path="/monitoring"
-          element={<PlaceholderPage title="Monitoring" subtitle="Metrics, alerts, security events." />}
-        />
+        <Route path="/monitoring" element={<MonitoringPage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route
           path="/team"

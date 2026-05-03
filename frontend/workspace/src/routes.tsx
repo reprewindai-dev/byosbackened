@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { BillingPage } from "./pages/BillingPage";
@@ -12,6 +11,8 @@ import { VaultPage } from "./pages/VaultPage";
 import { TeamPage } from "./pages/TeamPage";
 import { CompliancePage } from "./pages/CompliancePage";
 import { ModelsPage } from "./pages/ModelsPage";
+import { PipelinesPage } from "./pages/PipelinesPage";
+import { DeploymentsPage } from "./pages/DeploymentsPage";
 
 export function AppRoutes() {
   return (
@@ -24,14 +25,8 @@ export function AppRoutes() {
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/models" element={<ModelsPage />} />
-        <Route
-          path="/pipelines"
-          element={<PlaceholderPage title="Pipelines" subtitle="Governed execution pipelines." />}
-        />
-        <Route
-          path="/deployments"
-          element={<PlaceholderPage title="Deployments" subtitle="Active deployments and canary status." />}
-        />
+        <Route path="/pipelines" element={<PipelinesPage />} />
+        <Route path="/deployments" element={<DeploymentsPage />} />
         <Route path="/vault" element={<VaultPage />} />
         <Route path="/compliance" element={<CompliancePage />} />
         <Route path="/monitoring" element={<MonitoringPage />} />

@@ -10,15 +10,52 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html, body {
+  min-height: 100%;
+  margin: 0;
+  background: #0c0c0e;
+  color: #f3efe6;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+body {
+  min-height: 100vh;
+}
+.app-shell {
+  max-width: 480px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 64px 24px 96px;
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  margin-bottom: 48px;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 22px;
+}
+.app-card {
+  min-height: 456px;
+  background: #131318;
+  border: 1px solid #25252e;
+  border-radius: 6px;
+  padding: 40px 32px;
+}
+#alert {
+  min-height: 0;
+}
+</style>
 <link rel="stylesheet" href="/app/app.css">
 </head>
 <body>
 <main class="app-shell">
-  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" width="32" height="32" /> Veklom</div>
   <div class="app-card">
     <h1 class="app-h1">Sign in</h1>
     <p class="app-sub">Welcome back. Sign in to manage your workspace, API keys, and subscription.</p>
-    <div id="alert"></div>
+    <div id="alert" aria-live="polite"></div>
     <form id="form">
       <div class="field">
         <label for="email">Email</label>

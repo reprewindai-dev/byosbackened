@@ -29,9 +29,17 @@ export function fmtDelta(n: number, suffix = ""): string {
   return `${sign}${n.toFixed(n % 1 === 0 ? 0 : 1)}${suffix}`;
 }
 
+export function dateFromApiTimestamp(iso: string): Date | null {
+  if (!iso) return null;
+  const normalized = /(?:z|[+-]\d{2}:?\d{2})$/i.test(iso) ? iso : `${iso}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "—";
+  const date = dateFromApiTimestamp(iso);
+  if (!date) return "-";
+  const then = date.getTime();
   const rawDiff = Date.now() - then;
   const future = rawDiff < 0;
   const diff = Math.abs(rawDiff);
@@ -45,5 +53,20 @@ export function relativeTime(iso: string): string {
   if (h < 24) return `${prefix}${h}h${suffix}`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${prefix}${d}d${suffix}`;
-  return new Date(iso).toLocaleDateString();
+  return date.toLocaleDateString();
+}
+
+export function formatApiDate(iso: string): string {
+  const date = dateFromApiTimestamp(iso);
+  return date ? date.toLocaleDateString() : "-";
+}
+
+export function formatApiDateTime(iso: string): string {
+  const date = dateFromApiTimestamp(iso);
+  return date ? date.toLocaleString() : "-";
+}
+
+export function formatApiTime(iso: string): string {
+  const date = dateFromApiTimestamp(iso);
+  return date ? date.toLocaleTimeString() : "-";
 }

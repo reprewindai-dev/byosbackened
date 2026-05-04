@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { cn, fmtCents, fmtNumber, relativeTime } from "@/lib/cn";
+import { cn, fmtCents, fmtNumber, formatApiDate, relativeTime } from "@/lib/cn";
 
 interface WalletBalance {
   workspace_id: string;
@@ -179,7 +179,7 @@ export function BillingPage() {
             </div>
             {balance.data?.monthly_period_end && (
               <div className="mt-2 font-mono text-[10px] text-muted">
-                resets {new Date(balance.data.monthly_period_end).toLocaleDateString()}
+                resets {formatApiDate(balance.data.monthly_period_end)}
               </div>
             )}
           </div>

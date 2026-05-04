@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, TerminalSquare, TrendingUp, TrendingDown, ShieldCheck, AlertCircle } from "lucide-react";
+import { PlatformPulseSection } from "@/components/overview/PlatformPulseSection";
 import { api } from "@/lib/api";
 import type { OverviewPayload } from "@/types/api";
 import { dateFromApiTimestamp, fmtCents, fmtDelta, fmtNumber, formatApiTime, relativeTime } from "@/lib/cn";
@@ -449,6 +450,8 @@ export function OverviewPage() {
           </ul>
         </div>
       </section>
+
+      <PlatformPulseSection />
     </div>
   );
 }

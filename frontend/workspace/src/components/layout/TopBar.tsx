@@ -1,8 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Bell, BookOpen, Command, Key, Search } from "lucide-react";
+import {
+  Bell,
+  BookOpen,
+  CheckCircle2,
+  Command,
+  Key,
+  LogOut,
+  Search,
+  Settings as SettingsIcon,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
 import { api } from "@/lib/api";
+import { logout } from "@/lib/auth";
 import { fmtCents } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
 import type { OverviewPayload } from "@/types/api";
@@ -34,6 +46,11 @@ export function TopBar() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [jump, setJump] = useState("");
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const overview = useQuery({
     queryKey: ["topbar-overview"],
     queryFn: async () => (await api.get<OverviewPayload>("/monitoring/overview")).data,
@@ -46,6 +63,16 @@ export function TopBar() {
     refetchInterval: 30_000,
     retry: false,
   });
+
+  // Close popovers on outside click
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
 
   const displayName = user?.full_name ?? user?.name ?? user?.email ?? "Veklom";
   const initials = displayName
@@ -65,6 +92,32 @@ export function TopBar() {
   }, [overview.data?.spend?.forecast_cap_pct, wallet.data]);
   const degraded = overview.isError || wallet.isError;
 
+  const policyEvents = overview.data?.policy_events ?? [];
+  const alerts = overview.data?.alerts ?? [];
+  const notifications = useMemo(() => {
+    const merged: Array<{ id: string; title: string; detail?: string; ts: string; severity: "info" | "warn" | "error" }> = [];
+    for (const a of alerts) {
+      merged.push({
+        id: `alert-${a.id}`,
+        title: a.title || "Alert",
+        detail: a.scope,
+        ts: a.when,
+        severity: a.severity,
+      });
+    }
+    for (const e of policyEvents.slice(0, 5)) {
+      merged.push({
+        id: `policy-${e.id}`,
+        title: e.summary || "Policy event",
+        detail: e.detail,
+        ts: e.ts,
+        severity: "info",
+      });
+    }
+    return merged.slice(0, 8);
+  }, [alerts, policyEvents]);
+  const notifCount = notifications.length;
+
   const submitJump = () => {
     const q = jump.trim().toLowerCase();
     if (!q) return;
@@ -72,6 +125,15 @@ export function TopBar() {
     if (route) {
       navigate(route.to);
       setJump("");
+    }
+  };
+
+  const handleSignOut = async () => {
+    setMenuOpen(false);
+    try {
+      await logout();
+    } finally {
+      navigate("/login", { replace: true });
     }
   };
 
@@ -120,31 +182,190 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-1 pl-2">
-        <button
+        {/* Docs — opens external documentation in a new tab */}
+        <a
+          href="https://veklom.com/docs/"
+          target="_blank"
+          rel="noopener noreferrer"
           className="rounded-md p-1.5 text-muted hover:bg-white/5 hover:text-bone"
-          aria-label="Docs"
-          onClick={() => {
-            window.location.href = "/docs/";
-          }}
+          aria-label="Documentation"
+          title="Documentation"
         >
           <BookOpen className="h-4 w-4" />
-        </button>
+        </a>
+
+        {/* API keys — goes to Vault */}
         <button
+          type="button"
           className="rounded-md p-1.5 text-muted hover:bg-white/5 hover:text-bone"
           aria-label="API keys"
+          title="API keys"
           onClick={() => navigate("/vault")}
         >
           <Key className="h-4 w-4" />
         </button>
-        <button
-          className="rounded-md p-1.5 text-muted hover:bg-white/5 hover:text-bone"
-          aria-label="Notifications"
-          onClick={() => navigate("/monitoring")}
-        >
-          <Bell className="h-4 w-4" />
-        </button>
-        <div className="ml-2 flex h-7 w-7 items-center justify-center rounded-md bg-brass/20 font-mono text-[11px] font-semibold text-brass-2">
-          {initials || "VK"}
+
+        {/* Notifications */}
+        <div className="relative" ref={notifRef}>
+          <button
+            type="button"
+            className="relative rounded-md p-1.5 text-muted hover:bg-white/5 hover:text-bone"
+            aria-label="Notifications"
+            aria-expanded={notifOpen}
+            title="Notifications"
+            onClick={() => {
+              setNotifOpen((v) => !v);
+              setMenuOpen(false);
+            }}
+          >
+            <Bell className="h-4 w-4" />
+            {notifCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-amber px-1 font-mono text-[9px] font-semibold text-ink">
+                {notifCount > 9 ? "9+" : notifCount}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-40 mt-1 w-80 overflow-hidden rounded-lg border border-rule bg-ink-1/95 shadow-2xl backdrop-blur-md"
+            >
+              <div className="flex items-center justify-between border-b border-rule px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                <span>Notifications</span>
+                <span>{notifCount} active</span>
+              </div>
+              <ul className="max-h-72 overflow-y-auto">
+                {notifications.length === 0 && (
+                  <li className="flex items-center gap-2 px-3 py-6 text-center text-[12px] text-muted">
+                    <CheckCircle2 className="h-4 w-4 text-moss" />
+                    <span>No active notifications. The control plane is calm.</span>
+                  </li>
+                )}
+                {notifications.map((n) => (
+                  <li
+                    key={n.id}
+                    className="border-b border-rule/40 px-3 py-2 text-[12px] last:border-0"
+                  >
+                    <div className="flex items-start gap-2">
+                      <span
+                        className={
+                          "mt-1 h-1.5 w-1.5 shrink-0 rounded-full " +
+                          (n.severity === "error"
+                            ? "bg-crimson"
+                            : n.severity === "warn"
+                            ? "bg-amber"
+                            : "bg-moss")
+                        }
+                      />
+                      <div className="flex-1">
+                        <div className="text-bone">{n.title}</div>
+                        {n.detail && (
+                          <div className="font-mono text-[10px] text-muted">{n.detail}</div>
+                        )}
+                        <div className="mt-0.5 font-mono text-[10px] text-muted-2">
+                          {new Date(n.ts).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-rule px-3 py-2">
+                <button
+                  type="button"
+                  className="w-full text-left font-mono text-[11px] text-muted hover:text-bone"
+                  onClick={() => {
+                    setNotifOpen(false);
+                    navigate("/monitoring");
+                  }}
+                >
+                  View all in Monitoring →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* User avatar / menu */}
+        <div className="relative ml-1" ref={menuRef}>
+          <button
+            type="button"
+            aria-label="Account menu"
+            aria-expanded={menuOpen}
+            title={displayName}
+            onClick={() => {
+              setMenuOpen((v) => !v);
+              setNotifOpen(false);
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-brass/20 font-mono text-[11px] font-semibold text-brass-2 hover:bg-brass/30"
+          >
+            {initials || "VK"}
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-lg border border-rule bg-ink-1/95 shadow-2xl backdrop-blur-md"
+            >
+              <div className="border-b border-rule px-3 py-2.5">
+                <div className="truncate text-[13px] text-bone">{displayName}</div>
+                {user?.email && user.email !== displayName && (
+                  <div className="truncate font-mono text-[10px] text-muted">{user.email}</div>
+                )}
+                <div className="mt-1 flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+                  <ShieldCheck className="h-3 w-3 text-brass-2" />
+                  <span>{workspaceLabel}</span>
+                  <span className="text-muted-2">·</span>
+                  <span>{planLabel}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-bone-2 hover:bg-white/5 hover:text-bone"
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/settings");
+                }}
+              >
+                <UserIcon className="h-3.5 w-3.5" />
+                Profile & account
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-bone-2 hover:bg-white/5 hover:text-bone"
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/vault");
+                }}
+              >
+                <Key className="h-3.5 w-3.5" />
+                API keys
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-bone-2 hover:bg-white/5 hover:text-bone"
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/settings");
+                }}
+              >
+                <SettingsIcon className="h-3.5 w-3.5" />
+                Settings
+              </button>
+              <div className="border-t border-rule" />
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-crimson hover:bg-crimson/10"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

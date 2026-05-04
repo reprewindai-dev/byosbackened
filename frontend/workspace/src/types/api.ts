@@ -92,6 +92,10 @@ export interface KpiSummary {
   tokens_delta_pct: number;
   spend_today_cents: number;
   spend_cap_pct: number;
+  // Per-metric history for inline sparklines (24 buckets × 5min = last 2h).
+  requests_series?: number[];
+  tokens_series?: number[];
+  spend_series?: number[];
   active_models: number;
   active_models_quantized: number;
   audit_entries: number;

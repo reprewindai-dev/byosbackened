@@ -472,6 +472,45 @@ async def workspace_overview(
     cap_cents = max(spend_cents * 4, 10000)  # placeholder cap if budget not configured
     burn_per_min = int(sum(float(l.cost or 0) * 100 for l in last_hour_logs) / 60) if last_hour_logs else 0
 
+    # ─── Time-series: bucket the last 2h into 24 x 5-minute windows ────────────
+    BUCKET_COUNT = 24
+    BUCKET_MIN = 5
+    series_window_start = now - timedelta(minutes=BUCKET_COUNT * BUCKET_MIN)
+
+    requests_series: list[int] = [0] * BUCKET_COUNT
+    tokens_series: list[int] = [0] * BUCKET_COUNT
+    spend_series: list[int] = [0] * BUCKET_COUNT  # cents per bucket
+    primary_series: list[int] = [0] * BUCKET_COUNT
+    burst_series: list[int] = [0] * BUCKET_COUNT
+
+    for log in recent_logs:
+        if log.created_at < series_window_start:
+            continue
+        offset_min = (log.created_at - series_window_start).total_seconds() / 60.0
+        idx = min(BUCKET_COUNT - 1, max(0, int(offset_min // BUCKET_MIN)))
+        requests_series[idx] += 1
+        tokens_series[idx] += _toks(log)
+        spend_series[idx] += int(float(log.cost or 0) * 100)
+        provider = (log.provider or "").lower()
+        if provider == "groq":
+            burst_series[idx] += 1
+        else:
+            primary_series[idx] += 1
+
+    # Normalize routing series to per-bucket utilization percentages.
+    routing_series = []
+    for i in range(BUCKET_COUNT):
+        bucket_total = primary_series[i] + burst_series[i]
+        bucket_ts = (series_window_start + timedelta(minutes=i * BUCKET_MIN)).strftime("%H:%M")
+        if bucket_total == 0:
+            routing_series.append({"t": bucket_ts, "primary": 0, "burst": 0})
+        else:
+            routing_series.append({
+                "t": bucket_ts,
+                "primary": round(primary_series[i] / bucket_total * 100, 1),
+                "burst": round(burst_series[i] / bucket_total * 100, 1),
+            })
+
     return {
         "kpi": {
             "requests_per_minute": rpm,
@@ -486,6 +525,10 @@ async def workspace_overview(
             "active_models_quantized": quantized,
             "audit_entries": audit_count,
             "audit_verified_pct": 100,
+            # Real per-metric history for sparklines (24 buckets × 5 min = last 2h).
+            "requests_series": requests_series,
+            "tokens_series": tokens_series,
+            "spend_series": spend_series,
         },
         "routing": {
             "primary_plane": "Hetzner primary",
@@ -495,7 +538,7 @@ async def workspace_overview(
             "primary_hosts": [
                 {"name": "hetzner-fsn1", "util_pct": primary_util, "detail": f"{primary_count} req / 1h"}
             ],
-            "series": [],
+            "series": routing_series,
         },
         "spend": {
             "spend_cents": spend_cents,

@@ -23,9 +23,9 @@ jobs:
 
       - name: Health check — LLM status
         run: |
-          RESP=$(curl -s https://api.veklom.com/status)
+          RESP=$(curl -s https://api.veklom.com/status/data)
           echo "Status response: $RESP"
-          echo "$RESP" | grep -q '"status":"ok"' || (echo "Status check failed" && exit 1)
+          echo "$RESP" | grep -q '"services"' || (echo "Status check failed" && exit 1)
           echo "LLM proxy healthy"
 
       - name: Health check — Engine

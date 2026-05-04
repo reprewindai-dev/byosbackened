@@ -1,31 +1,50 @@
-name: Deploy Pricing Page
+name: Deploy Cloudflare Pages
 
 on:
   push:
     branches: [main]
     paths:
+      - 'backend/landing/**'
+      - 'frontend/workspace/**'
       - 'landing/**'
+      - '.github/workflows/deploy-pricing-page.yml'
   workflow_dispatch:
 
 jobs:
-  deploy-pricing:
+  deploy-pages:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/workspace/package-lock.json
+
+      - name: Build and export workspace app
+        run: |
+          cd frontend/workspace
+          npm ci
+          npm run export:landing
+
       - name: Install Wrangler
         run: npm install -g wrangler
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy public site to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          cd landing
-          wrangler pages deploy . --project-name=veklom-pricing --branch=main
+          cd backend/landing
+          wrangler pages deploy . --project-name=veklom --branch=main
 
-      - name: Verify pricing page live
+      - name: Verify site live
         run: |
           sleep 20
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://veklom.com)
           echo "veklom.com status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Cloudflare Pages deploy verification failed"
+            exit 1
+          fi

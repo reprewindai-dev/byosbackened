@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, TerminalSquare, TrendingUp, TrendingDown, ShieldCheck, AlertCircle } from "lucide-react";
 import { PlatformPulseSection } from "@/components/overview/PlatformPulseSection";
+import { Sparkline } from "@/components/overview/Sparkline";
 import { api } from "@/lib/api";
 import type { OverviewPayload } from "@/types/api";
 import { dateFromApiTimestamp, fmtCents, fmtDelta, fmtNumber, formatApiTime, relativeTime } from "@/lib/cn";
@@ -122,10 +123,16 @@ function median(values: number[]): number {
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
+/**
+ * Smooth area chart for routing utilization (Hetzner primary vs AWS burst).
+ * Renders two overlaid curves with mid-point quadratic interpolation —
+ * matches the reference dashboard look (orange line over blue line, with
+ * Y-axis grid labels at 30/60/90/120%).
+ */
 function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
   if (isLoading) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-rule bg-ink-2/40 font-mono text-[11px] text-muted">
+      <div className="flex h-56 items-center justify-center rounded-lg border border-rule bg-ink-2/40 font-mono text-[11px] text-muted">
         Loading routing telemetry...
       </div>
     );
@@ -140,7 +147,7 @@ function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: 
 
   if (!hasActivity) {
     return (
-      <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-rule bg-ink-2/40 px-6 text-center font-mono text-[11px] text-muted">
+      <div className="flex h-56 flex-col items-center justify-center rounded-lg border border-rule bg-ink-2/40 px-6 text-center font-mono text-[11px] text-muted">
         <div>No routing events in this workspace yet.</div>
         <div className="mt-1 text-[10px] text-muted-2">Run the Playground or execute a pipeline to populate live routing telemetry.</div>
       </div>
@@ -149,34 +156,124 @@ function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: 
 
   if (series.length) {
     const points = series.slice(-24);
+    const W = 800;
+    const H = 200;
+    const padL = 36; // room for Y-axis labels
+    const padR = 8;
+    const padT = 8;
+    const padB = 22;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+
+    const yFor = (v: number) => padT + innerH * (1 - Math.max(0, Math.min(100, v)) / 100);
+    const xFor = (i: number) =>
+      padL + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+
+    function curvePath(values: number[]): { line: string; area: string } {
+      const pts = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
+      let line = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+      for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1];
+        const cur = pts[i];
+        const midX = (prev.x + cur.x) / 2;
+        const midY = (prev.y + cur.y) / 2;
+        line += ` Q ${prev.x.toFixed(2)} ${prev.y.toFixed(2)}, ${midX.toFixed(2)} ${midY.toFixed(2)}`;
+      }
+      const last = pts[pts.length - 1];
+      line += ` T ${last.x.toFixed(2)} ${last.y.toFixed(2)}`;
+      const area = `${line} L ${last.x.toFixed(2)} ${(padT + innerH).toFixed(2)} L ${pts[0].x.toFixed(2)} ${(padT + innerH).toFixed(2)} Z`;
+      return { line, area };
+    }
+
+    const primary = curvePath(points.map((p) => p.primary));
+    const burst = curvePath(points.map((p) => p.burst));
+    const yTicks = [120, 90, 60, 30];
+    const xTicks = [0, Math.floor((points.length - 1) / 2), points.length - 1];
+
     return (
-      <div className="h-48 rounded-lg border border-rule bg-ink-2/40 p-4">
-        <div className="flex h-32 items-end gap-1">
-          {points.map((point, index) => {
-            const primary = Math.max(0, Math.min(100, point.primary));
-            const burst = Math.max(0, Math.min(100, point.burst));
-            return (
-              <div key={`${point.t}-${index}`} className="flex min-w-0 flex-1 flex-col justify-end overflow-hidden rounded-sm bg-rule/40">
-                <div className="bg-electric/80" style={{ height: `${burst}%` }} title={`AWS burst ${burst}%`} />
-                <div className="bg-brass/90" style={{ height: `${primary}%` }} title={`Hetzner primary ${primary}%`} />
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-muted">
-          <span>{points[0]?.t ?? "start"}</span>
-          <span className="flex items-center gap-3">
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-brass" />Hetzner</span>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-electric" />AWS burst</span>
+      <div className="rounded-lg border border-rule bg-ink-2/40 p-3">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="h-56 w-full"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Hetzner primary vs AWS burst routing utilization, last 2 hours"
+        >
+          {/* Y-axis gridlines + labels */}
+          {yTicks.map((tick) => (
+            <g key={`yt-${tick}`}>
+              <line
+                x1={padL}
+                x2={W - padR}
+                y1={yFor(tick)}
+                y2={yFor(tick)}
+                stroke="rgba(255,255,255,0.05)"
+                strokeWidth={1}
+              />
+              <text
+                x={padL - 6}
+                y={yFor(tick) + 3}
+                textAnchor="end"
+                fontSize="10"
+                fontFamily="JetBrains Mono, monospace"
+                fill="rgba(255,255,255,0.35)"
+              >
+                {tick}
+              </text>
+            </g>
+          ))}
+
+          {/* AWS burst (blue, behind) */}
+          <path d={burst.area} fill="rgba(110, 168, 254, 0.15)" />
+          <path
+            d={burst.line}
+            fill="none"
+            stroke="rgba(110, 168, 254, 0.95)"
+            strokeWidth={1.75}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* Hetzner primary (orange, front) */}
+          <path d={primary.area} fill="rgba(229, 177, 110, 0.18)" />
+          <path
+            d={primary.line}
+            fill="none"
+            stroke="rgba(229, 177, 110, 0.98)"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* X-axis labels */}
+          {xTicks.map((i) => (
+            <text
+              key={`xt-${i}`}
+              x={xFor(i)}
+              y={H - 6}
+              textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
+              fontSize="10"
+              fontFamily="JetBrains Mono, monospace"
+              fill="rgba(255,255,255,0.4)"
+            >
+              {points[i]?.t ?? ""}
+            </text>
+          ))}
+        </svg>
+        <div className="mt-2 flex items-center justify-end gap-4 font-mono text-[10px] text-muted">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-3 rounded-sm bg-brass-2" /> Hetzner primary
           </span>
-          <span>{points.at(-1)?.t ?? "now"}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-3 rounded-sm bg-electric" /> AWS burst
+          </span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-48 rounded-lg border border-rule bg-ink-2/40 p-4">
+    <div className="h-56 rounded-lg border border-rule bg-ink-2/40 p-4">
       <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">Live host utilization</div>
       <div className="space-y-3">
         {hosts.slice(0, 4).map((host) => (
@@ -251,6 +348,7 @@ export function OverviewPage() {
           delta={data ? fmtDelta(data.kpi.requests_delta_pct, "%") : undefined}
           positive={!!data && data.kpi.requests_delta_pct >= 0}
           loading={isLoading}
+          series={data?.kpi.requests_series}
         />
         <KpiCard
           label="P50 latency"
@@ -265,6 +363,7 @@ export function OverviewPage() {
           delta={data ? fmtDelta(data.kpi.tokens_delta_pct, "%") : undefined}
           positive={!!data && data.kpi.tokens_delta_pct >= 0}
           loading={isLoading}
+          series={data?.kpi.tokens_series}
         />
         <KpiCard
           label="Spend today"
@@ -272,6 +371,7 @@ export function OverviewPage() {
           delta={data ? `${data.kpi.spend_cap_pct}% cap` : undefined}
           positive={!!data && data.kpi.spend_cap_pct < 80}
           loading={isLoading}
+          series={data?.kpi.spend_series}
         />
         <KpiCard
           label="Active models"
@@ -339,10 +439,10 @@ export function OverviewPage() {
             />
           </div>
           <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
-            <SpendRow label="Inference" cents={data?.spend.inference_cents} />
-            <SpendRow label="Embeddings" cents={data?.spend.embeddings_cents} />
-            <SpendRow label="GPU burst" cents={data?.spend.gpu_burst_cents} />
-            <SpendRow label="Storage" cents={data?.spend.storage_cents} />
+            <SpendRow label="Inference" cents={data?.spend.inference_cents} total={data?.spend.spend_cents} />
+            <SpendRow label="Embeddings" cents={data?.spend.embeddings_cents} total={data?.spend.spend_cents} />
+            <SpendRow label="GPU burst" cents={data?.spend.gpu_burst_cents} total={data?.spend.spend_cents} />
+            <SpendRow label="Storage" cents={data?.spend.storage_cents} total={data?.spend.spend_cents} />
           </div>
           <div className="mt-4 space-y-1 font-mono text-[11px] text-muted">
             <div className="flex justify-between">
@@ -462,12 +562,14 @@ function KpiCard({
   delta,
   positive,
   loading,
+  series,
 }: {
   label: string;
   value: string;
   delta?: string;
   positive?: boolean;
   loading?: boolean;
+  series?: number[];
 }) {
   return (
     <div className="v-card p-4">
@@ -489,15 +591,21 @@ function KpiCard({
           </div>
         )}
       </div>
-      <div className="mt-2 h-6 w-full rounded bg-gradient-to-r from-brass/20 to-transparent opacity-60" />
+      <div className="mt-2 h-7 w-full">
+        <Sparkline values={series ?? []} />
+      </div>
     </div>
   );
 }
 
-function SpendRow({ label, cents }: { label: string; cents?: number }) {
+function SpendRow({ label, cents, total }: { label: string; cents?: number; total?: number }) {
+  const pct = cents !== undefined && total && total > 0 ? Math.round((cents / total) * 100) : undefined;
   return (
     <div className="flex items-center justify-between rounded border border-rule px-2 py-1.5">
-      <span className="text-muted">{label}</span>
+      <div className="flex flex-col leading-tight">
+        <span className="text-muted">{label}</span>
+        {pct !== undefined && <span className="text-[10px] text-muted-2">{pct}%</span>}
+      </div>
       <span className="text-bone">{cents !== undefined ? fmtCents(cents) : "—"}</span>
     </div>
   );

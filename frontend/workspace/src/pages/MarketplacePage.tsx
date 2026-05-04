@@ -229,11 +229,14 @@ export function MarketplacePage() {
 
   const checkoutMut = useMutation({
     mutationFn: async (id: string) => {
-      const r = await api.post<{ checkout_url: string }>("/marketplace/payments/create-checkout", {
-        listing_id: id,
-        success_url: window.location.href,
-        cancel_url: window.location.href,
-      });
+      const r = await api.post<{ checkout_url: string; order_id?: string }>(
+        "/marketplace/payments/create-checkout",
+        {
+          listing_id: id,
+          success_url: window.location.href,
+          cancel_url: window.location.href,
+        },
+      );
       return r.data;
     },
     onSuccess: (data) => {
@@ -614,6 +617,12 @@ export function MarketplacePage() {
               <div className="text-[12px] text-crimson">
                 {(installMut.error as { response?: { data?: { detail?: string } } })?.response?.data
                   ?.detail ?? (installMut.error as Error)?.message}
+              </div>
+            )}
+            {checkoutMut.isError && (
+              <div className="text-[12px] text-crimson">
+                {(checkoutMut.error as { response?: { data?: { detail?: string } } })?.response
+                  ?.data?.detail ?? (checkoutMut.error as Error)?.message}
               </div>
             )}
           </div>

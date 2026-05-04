@@ -551,21 +551,26 @@ class OrderCreateRequest(BaseModel):
     items: list[str] = Field(default_factory=list, description="Listing IDs")
 
 
-@router.post("/orders/create")
-async def orders_create(
-    payload: OrderCreateRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    if not payload.items:
+def _create_order_for_listing_ids(
+    *,
+    db: Session,
+    current_user: User,
+    listing_ids: list[str],
+) -> MarketplaceOrder:
+    if not listing_ids:
         raise HTTPException(status_code=400, detail="No order items provided")
-    deduped_items = list(dict.fromkeys(payload.items))
+
+    deduped_items = list(dict.fromkeys(listing_ids))
     listings = db.query(Listing).filter(Listing.id.in_(deduped_items), Listing.status == "active").all()
-    if not listings:
-        raise HTTPException(status_code=404, detail="No active listings found")
+    found_ids = {x.id for x in listings}
+    missing_ids = [x for x in deduped_items if x not in found_ids]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail="One or more active listings were not found")
+
     currencies = {x.currency for x in listings}
     if len(currencies) != 1:
         raise HTTPException(status_code=400, detail="All listings in an order must have matching currency")
+
     total = sum(x.price_cents for x in listings)
     order = MarketplaceOrder(
         buyer_id=current_user.id,
@@ -588,6 +593,16 @@ async def orders_create(
         )
     db.commit()
     db.refresh(order)
+    return order
+
+
+@router.post("/orders/create")
+async def orders_create(
+    payload: OrderCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    order = _create_order_for_listing_ids(db=db, current_user=current_user, listing_ids=payload.items)
     return {"id": order.id, "total_cents": order.total_cents, "currency": order.currency}
 
 
@@ -651,7 +666,8 @@ async def payments_create_intent(
 
 
 class CheckoutSessionRequest(BaseModel):
-    order_id: str
+    order_id: Optional[str] = None
+    listing_id: Optional[str] = None
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
 
@@ -665,12 +681,18 @@ async def payments_create_checkout(
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe is not configured")
     stripe.api_key = settings.stripe_secret_key
-    order = db.query(MarketplaceOrder).filter(
-        MarketplaceOrder.id == payload.order_id,
-        MarketplaceOrder.buyer_id == current_user.id,
-    ).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+    if payload.order_id:
+        order = db.query(MarketplaceOrder).filter(
+            MarketplaceOrder.id == payload.order_id,
+            MarketplaceOrder.buyer_id == current_user.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+    elif payload.listing_id:
+        order = _create_order_for_listing_ids(db=db, current_user=current_user, listing_ids=[payload.listing_id])
+    else:
+        raise HTTPException(status_code=400, detail="order_id or listing_id is required")
+
     if order.total_cents <= 0:
         raise HTTPException(status_code=400, detail="Order total must be positive")
     if order.status == "paid":
@@ -681,6 +703,8 @@ async def payments_create_checkout(
 
     line_items = []
     for item in order.items:
+        if item.price_cents <= 0:
+            continue
         listing = db.query(Listing).filter(Listing.id == item.listing_id).first()
         title = listing.title if listing else f"Listing {item.listing_id}"
         line_items.append(
@@ -696,6 +720,8 @@ async def payments_create_checkout(
                 },
             }
         )
+    if not line_items:
+        raise HTTPException(status_code=400, detail="Order has no paid checkout items")
 
     session = stripe.checkout.Session.create(
         mode="payment",
@@ -706,7 +732,7 @@ async def payments_create_checkout(
         cancel_url=cancel_url,
         metadata={"order_id": order.id, "workspace_id": order.workspace_id},
     )
-    return {"checkout_url": session.url, "checkout_session_id": session.id}
+    return {"checkout_url": session.url, "checkout_session_id": session.id, "order_id": order.id}
 
 
 @router.post("/payments/webhook")

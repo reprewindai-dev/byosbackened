@@ -1,0 +1,34 @@
+name: Deploy & Health Check
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Coolify to deploy
+        run: sleep 45
+
+      - name: Health check — Main API
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/health)
+          echo "Main API status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "DEPLOY FAILED - api.veklom.com/health returned $STATUS"
+            exit 1
+          fi
+          echo "api.veklom.com healthy"
+
+      - name: Health check — LLM status
+        run: |
+          RESP=$(curl -s https://api.veklom.com/status)
+          echo "Status response: $RESP"
+          echo "$RESP" | grep -q '"status":"ok"' || (echo "Status check failed" && exit 1)
+          echo "LLM proxy healthy"
+
+      - name: Health check — Engine
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://5.78.153.146:8000/health || echo "000")
+          echo "Engine status: $STATUS"

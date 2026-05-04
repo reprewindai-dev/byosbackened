@@ -1,0 +1,7 @@
+name = "veklom"
+main = "cloudflare/worker.ts"
+compatibility_date = "2026-05-04"
+workers_dev = true
+
+[observability]
+enabled = true

@@ -1,0 +1,11 @@
+{
+  "name": "veklom-cloudflare-worker-sentinel",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Cloudflare Worker sentinel build: no production domain routes\"",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
+  }
+}

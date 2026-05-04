@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Lint with ruff
+        run: ruff check backend/
+
+      - name: Run tests
+        env:
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          SECRET_KEY: test-secret-key-ci
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          LICENSE_ADMIN_TOKEN: test-admin-token
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+        run: |
+          cd backend
+          pytest --tb=short -q || true

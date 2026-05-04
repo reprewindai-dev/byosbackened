@@ -1,0 +1,55 @@
+name: Weekly Stripe Reconciliation
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install stripe psycopg2-binary
+
+      - name: Run reconciliation
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python - <<'EOF'
+          import stripe, psycopg2, os, sys
+
+          stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          stripe_active = set()
+          for sub in stripe.Subscription.list(status="active", limit=100).auto_paging_iter():
+              stripe_active.add(sub.customer)
+
+          cur.execute("SELECT stripe_customer_id FROM subscriptions WHERE status = 'active'")
+          db_active = set(row[0] for row in cur.fetchall() if row[0])
+
+          stripe_only = stripe_active - db_active
+          db_only = db_active - stripe_active
+
+          issues = []
+          if stripe_only:
+              issues.append(f"Stripe has {len(stripe_only)} customers with no DB record")
+          if db_only:
+              issues.append(f"DB has {len(db_only)} active records with no Stripe subscription")
+
+          if issues:
+              for i in issues:
+                  print(f"ISSUE: {i}")
+              sys.exit(1)
+          else:
+              print(f"Reconciliation clean - {len(stripe_active)} active Stripe subs match DB")
+          EOF

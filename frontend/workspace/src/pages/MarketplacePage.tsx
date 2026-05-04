@@ -282,30 +282,43 @@ export function MarketplacePage() {
   }, [allCards, selected?.id, slug]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="mx-auto w-full max-w-[1400px] space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-            Workspace · Marketplace
+            Marketplace
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Self-organizing AI marketplace</h1>
-          <p className="mt-2 max-w-2xl text-sm text-bone-2">
-            Every listing is auto-classified, auto-validated, and ships with pre-flight cost,
-            quality, and failure-risk predictions for your workspace's data context. One-click
-            install turns any pipeline listing into a live, audited workflow.
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
+            Sovereign-ready assets, governed distribution
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm text-bone-2">
+            Models, pipelines, compliance packs, connectors, and managed services - every listing inherits Veklom's
+            policy engine and audit trail.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" /> live ·{" "}
               <span className="font-mono">/api/v1/marketplace</span>
             </span>
-            <span className="v-chip v-chip-brass">{allCards.length} listings</span>
+            <span className="v-chip v-chip-brass">
+              <ShieldCheck className="h-3 w-3" />
+              License-bound
+            </span>
+            <span className="v-chip">{allCards.length} listings</span>
           </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Purchase history route is not wired yet.">
+            <Store className="h-3.5 w-3.5" /> My purchases
+          </button>
+          <button className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Provider onboarding is handled outside this page for now.">
+            <Sparkles className="h-3.5 w-3.5" /> Become a provider
+          </button>
         </div>
       </header>
 
       {/* Search + type chips */}
-      <div className="v-card flex flex-wrap items-center gap-3 p-3">
+      <div className="frame flex flex-wrap items-center gap-3 p-3">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
@@ -330,7 +343,7 @@ export function MarketplacePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
         {/* Category sidebar */}
-        <aside className="v-card h-fit p-3">
+        <aside className="frame h-fit p-3">
           <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
             Categories
           </div>
@@ -405,7 +418,7 @@ export function MarketplacePage() {
                 title={`Results (${filteredAll.length})`}
               />
               {filteredAll.length === 0 ? (
-                <div className="v-card mt-3 flex flex-col items-center gap-2 py-12 text-center text-sm text-bone-2">
+                <div className="frame mt-3 flex flex-col items-center gap-2 py-12 text-center text-sm text-bone-2">
                   <Store className="h-8 w-8 text-brass-2" />
                   No listings match your filters.
                 </div>
@@ -420,7 +433,7 @@ export function MarketplacePage() {
           )}
 
           {featuredQ.isError && (
-            <div className="v-card flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+            <div className="frame flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
               <AlertCircle className="mt-0.5 h-4 w-4" />
               <div>
                 <div className="font-semibold">Failed to load marketplace</div>
@@ -440,7 +453,7 @@ export function MarketplacePage() {
           onClick={() => setSelected(null)}
         >
           <div
-            className="v-card w-full max-w-2xl space-y-4 p-5"
+            className="frame w-full max-w-2xl space-y-4 p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <header className="flex items-start justify-between gap-3">
@@ -692,7 +705,7 @@ function ListingCardView({ card, onClick }: { card: ListingCard; onClick: () => 
   return (
     <button
       onClick={onClick}
-      className="v-card group flex flex-col gap-2 p-4 text-left transition hover:border-brass/40"
+      className="frame group flex flex-col gap-2 p-4 text-left transition hover:border-brass/40"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

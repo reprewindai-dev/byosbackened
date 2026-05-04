@@ -160,6 +160,7 @@ async def demo_pipeline_stream(
     request: Request,
     prompt: str = Query(..., min_length=1, max_length=_DEMO_PROMPT_MAX_CHARS),
     vertical: str = Query("default", regex=r"^(legal|medical|finance|agency|infrastructure|default)$"),
+    system_prompt: Optional[str] = Query(None, min_length=1, max_length=1500),
     force_fallback: bool = Query(False, description="Simulate Ollama outage to demo the circuit breaker path"),
 ):
     """
@@ -179,7 +180,7 @@ async def demo_pipeline_stream(
             headers={"Retry-After": str(window_ttl)},
         )
 
-    system = _VERTICAL_SYSTEM_PROMPTS.get(vertical, _VERTICAL_SYSTEM_PROMPTS["default"])
+    system = (system_prompt or "").strip() or _VERTICAL_SYSTEM_PROMPTS.get(vertical, _VERTICAL_SYSTEM_PROMPTS["default"])
     effective_prompt = f"{system}\n\nUser: {prompt}\nAssistant:"
 
     def _gen():

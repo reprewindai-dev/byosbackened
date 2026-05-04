@@ -67,12 +67,34 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _build_log_hash(payload: dict, previous_log_hash: Optional[str]) -> str:
-    envelope = {
-        "payload": payload,
+def _build_log_hash(
+    *,
+    log_id: str,
+    workspace_id: str,
+    user_id: str,
+    operation_type: str,
+    provider: str,
+    model: Optional[str],
+    input_hash: str,
+    output_hash: str,
+    cost: Decimal,
+    created_at: datetime,
+    previous_log_hash: Optional[str],
+) -> str:
+    log_data = {
+        "id": log_id,
+        "workspace_id": workspace_id,
+        "user_id": user_id,
+        "operation_type": operation_type,
+        "provider": provider,
+        "model": model,
+        "input_hash": input_hash,
+        "output_hash": output_hash,
+        "cost": str(cost),
+        "created_at": created_at.isoformat() if created_at else None,
         "previous_log_hash": previous_log_hash,
     }
-    digest = json.dumps(envelope, sort_keys=True, separators=(",", ":"))
+    digest = json.dumps(log_data, sort_keys=True)
     return hmac.new(settings.secret_key.encode("utf-8"), digest.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -212,6 +234,7 @@ async def complete(
 
     try:
         response_text = (llm_result.get("response") or "").strip()
+        executed_model = str(llm_result.get("model") or model_row.bedrock_model_id or payload.model)
         prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
         total_tokens = int(llm_result.get("total_tokens") or (prompt_tokens + output_tokens))
@@ -243,8 +266,8 @@ async def complete(
                 metadata_json=json.dumps(
                     {
                         "provider": provider,
-                        "model": payload.model,
-                        "runtime_model_id": model_row.bedrock_model_id,
+                        "model": executed_model,
+                        "requested_model": payload.model,
                         "output_tokens": output_tokens,
                         "tokens_deducted": tokens_deducted,
                     },
@@ -257,26 +280,12 @@ async def complete(
             wallet.total_credits_used = (wallet.total_credits_used or 0) + tokens_deducted
             wallet.updated_at = datetime.utcnow()
 
-        audit_payload = {
-            "user_id": current_user.id,
-            "workspace_id": current_user.workspace_id,
-            "model": payload.model,
-            "runtime_model_id": model_row.bedrock_model_id,
-            "tokens_deducted": tokens_deducted,
-            "prompt_tokens": prompt_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "provider": provider,
-            "latency_ms": latency_ms,
-            "timestamp": started_at.isoformat(),
-            "request_id": request_id,
-        }
         audit_entry = AIAuditLog(
             workspace_id=current_user.workspace_id,
             user_id=current_user.id,
             operation_type="ai.complete",
             provider=provider,
-            model=model_row.bedrock_model_id,
+            model=executed_model,
             input_hash=_sha256(payload.prompt),
             output_hash=_sha256(response_text),
             input_preview=payload.prompt[:500],
@@ -289,29 +298,45 @@ async def complete(
             pii_detected=False,
             pii_types=[],
             sensitive_data_flags={},
-            log_hash=_build_log_hash(audit_payload, previous_log_hash),
+            created_at=datetime.utcnow(),
+            log_hash="",
             previous_log_hash=previous_log_hash,
         )
         db.add(audit_entry)
+        db.flush()
+        audit_entry.log_hash = _build_log_hash(
+            log_id=audit_entry.id,
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            operation_type="ai.complete",
+            provider=provider,
+            model=executed_model,
+            input_hash=audit_entry.input_hash,
+            output_hash=audit_entry.output_hash,
+            cost=cost_usd,
+            created_at=audit_entry.created_at,
+            previous_log_hash=previous_log_hash,
+        )
         db.commit()
         record_request_log(
             db,
             workspace_id=current_user.workspace_id,
             request_kind="ai.complete",
             request_path="/api/v1/ai/complete",
-            model=payload.model,
+            model=executed_model,
             provider=provider,
             status="success",
             prompt_preview=payload.prompt[:500],
             response_preview=response_text[:500],
             request_json={
                 "model": payload.model,
+                "resolved_model": executed_model,
                 "prompt": payload.prompt,
                 "max_tokens": payload.max_tokens,
             },
             response_json={
                 "response_text": response_text,
-                "runtime_model_id": model_row.bedrock_model_id,
+                "runtime_model_id": executed_model,
                 "provider": provider,
                 "prompt_tokens": prompt_tokens,
                 "output_tokens": output_tokens,
@@ -341,15 +366,15 @@ async def complete(
         "AI completion logged user_id=%s workspace_id=%s model=%s tokens_deducted=%s timestamp=%s",
         current_user.id,
         current_user.workspace_id,
-        payload.model,
+        executed_model,
         tokens_deducted,
         started_at.isoformat(),
     )
 
     return AICompleteResponse(
         response_text=response_text,
-        model=payload.model,
-        bedrock_model_id=model_row.bedrock_model_id,
+        model=executed_model,
+        bedrock_model_id=executed_model,
         provider=provider,
         request_id=request_id,
         audit_log_id=str(audit_entry.id),

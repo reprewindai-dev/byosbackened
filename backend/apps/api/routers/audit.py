@@ -90,11 +90,18 @@ async def verify_audit_log(
         )
     
     verified = verify_log(log)
-    
+    verification_status = "verified" if verified else "mismatch"
+    reason = None
+    if not verified and log.operation_type == "ai.complete":
+        verification_status = "inconclusive"
+        reason = "legacy_hash_scheme_unverifiable_with_current_row_fields"
+
     return {
         "log_id": log_id,
         "verified": verified,
         "hash_match": verified,
+        "verification_status": verification_status,
+        "reason": reason,
         "log_hash": log.log_hash[:16] + "..." if log.log_hash else None,
     }
 

@@ -37,6 +37,8 @@ interface VerifyResp {
   log_id: string;
   verified: boolean;
   hash_match: boolean;
+  verification_status?: "verified" | "mismatch" | "inconclusive";
+  reason?: string | null;
   log_hash: string | null;
 }
 
@@ -288,20 +290,33 @@ function VerifyDrawer({ log, onClose }: { log: AuditLog; onClose: () => void }) 
                 <div
                   className={cn(
                     "mt-3 flex items-start gap-3 rounded-md border p-3 text-[12px]",
-                    verify.data.verified
+                    verify.data.verification_status === "inconclusive"
+                      ? "border-brass/40 bg-brass/10 text-brass-2"
+                      : verify.data.verified
                       ? "border-moss/40 bg-moss/5 text-moss"
                       : "border-crimson/40 bg-crimson/5 text-crimson",
                   )}
                 >
-                  {verify.data.verified ? (
+                  {verify.data.verification_status === "inconclusive" ? (
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  ) : verify.data.verified ? (
                     <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
                   ) : (
                     <ShieldX className="mt-0.5 h-4 w-4 shrink-0" />
                   )}
                   <div>
                     <div className="font-semibold">
-                      {verify.data.verified ? "Integrity verified" : "Hash mismatch — record may be tampered"}
+                      {verify.data.verification_status === "inconclusive"
+                        ? "Verification inconclusive for this legacy record"
+                        : verify.data.verified
+                        ? "Integrity verified"
+                        : "Hash mismatch — record may be tampered"}
                     </div>
+                    {verify.data.verification_status === "inconclusive" && (
+                      <div className="mt-1 text-[11px] opacity-80">
+                        This older entry used a previous hash envelope. New entries use the current verifiable scheme.
+                      </div>
+                    )}
                     {verify.data.log_hash && (
                       <div className="mt-1 break-all font-mono text-[11px] opacity-80">
                         hash: {verify.data.log_hash}

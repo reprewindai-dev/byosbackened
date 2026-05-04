@@ -12,6 +12,42 @@ export interface User {
   plan?: string;
   region?: string;
   last_login_at?: string | null;
+  is_superuser?: boolean;
+}
+
+export interface PlatformPulseActivity {
+  kind: "listing_new" | "order_completed" | "upgrade" | "user_registered" | "rate_limit_hit";
+  actor: string;
+  ts: string;
+  title?: string;
+  order_id?: string;
+  to_plan?: string;
+  tier?: string;
+  amount_cents?: number;
+  billing_cycle?: string;
+}
+
+export interface PlatformPulseSuperuser {
+  mrr_cents: number;
+  mrr_delta_pct_vs_prior: number;
+  arpu_cents: number;
+  churn_pct_30d: number;
+  trial_conversions_30d: number;
+  open_security_threats: number;
+  past_due_subscriptions: number;
+  marketplace_gross_30d_cents: number;
+}
+
+export interface PlatformPulse {
+  users: { total: number; delta_pct_30d: number; added_30d: number };
+  active_listings: { total: number; added_7d: number };
+  orders_30d: { count: number; delta_pct_vs_prior: number };
+  paid_tier_users: { total: number; upgrades_30d: number };
+  tier_distribution: Record<string, number>;
+  activity: PlatformPulseActivity[];
+  is_superuser: boolean;
+  generated_at: string;
+  superuser?: PlatformPulseSuperuser;
 }
 
 export interface Workspace {

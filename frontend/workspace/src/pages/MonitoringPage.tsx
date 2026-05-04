@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { cn, fmtNumber, relativeTime } from "@/lib/cn";
+import { cn, fmtNumber, formatApiDateTime, relativeTime } from "@/lib/cn";
 
 interface AuditLog {
   id: string;
@@ -248,7 +248,7 @@ function VerifyDrawer({ log, onClose }: { log: AuditLog; onClose: () => void }) 
             <Cell label="Provider" value={log.provider || "—"} />
             <Cell label="Model" value={log.model || "—"} />
             <Cell label="Cost" value={`$${parseFloat(log.cost || "0").toFixed(6)}`} />
-            <Cell label="When" value={new Date(log.created_at).toLocaleString()} />
+            <Cell label="When" value={formatApiDateTime(log.created_at)} />
             <Cell label="PII" value={log.pii_detected ? "detected" : "clean"} warn={log.pii_detected} />
           </div>
 

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, TerminalSquare, TrendingUp, TrendingDown, ShieldCheck, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import type { OverviewPayload } from "@/types/api";
-import { fmtCents, fmtDelta, fmtNumber, relativeTime } from "@/lib/cn";
+import { dateFromApiTimestamp, fmtCents, fmtDelta, fmtNumber, formatApiTime, relativeTime } from "@/lib/cn";
 import { isRouteUnavailable } from "@/lib/errors";
 
 async function fetchOverview(): Promise<OverviewPayload> {
@@ -38,8 +38,8 @@ function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
   const calls = Number(data.total_api_calls ?? 0);
   const tokens = Number(data.total_tokens_used ?? 0);
   const costUsd = Number(data.total_cost_usd ?? 0);
-  const periodStart = data.period_start ? new Date(data.period_start).getTime() : Date.now();
-  const periodEnd = data.period_end ? new Date(data.period_end).getTime() : Date.now();
+  const periodStart = data.period_start ? (dateFromApiTimestamp(data.period_start)?.getTime() ?? Date.now()) : Date.now();
+  const periodEnd = data.period_end ? (dateFromApiTimestamp(data.period_end)?.getTime() ?? Date.now()) : Date.now();
   const minutes = Math.max(1, Math.round((periodEnd - periodStart) / 60000));
   const activeModels = data.active_models ?? [];
   const recent = data.live_feed ?? [];
@@ -437,7 +437,7 @@ export function OverviewPage() {
                 <div className="flex-1">
                   <div className="flex justify-between text-bone">
                     <span>{e.summary}</span>
-                    <span className="text-muted">{new Date(e.ts).toLocaleTimeString()}</span>
+                    <span className="text-muted">{formatApiTime(e.ts)}</span>
                   </div>
                   <div className="text-muted">{e.detail}</div>
                 </div>

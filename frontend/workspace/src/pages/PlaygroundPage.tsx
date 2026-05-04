@@ -1,4 +1,4 @@
-import { type ReactNode, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { type ReactNode, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -61,27 +61,30 @@ const SAMPLE_PROMPTS: Record<Vertical, string> = {
 };
 
 const EVENT_META: Record<string, { label: string; color: string; icon: string }> = {
-  request_received: { label: "Request received", color: "text-bone", icon: "◆" },
-  zero_trust_check: { label: "Zero-trust check", color: "text-electric", icon: "🛡" },
-  rate_limit_check: { label: "Rate limit", color: "text-electric", icon: "⏱" },
-  token_budget_check: { label: "Token budget", color: "text-electric", icon: "◉" },
-  circuit_breaker_check: { label: "Circuit breaker", color: "text-amber", icon: "↯" },
-  provider_selected: { label: "Provider chosen", color: "text-brass-2", icon: "⇨" },
-  ollama_attempt: { label: "Ollama attempt", color: "text-brass-2", icon: "▶" },
-  ollama_unavailable: { label: "Ollama unavailable", color: "text-crimson", icon: "✕" },
-  circuit_breaker_opened: { label: "Breaker opened", color: "text-crimson", icon: "⚠" },
-  groq_fallback: { label: "Groq fallback", color: "text-violet", icon: "↪" },
-  redis_memory_check: { label: "Memory check", color: "text-electric", icon: "◎" },
-  token_delta: { label: "Token", color: "text-moss", icon: "·" },
-  response_complete: { label: "Response complete", color: "text-moss", icon: "✓" },
-  audit_written: { label: "Audit written", color: "text-moss", icon: "✓" },
-  cost_recorded: { label: "Cost recorded", color: "text-moss", icon: "✓" },
-  done: { label: "Done", color: "text-moss", icon: "●" },
-  error: { label: "Error", color: "text-crimson", icon: "✕" },
+  request_received: { label: "Request received", color: "text-bone", icon: "â—†" },
+  zero_trust_check: { label: "Zero-trust check", color: "text-electric", icon: "ðŸ›¡" },
+  rate_limit_check: { label: "Rate limit", color: "text-electric", icon: "â±" },
+  token_budget_check: { label: "Token budget", color: "text-electric", icon: "â—‰" },
+  circuit_breaker_check: { label: "Circuit breaker", color: "text-amber", icon: "â†¯" },
+  provider_selected: { label: "Provider chosen", color: "text-brass-2", icon: "â‡¨" },
+  circuit_breaker_triggered: { label: "Circuit breaker triggered", color: "text-brass-2", icon: "!" },
+  ollama_attempt: { label: "Ollama attempt", color: "text-brass-2", icon: "â–¶" },
+  ollama_unavailable: { label: "Ollama unavailable", color: "text-crimson", icon: "âœ•" },
+  circuit_breaker_opened: { label: "Breaker opened", color: "text-crimson", icon: "âš " },
+  groq_fallback: { label: "Groq fallback", color: "text-violet", icon: "â†ª" },
+  redis_memory_check: { label: "Memory check", color: "text-electric", icon: "â—Ž" },
+  token_delta: { label: "Token", color: "text-moss", icon: "Â·" },
+  response_complete: { label: "Response complete", color: "text-moss", icon: "âœ“" },
+  audit_written: { label: "Audit written", color: "text-moss", icon: "âœ“" },
+  cost_recorded: { label: "Cost recorded", color: "text-moss", icon: "âœ“" },
+  done: { label: "Done", color: "text-moss", icon: "â—" },
+  error: { label: "Error", color: "text-crimson", icon: "âœ•" },
 };
 
 export function PlaygroundPage() {
   const [vertical, setVertical] = useState<Vertical>("default");
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState("");
   const [prompt, setPrompt] = useState(SAMPLE_PROMPTS.default);
   const [forceFallback, setForceFallback] = useState(false);
   const [running, setRunning] = useState(false);
@@ -104,6 +107,9 @@ export function PlaygroundPage() {
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const eventSrcRef = useRef<EventSource | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
+  const intendedProviderRef = useRef<string | null>(null);
+  const intendedModelRef = useRef<string | null>(null);
+  const failoverLoggedRef = useRef(false);
 
   const apiBase = resolveApiBase();
 
@@ -126,11 +132,17 @@ export function PlaygroundPage() {
     setError(null);
     setNotice(null);
     setExportNotice(null);
+    intendedProviderRef.current = null;
+    intendedModelRef.current = null;
+    failoverLoggedRef.current = false;
     setRunning(true);
 
     const url = new URL(`${apiBase}/api/v1/demo/pipeline/stream`, window.location.origin);
     url.searchParams.set("prompt", prompt.slice(0, 800));
     url.searchParams.set("vertical", vertical);
+    if (systemPrompt.trim()) {
+      url.searchParams.set("system_prompt", systemPrompt.trim());
+    }
     if (forceFallback) url.searchParams.set("force_fallback", "true");
 
     const es = new EventSource(url.toString());
@@ -139,10 +151,25 @@ export function PlaygroundPage() {
     const handle = (evt: MessageEvent, name: string) => {
       try {
         const data = JSON.parse(evt.data);
-        setEvents((prev) => [
-          ...prev,
-          { id: `${name}-${prev.length}`, event: name, data, ts: Date.now() },
-        ]);
+        setEvents((prev) => {
+          const next = [...prev];
+          if (name === "provider_selected") {
+            if (!intendedProviderRef.current && typeof data.provider === "string") intendedProviderRef.current = data.provider;
+            if (!intendedModelRef.current && typeof data.model === "string") intendedModelRef.current = data.model;
+          }
+          if (name === "response_complete" && !failoverLoggedRef.current) {
+            const intendedProvider = intendedProviderRef.current ?? "";
+            const intendedModel = intendedModelRef.current ?? "";
+            const actualProvider = typeof data.provider === "string" ? data.provider : "";
+            const actualModel = typeof data.model === "string" ? data.model : "";
+            if (intendedProvider && actualProvider && (intendedProvider !== actualProvider || (intendedModel && actualModel && intendedModel !== actualModel))) {
+              next.push({ id: `circuit_breaker_triggered-${next.length}`, event: "circuit_breaker_triggered", data: { intended_provider: intendedProvider, intended_model: intendedModel || "unknown", actual_provider: actualProvider, actual_model: actualModel || "unknown", reason: "circuit_breaker_failover" }, ts: Date.now() });
+              failoverLoggedRef.current = true;
+            }
+          }
+          next.push({ id: `${name}-${next.length}`, event: name, data, ts: Date.now() });
+          return next;
+        });
         if (name === "token_delta") {
           const delta = typeof data.delta === "string" ? data.delta : typeof data.text === "string" ? data.text : "";
           if (delta) {
@@ -159,6 +186,8 @@ export function PlaygroundPage() {
         }
         if (name === "response_complete") {
           setStats((s) => ({
+            provider: String(data.provider ?? s.provider ?? ""),
+            model: String(data.model ?? s.model ?? ""),
             ...s,
             prompt_tokens: Number(data.prompt_tokens ?? s.prompt_tokens ?? 0),
             completion_tokens: Number(data.completion_tokens ?? s.completion_tokens ?? 0),
@@ -206,7 +235,7 @@ export function PlaygroundPage() {
     if (!prompt.trim()) return;
     setPreflight({ loading: true });
     try {
-      // Cost prediction — always available, server-side, ML when warm.
+      // Cost prediction â€” always available, server-side, ML when warm.
       const costResp = await api.post("/cost/predict", {
         operation_type: "generation",
         provider: "local",
@@ -228,14 +257,14 @@ export function PlaygroundPage() {
         loading: false,
       };
 
-      // Quality + failure risk — best-effort; ML may be cold for new workspaces.
+      // Quality + failure risk â€” best-effort; ML may be cold for new workspaces.
       const params = { operation_type: "generation", provider: "local", input_text: prompt.slice(0, 2000) };
       try {
         const qResp = await api.post("/autonomous/quality/predict", null, { params });
         const q = qResp.data as { predicted_quality?: number };
         if (q?.predicted_quality != null) next.predicted_quality = q.predicted_quality;
       } catch {
-        /* ML cold — skip */
+        /* ML cold â€” skip */
       }
       try {
         const rResp = await api.post("/autonomous/quality/failure-risk", null, { params });
@@ -243,7 +272,7 @@ export function PlaygroundPage() {
         const risk = r?.failure_risk ?? r?.risk;
         if (risk != null) next.failure_risk = risk;
       } catch {
-        /* ML cold — skip */
+        /* ML cold â€” skip */
       }
 
       setPreflight(next);
@@ -259,7 +288,7 @@ export function PlaygroundPage() {
     if (!prompt.trim() || savingPipeline) return;
     setSavingPipeline(true);
     try {
-      const name = `Playground · ${vertical} · ${new Date().toLocaleDateString()}`;
+      const name = `Playground Â· ${vertical} Â· ${new Date().toLocaleDateString()}`;
       const resp = await api.post<{ slug: string }>("/pipelines", {
         name,
         description: `Saved from Playground (${vertical}). Original prompt preserved as input node.`,
@@ -322,17 +351,17 @@ export function PlaygroundPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-            Workspace · Playground
+            Workspace Â· Playground
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">Governed execution theater</h1>
           <p className="mt-2 max-w-2xl text-sm text-bone-2">
             Every prompt passes through zero-trust, rate limits, token budget, circuit breaker, provider selection,
-            memory, audit, and cost recording — before a single token leaves your perimeter. Watch it happen.
+            memory, audit, and cost recording â€” before a single token leaves your perimeter. Watch it happen.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              live SSE · <span className="font-mono">/api/v1/demo/pipeline/stream</span>
+              live SSE Â· <span className="font-mono">/api/v1/demo/pipeline/stream</span>
             </span>
             <span className="v-chip">no auth required</span>
             <span className="v-chip">rate-limited 5/min</span>
@@ -378,7 +407,7 @@ export function PlaygroundPage() {
               <div className="flex-1">
                 <div className="text-[13px] font-medium text-bone">Force fallback</div>
                 <div className="mt-1 text-[11px] leading-relaxed text-muted">
-                  Simulate Ollama outage — exercises the circuit breaker and routes through Groq fallback.
+                  Simulate Ollama outage â€” exercises the circuit breaker and routes through Groq fallback.
                 </div>
               </div>
             </label>
@@ -399,7 +428,7 @@ export function PlaygroundPage() {
                 "Cost ledger entry",
               ].map((s) => (
                 <li key={s} className="flex items-start gap-2 text-bone-2">
-                  <span className="mt-0.5 text-moss">✓</span>
+                  <span className="mt-0.5 text-moss">âœ“</span>
                   {s}
                 </li>
               ))}
@@ -409,6 +438,27 @@ export function PlaygroundPage() {
 
         <section className="space-y-4">
           <div className="v-card p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                className="v-btn-ghost px-2 py-1 text-[11px]"
+                onClick={() => setShowSystemPrompt((v) => !v)}
+                type="button"
+              >
+                {showSystemPrompt ? "Hide system prompt" : "System prompt (optional)"}
+              </button>
+            </div>
+            {showSystemPrompt && (
+              <div className="mb-3">
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value.slice(0, 1500))}
+                  rows={3}
+                  className="v-input min-h-[84px] resize-y font-mono text-[12px] leading-relaxed"
+                  placeholder="You are a governed AI assistant running inside Veklom's sovereign control plane..."
+                  disabled={running}
+                />
+              </div>
+            )}
             <div className="mb-2 flex items-center justify-between">
               <label htmlFor="prompt" className="v-label mb-0">
                 Prompt
@@ -421,7 +471,7 @@ export function PlaygroundPage() {
               onChange={(e) => setPrompt(e.target.value.slice(0, 800))}
               rows={4}
               className="v-input min-h-[96px] resize-y font-mono text-[13px] leading-relaxed"
-              placeholder="What would you like the governed control plane to answer…"
+              placeholder="What would you like the governed control plane to answerâ€¦"
               disabled={running}
             />
             <div className="mt-3 flex items-center justify-between">
@@ -450,7 +500,7 @@ export function PlaygroundPage() {
                   title="Save this run as a governed pipeline"
                 >
                   <Save className="h-4 w-4" />
-                  {savingPipeline ? "Saving…" : savedPipelineSlug ? "Saved✓" : "Save as Pipeline"}
+                  {savingPipeline ? "Savingâ€¦" : savedPipelineSlug ? "Savedâœ“" : "Save as Pipeline"}
                 </button>
                 <button
                   className="v-btn-ghost"
@@ -459,7 +509,7 @@ export function PlaygroundPage() {
                   title="Predict cost, quality, and failure risk before running"
                 >
                   <TrendingDown className="h-4 w-4" />
-                  {preflight.loading ? "Predicting…" : "Pre-flight"}
+                  {preflight.loading ? "Predictingâ€¦" : "Pre-flight"}
                 </button>
               </div>
               <div className="flex gap-2 font-mono text-[11px]">
@@ -512,10 +562,10 @@ export function PlaygroundPage() {
                   <div className="grid grid-cols-3 gap-3 font-mono text-[12px]">
                     <PreflightCell
                       label="cost / run"
-                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "—"}
+                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "â€”"}
                       sub={
                         preflight.cost_confidence_upper != null && preflight.predicted_cost != null
-                          ? `±$${(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}`
+                          ? `Â±$${(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}`
                           : "server-side ml"
                       }
                       tone="ok"
@@ -525,7 +575,7 @@ export function PlaygroundPage() {
                       value={
                         preflight.predicted_quality != null
                           ? `${(preflight.predicted_quality * 100).toFixed(0)}%`
-                          : "—"
+                          : "â€”"
                       }
                       sub={preflight.predicted_quality != null ? "predicted" : "ml warming"}
                       tone={
@@ -539,7 +589,7 @@ export function PlaygroundPage() {
                       value={
                         preflight.failure_risk != null
                           ? `${(preflight.failure_risk * 100).toFixed(0)}%`
-                          : "—"
+                          : "â€”"
                       }
                       sub={preflight.failure_risk != null ? "before run" : "ml warming"}
                       tone={
@@ -552,9 +602,9 @@ export function PlaygroundPage() {
                   <div className="mt-2 flex flex-wrap gap-1.5 font-mono text-[10px]">
                     {preflight.alternatives.slice(0, 3).map((alt) => (
                       <span key={alt.provider} className="v-chip">
-                        via {alt.provider} → ${parseFloat(alt.cost).toFixed(4)}
+                        via {alt.provider} â†’ ${parseFloat(alt.cost).toFixed(4)}
                         {alt.savings_percent > 0 && (
-                          <span className="text-moss"> · save {alt.savings_percent.toFixed(0)}%</span>
+                          <span className="text-moss"> Â· save {alt.savings_percent.toFixed(0)}%</span>
                         )}
                       </span>
                     ))}
@@ -569,14 +619,14 @@ export function PlaygroundPage() {
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Response</div>
               {stats.provider && (
                 <span className="v-chip v-chip-brass font-mono">
-                  {stats.provider} · {stats.model ?? "—"}
+                  {stats.provider} Â· {stats.model ?? "â€”"}
                 </span>
               )}
             </header>
             <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
               {responseText ? <ResponseMarkdown text={responseText} /> : (
                 <span className="text-muted">
-                  {running ? "Streaming…" : "Click “Run through pipeline” to stream a response."}
+                  {running ? "Streamingâ€¦" : "Click â€œRun through pipelineâ€ to stream a response."}
                 </span>
               )}
               {running && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-brass" />}
@@ -590,13 +640,13 @@ export function PlaygroundPage() {
               <Gauge className="h-3 w-3" /> Telemetry
             </div>
             <dl className="space-y-2.5 font-mono text-[12px]">
-              <Stat label="trace_id" value={stats.trace_id ?? "—"} mono />
-              <Stat label="provider" value={stats.provider ?? "—"} />
-              <Stat label="model" value={stats.model ?? "—"} />
-              <Stat label="prompt tokens" value={stats.prompt_tokens?.toString() ?? "—"} />
-              <Stat label="completion tokens" value={stats.completion_tokens?.toString() ?? "—"} />
-              <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "—"} />
-              <Stat label="audit hash" value={stats.audit_hash ? stats.audit_hash.slice(0, 12) + "…" : "—"} mono />
+              <Stat label="trace_id" value={stats.trace_id ?? "â€”"} mono />
+              <Stat label="provider" value={stats.provider ?? "â€”"} />
+              <Stat label="model" value={stats.model ?? "â€”"} />
+              <Stat label="prompt tokens" value={stats.prompt_tokens?.toString() ?? "â€”"} />
+              <Stat label="completion tokens" value={stats.completion_tokens?.toString() ?? "â€”"} />
+              <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "â€”"} />
+              <Stat label="audit hash" value={stats.audit_hash ? stats.audit_hash.slice(0, 12) + "â€¦" : "â€”"} mono />
             </dl>
           </div>
 
@@ -613,12 +663,12 @@ export function PlaygroundPage() {
             >
               {events.length === 0 ? (
                 <div className="py-8 text-center text-muted">
-                  {running ? "Waiting on first event…" : "No events yet."}
+                  {running ? "Waiting on first eventâ€¦" : "No events yet."}
                 </div>
               ) : (
                 <ul className="space-y-1.5">
                   {events.map((e) => {
-                    const meta = EVENT_META[e.event] ?? { label: e.event, color: "text-bone-2", icon: "·" };
+                    const meta = EVENT_META[e.event] ?? { label: e.event, color: "text-bone-2", icon: "Â·" };
                     const isToken = e.event === "token_delta";
                     return (
                       <li key={e.id} className={cn("flex items-start gap-2", isToken && "opacity-60")}>

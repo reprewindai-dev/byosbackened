@@ -70,8 +70,8 @@ async function createTopup(pack: string) {
   const origin = window.location.origin;
   const resp = await api.post<{ checkout_url: string; session_id: string }>("/wallet/topup/checkout", {
     pack_name: pack,
-    success_url: `${origin}/billing?topup=success`,
-    cancel_url: `${origin}/billing?topup=cancel`,
+    success_url: `${origin}/workspace-app#/billing?topup=success`,
+    cancel_url: `${origin}/workspace-app#/billing?topup=cancel`,
   });
   return resp.data;
 }

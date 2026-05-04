@@ -1,0 +1,51 @@
+name: Token Wallet Drift Check
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install psycopg2-binary
+
+      - name: Check wallet vs audit log drift
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python - <<'EOF'
+          import psycopg2, os, sys
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          cur.execute("""
+            SELECT
+              w.workspace_id,
+              w.balance AS wallet_balance,
+              COALESCE(SUM(al.tokens_used), 0) AS audit_total,
+              ABS(w.balance - (w.initial_credits - COALESCE(SUM(al.tokens_used), 0))) AS drift
+            FROM token_wallets w
+            LEFT JOIN audit_logs al ON al.workspace_id = w.workspace_id
+            GROUP BY w.workspace_id, w.balance, w.initial_credits
+            HAVING ABS(w.balance - (w.initial_credits - COALESCE(SUM(al.tokens_used), 0))) > 100
+          """)
+
+          drifts = cur.fetchall()
+          if drifts:
+              print(f"WALLET DRIFT DETECTED in {len(drifts)} workspaces:")
+              for d in drifts:
+                  print(f"  workspace={d[0]} wallet={d[1]} drift={d[3]}")
+              sys.exit(1)
+          else:
+              print("No wallet drift detected")
+          EOF

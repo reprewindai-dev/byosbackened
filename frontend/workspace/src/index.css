@@ -58,6 +58,26 @@
 }
 
 @layer components {
+  .frame {
+    @apply rounded-xl border border-rule bg-ink-2/70 shadow-soft backdrop-blur-sm;
+  }
+
+  .text-eyebrow {
+    @apply font-mono text-[10px] uppercase tracking-[0.18em] text-muted;
+  }
+
+  .font-display {
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em];
+  }
+
+  .hover-elevate {
+    @apply transition-colors hover:bg-white/[0.035];
+  }
+
   .v-card {
     @apply rounded-xl border border-rule bg-ink-2/60 backdrop-blur-sm;
   }

@@ -1,3 +1,48 @@
+// =============================================================================
+// DEVELOPER NOTE — READ BEFORE TOUCHING CONVERSATION STATE
+// =============================================================================
+// Added by: Perplexity AI (on behalf of Veklom founder), 2026-05-04
+//
+// WHY THIS WAS ADDED:
+//   The original playground was single-shot only — every "Run" wiped the
+//   previous response and started fresh. There was zero conversation memory.
+//   Competing products (OpenAI Playground, Bedrock Console, Anthropic Console)
+//   all support multi-turn back-and-forth. Customers expect it and stay longer
+//   when they can build on previous answers mid-session.
+//
+// WHAT WAS CHANGED:
+//   1. New `ConversationTurn` interface — tracks role (user/assistant),
+//      message content, model slug used, timestamp, and per-turn stats.
+//   2. New `conversation` state array — the full thread for the session.
+//   3. `run()` now APPENDS to the thread instead of replacing responseText.
+//      It also passes the previous turns as context to /ai/complete via the
+//      new `messages` field (array of {role, content} pairs). Backend must
+//      support this field — if it doesn't yet, it gracefully falls back to
+//      single-shot (the `prompt` field is still sent as before).
+//   4. New conversation thread UI rendered above the prompt textarea.
+//   5. "Clear conversation" button resets the thread.
+//   6. Model can be switched between turns — each turn records which model
+//      was used so the thread stays honest even mid-session model switches.
+//
+// WHAT WAS NOT CHANGED:
+//   - No token system. No credits per turn beyond what already existed.
+//   - No streaming (that's a separate backend concern).
+//   - All existing features (preflight, save-as-pipeline, export audit,
+//     event log, telemetry, vertical selector) are fully preserved.
+//
+// BACKEND CONTRACT:
+//   POST /ai/complete now receives an optional `messages` array:
+//     [{ role: "user" | "assistant", content: string }, ...]
+//   If the backend ignores it, single-shot still works. When the backend
+//   honours it, the model gets full conversation context. Wire this up on
+//   the backend side when ready — the frontend is already sending it.
+//
+// DO NOT:
+//   - Remove the `conversation` state without replacing it with something else.
+//   - Reset `conversation` inside `run()` — only `clearConversation()` should do that.
+//   - Change ConversationTurn shape without updating the thread render below.
+// =============================================================================
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -10,16 +55,22 @@ import {
   Gauge,
   GitBranch,
   Loader2,
+  MessageSquare,
   Play,
   Save,
   Shield,
   Sparkles,
+  Trash2,
   TrendingDown,
   Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { responseDetail } from "@/lib/errors";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface PreflightState {
   predicted_cost?: number;
@@ -68,6 +119,26 @@ interface AICompleteResponse {
   timestamp: string;
 }
 
+/**
+ * A single turn in the multi-turn conversation thread.
+ * Added 2026-05-04 — see developer note at top of file.
+ */
+interface ConversationTurn {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  modelSlug?: string;       // which model answered (assistant turns only)
+  provider?: string;        // provider for this turn
+  cost_usd?: string;        // per-turn cost
+  tokens?: number;          // completion tokens for this turn
+  latency_ms?: number;
+  ts: number;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const VERTICALS: { value: Vertical; label: string; hint: string }[] = [
   { value: "default", label: "General", hint: "Broad control-plane request" },
   { value: "legal", label: "Legal", hint: "Privacy-first legal ops" },
@@ -100,6 +171,11 @@ const EVENT_META: Record<string, { label: string; color: string; icon: string }>
 
 const DEFAULT_MAX_TOKENS = 64;
 const REQUEST_TIMEOUT_MS = 90_000;
+const MAX_CONVERSATION_TURNS = 20; // safety cap — keeps context window sane
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function normalizeModel(raw: unknown): WorkspaceModel {
   const row = raw as Record<string, unknown>;
@@ -122,6 +198,10 @@ async function fetchWorkspaceModels(): Promise<WorkspaceModel[]> {
   return raw.map(normalizeModel).filter((model) => Boolean(model.slug));
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function PlaygroundPage() {
   const [vertical, setVertical] = useState<Vertical>("default");
   const [prompt, setPrompt] = useState(SAMPLE_PROMPTS.default);
@@ -130,6 +210,27 @@ export function PlaygroundPage() {
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
+
+  // -------------------------------------------------------------------------
+  // Multi-turn conversation history (added 2026-05-04 — see note at top)
+  // -------------------------------------------------------------------------
+  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const threadRef = useRef<HTMLDivElement>(null);
+
+  const clearConversation = useCallback(() => {
+    setConversation([]);
+    setResponseText("");
+    setEvents([]);
+  }, []);
+
+  const appendTurn = useCallback((turn: Omit<ConversationTurn, "id" | "ts">) => {
+    setConversation((prev) => [
+      ...prev.slice(-MAX_CONVERSATION_TURNS),
+      { ...turn, id: `${turn.role}-${Date.now()}`, ts: Date.now() },
+    ]);
+  }, []);
+  // -------------------------------------------------------------------------
+
   const [stats, setStats] = useState<{
     provider?: string;
     model?: string;
@@ -180,6 +281,11 @@ export function PlaygroundPage() {
     ]);
   }, []);
 
+  // Scroll thread to bottom whenever a new turn lands
+  useEffect(() => {
+    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [conversation.length]);
+
   const handleVerticalChange = (v: Vertical) => {
     setVertical(v);
     if (prompt === SAMPLE_PROMPTS[vertical]) setPrompt(SAMPLE_PROMPTS[v]);
@@ -197,6 +303,10 @@ export function PlaygroundPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     const startedAt = performance.now();
+
+    // Add user turn to conversation thread BEFORE the request fires
+    const userContent = prompt.trim();
+    appendTurn({ role: "user", content: userContent });
 
     setEvents([]);
     setResponseText("");
@@ -218,12 +328,20 @@ export function PlaygroundPage() {
       runtime_model_id: selectedModel.runtime_model_id,
     });
 
+    // Build messages array for multi-turn context. Backend honours this if
+    // it supports conversational /ai/complete; otherwise falls back to prompt.
+    const messages = conversation
+      .slice(-MAX_CONVERSATION_TURNS)
+      .map((t) => ({ role: t.role, content: t.content }))
+      .concat([{ role: "user" as const, content: userContent }]);
+
     try {
       const resp = await api.post<AICompleteResponse>(
         "/ai/complete",
         {
           model: selectedModel.slug,
-          prompt: prompt.slice(0, 800),
+          prompt: userContent.slice(0, 800),
+          messages,                           // multi-turn context — see note at top
           max_tokens: maxTokens,
         },
         { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS },
@@ -248,6 +366,21 @@ export function PlaygroundPage() {
         wallet_balance: payload.wallet_balance,
         cost_usd: payload.cost_usd,
       });
+
+      // Append assistant turn to conversation thread
+      appendTurn({
+        role: "assistant",
+        content: payload.response_text,
+        modelSlug: selectedModel.slug,
+        provider,
+        cost_usd: payload.cost_usd,
+        tokens: payload.output_tokens,
+        latency_ms: latency,
+      });
+
+      // Clear the prompt input so the user can type the next message naturally
+      setPrompt("");
+
       appendEvent("response_complete", {
         provider,
         model: payload.model,
@@ -279,7 +412,7 @@ export function PlaygroundPage() {
       abortRef.current = null;
       setRunning(false);
     }
-  }, [appendEvent, maxTokens, prompt, running, selectedModel]);
+  }, [appendEvent, appendTurn, conversation, maxTokens, prompt, running, selectedModel]);
 
   useEffect(() => {
     return () => stop();
@@ -382,6 +515,7 @@ export function PlaygroundPage() {
             request_id: stats.request_id,
             vertical,
             prompt,
+            conversation,       // now includes full multi-turn thread
             response: responseText,
             stats,
             events,
@@ -419,6 +553,10 @@ export function PlaygroundPage() {
             </span>
             <span className="v-chip">wallet metered</span>
             <span className="v-chip">audit logged</span>
+            <span className="v-chip v-chip-ok">
+              <MessageSquare className="h-3 w-3" />
+              multi-turn
+            </span>
           </div>
         </div>
       </header>
@@ -537,10 +675,80 @@ export function PlaygroundPage() {
         </aside>
 
         <section className="space-y-4">
+          {/* ----------------------------------------------------------------
+              CONVERSATION THREAD — added 2026-05-04
+              Renders the full multi-turn history above the prompt input.
+              Each turn shows role badge, content, model used, and per-turn cost.
+          ----------------------------------------------------------------- */}
+          {conversation.length > 0 && (
+            <div className="v-card p-0">
+              <header className="flex items-center justify-between border-b border-rule px-4 py-2">
+                <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+                  <MessageSquare className="h-3 w-3" /> Conversation
+                  <span className="v-chip">{conversation.length} turns</span>
+                </div>
+                <button
+                  className="v-btn-ghost text-[11px] text-crimson"
+                  onClick={clearConversation}
+                  title="Clear conversation and start fresh"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Clear
+                </button>
+              </header>
+              <div
+                ref={threadRef}
+                className="max-h-[480px] overflow-y-auto space-y-0 divide-y divide-rule"
+              >
+                {conversation.map((turn) => (
+                  <div
+                    key={turn.id}
+                    className={cn(
+                      "px-4 py-3",
+                      turn.role === "user"
+                        ? "bg-white/[0.02]"
+                        : "bg-moss/[0.04]",
+                    )}
+                  >
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
+                          turn.role === "user"
+                            ? "bg-brass/10 text-brass-2"
+                            : "bg-moss/10 text-moss",
+                        )}
+                      >
+                        {turn.role}
+                      </span>
+                      {turn.role === "assistant" && turn.modelSlug && (
+                        <span className="font-mono text-[10px] text-muted">{turn.modelSlug}</span>
+                      )}
+                      {turn.role === "assistant" && turn.cost_usd && (
+                        <span className="ml-auto font-mono text-[10px] text-muted">{turn.cost_usd}</span>
+                      )}
+                      {turn.role === "assistant" && turn.tokens != null && (
+                        <span className="font-mono text-[10px] text-muted">{turn.tokens} tok</span>
+                      )}
+                    </div>
+                    <div className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-bone">
+                      {turn.content}
+                    </div>
+                  </div>
+                ))}
+                {running && (
+                  <div className="flex items-center gap-2 px-4 py-3 font-mono text-[12px] text-muted">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Waiting for response...
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="v-card p-4">
             <div className="mb-2 flex items-center justify-between">
               <label htmlFor="prompt" className="v-label mb-0">
-                Prompt
+                {conversation.length > 0 ? "Next message" : "Prompt"}
               </label>
               <span className="font-mono text-[10px] text-muted">{prompt.length} / 800</span>
             </div>
@@ -550,18 +758,35 @@ export function PlaygroundPage() {
               onChange={(e) => setPrompt(e.target.value.slice(0, 800))}
               rows={4}
               className="v-input min-h-[96px] resize-y font-mono text-[13px] leading-relaxed"
-              placeholder="What would you like the governed control plane to answer?"
+              placeholder={
+                conversation.length > 0
+                  ? "Continue the conversation..."
+                  : "What would you like the governed control plane to answer?"
+              }
               disabled={running}
+              onKeyDown={(e) => {
+                // Ctrl+Enter / Cmd+Enter sends the message
+                if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && canRun) {
+                  e.preventDefault();
+                  void run();
+                }
+              }}
             />
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 {!running ? (
                   <button className="v-btn-primary" onClick={run} disabled={!canRun}>
-                    <Play className="h-4 w-4" /> Run workspace request
+                    <Play className="h-4 w-4" />
+                    {conversation.length > 0 ? "Send" : "Run workspace request"}
                   </button>
                 ) : (
                   <button className="v-btn-ghost text-crimson" onClick={stop}>
                     <CircleStop className="h-4 w-4" /> Stop request
+                  </button>
+                )}
+                {conversation.length > 0 && (
+                  <button className="v-btn-ghost text-[12px]" onClick={clearConversation} title="Clear thread">
+                    <Trash2 className="h-3.5 w-3.5" /> New conversation
                   </button>
                 )}
                 <button
@@ -598,6 +823,11 @@ export function PlaygroundPage() {
                 <span className="v-chip">
                   <Sparkles className="h-3 w-3" /> {tokenCount} tokens
                 </span>
+                {conversation.length > 0 && (
+                  <span className="v-chip">
+                    <MessageSquare className="h-3 w-3" /> {conversation.length} turns
+                  </span>
+                )}
               </div>
             </div>
             {error && (
@@ -672,24 +902,35 @@ export function PlaygroundPage() {
             )}
           </div>
 
-          <div className="v-card p-0">
-            <header className="flex items-center justify-between border-b border-rule px-4 py-2">
-              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Response</div>
-              {stats.provider && (
-                <span className="v-chip v-chip-brass font-mono">
-                  {stats.provider} - {stats.model ?? "-"}
-                </span>
-              )}
-            </header>
-            <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
-              {responseText || (
+          {/* Single-shot response panel — still shown for the latest turn only */}
+          {responseText && (
+            <div className="v-card p-0">
+              <header className="flex items-center justify-between border-b border-rule px-4 py-2">
+                <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Latest response</div>
+                {stats.provider && (
+                  <span className="v-chip v-chip-brass font-mono">
+                    {stats.provider} - {stats.model ?? "-"}
+                  </span>
+                )}
+              </header>
+              <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
+                {responseText}
+              </div>
+            </div>
+          )}
+          {!responseText && conversation.length === 0 && (
+            <div className="v-card p-0">
+              <header className="flex items-center justify-between border-b border-rule px-4 py-2">
+                <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Response</div>
+              </header>
+              <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
                 <span className="text-muted">
                   {running ? "Waiting for /api/v1/ai/complete..." : "Click Run workspace request to call the backend."}
                 </span>
-              )}
-              {running && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-brass" />}
+                {running && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-brass" />}
+              </div>
             </div>
-          </div>
+          )}
         </section>
 
         <aside className="space-y-4">
@@ -709,6 +950,7 @@ export function PlaygroundPage() {
               <Stat label="credits" value={stats.tokens_deducted?.toString() ?? "-"} />
               <Stat label="wallet" value={stats.wallet_balance?.toString() ?? "-"} />
               <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash.slice(0, 12)}...` : "-"} mono />
+              <Stat label="turns" value={conversation.length.toString()} />
             </dl>
           </div>
 
@@ -745,6 +987,10 @@ export function PlaygroundPage() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (

@@ -137,6 +137,11 @@
 
   const fmtMoney = (value) => `$${Number(value || 0).toFixed(6)}`;
   const fmtInt = (value) => Number(value || 0).toLocaleString();
+  const toNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
 
   const routeName = () => {
     const hash = location.hash || "";
@@ -519,7 +524,14 @@
     const totalCalls = fmtInt(overview.total_api_calls || analytics.totals?.total_requests || 0);
     const totalTokens = fmtInt(overview.total_tokens_used || latestRun.tokens || latestRun.tokens_out || 0);
     const latestTokens = fmtInt(latestRun.tokens || latestRun.tokens_out || latestRun.tokens_in || 0);
-    const latestLatency = latestRun.latency_ms !== undefined ? `${fmtInt(latestRun.latency_ms)} ms` : "no runs";
+    const latestLatencyMs = (
+      toNumber(latestRun.latency_ms) ??
+      toNumber(latestRun.latency) ??
+      toNumber(latestRun.p50_latency_ms) ??
+      toNumber(overview.p50_latency_ms) ??
+      toNumber(analytics.totals?.p50_latency_ms)
+    );
+    const latestLatency = latestLatencyMs !== null ? `${fmtInt(latestLatencyMs)} ms` : "no runs";
     const liveCost = fmtMoney(overview.total_cost_usd || cost.total_cost_usd || analytics.totals?.total_cost_usd || 0);
     const observedRows = fmtInt(observability.total || recent.length || 0);
     const walletBalance = wallet.balance !== undefined ? `${fmtInt(wallet.balance)} credits` : "wallet live";

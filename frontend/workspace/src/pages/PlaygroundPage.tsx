@@ -100,6 +100,11 @@ export function PlaygroundPage() {
     trace_id?: string;
     audit_hash?: string;
   }>({});
+  const [billingMeta, setBillingMeta] = useState<{
+    billable?: boolean;
+    public_demo?: boolean;
+    credits_charged?: number | null;
+  }>({});
   const [error, setError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<PreflightState>({});
   const [savedPipelineSlug, setSavedPipelineSlug] = useState<string | null>(null);
@@ -132,6 +137,7 @@ export function PlaygroundPage() {
     setError(null);
     setNotice(null);
     setExportNotice(null);
+    setBillingMeta({});
     intendedProviderRef.current = null;
     intendedModelRef.current = null;
     failoverLoggedRef.current = false;
@@ -196,6 +202,13 @@ export function PlaygroundPage() {
         }
         if (name === "audit_written" && typeof data.audit_hash === "string") {
           setStats((s) => ({ ...s, audit_hash: data.audit_hash as string }));
+        }
+        if (name === "cost_recorded") {
+          setBillingMeta({
+            billable: typeof data.billable === "boolean" ? data.billable : undefined,
+            public_demo: typeof data.public_demo === "boolean" ? data.public_demo : undefined,
+            credits_charged: typeof data.credits_charged === "number" ? data.credits_charged : null,
+          });
         }
         if (name === "done" || name === "error") {
           stop();
@@ -366,6 +379,14 @@ export function PlaygroundPage() {
             <span className="v-chip">no auth required</span>
             <span className="v-chip">rate-limited 5/min</span>
           </div>
+          {billingMeta.public_demo === true && billingMeta.billable === false && (
+            <div className="mt-3 flex items-start gap-2 rounded-md border border-brass/40 bg-brass/10 px-3 py-2 text-[12px] text-brass-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                DEMO MODE — billing suspended. This run is non-billable (`public_demo=true`, credits charged: {billingMeta.credits_charged ?? 0}).
+              </span>
+            </div>
+          )}
         </div>
       </header>
 

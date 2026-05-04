@@ -48,17 +48,23 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   CircleStop,
+  Copy,
   Cpu,
   Download,
   Gauge,
   GitBranch,
   Loader2,
   MessageSquare,
+  Pencil,
   Play,
+  RotateCcw,
   Save,
   Shield,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   TrendingDown,
@@ -169,9 +175,10 @@ const EVENT_META: Record<string, { label: string; color: string; icon: string }>
   error: { label: "Error", color: "text-crimson", icon: "!" },
 };
 
-const DEFAULT_MAX_TOKENS = 64;
+const DEFAULT_MAX_TOKENS = 512;
 const REQUEST_TIMEOUT_MS = 90_000;
 const MAX_CONVERSATION_TURNS = 20; // safety cap — keeps context window sane
+const PLAYGROUND_STORAGE_KEY = "veklom.workspace.playground.v2";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -198,15 +205,40 @@ async function fetchWorkspaceModels(): Promise<WorkspaceModel[]> {
   return raw.map(normalizeModel).filter((model) => Boolean(model.slug));
 }
 
+function readStoredPlaygroundState() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PLAYGROUND_STORAGE_KEY);
+    return raw
+      ? (JSON.parse(raw) as {
+          prompt?: string;
+          vertical?: Vertical;
+          selectedModelSlug?: string;
+          maxTokens?: number;
+          conversation?: ConversationTurn[];
+          systemPrompt?: string;
+          temperature?: number;
+          showSystemPrompt?: boolean;
+        })
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function PlaygroundPage() {
-  const [vertical, setVertical] = useState<Vertical>("default");
-  const [prompt, setPrompt] = useState(SAMPLE_PROMPTS.default);
-  const [maxTokens, setMaxTokens] = useState(DEFAULT_MAX_TOKENS);
-  const [selectedModelSlug, setSelectedModelSlug] = useState("");
+  const stored = useMemo(() => readStoredPlaygroundState(), []);
+  const [vertical, setVertical] = useState<Vertical>(stored?.vertical ?? "default");
+  const [prompt, setPrompt] = useState(stored?.prompt ?? SAMPLE_PROMPTS[stored?.vertical ?? "default"]);
+  const [maxTokens, setMaxTokens] = useState(stored?.maxTokens ?? DEFAULT_MAX_TOKENS);
+  const [selectedModelSlug, setSelectedModelSlug] = useState(stored?.selectedModelSlug ?? "");
+  const [systemPrompt, setSystemPrompt] = useState(stored?.systemPrompt ?? "");
+  const [temperature, setTemperature] = useState(stored?.temperature ?? 0.4);
+  const [showSystemPrompt, setShowSystemPrompt] = useState(stored?.showSystemPrompt ?? false);
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
@@ -214,7 +246,7 @@ export function PlaygroundPage() {
   // -------------------------------------------------------------------------
   // Multi-turn conversation history (added 2026-05-04 — see note at top)
   // -------------------------------------------------------------------------
-  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [conversation, setConversation] = useState<ConversationTurn[]>(stored?.conversation ?? []);
   const threadRef = useRef<HTMLDivElement>(null);
 
   const clearConversation = useCallback(() => {
@@ -269,6 +301,23 @@ export function PlaygroundPage() {
     }
   }, [runnableModels, selectedModelSlug]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      PLAYGROUND_STORAGE_KEY,
+      JSON.stringify({
+        vertical,
+        prompt,
+        maxTokens,
+        selectedModelSlug,
+        conversation,
+        systemPrompt,
+        temperature,
+        showSystemPrompt,
+      }),
+    );
+  }, [conversation, maxTokens, prompt, selectedModelSlug, showSystemPrompt, systemPrompt, temperature, vertical]);
+
   const selectedModel = useMemo(
     () => runnableModels.find((model) => model.slug === selectedModelSlug) ?? runnableModels[0],
     [runnableModels, selectedModelSlug],
@@ -285,6 +334,24 @@ export function PlaygroundPage() {
   useEffect(() => {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
   }, [conversation.length]);
+
+  const copyTurn = useCallback(async (content: string) => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(content);
+  }, []);
+
+  const editAndResendTurn = useCallback((content: string) => {
+    setPrompt(content);
+  }, []);
+
+  const regenerateFromTurn = useCallback((turnId: string) => {
+    const idx = conversation.findIndex((turn) => turn.id === turnId);
+    if (idx <= 0) return;
+    const priorUserTurn = [...conversation.slice(0, idx)].reverse().find((turn) => turn.role === "user");
+    if (!priorUserTurn) return;
+    setConversation(conversation.slice(0, idx));
+    setPrompt(priorUserTurn.content);
+  }, [conversation]);
 
   const handleVerticalChange = (v: Vertical) => {
     setVertical(v);
@@ -319,6 +386,7 @@ export function PlaygroundPage() {
       endpoint: "/api/v1/ai/complete",
       model: selectedModel.slug,
       max_tokens: maxTokens,
+      temperature,
     });
     appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace" });
     appendEvent("wallet_check", { status: "reservation requested", model: selectedModel.slug });
@@ -340,8 +408,10 @@ export function PlaygroundPage() {
         "/ai/complete",
         {
           model: selectedModel.slug,
-          prompt: userContent.slice(0, 800),
-          messages,                           // multi-turn context — see note at top
+          prompt: userContent.slice(0, 8000),
+          messages,
+          system_prompt: systemPrompt.trim() || undefined,
+          temperature,
           max_tokens: maxTokens,
         },
         { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS },
@@ -412,7 +482,7 @@ export function PlaygroundPage() {
       abortRef.current = null;
       setRunning(false);
     }
-  }, [appendEvent, appendTurn, conversation, maxTokens, prompt, running, selectedModel]);
+  }, [appendEvent, appendTurn, conversation, maxTokens, prompt, running, selectedModel, systemPrompt, temperature]);
 
   useEffect(() => {
     return () => stop();
@@ -543,15 +613,15 @@ export function PlaygroundPage() {
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">Authenticated AI execution</h1>
           <p className="mt-2 max-w-2xl text-sm text-bone-2">
-            Send a real workspace request through Veklom's wallet-backed completion endpoint. The backend selects the
-            runtime, enforces model availability, records the cost entry, and writes the audit artifact.
+            Send a real workspace request through Veklom's governed execution endpoint. The backend selects the
+            runtime, enforces model availability, records the reserve debit, and writes the audit artifact.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
               authenticated - <span className="font-mono">/api/v1/ai/complete</span>
             </span>
-            <span className="v-chip">wallet metered</span>
+            <span className="v-chip">reserve metered</span>
             <span className="v-chip">audit logged</span>
             <span className="v-chip v-chip-ok">
               <MessageSquare className="h-3 w-3" />
@@ -619,18 +689,54 @@ export function PlaygroundPage() {
                   </div>
                 )}
                 <label className="block">
-                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Max tokens</div>
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Max output units</div>
                   <select
                     className="v-input w-full"
                     value={maxTokens}
                     disabled={running}
                     onChange={(e) => setMaxTokens(Number(e.target.value))}
                   >
-                    {[16, 32, 64, 128].map((n) => (
+                    {[128, 256, 512, 1024, 2048, 4096].map((n) => (
                       <option key={n} value={n}>{n}</option>
                     ))}
                   </select>
                 </label>
+                <label className="block">
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Sampling</div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1.2}
+                      step={0.1}
+                      value={temperature}
+                      disabled={running}
+                      onChange={(e) => setTemperature(Number(e.target.value))}
+                      className="w-full accent-[var(--brass)]"
+                    />
+                    <span className="min-w-10 text-right font-mono text-[11px] text-bone">{temperature.toFixed(1)}</span>
+                  </div>
+                </label>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-lg border border-rule-2 bg-white/[0.02] px-3 py-2 text-left text-[12px] text-bone-2"
+                  onClick={() => setShowSystemPrompt((prev) => !prev)}
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-brass-2" />
+                    System instruction
+                  </span>
+                  {showSystemPrompt ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                {showSystemPrompt && (
+                  <textarea
+                    className="v-input min-h-[108px] resize-y font-mono text-[12px] leading-relaxed"
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value.slice(0, 12000))}
+                    placeholder="You are a governed AI assistant running inside Veklom's sovereign control plane..."
+                    disabled={running}
+                  />
+                )}
               </div>
             ) : (
               <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[12px] text-brass-2">
@@ -660,7 +766,7 @@ export function PlaygroundPage() {
               {[
                 "Bearer auth verification",
                 "Tenant-scoped workspace model",
-                "Wallet/reserve metering",
+                "Reserve metering",
                 "Circuit breaker fallback",
                 "Tamper-evident audit write",
                 "Request ledger entry",
@@ -727,11 +833,24 @@ export function PlaygroundPage() {
                         <span className="ml-auto font-mono text-[10px] text-muted">{turn.cost_usd}</span>
                       )}
                       {turn.role === "assistant" && turn.tokens != null && (
-                        <span className="font-mono text-[10px] text-muted">{turn.tokens} tok</span>
+                        <span className="font-mono text-[10px] text-muted">{turn.tokens} out</span>
                       )}
                     </div>
                     <div className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-bone">
                       {turn.content}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button className="v-btn-ghost text-[11px]" onClick={() => void copyTurn(turn.content)}>
+                        <Copy className="h-3.5 w-3.5" /> Copy
+                      </button>
+                      <button className="v-btn-ghost text-[11px]" onClick={() => editAndResendTurn(turn.content)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
+                      {turn.role === "assistant" && (
+                        <button className="v-btn-ghost text-[11px]" onClick={() => regenerateFromTurn(turn.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" /> Regenerate
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -750,12 +869,12 @@ export function PlaygroundPage() {
               <label htmlFor="prompt" className="v-label mb-0">
                 {conversation.length > 0 ? "Next message" : "Prompt"}
               </label>
-              <span className="font-mono text-[10px] text-muted">{prompt.length} / 800</span>
+              <span className="font-mono text-[10px] text-muted">{prompt.length} / 8000</span>
             </div>
             <textarea
               id="prompt"
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value.slice(0, 800))}
+              onChange={(e) => setPrompt(e.target.value.slice(0, 8000))}
               rows={4}
               className="v-input min-h-[96px] resize-y font-mono text-[13px] leading-relaxed"
               placeholder={
@@ -772,6 +891,23 @@ export function PlaygroundPage() {
                 }
               }}
             />
+            {!conversation.length && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {VERTICALS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className="v-chip hover:text-bone"
+                    onClick={() => {
+                      setVertical(item.value);
+                      setPrompt(SAMPLE_PROMPTS[item.value]);
+                    }}
+                  >
+                    {item.label} starter
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 {!running ? (
@@ -821,7 +957,7 @@ export function PlaygroundPage() {
                   <Activity className="h-3 w-3" /> {eventCount} events
                 </span>
                 <span className="v-chip">
-                  <Sparkles className="h-3 w-3" /> {tokenCount} tokens
+                  <Sparkles className="h-3 w-3" /> {tokenCount} output units
                 </span>
                 {conversation.length > 0 && (
                   <span className="v-chip">
@@ -903,7 +1039,7 @@ export function PlaygroundPage() {
           </div>
 
           {/* Single-shot response panel — still shown for the latest turn only */}
-          {responseText && (
+          {responseText && conversation.length === 0 && (
             <div className="v-card p-0">
               <header className="flex items-center justify-between border-b border-rule px-4 py-2">
                 <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Latest response</div>
@@ -921,13 +1057,26 @@ export function PlaygroundPage() {
           {!responseText && conversation.length === 0 && (
             <div className="v-card p-0">
               <header className="flex items-center justify-between border-b border-rule px-4 py-2">
-                <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Response</div>
+                <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Playground ready</div>
               </header>
-              <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
-                <span className="text-muted">
-                  {running ? "Waiting for /api/v1/ai/complete..." : "Click Run workspace request to call the backend."}
-                </span>
-                {running && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-brass" />}
+              <div className="min-h-[180px] p-4">
+                <div className="font-display text-lg text-bone">Bring the governed run to life.</div>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-bone-2">
+                  Use a starter above or write your own request. Veklom will route, meter, audit, and log each step before a model answer is accepted.
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {Object.entries(SAMPLE_PROMPTS).slice(0, 4).map(([key, value]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className="rounded-lg border border-rule-2 bg-white/[0.02] px-3 py-3 text-left text-[12px] text-bone-2 hover:bg-white/[0.04]"
+                      onClick={() => setPrompt(value)}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+                {running && <span className="mt-4 inline-block h-4 w-2 animate-pulse bg-brass" />}
               </div>
             </div>
           )}
@@ -943,12 +1092,12 @@ export function PlaygroundPage() {
               <Stat label="provider" value={stats.provider ?? "-"} />
               <Stat label="model" value={stats.model ?? "-"} />
               <Stat label="runtime" value={stats.runtime_model_id ?? "-"} mono />
-              <Stat label="prompt tokens" value={stats.prompt_tokens?.toString() ?? "-"} />
-              <Stat label="completion tokens" value={stats.completion_tokens?.toString() ?? "-"} />
-              <Stat label="total tokens" value={stats.total_tokens?.toString() ?? "-"} />
+              <Stat label="input units" value={stats.prompt_tokens?.toString() ?? "-"} />
+              <Stat label="output units" value={stats.completion_tokens?.toString() ?? "-"} />
+              <Stat label="total units" value={stats.total_tokens?.toString() ?? "-"} />
               <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "-"} />
-              <Stat label="credits" value={stats.tokens_deducted?.toString() ?? "-"} />
-              <Stat label="wallet" value={stats.wallet_balance?.toString() ?? "-"} />
+              <Stat label="reserve debit" value={stats.tokens_deducted?.toString() ?? "-"} />
+              <Stat label="reserve balance" value={stats.wallet_balance?.toString() ?? "-"} />
               <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash.slice(0, 12)}...` : "-"} mono />
               <Stat label="turns" value={conversation.length.toString()} />
             </dl>

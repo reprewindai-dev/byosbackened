@@ -1,0 +1,67 @@
+name: Nightly License Integrity Audit
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install -r backend/requirements.txt
+
+      - name: Run license integrity audit
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          LICENSE_ADMIN_TOKEN: ${{ secrets.LICENSE_ADMIN_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import asyncio, httpx, os, json
+
+          LICENSE_URL = "https://license.veklom.com"
+          ADMIN_TOKEN = os.environ["LICENSE_ADMIN_TOKEN"]
+
+          async def audit():
+              async with httpx.AsyncClient() as client:
+                  r = await client.get(
+                      f"{LICENSE_URL}/admin/licenses",
+                      headers={"X-Admin-Token": ADMIN_TOKEN}
+                  )
+                  licenses = r.json()
+                  active = [l for l in licenses if l["status"] == "active"]
+                  print(f"Active licenses: {len(active)}")
+
+                  issues = []
+                  for lic in active:
+                      v = await client.post(
+                          f"{LICENSE_URL}/verify",
+                          json={"license_key": lic["license_key"],
+                                "machine_fingerprint": lic.get("machine_fingerprint", "")}
+                      )
+                      if v.status_code != 200:
+                          issues.append(lic["license_key"])
+
+                  if issues:
+                      print(f"INTEGRITY ISSUES: {issues}")
+                      exit(1)
+                  else:
+                      print(f"All {len(active)} licenses verified clean")
+
+          asyncio.run(audit())
+          EOF
+
+      - name: Alert on failure
+        if: failure()
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-type: application/json' \
+            -d '{"text":"LICENSE INTEGRITY AUDIT FAILED - check GitHub Actions immediately"}'

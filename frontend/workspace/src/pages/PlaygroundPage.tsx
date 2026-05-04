@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -36,6 +36,11 @@ interface PipelineEvent {
   data: Record<string, unknown>;
   ts: number;
 }
+
+type Notice = {
+  tone: "warn" | "ok";
+  message: string;
+} | null;
 
 const VERTICALS: { value: Vertical; label: string; hint: string }[] = [
   { value: "default", label: "General", hint: "Broad control-plane demo" },
@@ -82,6 +87,7 @@ export function PlaygroundPage() {
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
+  const [notice, setNotice] = useState<Notice>(null);
   const [stats, setStats] = useState<{
     provider?: string;
     model?: string;
@@ -95,6 +101,7 @@ export function PlaygroundPage() {
   const [preflight, setPreflight] = useState<PreflightState>({});
   const [savedPipelineSlug, setSavedPipelineSlug] = useState<string | null>(null);
   const [savingPipeline, setSavingPipeline] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const eventSrcRef = useRef<EventSource | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
@@ -117,6 +124,8 @@ export function PlaygroundPage() {
     setResponseText("");
     setStats({});
     setError(null);
+    setNotice(null);
+    setExportNotice(null);
     setRunning(true);
 
     const url = new URL(`${apiBase}/api/v1/demo/pipeline/stream`, window.location.origin);
@@ -134,8 +143,11 @@ export function PlaygroundPage() {
           ...prev,
           { id: `${name}-${prev.length}`, event: name, data, ts: Date.now() },
         ]);
-        if (name === "token_delta" && typeof data.text === "string") {
-          setResponseText((t) => t + data.text);
+        if (name === "token_delta") {
+          const delta = typeof data.delta === "string" ? data.delta : typeof data.text === "string" ? data.text : "";
+          if (delta) {
+            setResponseText((t) => t + delta);
+          }
         }
         if (name === "provider_selected" || name === "groq_fallback") {
           setStats((s) => ({
@@ -159,6 +171,12 @@ export function PlaygroundPage() {
         if (name === "done" || name === "error") {
           stop();
           if (name === "error") setError(String(data.detail ?? data.message ?? "Stream failed"));
+        }
+        if (name === "ollama_unavailable" || name === "circuit_breaker_opened" || name === "groq_fallback") {
+          setNotice({
+            tone: "warn",
+            message: "Circuit breaker fired: Ollama unavailable. Request routed to Groq fallback.",
+          });
         }
       } catch (e) {
         console.warn("malformed SSE frame", name, evt.data, e);
@@ -296,6 +314,7 @@ export function PlaygroundPage() {
     a.download = `veklom-audit-${stats.trace_id ?? Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(href);
+    setExportNotice("Audit bundle exported.");
   };
 
   return (
@@ -458,6 +477,21 @@ export function PlaygroundPage() {
                 <span>{error}</span>
               </div>
             )}
+            {notice && (
+              <div className={cn(
+                "mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[12px]",
+                notice.tone === "warn" ? "border-brass/40 bg-brass/10 text-brass-2" : "border-moss/40 bg-moss/10 text-moss",
+              )}>
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{notice.message}</span>
+              </div>
+            )}
+            {exportNotice && (
+              <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/40 bg-moss/5 px-3 py-2 text-[12px] text-moss">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {exportNotice}
+              </div>
+            )}
             {savedPipelineSlug && (
               <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -540,7 +574,7 @@ export function PlaygroundPage() {
               )}
             </header>
             <div className="min-h-[180px] whitespace-pre-wrap p-4 font-mono text-[13px] leading-relaxed text-bone">
-              {responseText || (
+              {responseText ? <ResponseMarkdown text={responseText} /> : (
                 <span className="text-muted">
                   {running ? "Streaming…" : "Click “Run through pipeline” to stream a response."}
                 </span>
@@ -653,4 +687,31 @@ function compactPayload(data: Record<string, unknown>): string {
   }
   const first = keys[0]!;
   return `${first}=${String(data[first]).slice(0, 40)}`;
+}
+
+function ResponseMarkdown({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, idx) => (
+        <Fragment key={`${idx}-${line.length}`}>
+          <span>{renderInlineMarkdown(line)}</span>
+          {idx < lines.length - 1 && <br />}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+function renderInlineMarkdown(input: string): ReactNode[] {
+  const chunks = input.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
+  return chunks.map((chunk, index) => {
+    if (chunk.startsWith("**") && chunk.endsWith("**") && chunk.length > 4) {
+      return <strong key={`${chunk}-${index}`}>{chunk.slice(2, -2)}</strong>;
+    }
+    if (chunk.startsWith("`") && chunk.endsWith("`") && chunk.length > 2) {
+      return <code key={`${chunk}-${index}`}>{chunk.slice(1, -1)}</code>;
+    }
+    return <Fragment key={`${chunk}-${index}`}>{chunk}</Fragment>;
+  });
 }

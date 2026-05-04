@@ -70,9 +70,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
     >
       <div className="flex h-14 items-center justify-between border-b border-rule px-3">
         <NavLink to="/overview" className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brass/20 font-mono text-[11px] font-bold text-brass-2">
-            V
-          </div>
+          <img src="/logo-mark.svg" alt="Veklom mark" className="h-7 w-7 rounded-md object-contain" />
           {!collapsed && (
             <div className="flex flex-col leading-none">
               <span className="text-[13px] font-semibold tracking-tight">Veklom</span>

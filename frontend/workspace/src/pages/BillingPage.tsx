@@ -104,10 +104,10 @@ export function BillingPage() {
           <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
             Workspace · Billing
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Operating reserve &amp; token wallet</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Operating reserve and event billing</h1>
           <p className="mt-2 max-w-2xl text-sm text-bone-2">
-            Pay-as-you-go token credits. Every inference call debits in real time. Monthly allowance renews
-            automatically; top up any time for bonus credits.
+            Free Evaluation uses typed quotas. Activated workspaces use Operating Reserve and event-type
+            debits for governed runs, governance calls, and signed evidence actions.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
@@ -118,6 +118,19 @@ export function BillingPage() {
           </div>
         </div>
       </header>
+
+      <section className="v-card p-4">
+        <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Event pricing model</div>
+        <div className="grid grid-cols-1 gap-2 text-[12px] md:grid-cols-2">
+          <div className="rounded border border-rule px-3 py-2">Playground governed run: <span className="text-bone">$0.25 Founding / $0.40 Standard</span></div>
+          <div className="rounded border border-rule px-3 py-2">Compare run: <span className="text-bone">$0.75 Founding / $1.20 Standard</span></div>
+          <div className="rounded border border-rule px-3 py-2">Signed Playground export: <span className="text-bone">$3 / $4</span></div>
+          <div className="rounded border border-rule px-3 py-2">BYOK governance calls: <span className="text-bone">$6 / $8 per 1,000</span></div>
+          <div className="rounded border border-rule px-3 py-2">Managed governance calls: <span className="text-bone">$12 / $16 per 1,000</span></div>
+          <div className="rounded border border-rule px-3 py-2">Signed evidence package: <span className="text-bone">$99 / $149</span></div>
+          <div className="rounded border border-rule px-3 py-2 md:col-span-2">Auditor bundle: <span className="text-bone">$249 / $349</span></div>
+        </div>
+      </section>
 
       {balance.isError && (
         <div className="v-card flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
@@ -138,7 +151,7 @@ export function BillingPage() {
         <div className="v-card p-5 lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Token balance</div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Reserve balance</div>
               <h3 className="mt-1 text-sm font-semibold">Current operating reserve</h3>
             </div>
             <Wallet className="h-5 w-5 text-brass-2" />
@@ -154,12 +167,12 @@ export function BillingPage() {
                 "—"
               )}
             </div>
-            <span className="font-mono text-[12px] uppercase tracking-widest text-muted">credits</span>
+            <span className="font-mono text-[12px] uppercase tracking-widest text-muted">reserve units</span>
           </div>
 
           <div className="mt-5">
             <div className="mb-1 flex justify-between font-mono text-[11px] text-muted">
-              <span>Monthly allowance used</span>
+              <span>Free Evaluation quota used</span>
               <span className="text-bone">
                 {balance.data
                   ? `${fmtNumber(balance.data.monthly_credits_used)} / ${fmtNumber(
@@ -187,12 +200,12 @@ export function BillingPage() {
           <div className="mt-6 grid grid-cols-2 gap-3 font-mono text-[11px]">
             <Stat
               icon={<ArrowUpRight className="h-3 w-3 text-moss" />}
-              label="Lifetime purchased"
+              label="Lifetime reserve funded"
               value={balance.data ? fmtNumber(balance.data.total_credits_purchased) : "—"}
             />
             <Stat
               icon={<TrendingUp className="h-3 w-3 text-electric" />}
-              label="Lifetime used"
+              label="Lifetime reserve debited"
               value={balance.data ? fmtNumber(balance.data.total_credits_used) : "—"}
             />
           </div>
@@ -205,7 +218,7 @@ export function BillingPage() {
             onClick={() => setSelectedPack(packs.data?.options[1]?.pack_name ?? "growth")}
             disabled={packs.isLoading}
           >
-            <Sparkles className="h-4 w-4" /> Top up credits
+            <Sparkles className="h-4 w-4" /> Fund reserve
           </button>
           <a href="/settings" className="v-btn-ghost mt-2 w-full justify-center">
             <CreditCard className="h-4 w-4" /> Manage payment method
@@ -220,8 +233,8 @@ export function BillingPage() {
       <section>
         <header className="mb-3 flex items-end justify-between">
           <div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Token packs</div>
-            <h2 className="mt-1 text-lg font-semibold">Top up with bonus credits</h2>
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Reserve packs</div>
+            <h2 className="mt-1 text-lg font-semibold">Fund operating reserve</h2>
           </div>
           {packs.isLoading && (
             <span className="font-mono text-[11px] text-muted">loading…</span>
@@ -259,10 +272,10 @@ export function BillingPage() {
                 </div>
                 <div>
                   <div className="font-mono text-[14px] font-semibold text-bone">
-                    {fmtNumber(effectiveCredits)} credits
+                    {fmtNumber(effectiveCredits)} reserve units
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-muted">
-                    ≈ ${pricePerK} / 1k credits
+                    ≈ ${pricePerK} / 1k reserve units
                   </div>
                 </div>
                 <button
@@ -299,7 +312,7 @@ export function BillingPage() {
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
                 Recent transactions
               </div>
-              <h3 className="mt-0.5 text-sm font-semibold">Debit &amp; credit ledger</h3>
+              <h3 className="mt-0.5 text-sm font-semibold">Reserve debit &amp; credit ledger</h3>
             </div>
           </div>
           <span className="v-chip font-mono">
@@ -313,7 +326,7 @@ export function BillingPage() {
               <th className="px-5 py-2 text-left font-medium">When</th>
               <th className="px-5 py-2 text-left font-medium">Type</th>
               <th className="px-5 py-2 text-left font-medium">Description</th>
-              <th className="px-5 py-2 text-right font-medium">Δ credits</th>
+              <th className="px-5 py-2 text-right font-medium">Δ reserve units</th>
               <th className="px-5 py-2 text-right font-medium">Balance after</th>
             </tr>
           </thead>

@@ -125,8 +125,11 @@ export function MarketplacePage() {
 
   const checkoutMut = useMutation({
     mutationFn: async (id: string) => {
-      const r = await api.post<{ checkout_url: string }>("/marketplace/payments/create-checkout", {
-        listing_id: id,
+      const order = await api.post<{ id: string; total_cents: number; currency: string }>("/orders/create", {
+        items: [id],
+      });
+      const r = await api.post<{ checkout_url: string }>("/payments/create-checkout", {
+        order_id: order.data.id,
         success_url: window.location.href,
         cancel_url: window.location.href,
       });

@@ -1,8 +1,11 @@
-import { Bell, BookOpen, Command, Key, Search } from "lucide-react";
+﻿import { Bell, BookOpen, Command, Key, Search } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
 export function TopBar() {
   const user = useAuthStore((s) => s.user);
+  const workspaceLabel = user?.workspace_name ?? user?.workspace_id ?? "workspace";
+  const regionLabel = user?.region ?? "region-unset";
+  const planLabel = user?.plan ?? "plan-unset";
   const initials = (user?.name ?? user?.email ?? "VK")
     .split(/[\s@]/)
     .filter(Boolean)
@@ -15,17 +18,17 @@ export function TopBar() {
       <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-bone-2">
         <span className="v-chip">
           <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss shadow-moss-glow" />
-          acme-prod
+          {workspaceLabel}
         </span>
-        <span className="v-chip">us-east</span>
-        <span className="v-chip">v1.42.0</span>
+        <span className="v-chip">{regionLabel}</span>
+        <span className="v-chip">{planLabel}</span>
       </div>
 
       <div className="relative mx-2 flex-1 max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <input
           className="v-input pl-9 pr-14 text-[13px]"
-          placeholder="Jump to model, deployment, log, or doc…"
+          placeholder="Jump to model, deployment, log, or doc..."
         />
         <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded border border-rule-2 bg-ink-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
           <Command className="h-3 w-3" />K
@@ -33,13 +36,9 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.1em]">
-        <span className="v-chip">
-          Burn <span className="text-bone">$0.0184</span>/min
-        </span>
-        <span className="v-chip">
-          <span className="text-amber">68%</span> budget
-        </span>
-        <span className="v-chip v-chip-ok">● healthy</span>
+        <span className="v-chip">Operating reserve</span>
+        <span className="v-chip">Event-based billing</span>
+        <span className="v-chip v-chip-ok">live backend</span>
         <span className="v-chip v-chip-brass">EU-sovereign</span>
       </div>
 

@@ -30,6 +30,13 @@ interface CheckResult {
   issues?: string[];
 }
 
+interface ComplianceReport {
+  report_id?: string;
+  regulation_id?: string;
+  generated_at?: string;
+  [key: string]: unknown;
+}
+
 async function fetchRegulations(): Promise<Regulation[]> {
   const resp = await api.get<RegulationsResp>("/compliance/regulations");
   return resp.data.regulations ?? [];
@@ -37,6 +44,18 @@ async function fetchRegulations(): Promise<Regulation[]> {
 
 async function runCheck(regulation_id: string): Promise<CheckResult> {
   const resp = await api.post<CheckResult>("/compliance/check", { regulation_id });
+  return resp.data;
+}
+
+async function generateReport(regulation_id: string): Promise<ComplianceReport> {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - 30);
+  const resp = await api.post<ComplianceReport>("/compliance/report", {
+    regulation_id,
+    start_date: start.toISOString(),
+    end_date: end.toISOString(),
+  });
   return resp.data;
 }
 
@@ -51,10 +70,31 @@ export function CompliancePage() {
   const regs = useQuery({ queryKey: ["compliance-regs"], queryFn: fetchRegulations });
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResult | null>(null);
+  const [evidenceNotice, setEvidenceNotice] = useState<string | null>(null);
 
   const check = useMutation({
     mutationFn: runCheck,
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      setResult(data);
+      setEvidenceNotice(null);
+    },
+  });
+
+  const report = useMutation({
+    mutationFn: generateReport,
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `veklom-compliance-${selected ?? "report"}-${new Date().toISOString()}.json`;
+      a.click();
+      URL.revokeObjectURL(href);
+      setEvidenceNotice("Evidence bundle generated and downloaded.");
+    },
+    onError: (err) => {
+      setEvidenceNotice((err as Error)?.message ?? "Failed to generate evidence bundle.");
+    },
   });
 
   return (
@@ -139,10 +179,19 @@ export function CompliancePage() {
               {selected ? `Framework: ${selected}` : "Pick a framework above"}
             </h3>
           </div>
-          <button className="v-btn-ghost" disabled={!result}>
+          <button
+            className="v-btn-ghost"
+            disabled={!selected || report.isPending}
+            onClick={() => selected && report.mutate(selected)}
+          >
             <FileDown className="h-4 w-4" /> Evidence bundle
           </button>
         </header>
+        {evidenceNotice && (
+          <div className="mb-3 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
+            {evidenceNotice}
+          </div>
+        )}
 
         {check.isPending && (
           <div className="flex items-center justify-center gap-2 py-6 font-mono text-[12px] text-muted">

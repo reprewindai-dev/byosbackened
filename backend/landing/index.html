@@ -1,25 +1,33 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Veklom — Watch AI get governed in real time</title>
-  <meta name="description" content="Veklom is the control plane between your systems, AI, policy, cost, and audit. Watch a live request move through zero-trust, circuit-breakers, provider routing, memory, and audit — before anything actually runs." />
+    <title>Veklom</title>
+  <meta name="description" content="Sovereign control plane for governed inference." />
   <meta name="canonical" content="https://veklom.com/" />
   <meta name="keywords" content="sovereign AI, AI control plane, private AI gateway, governed AI, SNMP Modbus, edge control layer, audit, circuit breaker, fallback" />
-  <meta property="og:title" content="Veklom — Watch AI get governed in real time" />
-  <meta property="og:description" content="The control plane between systems, AI, policy, cost, and audit." />
-  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:url" content="https://veklom.com/" />
+  <meta property="og:title" content="Veklom" />
+  <meta property="og:description" content="Sovereign control plane for governed inference." />
+  <meta property="og:image" content="https://veklom.com/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Veklom - Sovereign control plane" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Veklom" />
+  <meta name="twitter:description" content="Sovereign control plane for governed inference." />
+  <meta name="twitter:image" content="https://veklom.com/og-image.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <style>
     /* ==========================================================
-       VEKLOM CONTROL PLANE — FOUNDATION STYLES
+       VEKLOM CONTROL PLANE â€” FOUNDATION STYLES
        This is the look-and-feel reference for the future dashboard.
        Palette: ink / bone / brass / moss / electric / amber / crimson
        Typography: Inter (UI) + JetBrains Mono (telemetry)
@@ -450,7 +458,7 @@
     .muted-small { color: var(--muted); font-size: 12px; font-family: "JetBrains Mono", monospace; }
     .plan ul { margin: 14px 0 0; padding: 0; list-style: none; color: var(--bone-2); font-size: 13px; }
     .plan ul li { padding: 6px 0; border-top: 1px dashed var(--rule); display: flex; gap: 8px; }
-    .plan ul li::before { content: "→"; color: var(--brass-2); }
+    .plan ul li::before { content: "â†’"; color: var(--brass-2); }
 
     /* detailed pricing table */
     .price-table-wrap { margin-top: 32px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
@@ -465,9 +473,20 @@
     .price-table td.num { font-family: "JetBrains Mono", monospace; color: var(--bone); }
     .price-table td.event { color: var(--bone-2); }
     .price-table .col-founding { color: var(--brass-2); }
+    .access-wrap { margin-top: 26px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
+    .access-wrap h4 { margin: 0; font-size: 14px; letter-spacing: .04em; }
+    .access-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+    .access-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .access-table th, .access-table td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    .access-table thead th { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 500; background: rgba(255,255,255,0.015); }
+    .access-table tbody tr:last-child td { border-bottom: 0; }
+    .locked-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule-2); border-radius: 999px; padding: 5px 10px; font-size: 11px; font-family: "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .warn-copy { margin-top: 16px; border: 1px solid rgba(229,177,110,.25); background: rgba(229,177,110,.06); color: var(--bone-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; line-height: 1.6; }
     @media (max-width: 860px) {
       .price-table-wrap { overflow-x: auto; }
       .price-table { min-width: 640px; }
+      .access-wrap { overflow-x: auto; }
+      .access-table { min-width: 760px; }
     }
 
     /* cta band */
@@ -538,20 +557,20 @@
   <!-- ============ HERO ============ -->
   <section class="hero">
     <div class="container">
-      <span class="eyebrow">Private AI Gateway · Governed Control Plane · Auditable Execution</span>
+      <span class="eyebrow">Private AI Gateway Â· Governed Control Plane Â· Auditable Execution</span>
       <h1><span class="grad">Watch AI get governed</span><br /><span class="soft">before it ever runs.</span></h1>
       <p class="lead">
-        Veklom is the control plane between your systems, AI, policy, cost, and audit. Routing, memory, circuit-breakers, and trace artifacts — on prompts <em>and</em> on the legacy infrastructure you already run.
+        Veklom is the control plane between your systems, AI, policy, cost, and audit. Routing, memory, circuit-breakers, and trace artifacts â€” on prompts <em>and</em> on the legacy infrastructure you already run.
       </p>
       <div class="actions">
-        <a class="cta-primary" href="#theater">Run the live demo ↓</a>
+        <a class="cta-primary" href="#theater">Run the live demo â†“</a>
         <a class="cta-ghost" href="/signup/">Start Free Evaluation</a>
         <a class="cta-ghost" href="#pricing">View pricing</a>
       </div>
       <div class="trust-row" role="status" aria-live="polite">
         <span class="live-tag" id="heroLive">Live backend connected</span>
         <span class="sep"></span>
-        <span>SOC2-ready · HIPAA-aware · EU-sovereign</span>
+        <span>SOC2-ready Â· HIPAA-aware Â· EU-sovereign</span>
         <span class="sep"></span>
         <span>Zero key exposure in this demo</span>
       </div>
@@ -578,7 +597,7 @@
         <div class="theater-body">
           <!-- ---- CONTROLS ---- -->
           <aside class="pane controls-pane" aria-label="Controls">
-            <div class="pane-title" id="ctrlTitle">Legacy Infrastructure · Scenario</div>
+            <div class="pane-title" id="ctrlTitle">Legacy Infrastructure Â· Scenario</div>
 
             <div class="verticals" id="verticals" role="tablist" data-visible="ai">
               <button class="vertical active" data-vertical="default">Default</button>
@@ -599,13 +618,13 @@
               >Draft a one-paragraph response to a client asking how our AI handles their regulated data. Keep it confident, specific, and reference the controls that would fire.</textarea>
               <div class="prompt-meta">
                 <span id="promptCount">153 / 800</span>
-                <span>Public demo · 250 token cap</span>
+                <span>Public demo Â· 250 token cap</span>
               </div>
 
               <div class="scenario-grid">
                 <button class="scenario-btn primary" id="btnAI">
                   <span class="sb-title">AI Request</span>
-                  <span class="sb-sub">Ollama → Groq fallback</span>
+                  <span class="sb-sub">Ollama â†’ Groq fallback</span>
                 </button>
                 <button class="scenario-btn danger" id="btnChaos">
                   <span class="sb-title">Break It Safely</span>
@@ -618,11 +637,11 @@
               <div class="scenario-grid" style="grid-template-columns: 1fr;">
                 <button class="scenario-btn" id="btnNetwork">
                   <span class="sb-title">Network Instability</span>
-                  <span class="sb-sub">SNMP · retrans 16 · loss 18%</span>
+                  <span class="sb-sub">SNMP Â· retrans 16 Â· loss 18%</span>
                 </button>
                 <button class="scenario-btn" id="btnMachine">
                   <span class="sb-title">Machine Overheat</span>
-                  <span class="sb-sub">Modbus · 92°C · vibration 71</span>
+                  <span class="sb-sub">Modbus Â· 92Â°C Â· vibration 71</span>
                 </button>
               </div>
             </div>
@@ -642,9 +661,9 @@
                 <span class="h-left">Protocol validation</span>
                 <span class="h-right" id="protocolStatus">cached</span>
               </div>
-              <div class="protocol-meta" id="protocolLastChecked">Last checked: —</div>
+              <div class="protocol-meta" id="protocolLastChecked">Last checked: â€”</div>
               <div class="protocol-list" id="protocolRows"></div>
-              <div class="protocol-proof" id="protocolProof">connect → normalize → decision → audit → cost control</div>
+              <div class="protocol-proof" id="protocolProof">connect â†’ normalize â†’ decision â†’ audit â†’ cost control</div>
             </div>
           </aside>
 
@@ -697,9 +716,9 @@
               </svg>
 
               <div class="metric-strip" aria-label="Live metrics">
-                <div class="metric"><div class="m-label">Latency</div><div class="m-value" id="metLatency">—</div></div>
-                <div class="metric"><div class="m-label">Tokens</div><div class="m-value" id="metTokens">—</div></div>
-                <div class="metric"><div class="m-label">Provider</div><div class="m-value" id="metProvider">—</div></div>
+                <div class="metric"><div class="m-label">Latency</div><div class="m-value" id="metLatency">â€”</div></div>
+                <div class="metric"><div class="m-label">Tokens</div><div class="m-value" id="metTokens">â€”</div></div>
+                <div class="metric"><div class="m-label">Provider</div><div class="m-value" id="metProvider">â€”</div></div>
                 <div class="metric"><div class="m-label">Policy</div><div class="m-value ok" id="metPolicy">passed</div></div>
                 <div class="metric"><div class="m-label">Billable</div><div class="m-value ok" id="metBillable">no</div></div>
               </div>
@@ -714,8 +733,8 @@
                 <span class="tb-dot" style="background:#ff5f57;"></span>
                 <span class="tb-dot" style="background:#febc2e;"></span>
                 <span class="tb-dot" style="background:#28c840;"></span>
-                <span style="margin-left:6px;">veklom · live-pipeline</span>
-                <span style="margin-left:auto;" id="termTraceId">trace: —</span>
+                <span style="margin-left:6px;">veklom Â· live-pipeline</span>
+                <span style="margin-left:auto;" id="termTraceId">trace: â€”</span>
               </div>
               <div class="term-body" id="termBody">
                 <div class="term-line"><span class="t-time">--:--:--</span><span class="t-evt">ready</span><span class="t-txt">awaiting request.</span></div>
@@ -727,7 +746,7 @@
                 <span class="h-left">Audit artifact</span>
                 <span class="h-right" id="auditStatus">pending</span>
               </div>
-              <div class="hash-row" id="auditHash">—</div>
+              <div class="hash-row" id="auditHash">â€”</div>
             </div>
 
             <div class="cost-card" id="costCard">
@@ -735,9 +754,9 @@
                 <span class="h-left">Cost control</span>
                 <span class="h-right" id="costStatus">pending</span>
               </div>
-              <div class="kv"><span>public_demo</span><span class="v" id="kvDemo">—</span></div>
-              <div class="kv"><span>billable</span><span class="v" id="kvBillable">—</span></div>
-              <div class="kv"><span>credits_charged</span><span class="v" id="kvCredits">—</span></div>
+              <div class="kv"><span>public_demo</span><span class="v" id="kvDemo">â€”</span></div>
+              <div class="kv"><span>billable</span><span class="v" id="kvBillable">â€”</span></div>
+              <div class="kv"><span>credits_charged</span><span class="v" id="kvCredits">â€”</span></div>
             </div>
           </aside>
         </div>
@@ -749,7 +768,7 @@
   <section class="section" id="why">
     <div class="container">
       <span class="section-eyebrow">The control plane for governed AI</span>
-      <h2 class="section-title">Every execution — routed, policed, traced.</h2>
+      <h2 class="section-title">Every execution â€” routed, policed, traced.</h2>
       <p class="section-copy">No lock-ins, no blind call chains, no surprise invoices. Veklom ships private-by-default and is designed for teams operating under CISO, compliance, and procurement constraints.</p>
       <div class="pillars">
         <div class="pill">
@@ -760,7 +779,7 @@
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2.2"/></svg></div>
           <h3>Policy before provider</h3>
-          <p>Per-tenant routing, budgets, redaction, and kill-switches evaluated <em>before</em> any model is called — on prompts and on edge signals.</p>
+          <p>Per-tenant routing, budgets, redaction, and kill-switches evaluated <em>before</em> any model is called â€” on prompts and on edge signals.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg></div>
@@ -775,12 +794,12 @@
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9 5 9-5M3 7v10l9 5 9-5V7"/></svg></div>
           <h3>Legacy-aware</h3>
-          <p>SNMP, Modbus, MQTT in. Normalized signals → governed AI decisions → the same audit trail as every prompt.</p>
+          <p>SNMP, Modbus, MQTT in. Normalized signals â†’ governed AI decisions â†’ the same audit trail as every prompt.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg></div>
           <h3>Cost-intelligent</h3>
-          <p>Token budgets, per-tenant spend caps, and real-time meters that hard-stop at your limit — not after the bill lands.</p>
+          <p>Token budgets, per-tenant spend caps, and real-time meters that hard-stop at your limit â€” not after the bill lands.</p>
         </div>
       </div>
     </div>
@@ -799,21 +818,21 @@
           <div class="muted-small">No production routing</div>
           <ul>
             <li>15 governed Playground runs</li>
-            <li>3 compare runs · 20 policy tests</li>
+            <li>3 compare runs Â· 20 policy tests</li>
             <li>2 watermarked exports</li>
             <li>BYOK provider testing</li>
             <li>Marketplace browsing</li>
           </ul>
         </article>
         <article class="plan highlight">
-          <span class="tier">Founding · most chosen</span><h4>Founding Activation</h4>
+          <span class="tier">Founding Â· most chosen</span><h4>Founding Activation</h4>
           <div class="value">$395 <span class="muted-small">one-time</span></div>
           <div class="muted-small">+ $150 minimum Operating Reserve</div>
           <ul>
-            <li>Playground run — $0.25</li>
-            <li>Compare run — $0.75</li>
-            <li>BYOK Governance Calls — $6 / 1,000</li>
-            <li>Managed Governance Calls — $12 / 1,000</li>
+            <li>Playground run â€” $0.25</li>
+            <li>Compare run â€” $0.75</li>
+            <li>BYOK Governance Calls â€” $6 / 1,000</li>
+            <li>Managed Governance Calls â€” $12 / 1,000</li>
           </ul>
         </article>
         <article class="plan">
@@ -821,19 +840,19 @@
           <div class="value">$795 <span class="muted-small">one-time</span></div>
           <div class="muted-small">+ $300 minimum Operating Reserve</div>
           <ul>
-            <li>Playground run — $0.40</li>
-            <li>Compare run — $1.20</li>
-            <li>BYOK Governance Calls — $8 / 1,000</li>
-            <li>Managed Governance Calls — $16 / 1,000</li>
+            <li>Playground run â€” $0.40</li>
+            <li>Compare run â€” $1.20</li>
+            <li>BYOK Governance Calls â€” $8 / 1,000</li>
+            <li>Managed Governance Calls â€” $16 / 1,000</li>
           </ul>
         </article>
         <article class="plan">
           <span class="tier">Regulated / Enterprise</span><h4>Regulated</h4>
           <div class="value">From $2,500 <span class="muted-small">activation</span></div>
-          <div class="muted-small">+ $2,500 minimum reserve · private terms</div>
+          <div class="muted-small">+ $2,500 minimum reserve Â· private terms</div>
           <ul>
-            <li>BYOK Governance Calls — $10 / 1,000</li>
-            <li>Managed Governance Calls — $20 / 1,000</li>
+            <li>BYOK Governance Calls â€” $10 / 1,000</li>
+            <li>Managed Governance Calls â€” $20 / 1,000</li>
             <li>Private deployment</li>
             <li>Procurement & security review</li>
           </ul>
@@ -843,7 +862,7 @@
       <div class="price-table-wrap" aria-label="Detailed pricing ladder">
         <div class="price-table-head">
           <h4>Full pricing ladder</h4>
-          <span class="eyebrow">Per event · versioned · v1_public</span>
+          <span class="eyebrow">Per event Â· versioned Â· v1_public</span>
         </div>
         <table class="price-table">
           <thead>
@@ -901,12 +920,65 @@
         </table>
       </div>
 
+      <div class="access-wrap" aria-label="Playground versus activated workspace">
+        <div class="access-head">
+          <h4>Playground vs Activated Workspace</h4>
+          <span class="eyebrow">Access model · evidence is paywalled</span>
+        </div>
+        <table class="access-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Playground</th>
+              <th>Activated Workspace</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Governed runs</td>
+              <td>Limited evaluation runs in shared/demo context.</td>
+              <td>Production-oriented governed execution in your own workspace.</td>
+            </tr>
+            <tr>
+              <td>Retention</td>
+              <td>Short-lived only; not for compliance recordkeeping.</td>
+              <td>Durable retention under workspace policy and controls.</td>
+            </tr>
+            <tr>
+              <td>Signed artifacts</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Signed, exportable artifacts for governed runs.</td>
+            </tr>
+            <tr>
+              <td>Evidence packs</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Generate/export evidence packs for audits, incidents, and procurement.</td>
+            </tr>
+            <tr>
+              <td>Auditor bundles</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Structured auditor handoff bundles with export controls.</td>
+            </tr>
+            <tr>
+              <td>Bulk export + retention controls</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Case/time-window export and retention policy management.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="warn-copy">
+        The Playground is for evaluation only and is not suitable for compliance evidence, long-term
+        recordkeeping, or regulatory audit use. Free lets you see governed AI. Paid lets you prove it.
+      </div>
+
       <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Marketplace vendors monetize through a 12% standard take (8% for preferred partners). Founding vendors keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
 
       <div class="cta-band">
         <div>
           <h3>You just watched it work. Now run it on your data.</h3>
-          <p>Free Evaluation — 15 governed runs, no card, no key exposure. Keep every audit artifact you generate.</p>
+          <p>Free Evaluation â€” 15 governed runs, no card, no key exposure. Keep every audit artifact you generate.</p>
         </div>
         <div style="display:flex; gap:12px;">
           <a class="cta-primary" href="/signup/">Start Free Evaluation</a>
@@ -926,7 +998,7 @@
       <a href="/legal/privacy">Privacy</a>
       <a href="/login/">Sign In</a>
     </div>
-    <div>© Veklom · Sovereign Control Node</div>
+    <div>Â© Veklom Â· Sovereign Control Node</div>
   </div>
 </footer>
 
@@ -939,7 +1011,7 @@
    - All animation state derives from real server events.
    ============================================================== */
 (function () {
-  // Mirror app/auth.js host routing: .dev → api.veklom.dev, else api.veklom.com.
+  // Mirror app/auth.js host routing: .dev â†’ api.veklom.dev, else api.veklom.com.
   // Allow override via window.VEKLOM_API for local dev.
   const API_BASE = (function () {
     if (typeof window !== "undefined" && window.VEKLOM_API) return window.VEKLOM_API.replace(/\/+$/, "");
@@ -955,16 +1027,16 @@
       label: "AI Request Control Plane",
       nodes: [
         { id: "request_received",    title: "Request",        sub: "inbound" },
-        { id: "zero_trust_check",    title: "Zero-Trust",     sub: "auth · policy" },
+        { id: "zero_trust_check",    title: "Zero-Trust",     sub: "auth Â· policy" },
         { id: "rate_limit_check",    title: "Rate Limit",     sub: "per tenant / ip" },
         { id: "token_budget_check",  title: "Token Budget",   sub: "per workspace" },
         { id: "circuit_breaker_check", title: "Circuit Breaker", sub: "self-heal" },
-        { id: "provider_selected",   title: "Provider Route", sub: "ollama · groq" },
-        { id: "redis_memory_check",  title: "Memory",         sub: "redis · scoped" },
+        { id: "provider_selected",   title: "Provider Route", sub: "ollama Â· groq" },
+        { id: "redis_memory_check",  title: "Memory",         sub: "redis Â· scoped" },
         { id: "response_complete",   title: "Response",       sub: "streamed" },
         { id: "audit_cost",          title: "Audit + Cost",   sub: "signed artifact" },
       ],
-      // map server events → node ids they "own"
+      // map server events â†’ node ids they "own"
       eventMap: {
         request_received:       "request_received",
         zero_trust_check:       "zero_trust_check",
@@ -985,7 +1057,7 @@
     edge: {
       label: "Legacy Infrastructure Control Plane",
       nodes: [
-        { id: "legacy_signal",    title: "Legacy Signal",   sub: "snmp · modbus" },
+        { id: "legacy_signal",    title: "Legacy Signal",   sub: "snmp Â· modbus" },
         { id: "protocol_ingest",  title: "Protocol Ingest", sub: "adapters" },
         { id: "normalize",        title: "Normalize",       sub: "canonical schema" },
         { id: "policy_control",   title: "Policy Control",  sub: "rules engine" },
@@ -1230,7 +1302,7 @@
   function resetTerm() {
     termBody.innerHTML =
       `<div class="term-line"><span class="t-time">${tstamp()}</span>` +
-      `<span class="t-evt">boot</span><span class="t-txt">connecting to veklom control plane…</span></div>`;
+      `<span class="t-evt">boot</span><span class="t-txt">connecting to veklom control planeâ€¦</span></div>`;
   }
 
   // ---- Live latency meter ----
@@ -1252,21 +1324,21 @@
     renderPipeline();
     resetTerm();
     streamText = ""; streamLine = null;
-    metLatency.textContent = "—";
-    metTokens.textContent = "—";
-    metProvider.textContent = "—";
-    metPolicy.textContent = "—"; metPolicy.className = "m-value";
-    metBillable.textContent = "—"; metBillable.className = "m-value";
+    metLatency.textContent = "â€”";
+    metTokens.textContent = "â€”";
+    metProvider.textContent = "â€”";
+    metPolicy.textContent = "â€”"; metPolicy.className = "m-value";
+    metBillable.textContent = "â€”"; metBillable.className = "m-value";
     chipProvider.className = "chip";
     chipProvider.innerHTML = mode === "edge"
       ? '<span class="dot"></span>Provider: awaiting protocol'
       : '<span class="dot"></span>Provider: awaiting model';
-    chipCB.className = "chip"; chipCB.innerHTML = '<span class="dot"></span>Circuit: —';
+    chipCB.className = "chip"; chipCB.innerHTML = '<span class="dot"></span>Circuit: â€”';
     auditCard.classList.remove("locked");
-    auditStatus.textContent = "pending"; auditHash.textContent = "—";
+    auditStatus.textContent = "pending"; auditHash.textContent = "â€”";
     costCard.classList.remove("locked");
     costStatus.textContent = "pending";
-    kvDemo.textContent = "—"; kvBillable.textContent = "—"; kvCredits.textContent = "—";
+    kvDemo.textContent = "â€”"; kvBillable.textContent = "â€”"; kvCredits.textContent = "â€”";
   }
 
   function renderProtocolCanary(summary) {
@@ -1281,7 +1353,7 @@
       status === "not_run" ? "warn" :
       "err"
     );
-    protocolLastChecked.textContent = "Last checked: " + (summary?.last_checked_at || "—");
+    protocolLastChecked.textContent = "Last checked: " + (summary?.last_checked_at || "â€”");
     protocolRows.innerHTML = [
       ["SNMP", rows.snmp],
       ["Modbus TCP", rows.modbus_tcp],
@@ -1302,13 +1374,13 @@
       `decision=${proof.decision ? "true" : "false"}`,
       `audit=${proof.audit ? "true" : "false"}`,
       `cost_control=${proof.cost_control ? "true" : "false"}`,
-    ].join(" · ");
+    ].join(" Â· ");
   }
 
   function setRunning(on, label) {
     runBtn.disabled = on;
     runLabel.innerHTML = on
-      ? `<span class="spinner"></span> ${label || "Streaming…"}`
+      ? `<span class="spinner"></span> ${label || "Streamingâ€¦"}`
       : (label || "Run pipeline");
   }
 
@@ -1319,7 +1391,7 @@
     if (!prompt) { promptInput.focus(); return; }
     mode = "ai"; renderPipeline();
     resetPipelineState();
-    setRunning(true, forceFallback ? "Breaking it safely…" : "Streaming…");
+    setRunning(true, forceFallback ? "Breaking it safelyâ€¦" : "Streamingâ€¦");
     startLatency();
 
     const url = new URL(API_BASE + "/demo/pipeline/stream");
@@ -1334,33 +1406,33 @@
 
     eventOn("request_received", (d) => {
       termTraceId.textContent = "trace: " + d.trace_id;
-      termPush("request", `inbound · ${d.prompt_len} chars · vertical=${d.vertical}${d.force_fallback ? " · chaos=on" : ""}`);
+      termPush("request", `inbound Â· ${d.prompt_len} chars Â· vertical=${d.vertical}${d.force_fallback ? " Â· chaos=on" : ""}`);
       advanceTo("request_received");
     });
     eventOn("zero_trust_check", (d) => {
-      termPush("zero-trust", `policy=${d.policy} · demo_mode=${d.demo_mode}`, "ok");
+      termPush("zero-trust", `policy=${d.policy} Â· demo_mode=${d.demo_mode}`, "ok");
       metPolicy.textContent = "passed"; metPolicy.className = "m-value ok";
       advanceTo("zero_trust_check");
     });
     eventOn("rate_limit_check", (d) => {
-      termPush("rate-limit", `hits=${d.hits}/${d.limit} · remaining=${d.remaining}`, "ok");
+      termPush("rate-limit", `hits=${d.hits}/${d.limit} Â· remaining=${d.remaining}`, "ok");
       advanceTo("rate_limit_check");
     });
     eventOn("token_budget_check", (d) => {
-      termPush("token-budget", `cap=${d.output_cap} · billable=${d.billable}`, "ok");
+      termPush("token-budget", `cap=${d.output_cap} Â· billable=${d.billable}`, "ok");
       metBillable.textContent = d.billable ? "yes" : "no";
       metBillable.className = d.billable ? "m-value warn" : "m-value ok";
       advanceTo("token_budget_check");
     });
     eventOn("circuit_breaker_check", (d) => {
       const cls = d.state === "open" ? "err" : d.state === "half_open" ? "warn" : "ok";
-      termPush("circuit-breaker", `state=${d.state} · failures=${d.failures}/${d.threshold}${d.forced ? " · FORCED" : ""}`, cls);
+      termPush("circuit-breaker", `state=${d.state} Â· failures=${d.failures}/${d.threshold}${d.forced ? " Â· FORCED" : ""}`, cls);
       chipCB.className = "chip " + (cls === "err" ? "err" : cls === "warn" ? "warn" : "ok");
       chipCB.innerHTML = `<span class="dot"></span>Circuit: ${d.state}`;
       advanceTo("circuit_breaker_check");
     });
     eventOn("provider_selected", (d) => {
-      termPush("provider", `${d.provider} · ${d.model} · reason=${d.reason}${d.sovereign ? " · sovereign" : ""}`, d.sovereign ? "ok" : "warn");
+      termPush("provider", `${d.provider} Â· ${d.model} Â· reason=${d.reason}${d.sovereign ? " Â· sovereign" : ""}`, d.sovereign ? "ok" : "warn");
       chipProvider.className = "chip " + (d.sovereign ? "ok" : "warn");
       chipProvider.innerHTML = `<span class="dot"></span>Provider: ${d.provider}`;
       metProvider.textContent = d.provider;
@@ -1368,18 +1440,18 @@
       advanceTo("provider_selected");
     });
     eventOn("ollama_attempt", (d) => {
-      termPush("ollama", `model=${d.model} · host=${d.base_url} · stream=${d.stream}`);
+      termPush("ollama", `model=${d.model} Â· host=${d.base_url} Â· stream=${d.stream}`);
     });
     eventOn("ollama_unavailable", (d) => {
-      termPush("ollama·fail", `${d.simulated ? "simulated outage" : d.reason}`, "err");
+      termPush("ollamaÂ·fail", `${d.simulated ? "simulated outage" : d.reason}`, "err");
       setNodeState("circuit_breaker_check", "err");
     });
     eventOn("circuit_breaker_opened", (d) => {
-      termPush("circuit·open", `${d.simulated ? "SIMULATED" : "opened"} — routing to fallback`, "warn");
+      termPush("circuitÂ·open", `${d.simulated ? "SIMULATED" : "opened"} â€” routing to fallback`, "warn");
       chipCB.className = "chip warn"; chipCB.innerHTML = '<span class="dot"></span>Circuit: open';
     });
     eventOn("redis_memory_check", (d) => {
-      termPush("memory", `tenant=${d.tenant_scope} · ttl=${d.ttl_sec}s · ephemeral=${d.demo_ephemeral}`, "ok");
+      termPush("memory", `tenant=${d.tenant_scope} Â· ttl=${d.ttl_sec}s Â· ephemeral=${d.demo_ephemeral}`, "ok");
       advanceTo("redis_memory_check");
     });
     eventOn("token_delta", (d) => {
@@ -1388,21 +1460,21 @@
     });
     eventOn("response_complete", (d) => {
       termStreamEnd();
-      termPush("complete", `tokens=${d.total_tokens} · latency=${d.latency_ms}ms · ${d.model}`, "ok");
+      termPush("complete", `tokens=${d.total_tokens} Â· latency=${d.latency_ms}ms Â· ${d.model}`, "ok");
       metTokens.textContent = d.total_tokens;
       stopLatency(d.latency_ms);
       setNodeState("response_complete", "done");
       setEdgeState(7, "done");
     });
     eventOn("audit_written", (d) => {
-      termPush("audit", `hash=${d.audit_hash.slice(0, 18)}… · store=${d.store}`, "ok");
+      termPush("audit", `hash=${d.audit_hash.slice(0, 18)}â€¦ Â· store=${d.store}`, "ok");
       auditCard.classList.add("locked");
       auditStatus.textContent = "locked";
       revealHash(d.audit_hash);
       setNodeState("audit_cost", "active");
     });
     eventOn("cost_recorded", (d) => {
-      termPush("cost", `billable=${d.billable} · credits=${d.credits_charged}`, "ok");
+      termPush("cost", `billable=${d.billable} Â· credits=${d.credits_charged}`, "ok");
       costCard.classList.add("locked");
       costStatus.textContent = "locked";
       kvDemo.textContent = String(d.public_demo); kvDemo.className = "v ok";
@@ -1414,7 +1486,7 @@
       termPush("error", d.message || "stream error", "err");
     });
     eventOn("done", (d) => {
-      termPush("done", `total=${d.total_latency_ms}ms · trace=${d.trace_id}`, "ok");
+      termPush("done", `total=${d.total_latency_ms}ms Â· trace=${d.trace_id}`, "ok");
       try { es.close(); } catch(e){}
       currentES = null;
       setRunning(false);
@@ -1448,13 +1520,13 @@
     if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
     mode = "edge"; renderPipeline();
     resetPipelineState();
-    setRunning(true, scenario === "network" ? "Ingesting SNMP…" : "Ingesting Modbus…");
+    setRunning(true, scenario === "network" ? "Ingesting SNMPâ€¦" : "Ingesting Modbusâ€¦");
     startLatency();
 
     const order = ["legacy_signal", "protocol_ingest", "normalize", "policy_control", "ai_decision", "audit_cost"];
     // animate the first 2 nodes optimistically while the fetch is in flight
     advanceTo("legacy_signal");
-    termPush("ingest", `scenario=${scenario} · awaiting backend state`);
+    termPush("ingest", `scenario=${scenario} Â· awaiting backend state`);
     setTimeout(() => advanceTo("protocol_ingest"), 180);
 
     try {
@@ -1468,7 +1540,7 @@
       const isFallback = payload.fallback === true;
       const isLive = payload.live === true && !isFallback;
       const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
-      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
+      termPush("protocol", `${payload.protocol || "?"} Â· src=${source} Â· ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
       chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
       chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
       advanceTo("normalize");
@@ -1476,7 +1548,7 @@
 
       const decision = payload.decision || {};
       const severity = decision.severity || "info";
-      termPush("policy", `severity=${severity} · ${decision.summary || "—"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
+      termPush("policy", `severity=${severity} Â· ${decision.summary || "â€”"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
       // Paint policy_control node severity-tinted
       advanceTo("policy_control");
       if (severity === "critical") setNodeState("policy_control", "err");
@@ -1488,7 +1560,7 @@
       advanceTo("ai_decision");
       metProvider.textContent = payload.protocol || "edge";
       metProvider.className = "m-value ok";
-      metTokens.textContent = "—";
+      metTokens.textContent = "â€”";
       metPolicy.textContent = severity; metPolicy.className = "m-value " + (severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
       metBillable.textContent = payload.cost_control?.billable ? "yes" : "no";
       metBillable.className = payload.cost_control?.billable ? "m-value warn" : "m-value ok";
@@ -1508,9 +1580,9 @@
       kvBillable.textContent = String(cost.billable ?? false); kvBillable.className = "v " + (cost.billable ? "warn" : "ok");
       kvCredits.textContent = cost.customer_route_cost_credits ?? 0;
       setNodeState("audit_cost", "done");
-      termPush("done", `trace=${payload.trace_id?.slice(0,8) || "—"}… · ${(payload.trace || []).join(" → ")}`, "ok");
+      termPush("done", `trace=${payload.trace_id?.slice(0,8) || "â€”"}â€¦ Â· ${(payload.trace || []).join(" â†’ ")}`, "ok");
     } catch (err) {
-      termPush("edge·fail", String(err.message || err), "err");
+      termPush("edgeÂ·fail", String(err.message || err), "err");
       setNodeState("protocol_ingest", "err");
     } finally {
       stopLatency();
@@ -1530,12 +1602,12 @@
       if (mode === "ai") {
         aiControls.hidden = false; edgeControls.hidden = true;
         verticalsBar.dataset.visible = "ai"; verticalsBar.style.display = "";
-        ctrlTitle.textContent = "AI Request · Vertical";
+        ctrlTitle.textContent = "AI Request Â· Vertical";
         runLabel.textContent = "Run pipeline";
       } else {
         aiControls.hidden = true; edgeControls.hidden = false;
         verticalsBar.style.display = "none";
-        ctrlTitle.textContent = "Legacy Infrastructure · Scenario";
+        ctrlTitle.textContent = "Legacy Infrastructure Â· Scenario";
         setSelectedEdgeScenario(selectedEdgeScenario);
       }
     });
@@ -1544,11 +1616,11 @@
   // ---- Vertical presets ----
   const presetPrompts = {
     default: "Draft a one-paragraph response to a client asking how our AI handles their regulated data. Keep it confident, specific, and reference the controls that would fire.",
-    legal: "Summarize this NDA for a legal ops reviewer: '[sample clause] — Confidential Information shall not be disclosed except to affiliates bound by equivalent obligations.' Flag redaction points and required audit fields.",
+    legal: "Summarize this NDA for a legal ops reviewer: '[sample clause] â€” Confidential Information shall not be disclosed except to affiliates bound by equivalent obligations.' Flag redaction points and required audit fields.",
     medical: "A clinician asks for a discharge-plan summary for a 62-year-old post-op cardiac patient. Note which PHI fields Veklom would redact and which audit events fire before the model responds.",
     finance: "Explain, for a SOC2 reviewer, how a customer-support LLM answering an account-balance question stays inside PCI scope. Reference the policy gates that must evaluate before generation.",
     agency: "A marketing agency operates 40 client tenants. Describe how tenant isolation, per-client budgets, and audit artifacts work when one client's creative team sends a brand-voice prompt.",
-    infrastructure: "A Modbus sensor reports 92°C and rising vibration on a mission-critical pump. Show how Veklom normalizes the signal, runs policy, produces a governed AI decision, and records the audit.",
+    infrastructure: "A Modbus sensor reports 92Â°C and rising vibration on a mission-critical pump. Show how Veklom normalizes the signal, runs policy, produces a governed AI decision, and records the audit.",
   };
   verticalsBar.addEventListener("click", (e) => {
     const b = e.target.closest(".vertical"); if (!b) return;
@@ -1603,7 +1675,7 @@
     } catch (err) {
       chipBackend.className = "chip warn";
       chipBackend.innerHTML = '<span class="dot"></span>Backend: reconnecting';
-      $("heroLive").textContent = "Reconnecting…";
+      $("heroLive").textContent = "Reconnectingâ€¦";
     }
   }
 
@@ -1635,4 +1707,5 @@
 </script>
 </body>
 </html>
+
 

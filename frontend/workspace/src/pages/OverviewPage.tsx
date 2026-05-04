@@ -1,15 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, TerminalSquare, TrendingUp, TrendingDown, ShieldCheck, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import type { OverviewPayload } from "@/types/api";
 import { fmtCents, fmtDelta, fmtNumber, relativeTime } from "@/lib/cn";
 
 async function fetchOverview(): Promise<OverviewPayload> {
-  const resp = await api.get<OverviewPayload>("/monitoring/overview");
-  return resp.data;
+  try {
+    const resp = await api.get<OverviewPayload>("/monitoring/overview");
+    return resp.data;
+  } catch {
+    const fallback = await api.get<OverviewPayload>("/workspace/overview");
+    return fallback.data;
+  }
 }
 
 export function OverviewPage() {
+  const navigate = useNavigate();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["overview"],
     queryFn: fetchOverview,
@@ -36,10 +43,10 @@ export function OverviewPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost">
+          <button className="v-btn-ghost" onClick={() => navigate("/deployments")}>
             <Plus className="h-4 w-4" /> New deployment
           </button>
-          <button className="v-btn-primary">
+          <button className="v-btn-primary" onClick={() => navigate("/playground")}>
             <TerminalSquare className="h-4 w-4" /> Open Playground
           </button>
         </div>
@@ -51,8 +58,7 @@ export function OverviewPage() {
           <div>
             <div className="font-semibold">Failed to load overview</div>
             <div className="mt-1 text-xs opacity-80">
-              {(error as Error)?.message ?? "Unknown error"} · the backend endpoint{" "}
-              <span className="font-mono">/api/v1/monitoring/overview</span> may not be implemented yet.
+              {(error as Error)?.message ?? "Unknown error"} · could not load workspace overview data.
             </div>
           </div>
         </div>
@@ -184,7 +190,7 @@ export function OverviewPage() {
               <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Recent runs · live</div>
               <h3 className="mt-1 text-sm font-semibold">Per-call routing, latency, cost</h3>
             </div>
-            <a href="/playground" className="v-chip hover:text-bone">Playground →</a>
+            <button className="v-chip hover:text-bone" onClick={() => navigate("/playground")}>Playground →</button>
           </header>
           <table className="w-full text-[13px]">
             <thead>

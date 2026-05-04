@@ -1,0 +1,32 @@
+name: Deploy License Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/license/**"
+      - "backend/core/config.py"
+  workflow_dispatch:
+
+jobs:
+  deploy-license:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy license server to Hetzner Server 2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 5.78.153.146
+          username: root
+          key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          script: |
+            if [ ! -d /opt/veklom-license/.git ]; then
+              git clone ${{ github.server_url }}/${{ github.repository }} /opt/veklom-license
+            fi
+            cd /opt/veklom-license
+            git pull origin main
+            pip install -r backend/requirements.txt
+            systemctl restart veklom-license
+            sleep 5
+            curl -f http://localhost:8001/health && echo "License server healthy" || (echo "License server failed" && exit 1)

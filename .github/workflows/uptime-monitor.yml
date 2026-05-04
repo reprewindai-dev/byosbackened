@@ -1,0 +1,23 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check api.veklom.com
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://api.veklom.com/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "api.veklom.com DOWN - status $STATUS"
+            exit 1
+          fi
+
+      - name: Check engine.veklom.com
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://engine.veklom.com/health || echo "000")
+          echo "Engine status: $STATUS"

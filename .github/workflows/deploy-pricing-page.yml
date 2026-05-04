@@ -1,0 +1,31 @@
+name: Deploy Pricing Page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "landing/**"
+  workflow_dispatch:
+
+jobs:
+  deploy-pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd landing
+          wrangler pages deploy . --project-name=veklom-pricing --branch=main
+
+      - name: Verify pricing page live
+        run: |
+          sleep 20
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://veklom.com)
+          echo "veklom.com status: $STATUS"

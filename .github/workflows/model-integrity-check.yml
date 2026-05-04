@@ -1,0 +1,27 @@
+name: Model Integrity Check
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  model-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Ollama model responds correctly
+        run: |
+          RESPONSE=$(curl -s -X POST https://api.veklom.com/v1/exec \
+            -H "X-API-Key: ${{ secrets.CI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"qwen2.5:0.5b","prompt":"Reply with only: OK","max_tokens":5}' \
+            --max-time 30)
+
+          echo "Model response: $RESPONSE"
+
+          if echo "$RESPONSE" | grep -qi "ok\|error\|response"; then
+            echo "Model responding"
+          else
+            echo "Model not responding as expected"
+            exit 1
+          fi

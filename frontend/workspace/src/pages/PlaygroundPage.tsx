@@ -43,11 +43,13 @@
 //   - Change ConversationTurn shape without updating the thread render below.
 // =============================================================================
 
+import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  Box,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -66,6 +68,7 @@ import {
   Shield,
   SlidersHorizontal,
   Sparkles,
+  TerminalSquare,
   Trash2,
   TrendingDown,
   Zap,
@@ -239,6 +242,10 @@ export function PlaygroundPage() {
   const [systemPrompt, setSystemPrompt] = useState(stored?.systemPrompt ?? "");
   const [temperature, setTemperature] = useState(stored?.temperature ?? 0.4);
   const [showSystemPrompt, setShowSystemPrompt] = useState(stored?.showSystemPrompt ?? false);
+  const [mode, setMode] = useState<"chat" | "completion">("chat");
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [autoRedact, setAutoRedact] = useState(true);
+  const [auditExportPinned, setAuditExportPinned] = useState(true);
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
@@ -403,6 +410,12 @@ export function PlaygroundPage() {
       .map((t) => ({ role: t.role, content: t.content }))
       .concat([{ role: "user" as const, content: userContent }]);
 
+    const governanceSystemPrompt = [
+      autoRedact ? "Redact or refuse disclosure of PII, PHI, secrets, access tokens, and regulated identifiers unless the user explicitly asks for a safe placeholder format." : "",
+      vertical !== "default" ? `Session vertical: ${vertical}. Apply the matching Veklom governance posture before answering.` : "",
+      systemPrompt.trim(),
+    ].filter(Boolean).join("\n\n");
+
     try {
       const resp = await api.post<AICompleteResponse>(
         "/ai/complete",
@@ -410,7 +423,7 @@ export function PlaygroundPage() {
           model: selectedModel.slug,
           prompt: userContent.slice(0, 8000),
           messages,
-          system_prompt: systemPrompt.trim() || undefined,
+          system_prompt: governanceSystemPrompt || undefined,
           temperature,
           max_tokens: maxTokens,
         },
@@ -482,7 +495,7 @@ export function PlaygroundPage() {
       abortRef.current = null;
       setRunning(false);
     }
-  }, [appendEvent, appendTurn, conversation, maxTokens, prompt, running, selectedModel, systemPrompt, temperature]);
+  }, [appendEvent, appendTurn, autoRedact, conversation, maxTokens, prompt, running, selectedModel, systemPrompt, temperature, vertical]);
 
   useEffect(() => {
     return () => stop();
@@ -589,6 +602,7 @@ export function PlaygroundPage() {
             response: responseText,
             stats,
             events,
+            audit_export_pinned: auditExportPinned,
           },
           null,
           2,
@@ -603,6 +617,372 @@ export function PlaygroundPage() {
     a.click();
     URL.revokeObjectURL(href);
   };
+
+  const sessionUnits = conversation.reduce((total, turn) => total + (turn.tokens ?? 0), 0);
+  const sessionCostLabel = stats.cost_usd ?? "$0.00";
+  const latestLatency = stats.latency_ms ?? "-";
+  const complianceTag = vertical === "default" ? "Standard" : vertical.toUpperCase();
+  const inputEstimate = Math.ceil(prompt.length / 4) || 0;
+
+  return (
+    <div className="mx-auto w-full max-w-[1400px]">
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-eyebrow">Workspace · Playground</div>
+          <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">Playground</h1>
+          <p className="mt-2 max-w-2xl text-sm text-bone-2">
+            Production-grade prompt theater. Every call is policed, routed, costed, and audit-stamped before a single
+            output unit is generated.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="chip border-brass/40 bg-brass/10 text-brass-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-brass-2" />
+              {selectedModel?.provider ?? "provider"} route
+            </span>
+            <span className="chip border-rule bg-ink/40 text-bone-2">{latestLatency} p50</span>
+            <span className="chip border-rule bg-ink/40 text-bone-2">{sessionCostLabel} session · {sessionUnits} out</span>
+            <span className="chip border-brass/40 bg-brass/10 text-brass-2">{complianceTag}</span>
+            <span className={cn("chip", autoRedact ? "border-brass/40 bg-brass/10 text-brass-2" : "border-rule bg-ink/40 text-muted")}>
+              <Shield className="h-3 w-3" />
+              {autoRedact ? "Auto-redact" : "Redact off"}
+            </span>
+            <span className="chip border-moss/30 bg-moss/10 text-moss">
+              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
+              POLICY ENGINE LIVE
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="v-btn-primary h-8 px-3 text-xs" onClick={exportAudit} disabled={!events.length || running}>
+            <Download className="h-3.5 w-3.5" /> Audit export
+          </button>
+          <button type="button" className="v-btn-ghost h-8 px-3 text-xs" onClick={saveAsPipeline} disabled={!responseText || running || savingPipeline}>
+            <Save className="h-3.5 w-3.5" /> {savingPipeline ? "Saving" : "Save prompt"}
+          </button>
+          <button type="button" className="v-btn-ghost h-8 px-3 text-xs" disabled title="Branching requires a saved pipeline run">
+            <GitBranch className="h-3.5 w-3.5" /> Branch
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-12 gap-4 py-4">
+        <aside className="col-span-12 space-y-3 xl:col-span-2">
+          <div className="frame">
+            <SideHeader icon={<MessageSquare className="h-3.5 w-3.5" />} label="Sessions" />
+            <div className="space-y-1 px-2 py-2">
+              <button className="hover-elevate flex w-full items-center justify-between rounded-md bg-white/[0.035] px-2 py-1.5 text-left text-[12px]">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-moss" />
+                  <span className="truncate">{conversation.length ? "Current governed thread" : "New governed thread"}</span>
+                </span>
+                <span className="font-mono text-[10px] text-muted">{conversation.length}t</span>
+              </button>
+              <button className="hover-elevate flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[12px]" disabled>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brass-2" />
+                  <span className="truncate">Last audit export</span>
+                </span>
+                <span className="font-mono text-[10px] text-muted">{stats.request_id ? "ready" : "none"}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<Sparkles className="h-3.5 w-3.5" />} label="Prompt Library" />
+            <div className="space-y-1 px-2 py-2">
+              {VERTICALS.map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => {
+                    handleVerticalChange(item.value);
+                    setPrompt(SAMPLE_PROMPTS[item.value]);
+                  }}
+                  className={cn(
+                    "hover-elevate flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left",
+                    vertical === item.value && "bg-brass/10 text-brass-2",
+                  )}
+                >
+                  <span className="truncate font-mono text-[11.5px]">{item.label.toLowerCase()}.starter</span>
+                  <span className="font-mono text-[10px] text-muted">v1</span>
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-rule px-3 py-2 text-[10.5px] text-muted">
+              Versioned · diffable · JSON / YAML import-export
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<SlidersHorizontal className="h-3.5 w-3.5" />} label="Tools / Functions" />
+            <div className="space-y-1 px-2 py-2">
+              <ToolRow name="compliance.fetch" enabled detail="live compliance route" />
+              <ToolRow name="vault.read" enabled detail="workspace API keys" />
+              <ToolRow name="http.get" detail="pipeline tool only" />
+              <ToolRow name="sql.exec" detail="disabled for playground" />
+            </div>
+          </div>
+        </aside>
+
+        <section className="frame col-span-12 overflow-hidden xl:col-span-7">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-4 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex h-8 items-center rounded-md border border-rule bg-ink/40 p-1">
+                <ModeButton active={mode === "chat"} onClick={() => setMode("chat")} icon={<MessageSquare className="h-3.5 w-3.5" />}>
+                  Chat
+                </ModeButton>
+                <ModeButton active={mode === "completion"} onClick={() => setMode("completion")} icon={<TerminalSquare className="h-3.5 w-3.5" />}>
+                  Completion
+                </ModeButton>
+              </div>
+              <div className="ml-1 flex items-center gap-2 text-[11px] text-muted">
+                <Cpu className="h-3.5 w-3.5" />
+                <span>{selectedModel?.name ?? "No model connected"}</span>
+                <span className="text-muted/60">·</span>
+                <span className="font-mono">{maxTokens} max out</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className={cn("flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] hover-elevate", compareOpen ? "border-brass/40 bg-brass/10 text-brass-2" : "border-rule bg-ink/40 text-muted")}
+                onClick={() => setCompareOpen((prev) => !prev)}
+                type="button"
+              >
+                <Box className="h-3.5 w-3.5" /> Compare {compareOpen ? "ON" : "off"}
+              </button>
+              <button className="rounded-md border border-rule bg-ink/40 px-2 py-1 text-[11px] text-muted hover-elevate" onClick={clearConversation} type="button">
+                <Trash2 className="mr-1 inline h-3.5 w-3.5" /> Clear
+              </button>
+            </div>
+          </div>
+
+          {compareOpen ? (
+            <div className="grid min-h-[420px] grid-cols-1 gap-3 px-4 py-4 lg:grid-cols-2">
+              <ComparePane model={selectedModel?.name ?? "Selected model"} prompt={prompt} status={responseText ? "last run ready" : "run first"} />
+              <ComparePane model={runnableModels.find((model) => model.slug !== selectedModel?.slug)?.name ?? "Second model"} prompt={prompt} status={runnableModels.length > 1 ? "select and run" : "connect another model"} />
+            </div>
+          ) : (
+            <div ref={threadRef} className="max-h-[58vh] min-h-[420px] space-y-4 overflow-y-auto px-5 py-5">
+              {systemPrompt.trim() && <SystemMessage content={systemPrompt.trim()} />}
+              {conversation.length === 0 && !running && (
+                <div className="grid min-h-[300px] place-items-center text-center">
+                  <div>
+                    <div className="font-display text-lg text-bone">Bring the governed run to life.</div>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-bone-2">
+                      Use a starter or write your own request. Veklom routes, meters, audits, and logs each step before a model answer is accepted.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {conversation.map((turn) => (
+                <ChatBubble
+                  key={turn.id}
+                  turn={turn}
+                  onCopy={() => void copyTurn(turn.content)}
+                  onEdit={() => editAndResendTurn(turn.content)}
+                  onRegenerate={turn.role === "assistant" ? () => regenerateFromTurn(turn.id) : undefined}
+                />
+              ))}
+              {running && <AssistantThinking />}
+            </div>
+          )}
+
+          <div className="border-t border-rule bg-ink-2/50 p-3">
+            {conversation.length === 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {VERTICALS.slice(0, 5).map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => {
+                      handleVerticalChange(item.value);
+                      setPrompt(SAMPLE_PROMPTS[item.value]);
+                    }}
+                    className="hover-elevate rounded-full border border-rule bg-ink/40 px-3 py-1 text-[11px] text-muted hover:text-bone"
+                    type="button"
+                  >
+                    <Sparkles className="mr-1.5 inline h-3 w-3" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="rounded-lg border border-rule bg-ink/40 focus-within:border-brass/50 focus-within:ring-1 focus-within:ring-brass/30">
+              <textarea
+                id="prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value.slice(0, 8000))}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && canRun) {
+                    e.preventDefault();
+                    void run();
+                  }
+                }}
+                placeholder={mode === "chat" ? "Ask anything. Ctrl + Enter to send..." : "Enter your prompt for raw completion..."}
+                className="min-h-[88px] w-full resize-none border-0 bg-transparent px-3 py-3 font-mono text-[13px] leading-relaxed text-bone outline-none placeholder:text-muted"
+                disabled={running}
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-rule px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                  <span className="chip border-rule bg-ink/40 text-muted">est · {inputEstimate} in</span>
+                  <span className="hidden md:inline">·</span>
+                  <span className="hidden font-mono md:inline">policy: outbound.public.v3</span>
+                  <span className="hidden md:inline">·</span>
+                  <span className="hidden font-mono md:inline">{prompt.length} / 8000 chars</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="v-btn-ghost h-7 px-2 text-xs" type="button" disabled title="Tool execution is available through pipeline/tool routes">
+                    <SlidersHorizontal className="h-3.5 w-3.5" /> Tools
+                  </button>
+                  <button className="v-btn-ghost h-7 px-2 text-xs" type="button" onClick={exportAudit} disabled={!events.length || running}>
+                    <Download className="h-3.5 w-3.5" /> JSON
+                  </button>
+                  {!running ? (
+                    <button className="v-btn-primary h-7 px-3 text-xs" onClick={run} disabled={!canRun} type="button">
+                      <Play className="h-3.5 w-3.5" /> Send
+                    </button>
+                  ) : (
+                    <button className="v-btn-ghost h-7 px-3 text-xs text-crimson" onClick={stop} type="button">
+                      <CircleStop className="h-3.5 w-3.5" /> Stop
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                <button className="v-btn-ghost text-xs" onClick={runPreflight} disabled={!prompt.trim() || preflight.loading} type="button">
+                  <TrendingDown className="h-4 w-4" /> {preflight.loading ? "Predicting..." : "Pre-flight"}
+                </button>
+                <button className="v-btn-ghost text-xs" onClick={saveAsPipeline} disabled={!responseText || running || savingPipeline} type="button">
+                  <Save className="h-4 w-4" /> {savingPipeline ? "Saving..." : savedPipelineSlug ? "Saved" : "Save as Pipeline"}
+                </button>
+                {conversation.length > 0 && (
+                  <button className="v-btn-ghost text-xs" onClick={clearConversation} title="Clear thread" type="button">
+                    <Trash2 className="h-3.5 w-3.5" /> New conversation
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2 font-mono text-[11px]">
+                <span className="chip border-rule bg-ink/40 text-bone-2"><Activity className="h-3 w-3" /> {eventCount} events</span>
+                <span className="chip border-rule bg-ink/40 text-bone-2"><Sparkles className="h-3 w-3" /> {tokenCount} out</span>
+                <span className="chip border-rule bg-ink/40 text-bone-2"><MessageSquare className="h-3 w-3" /> {conversation.length} turns</span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 flex items-start gap-2 rounded-md border border-crimson/30 bg-crimson/10 px-3 py-2 text-[12px] text-crimson">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+            {savedPipelineSlug && (
+              <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Saved as pipeline <span className="font-mono">{savedPipelineSlug}</span>.
+                <a href="#/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
+                  Open Pipelines <GitBranch className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+            {(preflight.predicted_cost != null || preflight.error) && (
+              <div className="mt-3 rounded-md border border-rule/70 bg-ink p-3">
+                <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <Zap className="h-3 w-3 text-brass-2" /> Pre-flight intelligence
+                </div>
+                {preflight.error ? (
+                  <div className="font-mono text-[12px] text-crimson">{preflight.error}</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 font-mono text-[12px] sm:grid-cols-3">
+                    <PreflightCell label="cost / run" value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "-"} sub={preflight.cost_confidence_upper != null && preflight.predicted_cost != null ? `+/-$${Math.abs(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}` : "server-side ml"} tone="ok" />
+                    <PreflightCell label="quality" value={preflight.predicted_quality != null ? `${(preflight.predicted_quality * 100).toFixed(0)}%` : "-"} sub={preflight.predicted_quality != null ? "predicted" : "ml warming"} tone={preflight.predicted_quality != null && preflight.predicted_quality > 0.8 ? "ok" : "warn"} />
+                    <PreflightCell label="failure risk" value={preflight.failure_risk != null ? `${(preflight.failure_risk * 100).toFixed(0)}%` : "-"} sub={preflight.failure_risk != null ? "before run" : "ml warming"} tone={preflight.failure_risk != null && preflight.failure_risk < 0.2 ? "ok" : "warn"} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="col-span-12 space-y-3 xl:col-span-3">
+          <div className="frame">
+            <SideHeader icon={<Cpu className="h-3.5 w-3.5" />} label="Model" />
+            <div className="px-3 pb-3 pt-2">
+              {models.isLoading ? (
+                <div className="flex items-center gap-2 font-mono text-[12px] text-muted">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading live models...
+                </div>
+              ) : models.isError ? (
+                <div className="rounded-md border border-crimson/30 bg-crimson/10 px-3 py-2 text-[12px] text-crimson">
+                  {responseDetail(models.error)}
+                </div>
+              ) : runnableModels.length ? (
+                <>
+                  <select className="v-input h-9 w-full" value={selectedModel?.slug ?? ""} disabled={running} onChange={(e) => setSelectedModelSlug(e.target.value)}>
+                    {runnableModels.map((model) => (
+                      <option key={model.slug} value={model.slug}>{model.name}</option>
+                    ))}
+                  </select>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted">
+                    <ModelFact label="Provider" value={selectedModel?.provider ?? "-"} />
+                    <ModelFact label="Runtime" value={selectedModel?.runtime_model_id ?? "-"} />
+                    <ModelFact label="Slug" value={selectedModel?.slug ?? "-"} />
+                    <ModelFact label="Status" value={selectedModel?.connected ? "connected" : "offline"} />
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[12px] text-brass-2">
+                  No connected models are enabled for this workspace.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<SlidersHorizontal className="h-3.5 w-3.5" />} label="Parameters" action={<button className="text-eyebrow hover:text-bone" onClick={() => { setTemperature(0.4); setMaxTokens(DEFAULT_MAX_TOKENS); }} type="button">Reset</button>} />
+            <div className="space-y-3 px-3 pb-3 pt-2">
+              <RangeControl label="Temperature" hint="creativity" value={temperature.toFixed(1)} min={0} max={1.2} step={0.1} current={temperature} onChange={setTemperature} disabled={running} />
+              <RangeControl label="Max output" hint="cap" value={String(maxTokens)} min={128} max={4096} step={128} current={maxTokens} onChange={setMaxTokens} disabled={running} />
+              <DisabledControl label="Top-p" value="backend default" />
+              <DisabledControl label="Response format" value="text" />
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<Shield className="h-3.5 w-3.5" />} label="Compliance" />
+            <div className="space-y-2.5 px-3 pb-3 pt-2">
+              <div>
+                <div className="mb-1.5 text-eyebrow">Session tag</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {VERTICALS.map((item) => (
+                    <button
+                      key={item.value}
+                      onClick={() => handleVerticalChange(item.value)}
+                      className={cn("rounded-md border px-2 py-1.5 text-[11px] hover-elevate", vertical === item.value ? "border-brass/40 bg-brass/15 text-bone" : "border-rule bg-ink/40 text-muted")}
+                      type="button"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10.5px] leading-snug text-muted">
+                  Tag scopes the system prompt, routing explanation, and audit export context. Backend policy remains authoritative.
+                </p>
+              </div>
+              <ToggleRow icon={<Shield className="h-3.5 w-3.5" />} label="Auto-redact PII/PHI" checked={autoRedact} onChange={setAutoRedact} />
+              <ToggleRow icon={<Download className="h-3.5 w-3.5" />} label="Sign audit on export" checked={auditExportPinned} onChange={setAuditExportPinned} />
+              <ToggleRow icon={<Cpu className="h-3.5 w-3.5" />} label="Lock to on-prem" checked={vertical === "medical" || vertical === "legal"} disabled />
+            </div>
+            <div className="border-t border-rule px-3 py-2 text-[10.5px] text-muted">
+              SHA-256 manifest emitted per session · evidence ready
+            </div>
+          </div>
+
+          <TelemetryPanel stats={stats} conversationLength={conversation.length} />
+          <EventLogPanel events={events} running={running} feedRef={feedRef} eventCount={eventCount} />
+        </aside>
+      </div>
+    </div>
+  );
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -992,10 +1372,10 @@ export function PlaygroundPage() {
                   <div className="grid grid-cols-3 gap-3 font-mono text-[12px]">
                     <PreflightCell
                       label="cost / run"
-                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost.toFixed(4)}` : "-"}
+                      value={preflight.predicted_cost != null ? `$${preflight.predicted_cost!.toFixed(4)}` : "-"}
                       sub={
                         preflight.cost_confidence_upper != null && preflight.predicted_cost != null
-                          ? `+/-$${Math.abs(preflight.cost_confidence_upper - preflight.predicted_cost).toFixed(4)}`
+                          ? `+/-$${Math.abs(preflight.cost_confidence_upper! - preflight.predicted_cost!).toFixed(4)}`
                           : "server-side ml"
                       }
                       tone="ok"
@@ -1004,27 +1384,27 @@ export function PlaygroundPage() {
                       label="quality"
                       value={
                         preflight.predicted_quality != null
-                          ? `${(preflight.predicted_quality * 100).toFixed(0)}%`
+                          ? `${(preflight.predicted_quality! * 100).toFixed(0)}%`
                           : "-"
                       }
                       sub={preflight.predicted_quality != null ? "predicted" : "ml warming"}
-                      tone={preflight.predicted_quality != null && preflight.predicted_quality > 0.8 ? "ok" : "warn"}
+                      tone={preflight.predicted_quality != null && preflight.predicted_quality! > 0.8 ? "ok" : "warn"}
                     />
                     <PreflightCell
                       label="failure risk"
                       value={
                         preflight.failure_risk != null
-                          ? `${(preflight.failure_risk * 100).toFixed(0)}%`
+                          ? `${(preflight.failure_risk! * 100).toFixed(0)}%`
                           : "-"
                       }
                       sub={preflight.failure_risk != null ? "before run" : "ml warming"}
-                      tone={preflight.failure_risk != null && preflight.failure_risk < 0.2 ? "ok" : "warn"}
+                      tone={preflight.failure_risk != null && preflight.failure_risk! < 0.2 ? "ok" : "warn"}
                     />
                   </div>
                 )}
                 {preflight.alternatives?.length ? (
                   <div className="mt-2 flex flex-wrap gap-1.5 font-mono text-[10px]">
-                    {preflight.alternatives.slice(0, 3).map((alt) => (
+                    {preflight.alternatives!.slice(0, 3).map((alt) => (
                       <span key={alt.provider} className="v-chip">
                         via {alt.provider} - ${parseFloat(alt.cost).toFixed(4)}
                         {alt.savings_percent > 0 && (
@@ -1098,7 +1478,7 @@ export function PlaygroundPage() {
               <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "-"} />
               <Stat label="reserve debit" value={stats.tokens_deducted?.toString() ?? "-"} />
               <Stat label="reserve balance" value={stats.wallet_balance?.toString() ?? "-"} />
-              <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash.slice(0, 12)}...` : "-"} mono />
+              <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash!.slice(0, 12)}...` : "-"} mono />
               <Stat label="turns" value={conversation.length.toString()} />
             </dl>
           </div>
@@ -1140,6 +1520,378 @@ export function PlaygroundPage() {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+function SideHeader({ icon, label, action }: { icon: React.ReactNode; label: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between border-b border-rule px-3 py-2">
+      <span className="text-eyebrow flex items-center gap-2 text-bone-2">
+        {icon}
+        {label}
+      </span>
+      {action}
+    </div>
+  );
+}
+
+function ToolRow({ name, detail, enabled }: { name: string; detail: string; enabled?: boolean }) {
+  return (
+    <div className="flex items-center justify-between rounded-md px-2 py-1.5">
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-mono text-[11.5px] text-bone">{name}</span>
+        <span className="truncate text-[10px] text-muted">{detail}</span>
+      </div>
+      <span
+        className={cn(
+          "h-5 w-9 rounded-full border p-0.5",
+          enabled ? "border-brass/40 bg-brass/20" : "border-rule bg-ink/70",
+        )}
+        title={enabled ? "Available in this workspace flow" : "Not available in Playground"}
+      >
+        <span className={cn("block h-3.5 w-3.5 rounded-full transition", enabled ? "translate-x-3.5 bg-brass-2" : "bg-muted")} />
+      </span>
+    </div>
+  );
+}
+
+function ModeButton({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-6 items-center gap-1.5 rounded px-2 text-xs transition",
+        active ? "bg-brass/15 text-brass-2" : "text-muted hover:text-bone",
+      )}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+function ComparePane({ model, prompt, status }: { model: string; prompt: string; status: string }) {
+  return (
+    <div className="flex h-[460px] flex-col rounded-xl border border-rule bg-ink/40">
+      <div className="border-b border-rule px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[12.5px] text-bone">{model}</span>
+          <span className="chip border-rule bg-ink/40 text-muted">compare</span>
+        </div>
+        <div className="mt-1 text-[10.5px] text-muted">{status}</div>
+      </div>
+      <div className="flex-1 overflow-auto px-3 py-3 text-[12.5px] leading-relaxed">
+        <p className="text-muted">{prompt ? `Prompt: ${prompt}` : "Send a prompt to compare across connected models."}</p>
+        <div className="mt-3 rounded-md border border-rule bg-ink-2/70 p-3 text-muted">
+          Compare is displayed here in the reference layout. Execution will stay honest: only live `/ai/complete` results are shown after a real run.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SystemMessage({ content }: { content: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-1 grid h-6 w-6 place-items-center rounded-md bg-white/[0.04] text-muted">
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex-1 rounded-md border border-dashed border-rule bg-white/[0.02] px-3 py-2 text-[12px] text-muted">
+        <span className="text-eyebrow mr-2">System</span>
+        {content}
+      </div>
+    </div>
+  );
+}
+
+function ChatBubble({
+  turn,
+  onCopy,
+  onEdit,
+  onRegenerate,
+}: {
+  turn: ConversationTurn;
+  onCopy: () => void;
+  onEdit: () => void;
+  onRegenerate?: () => void;
+}) {
+  const user = turn.role === "user";
+  return (
+    <div className={cn("flex items-start gap-3", user && "justify-end")}>
+      {!user && (
+        <div className="mt-1 grid h-6 w-6 place-items-center rounded-md bg-brass/15 text-brass-2">
+          <MessageSquare className="h-3.5 w-3.5" />
+        </div>
+      )}
+      <div className={cn("max-w-[78%] flex-1", user && "flex flex-col items-end")}>
+        <div
+          className={cn(
+            "rounded-2xl border px-4 py-3 text-[13px] leading-relaxed",
+            user ? "border-brass/30 bg-brass/10 text-bone" : "border-rule bg-ink-2/70 text-bone",
+          )}
+        >
+          <RichContent content={turn.content} />
+        </div>
+        {!user && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {turn.provider && <span className="chip border-brass/40 bg-brass/10 text-brass-2">{turn.provider}</span>}
+            {turn.latency_ms && <span className="chip border-rule bg-ink/40 text-muted">{turn.latency_ms} ms</span>}
+            {turn.cost_usd && <span className="chip border-rule bg-ink/40 text-muted">{turn.cost_usd}</span>}
+            {turn.tokens && <span className="chip border-rule bg-ink/40 text-muted">{turn.tokens} out</span>}
+            <span className="chip border-moss/30 bg-moss/10 text-moss">
+              <Shield className="h-3 w-3" /> policy passed
+            </span>
+            <button className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted hover:text-bone" onClick={onCopy} type="button">
+              <Copy className="h-3 w-3" /> copy
+            </button>
+            <button className="inline-flex items-center gap-1 text-[10px] text-muted hover:text-bone" onClick={onEdit} type="button">
+              <Pencil className="h-3 w-3" /> edit
+            </button>
+            {onRegenerate && (
+              <button className="inline-flex items-center gap-1 text-[10px] text-muted hover:text-bone" onClick={onRegenerate} type="button">
+                <RotateCcw className="h-3 w-3" /> regen
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {user && (
+        <div className="mt-1 grid h-6 w-6 place-items-center rounded-md bg-bone/10 font-display text-[10px] font-semibold text-bone">
+          U
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssistantThinking() {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-1 grid h-6 w-6 place-items-center rounded-md bg-brass/15 text-brass-2">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      </div>
+      <div className="rounded-2xl border border-rule bg-ink-2/70 px-4 py-3 text-[13px] text-muted">
+        Generating...
+      </div>
+    </div>
+  );
+}
+
+function RichContent({ content }: { content: string }) {
+  const blocks = content.split(/(```[\s\S]*?```)/g);
+  return (
+    <div className="space-y-2">
+      {blocks.map((block, idx) => {
+        if (block.startsWith("```")) {
+          const code = block.replace(/```(\w+)?\n?/, "").replace(/```$/, "");
+          return (
+            <pre key={idx} className="overflow-auto rounded-md border border-rule bg-ink p-3 font-mono text-[11.5px] leading-relaxed text-bone">
+              {code}
+            </pre>
+          );
+        }
+        return (
+          <p key={idx} className="whitespace-pre-wrap">
+            {block.split(/(\*\*[^*]+\*\*)/g).map((part, partIdx) =>
+              part.startsWith("**") ? (
+                <strong key={partIdx} className="text-bone">
+                  {part.slice(2, -2)}
+                </strong>
+              ) : (
+                <span key={partIdx}>{part}</span>
+              ),
+            )}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function ModelFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-rule bg-ink/40 px-2 py-1.5">
+      <div className="text-eyebrow">{label}</div>
+      <div className="truncate font-mono text-[12px] text-bone">{value}</div>
+    </div>
+  );
+}
+
+function RangeControl({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  step,
+  current,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  min: number;
+  max: number;
+  step: number;
+  current: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-end justify-between">
+        <span className="text-[11.5px]">
+          {label} <span className="text-muted">· {hint}</span>
+        </span>
+        <span className="font-mono text-[11px] text-bone">{value}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={current}
+        onChange={(e) => onChange(Number(e.target.value))}
+        disabled={disabled}
+        className="w-full accent-[#e5b16e]"
+      />
+    </div>
+  );
+}
+
+function DisabledControl({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-md border border-rule bg-ink/40 px-2.5 py-1.5 opacity-70">
+      <span className="text-[11.5px]">{label}</span>
+      <span className="font-mono text-[11px] text-muted">{value}</span>
+    </div>
+  );
+}
+
+function ToggleRow({
+  icon,
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  checked: boolean;
+  onChange?: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className="flex w-full items-center justify-between rounded-md border border-rule bg-ink/40 px-2.5 py-1.5 text-left disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      <span className="flex items-center gap-2 text-[11.5px]">
+        {icon}
+        {label}
+      </span>
+      <span className={cn("h-5 w-9 rounded-full border p-0.5", checked ? "border-brass/40 bg-brass/20" : "border-rule bg-ink/70")}>
+        <span className={cn("block h-3.5 w-3.5 rounded-full transition", checked ? "translate-x-3.5 bg-brass-2" : "bg-muted")} />
+      </span>
+    </button>
+  );
+}
+
+function TelemetryPanel({
+  stats,
+  conversationLength,
+}: {
+  stats: {
+    provider?: string;
+    model?: string;
+    runtime_model_id?: string;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    latency_ms?: number;
+    request_id?: string;
+    audit_hash?: string;
+    tokens_deducted?: number;
+    wallet_balance?: number;
+    cost_usd?: string;
+  };
+  conversationLength: number;
+}) {
+  return (
+    <div className="frame p-4">
+      <div className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+        <Gauge className="h-3 w-3" /> Telemetry
+      </div>
+      <dl className="space-y-2.5 font-mono text-[12px]">
+        <Stat label="request id" value={stats.request_id ?? "-"} mono />
+        <Stat label="provider" value={stats.provider ?? "-"} />
+        <Stat label="model" value={stats.model ?? "-"} />
+        <Stat label="runtime" value={stats.runtime_model_id ?? "-"} mono />
+        <Stat label="input units" value={stats.prompt_tokens?.toString() ?? "-"} />
+        <Stat label="output units" value={stats.completion_tokens?.toString() ?? "-"} />
+        <Stat label="total units" value={stats.total_tokens?.toString() ?? "-"} />
+        <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "-"} />
+        <Stat label="reserve debit" value={stats.tokens_deducted?.toString() ?? "-"} />
+        <Stat label="reserve balance" value={stats.wallet_balance?.toString() ?? "-"} />
+        <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash.slice(0, 12)}...` : "-"} mono />
+        <Stat label="turns" value={conversationLength.toString()} />
+      </dl>
+    </div>
+  );
+}
+
+function EventLogPanel({
+  events,
+  running,
+  feedRef,
+  eventCount,
+}: {
+  events: PipelineEvent[];
+  running: boolean;
+  feedRef: React.RefObject<HTMLDivElement>;
+  eventCount: number;
+}) {
+  return (
+    <div className="frame p-0">
+      <header className="flex items-center justify-between border-b border-rule px-4 py-2">
+        <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+          <Zap className="h-3 w-3" /> Event log
+        </div>
+        <span className="chip border-rule bg-ink/40 text-bone-2">{eventCount}</span>
+      </header>
+      <div ref={feedRef} className="max-h-[520px] overflow-y-auto p-3 font-mono text-[11px]">
+        {events.length === 0 ? (
+          <div className="py-8 text-center text-muted">{running ? "Waiting on backend..." : "No events yet."}</div>
+        ) : (
+          <ul className="space-y-1.5">
+            {events.map((event) => {
+              const meta = EVENT_META[event.event] ?? { label: event.event, color: "text-bone-2", icon: "-" };
+              return (
+                <li key={event.id} className="flex items-start gap-2">
+                  <span className={cn("w-3 shrink-0 text-center", meta.color)}>{meta.icon}</span>
+                  <span className={cn("shrink-0 font-semibold", meta.color)}>{meta.label}</span>
+                  <span className="ml-auto truncate text-muted">{compactPayload(event.data)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (

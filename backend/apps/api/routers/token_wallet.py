@@ -265,6 +265,8 @@ async def create_topup_checkout(
     
     workspace_id = current_user.workspace_id
     
+    success_separator = "&" if "?" in request.success_url else "?"
+
     # Create checkout session
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
@@ -280,7 +282,7 @@ async def create_topup_checkout(
             "quantity": 1,
         }],
         mode="payment",
-        success_url=request.success_url + "?session_id={CHECKOUT_SESSION_ID}",
+        success_url=request.success_url + f"{success_separator}session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=request.cancel_url,
         metadata={
             "workspace_id": workspace_id,

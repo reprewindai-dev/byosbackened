@@ -7,16 +7,24 @@
   <meta name="description" content="Veklom is the control plane between your systems, AI, policy, cost, and audit. Watch a live request move through zero-trust, circuit-breakers, provider routing, memory, and audit — before anything actually runs." />
   <meta name="canonical" content="https://veklom.com/" />
   <meta name="keywords" content="sovereign AI, AI control plane, private AI gateway, governed AI, SNMP Modbus, edge control layer, audit, circuit breaker, fallback" />
+  <meta property="og:url" content="https://veklom.com/" />
   <meta property="og:title" content="Veklom — Watch AI get governed in real time" />
   <meta property="og:description" content="The control plane between systems, AI, policy, cost, and audit." />
   <meta property="og:image" content="/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Veklom — Sovereign control plane for governed inference" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Veklom — Watch AI get governed in real time" />
+  <meta name="twitter:description" content="The control plane between systems, AI, policy, cost, and audit." />
+  <meta name="twitter:image" content="/og-image.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <style>
     /* ==========================================================
        VEKLOM CONTROL PLANE — FOUNDATION STYLES
@@ -465,9 +473,20 @@
     .price-table td.num { font-family: "JetBrains Mono", monospace; color: var(--bone); }
     .price-table td.event { color: var(--bone-2); }
     .price-table .col-founding { color: var(--brass-2); }
+    .access-wrap { margin-top: 26px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
+    .access-wrap h4 { margin: 0; font-size: 14px; letter-spacing: .04em; }
+    .access-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+    .access-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .access-table th, .access-table td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    .access-table thead th { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 500; background: rgba(255,255,255,0.015); }
+    .access-table tbody tr:last-child td { border-bottom: 0; }
+    .locked-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule-2); border-radius: 999px; padding: 5px 10px; font-size: 11px; font-family: "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .warn-copy { margin-top: 16px; border: 1px solid rgba(229,177,110,.25); background: rgba(229,177,110,.06); color: var(--bone-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; line-height: 1.6; }
     @media (max-width: 860px) {
       .price-table-wrap { overflow-x: auto; }
       .price-table { min-width: 640px; }
+      .access-wrap { overflow-x: auto; }
+      .access-table { min-width: 760px; }
     }
 
     /* cta band */
@@ -899,6 +918,59 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="access-wrap" aria-label="Playground versus activated workspace">
+        <div class="access-head">
+          <h4>Playground vs Activated Workspace</h4>
+          <span class="eyebrow">Access model · evidence is paywalled</span>
+        </div>
+        <table class="access-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Playground</th>
+              <th>Activated Workspace</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Governed runs</td>
+              <td>Limited evaluation runs in shared/demo context.</td>
+              <td>Production-oriented governed execution in your own workspace.</td>
+            </tr>
+            <tr>
+              <td>Retention</td>
+              <td>Short-lived only; not for compliance recordkeeping.</td>
+              <td>Durable retention under workspace policy and controls.</td>
+            </tr>
+            <tr>
+              <td>Signed artifacts</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Signed, exportable artifacts for governed runs.</td>
+            </tr>
+            <tr>
+              <td>Evidence packs</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Generate/export evidence packs for audits, incidents, and procurement.</td>
+            </tr>
+            <tr>
+              <td>Auditor bundles</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Structured auditor handoff bundles with export controls.</td>
+            </tr>
+            <tr>
+              <td>Bulk export + retention controls</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Case/time-window export and retention policy management.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="warn-copy">
+        The Playground is for evaluation only and is not suitable for compliance evidence, long-term
+        recordkeeping, or regulatory audit use. Free lets you see governed AI. Paid lets you prove it.
       </div>
 
       <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Marketplace vendors monetize through a 12% standard take (8% for preferred partners). Founding vendors keep 100% of their first $2,500 GMV. Payouts NET-14.</p>

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -28,10 +30,56 @@ from db.models import (
 
 TOKEN_USD_RATE = Decimal("0.00001")
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+_BEDROCK_PROBE_TTL_SECONDS = 60
+_bedrock_probe_cache: tuple[float, bool] | None = None
 
 
 def _workspace_token_cost_per_1k_output_tokens() -> Decimal:
     return (TOKEN_USD_RATE * Decimal(10)).quantize(Decimal("0.000001"))
+
+
+def _has_bedrock_credentials() -> bool:
+    return bool(settings.aws_access_key_id and settings.aws_secret_access_key)
+
+
+def _probe_bedrock_connectivity() -> bool:
+    try:
+        import boto3
+        from botocore.config import Config
+
+        client_config = Config(
+            connect_timeout=1,
+            read_timeout=1,
+            retries={"max_attempts": 1, "mode": "standard"},
+        )
+        session = boto3.Session(
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_default_region,
+        )
+        session.client("sts", config=client_config).get_caller_identity()
+        session.client("bedrock", config=client_config).list_foundation_models(byProvider="Anthropic")
+        return True
+    except Exception as exc:
+        logger.info("bedrock_model_catalog_probe_failed", extra={"error": str(exc)})
+        return False
+
+
+def _bedrock_connected() -> bool:
+    global _bedrock_probe_cache
+
+    if not _has_bedrock_credentials():
+        return False
+
+    now = time.monotonic()
+    if _bedrock_probe_cache and now - _bedrock_probe_cache[0] < _BEDROCK_PROBE_TTL_SECONDS:
+        return _bedrock_probe_cache[1]
+
+    connected = _probe_bedrock_connectivity()
+    _bedrock_probe_cache = (now, connected)
+    return connected
 
 
 def _runtime_model_catalog() -> list[dict]:
@@ -76,14 +124,14 @@ def _runtime_model_catalog() -> list[dict]:
             }
         )
 
-    if settings.aws_access_key_id and settings.aws_secret_access_key:
+    if _has_bedrock_credentials():
         rows.append(
             {
                 "model_slug": "bedrock-haiku",
                 "display_name": "anthropic.claude-3-haiku-20240307-v1:0 (Bedrock)",
                 "bedrock_model_id": "anthropic.claude-3-haiku-20240307-v1:0",
                 "provider": "bedrock",
-                "connected": True,
+                "connected": _bedrock_connected(),
                 "input_cost_per_1m_tokens": Decimal("0.00"),
                 "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
             }

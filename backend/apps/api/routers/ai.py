@@ -8,7 +8,7 @@ import logging
 import math
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
@@ -32,10 +32,25 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
+class AIMessage(BaseModel):
+    role: Literal["user", "assistant"] = "user"
+    content: str = Field(min_length=1, max_length=20000)
+
+    @field_validator("content")
+    @classmethod
+    def _content_must_have_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Message content cannot be empty")
+        return value.strip()
+
+
 class AICompleteRequest(BaseModel):
     model: str = Field(min_length=1, max_length=128)
     prompt: str = Field(min_length=1, max_length=20000)
     max_tokens: int = Field(default=512, ge=1, le=8192)
+    messages: list[AIMessage] = Field(default_factory=list, max_length=40)
+    system_prompt: Optional[str] = Field(default=None, max_length=12000)
+    temperature: Optional[float] = Field(default=None, ge=0, le=2)
 
     @field_validator("prompt")
     @classmethod
@@ -43,6 +58,14 @@ class AICompleteRequest(BaseModel):
         if not value.strip():
             raise ValueError("Prompt cannot be empty")
         return value.strip()
+
+    @field_validator("system_prompt")
+    @classmethod
+    def _normalize_system_prompt(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class AICompleteResponse(BaseModel):
@@ -109,7 +132,41 @@ def _get_or_create_wallet(db: Session, workspace_id: str) -> TokenWallet:
     return wallet
 
 
-def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, str]:
+def _conversation_messages(payload: AICompleteRequest) -> list[AIMessage]:
+    msgs = [AIMessage(role=msg.role, content=msg.content) for msg in payload.messages]
+    if not msgs or msgs[-1].role != "user" or msgs[-1].content != payload.prompt:
+        msgs.append(AIMessage(role="user", content=payload.prompt))
+    return msgs[-40:]
+
+
+def _compose_prompt(payload: AICompleteRequest) -> str:
+    parts: list[str] = []
+    if payload.system_prompt:
+        parts.append(f"System:\n{payload.system_prompt}")
+    for msg in _conversation_messages(payload):
+        role = "User" if msg.role == "user" else "Assistant"
+        parts.append(f"{role}:\n{msg.content}")
+    parts.append("Assistant:")
+    return "\n\n".join(parts).strip()
+
+
+def _request_input_text(payload: AICompleteRequest) -> str:
+    serialized = {
+        "system_prompt": payload.system_prompt,
+        "messages": [{"role": msg.role, "content": msg.content} for msg in _conversation_messages(payload)],
+        "prompt": payload.prompt,
+        "max_tokens": payload.max_tokens,
+        "temperature": payload.temperature,
+    }
+    return json.dumps(serialized, sort_keys=True, ensure_ascii=False)
+
+
+def _call_runtime_model(
+    model_row,
+    payload: AICompleteRequest,
+) -> tuple[dict, str]:
+    prompt = _compose_prompt(payload)
+    temperature = payload.temperature if payload.temperature is not None else 0.7
     if model_row.provider == "ollama":
         client = OllamaClient(model=model_row.bedrock_model_id)
         use_groq = is_open()
@@ -118,7 +175,7 @@ def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, 
                 result = client.generate(
                     prompt=prompt,
                     model=model_row.bedrock_model_id,
-                    options={"num_predict": max_tokens},
+                    options={"num_predict": payload.max_tokens, "temperature": temperature},
                 )
                 record_success()
                 return result, "ollama"
@@ -132,7 +189,7 @@ def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, 
                 detail="LLM unavailable: Ollama down and Groq fallback not configured.",
             )
         try:
-            return call_groq(prompt=prompt, max_tokens=max_tokens), "groq"
+            return call_groq(prompt=prompt, max_tokens=payload.max_tokens, temperature=temperature), "groq"
         except GroqFallbackError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -141,7 +198,12 @@ def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, 
 
     if model_row.provider == "groq":
         try:
-            return call_groq(prompt=prompt, model=model_row.bedrock_model_id, max_tokens=max_tokens), "groq"
+            return call_groq(
+                prompt=prompt,
+                model=model_row.bedrock_model_id,
+                max_tokens=payload.max_tokens,
+                temperature=temperature,
+            ), "groq"
         except GroqFallbackError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
@@ -163,18 +225,21 @@ def _call_runtime_model(model_row, prompt: str, max_tokens: int) -> tuple[dict, 
         if settings.aws_access_key_id and settings.aws_secret_access_key:
             kwargs["aws_access_key_id"] = settings.aws_access_key_id
             kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+        bedrock_messages = [
+            {"role": msg.role, "content": [{"text": msg.content}]}
+            for msg in _conversation_messages(payload)
+        ]
+        inference_config = {"maxTokens": payload.max_tokens, "temperature": temperature}
+        converse_args = {
+            "modelId": model_row.bedrock_model_id,
+            "messages": bedrock_messages,
+            "inferenceConfig": inference_config,
+        }
+        if payload.system_prompt:
+            converse_args["system"] = [{"text": payload.system_prompt}]
         try:
             client = boto3.client("bedrock-runtime", **kwargs)
-            response = client.converse(
-                modelId=model_row.bedrock_model_id,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [{"text": prompt}],
-                    }
-                ],
-                inferenceConfig={"maxTokens": max_tokens, "temperature": 0.5},
-            )
+            response = client.converse(**converse_args)
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -227,7 +292,7 @@ async def complete(
 
     started_at = datetime.utcnow()
     try:
-        llm_result, provider = _call_runtime_model(model_row, payload.prompt, payload.max_tokens)
+        llm_result, provider = _call_runtime_model(model_row, payload)
     except HTTPException:
         db.rollback()
         raise
@@ -235,6 +300,7 @@ async def complete(
     try:
         response_text = (llm_result.get("response") or "").strip()
         executed_model = str(llm_result.get("model") or model_row.bedrock_model_id or payload.model)
+        request_input_text = _request_input_text(payload)
         prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
         total_tokens = int(llm_result.get("total_tokens") or (prompt_tokens + output_tokens))
@@ -286,7 +352,7 @@ async def complete(
             operation_type="ai.complete",
             provider=provider,
             model=executed_model,
-            input_hash=_sha256(payload.prompt),
+            input_hash=_sha256(request_input_text),
             output_hash=_sha256(response_text),
             input_preview=payload.prompt[:500],
             output_preview=response_text[:500],
@@ -332,7 +398,10 @@ async def complete(
                 "model": payload.model,
                 "resolved_model": executed_model,
                 "prompt": payload.prompt,
+                "messages": [{"role": msg.role, "content": msg.content} for msg in _conversation_messages(payload)],
+                "system_prompt": payload.system_prompt,
                 "max_tokens": payload.max_tokens,
+                "temperature": payload.temperature,
             },
             response_json={
                 "response_text": response_text,

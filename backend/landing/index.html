@@ -756,7 +756,7 @@
               </div>
               <div class="kv"><span>public_demo</span><span class="v" id="kvDemo">—</span></div>
               <div class="kv"><span>billable</span><span class="v" id="kvBillable">—</span></div>
-              <div class="kv"><span>credits_charged</span><span class="v" id="kvCredits">—</span></div>
+              <div class="kv"><span>governance_runs</span><span class="v" id="kvCredits">—</span></div>
             </div>
           </aside>
         </div>
@@ -1431,6 +1431,12 @@
       chipCB.innerHTML = `<span class="dot"></span>Circuit: ${d.state}`;
       advanceTo("circuit_breaker_check");
     });
+    eventOn("hot_cache_check", (d) => {
+      const cls = d.status === "hit" || d.status === "mirror_hit" ? "ok" : d.status === "mirror_wait" ? "warn" : "";
+      const mirror = d.mirror ? ` · mirror=${d.mirror}` : "";
+      const model = d.model ? ` · ${d.model}` : "";
+      termPush("cache", `status=${d.status} · store=${d.store}${mirror}${model}`, cls);
+    });
     eventOn("provider_selected", (d) => {
       termPush("provider", `${d.provider} · ${d.model} · reason=${d.reason}${d.sovereign ? " · sovereign" : ""}`, d.sovereign ? "ok" : "warn");
       chipProvider.className = "chip " + (d.sovereign ? "ok" : "warn");
@@ -1474,12 +1480,13 @@
       setNodeState("audit_cost", "active");
     });
     eventOn("cost_recorded", (d) => {
-      termPush("cost", `billable=${d.billable} · credits=${d.credits_charged}`, "ok");
+      const runs = d.governance_runs_charged ?? d.credits_charged ?? 0;
+      termPush("cost", `billable=${d.billable} · governance_runs=${runs}`, "ok");
       costCard.classList.add("locked");
       costStatus.textContent = "locked";
       kvDemo.textContent = String(d.public_demo); kvDemo.className = "v ok";
       kvBillable.textContent = String(d.billable); kvBillable.className = "v " + (d.billable ? "warn" : "ok");
-      kvCredits.textContent = d.credits_charged;
+      kvCredits.textContent = runs;
       setNodeState("audit_cost", "done");
     });
     eventOn("error", (d) => {
@@ -1578,7 +1585,7 @@
       costStatus.textContent = "locked";
       kvDemo.textContent = String(cost.public_demo ?? true); kvDemo.className = "v ok";
       kvBillable.textContent = String(cost.billable ?? false); kvBillable.className = "v " + (cost.billable ? "warn" : "ok");
-      kvCredits.textContent = cost.customer_route_cost_credits ?? 0;
+      kvCredits.textContent = cost.governance_runs_charged ?? cost.customer_route_cost_credits ?? 0;
       setNodeState("audit_cost", "done");
       termPush("done", `trace=${payload.trace_id?.slice(0,8) || "—"}… · ${(payload.trace || []).join(" → ")}`, "ok");
     } catch (err) {

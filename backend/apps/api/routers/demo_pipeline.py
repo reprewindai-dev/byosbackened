@@ -50,6 +50,8 @@ _DEMO_RATE_LIMIT_WINDOW_SEC = 60
 _DEMO_RATE_LIMIT_MAX_HITS = 5
 _DEMO_EPHEMERAL_TTL_SEC = 60
 _DEMO_HOT_CACHE_TTL_SEC = 300
+_DEMO_MIRROR_LOCK_TTL_SEC = 15
+_DEMO_MIRROR_WAIT_TIMEOUT_SEC = 7.5
 _DEMO_OLLAMA_LATENCY_BUDGET_SECONDS = 2.0
 
 _VERTICAL_SYSTEM_PROMPTS = {
@@ -159,9 +161,9 @@ def _demo_cache_key(vertical: str, prompt: str, force_fallback: bool) -> str:
     return f"veklom:demo:hot:{digest}"
 
 
-def _get_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool) -> Optional[dict]:
+def _get_demo_hot_cache_by_key(cache_key: str) -> Optional[dict]:
     try:
-        raw = get_redis().get(_demo_cache_key(vertical, prompt, force_fallback))
+        raw = get_redis().get(cache_key)
         if not raw:
             return None
         if isinstance(raw, bytes):
@@ -171,15 +173,55 @@ def _get_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool) -> Opt
         return None
 
 
-def _set_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool, provider: str, result: dict) -> None:
+def _get_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool) -> Optional[dict]:
+    return _get_demo_hot_cache_by_key(_demo_cache_key(vertical, prompt, force_fallback))
+
+
+def _set_demo_hot_cache_by_key(cache_key: str, provider: str, result: dict) -> None:
     try:
         get_redis().setex(
-            _demo_cache_key(vertical, prompt, force_fallback),
+            cache_key,
             _DEMO_HOT_CACHE_TTL_SEC,
             json.dumps({"provider": provider, "result": result}, separators=(",", ":"), default=str),
         )
     except Exception:
         pass
+
+
+def _set_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool, provider: str, result: dict) -> None:
+    _set_demo_hot_cache_by_key(_demo_cache_key(vertical, prompt, force_fallback), provider, result)
+
+
+def _demo_mirror_lock_key(cache_key: str) -> str:
+    return f"{cache_key}:lock"
+
+
+def _acquire_demo_mirror_lock(cache_key: str, owner: str) -> bool:
+    try:
+        return bool(get_redis().set(_demo_mirror_lock_key(cache_key), owner, nx=True, ex=_DEMO_MIRROR_LOCK_TTL_SEC))
+    except Exception:
+        # If Redis is unavailable, fail open and let this request compute.
+        return True
+
+
+def _release_demo_mirror_lock(cache_key: str, owner: str) -> None:
+    try:
+        r = get_redis()
+        lock_key = _demo_mirror_lock_key(cache_key)
+        if r.get(lock_key) == owner:
+            r.delete(lock_key)
+    except Exception:
+        pass
+
+
+def _wait_for_demo_mirror_result(cache_key: str, timeout_seconds: float = _DEMO_MIRROR_WAIT_TIMEOUT_SEC) -> Optional[dict]:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        cached = _get_demo_hot_cache_by_key(cache_key)
+        if cached:
+            return cached
+        time.sleep(0.075)
+    return None
 
 
 # ?? Endpoint ??????????????????????????????????????????????????????????????????
@@ -268,7 +310,9 @@ async def demo_pipeline_stream(
         result: Optional[dict] = None
         circuit_was_open = cb_get_state().value == "open"
         used_groq = force_fallback or circuit_was_open
-        cached = _get_demo_hot_cache(vertical, effective_prompt, force_fallback)
+        cache_key = _demo_cache_key(vertical, effective_prompt, force_fallback)
+        cached = _get_demo_hot_cache_by_key(cache_key)
+        mirror_owner = False
 
         if cached:
             provider = str(cached.get("provider") or "cache")
@@ -290,11 +334,54 @@ async def demo_pipeline_stream(
                 time.sleep(0.008)
                 yield _sse("token_delta", {"delta": delta, "provider": provider, "cache": "hit"})
         else:
-            yield _sse("hot_cache_check", {
-                "status": "miss",
-                "store": "redis",
-                "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
-            })
+            mirror_owner = _acquire_demo_mirror_lock(cache_key, trace_id)
+            if mirror_owner:
+                yield _sse("hot_cache_check", {
+                    "status": "miss",
+                    "store": "redis",
+                    "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
+                    "mirror": "leader",
+                    "lock_ttl_sec": _DEMO_MIRROR_LOCK_TTL_SEC,
+                })
+            else:
+                yield _sse("hot_cache_check", {
+                    "status": "mirror_wait",
+                    "store": "redis",
+                    "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
+                    "mirror": "follower",
+                    "wait_timeout_sec": _DEMO_MIRROR_WAIT_TIMEOUT_SEC,
+                })
+                mirrored = _wait_for_demo_mirror_result(cache_key)
+                if mirrored:
+                    provider = str(mirrored.get("provider") or "cache")
+                    result = mirrored.get("result") or {}
+                    cached = mirrored
+                    yield _sse("hot_cache_check", {
+                        "status": "mirror_hit",
+                        "store": "redis",
+                        "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
+                        "mirror": "follower",
+                        "provider": provider,
+                        "model": result.get("model"),
+                    })
+                    yield _sse("redis_memory_check", {
+                        "demo_ephemeral": True,
+                        "ttl_sec": _DEMO_EPHEMERAL_TTL_SEC,
+                        "tenant_scope": "public_demo",
+                        "hot_cache": True,
+                        "mirror": "follower",
+                    })
+                    for delta in _chunk_text(str(result.get("response") or ""), 28):
+                        time.sleep(0.008)
+                        yield _sse("token_delta", {"delta": delta, "provider": provider, "cache": "mirror"})
+                else:
+                    mirror_owner = _acquire_demo_mirror_lock(cache_key, trace_id)
+                    yield _sse("hot_cache_check", {
+                        "status": "mirror_timeout",
+                        "store": "redis",
+                        "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
+                        "mirror": "leader" if mirror_owner else "direct",
+                    })
 
         if result is None and not used_groq:
             yield _sse("provider_selected", {
@@ -448,7 +535,10 @@ async def demo_pipeline_stream(
                     }
 
         if result is not None and not cached:
-            _set_demo_hot_cache(vertical, effective_prompt, force_fallback, provider, result)
+            _set_demo_hot_cache_by_key(cache_key, provider, result)
+
+        if mirror_owner:
+            _release_demo_mirror_lock(cache_key, trace_id)
 
         latency_ms = int((time.perf_counter() - started) * 1000)
 
@@ -478,9 +568,10 @@ async def demo_pipeline_stream(
         yield _sse("cost_recorded", {
             "billable": False,
             "public_demo": True,
+            "governance_runs_charged": 0,
             "credits_charged": 0,
             "customer_route_cost_credits": None,
-            "note": "Production requests are metered per-tenant in USD + credits.",
+            "note": "Public demo is evaluation-only. Activated workspaces are metered by governed execution.",
         })
 
         # ephemeral echo (safe, no PII, short TTL)

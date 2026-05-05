@@ -44,15 +44,47 @@ interface DeploymentsResp {
   zones: Array<{ region: string; deployments: Deployment[]; active_count: number }>;
 }
 
+interface ModelChoice {
+  slug: string;
+  name: string;
+  provider?: string;
+  enabled: boolean;
+  connected: boolean;
+  route?: string;
+}
+
 async function fetchDeployments(): Promise<DeploymentsResp> {
   const r = await api.get<DeploymentsResp>("/deployments");
   return r.data;
+}
+
+async function fetchModelChoices(): Promise<ModelChoice[]> {
+  const r = await api.get<{ models?: unknown[]; items?: unknown[] } | unknown[]>("/workspace/models");
+  const raw = Array.isArray(r.data) ? r.data : r.data.models ?? r.data.items ?? [];
+  return raw.map(normalizeModelChoice).filter((model) => model.slug);
+}
+
+function normalizeModelChoice(raw: unknown): ModelChoice {
+  const row = raw as Record<string, unknown>;
+  const slug = String(row.slug ?? row.model_slug ?? row.bedrock_model_id ?? "");
+  const name = String(row.name ?? row.display_name ?? row.model_slug ?? row.slug ?? slug);
+  const status = String(row.status ?? "").toLowerCase();
+  return {
+    slug,
+    name,
+    provider: row.provider ? String(row.provider) : undefined,
+    enabled: row.enabled !== false,
+    connected: row.connected !== false && status !== "not_connected" && status !== "disconnected",
+    route: row.route ? String(row.route) : undefined,
+  };
 }
 
 export function DeploymentsPage() {
   const qc = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     region: "hetzner-fsn1",
@@ -70,6 +102,12 @@ export function DeploymentsPage() {
     refetchInterval: 20_000,
   });
 
+  const models = useQuery({
+    queryKey: ["deployment-models"],
+    queryFn: fetchModelChoices,
+    refetchInterval: 30_000,
+  });
+
   const createMut = useMutation({
     mutationFn: async (payload: typeof form) => {
       const r = await api.post<Deployment>("/deployments", payload);
@@ -80,7 +118,10 @@ export function DeploymentsPage() {
       setSelectedId(created.id);
       setShowNew(false);
       setForm((current) => ({ ...current, name: "" }));
+      setNotice(`Endpoint created: ${created.name ?? created.slug ?? created.id}`);
+      setActionError(null);
     },
+    onError: (error) => setActionError(error),
   });
 
   const promoteMut = useMutation({
@@ -88,6 +129,11 @@ export function DeploymentsPage() {
       const r = await api.post(`/deployments/${id}/promote`, { target_traffic_percent: 100 });
       return r.data;
     },
+    onSuccess: () => {
+      setNotice("Deployment promoted to 100% traffic.");
+      setActionError(null);
+    },
+    onError: (error) => setActionError(error),
     onSettled: () => qc.invalidateQueries({ queryKey: ["deployments"] }),
   });
 
@@ -96,10 +142,16 @@ export function DeploymentsPage() {
       const r = await api.post(`/deployments/${id}/rollback`, {});
       return r.data;
     },
+    onSuccess: () => {
+      setNotice("Rollback request completed.");
+      setActionError(null);
+    },
+    onError: (error) => setActionError(error),
     onSettled: () => qc.invalidateQueries({ queryKey: ["deployments"] }),
   });
 
   const deployments = data?.items ?? [];
+  const modelChoices = (models.data ?? []).filter((model) => model.enabled && model.connected);
   const selected = deployments.find((deployment) => deployment.id === selectedId) ?? deployments[0] ?? null;
   const deploymentsUnavailable = isRouteUnavailable(error) || isRouteUnavailable(createMut.error);
 
@@ -114,6 +166,22 @@ export function DeploymentsPage() {
             Deployment creation is not enabled on the live backend yet. Existing deployments and health status remain
             readable.
           </div>
+        </div>
+      )}
+
+      {Boolean(actionError) && (
+        <div className="frame mb-4 flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <div>{actionUnavailableMessage(actionError, "Deployment action")}</div>
+        </div>
+      )}
+
+      {notice && (
+        <div className="frame mb-4 flex items-start justify-between gap-3 border-moss/30 bg-moss/5 p-4 text-sm text-moss">
+          <div>{notice}</div>
+          <button className="font-mono text-[11px] uppercase tracking-[0.14em] text-moss/80" onClick={() => setNotice(null)}>
+            dismiss
+          </button>
         </div>
       )}
 
@@ -143,6 +211,8 @@ export function DeploymentsPage() {
         <NewDeploymentModal
           form={form}
           setForm={setForm}
+          models={modelChoices}
+          modelsLoading={models.isLoading}
           pending={createMut.isPending}
           error={createMut.error}
           onClose={() => setShowNew(false)}
@@ -306,6 +376,8 @@ function EndpointDetail({
   onPromote: (id: string) => void;
   onRollback: (id: string) => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
   if (!deployment) {
     return (
       <div className="frame col-span-12 p-4 lg:col-span-7">
@@ -318,13 +390,18 @@ function EndpointDetail({
   const metrics = deployment.health_metrics ?? {};
   const rpsSeries = toNumberArray(metrics.rps_series);
   const p50 = metricNumber(metrics, ["p50_ms", "latency_p50_ms"]);
+  const endpoint = endpointPath(deployment);
+  const copyEndpoint = () => {
+    navigator.clipboard?.writeText(endpoint);
+    setCopied(true);
+  };
 
   return (
     <div className="frame col-span-12 p-4 lg:col-span-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-eyebrow">Endpoint detail · {deployment.name ?? deployment.slug ?? deployment.id}</div>
-          <div className="font-display truncate text-[14px] font-semibold text-bone">{endpointPath(deployment)}</div>
+          <div className="font-display truncate text-[14px] font-semibold text-bone">{endpoint}</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={deployment.status} />
@@ -354,9 +431,17 @@ function EndpointDetail({
           {deployment.deployed_at ? ` · deployed ${relativeTime(deployment.deployed_at)}` : ""}
         </div>
         <div className="flex gap-2">
+          <button className="v-btn-ghost h-8 px-3 text-xs" onClick={copyEndpoint}>
+            <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy endpoint"}
+          </button>
           <button
             className="v-btn-ghost h-8 px-3 text-xs"
             disabled={promotePending || (deployment.status === "active" && deployment.traffic_percent === 100)}
+            title={
+              deployment.status === "active" && deployment.traffic_percent === 100
+                ? "This endpoint is already receiving 100% traffic."
+                : "Promote this endpoint to 100% traffic."
+            }
             onClick={() => onPromote(deployment.id)}
           >
             <ArrowUpRight className="h-3.5 w-3.5" /> Promote
@@ -364,6 +449,7 @@ function EndpointDetail({
           <button
             className="v-btn-ghost h-8 px-3 text-xs"
             disabled={rollbackPending || !deployment.previous_version}
+            title={deployment.previous_version ? "Roll back to the previous version." : "No previous version is available for rollback."}
             onClick={() => onRollback(deployment.id)}
           >
             <RotateCcw className="h-3.5 w-3.5" /> Rollback
@@ -375,6 +461,7 @@ function EndpointDetail({
 }
 
 function DropInPanel() {
+  const [copied, setCopied] = useState(false);
   const snippet = `from openai import OpenAI
 client = OpenAI(
   base_url="https://api.veklom.com/v1",
@@ -394,8 +481,14 @@ client.chat.completions.create(
         {snippet}
       </pre>
       <div className="mt-3 flex items-center gap-2">
-        <button className="v-btn-ghost h-8 px-3 text-xs" onClick={() => navigator.clipboard?.writeText(snippet)}>
-          <Copy className="h-3.5 w-3.5" /> Copy
+        <button
+          className="v-btn-ghost h-8 px-3 text-xs"
+          onClick={() => {
+            navigator.clipboard?.writeText(snippet);
+            setCopied(true);
+          }}
+        >
+          <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy"}
         </button>
         <a href="#/vault" className="v-btn-primary h-8 px-3 text-xs">
           <KeyRound className="h-3.5 w-3.5" /> API keys
@@ -411,6 +504,8 @@ client.chat.completions.create(
 function NewDeploymentModal({
   form,
   setForm,
+  models,
+  modelsLoading,
   pending,
   error,
   onClose,
@@ -436,6 +531,8 @@ function NewDeploymentModal({
     strategy: "direct" | "blue_green" | "canary";
     traffic_percent: number;
   }) => void;
+  models: ModelChoice[];
+  modelsLoading: boolean;
   pending: boolean;
   error: unknown;
   onClose: () => void;
@@ -485,12 +582,38 @@ function NewDeploymentModal({
               <input className="v-input" value={form.version} onChange={(event) => setForm({ ...form, version: event.target.value })} />
             </Field>
           </div>
-          <Field label="Model slug">
-            <input
-              className="v-input"
-              value={form.model_slug}
-              onChange={(event) => setForm({ ...form, model_slug: event.target.value })}
-            />
+          <Field label="Model">
+            {models.length > 0 ? (
+              <select
+                className="v-input"
+                value={form.model_slug}
+                onChange={(event) => {
+                  const selected = models.find((model) => model.slug === event.target.value);
+                  setForm({
+                    ...form,
+                    model_slug: event.target.value,
+                    provider: selected?.provider ?? form.provider,
+                  });
+                }}
+              >
+                {!models.some((model) => model.slug === form.model_slug) && <option value={form.model_slug}>{form.model_slug}</option>}
+                {models.map((model) => (
+                  <option key={model.slug} value={model.slug}>
+                    {model.name} - {model.provider ?? "provider"}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="v-input"
+                value={form.model_slug}
+                onChange={(event) => setForm({ ...form, model_slug: event.target.value })}
+                placeholder={modelsLoading ? "loading workspace models..." : "qwen2.5:3b"}
+              />
+            )}
+            <div className="mt-1 font-mono text-[10px] text-muted">
+              Live workspace models only. Disabled or disconnected models are excluded from this picker.
+            </div>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Strategy">

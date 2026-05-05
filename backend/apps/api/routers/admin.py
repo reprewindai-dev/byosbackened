@@ -7,13 +7,15 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
-from apps.api.deps import get_current_user, require_admin, require_superuser
+from apps.api.deps import require_admin, require_superuser
 from core.security import get_password_hash
+from core.services.status_updates import notify_status_subscribers
 from db.session import get_db
 from db.models import (
     User, UserRole, UserStatus,
-    Workspace, Subscription, PlanTier, SubscriptionStatus,
+    Workspace, Subscription,
     SecurityEvent, Job, AIAuditLog,
+    IncidentLog, IncidentSeverity, IncidentStatus,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -63,6 +65,14 @@ class UserUpdateRequest(BaseModel):
     role: Optional[UserRole] = None
     status: Optional[UserStatus] = None
     is_active: Optional[bool] = None
+
+
+class StatusIncidentCreate(BaseModel):
+    title: str
+    description: str
+    severity: str = "medium"
+    incident_type: str = "system"
+    status: str = "investigating"
 
 
 # ─── Workspace Management (admin within workspace, superuser global) ───────────
@@ -253,7 +263,71 @@ async def delete_user(
     db.commit()
 
 
-# ─── System Overview (superuser) ──────────────────────────────────────────────
+# Public Status Operations (superuser only)
+
+@router.post("/status/incidents", status_code=status.HTTP_201_CREATED)
+async def create_status_incident(
+    payload: StatusIncidentCreate,
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    """Create a public status incident and notify status subscribers."""
+    title = (payload.title or "").strip()
+    description = (payload.description or "").strip()
+    if len(title) < 3:
+        raise HTTPException(status_code=400, detail="Title must be at least 3 characters")
+    if len(description) < 10:
+        raise HTTPException(status_code=400, detail="Description must be at least 10 characters")
+
+    try:
+        severity = IncidentSeverity(payload.severity.lower())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Severity must be one of {[item.value for item in IncidentSeverity]}",
+        ) from exc
+
+    try:
+        incident_status = IncidentStatus(payload.status.lower())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Status must be one of {[item.value for item in IncidentStatus]}",
+        ) from exc
+
+    incident = IncidentLog(
+        workspace_id=None,
+        incident_type=(payload.incident_type or "system").strip().lower()[:80],
+        severity=severity,
+        status=incident_status,
+        title=title,
+        description=description,
+    )
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    delivery = await notify_status_subscribers(
+        db,
+        event_type="incident",
+        title=incident.title,
+        description=incident.description,
+        severity=incident.severity.value,
+        status=incident.status.value,
+        url=f"https://veklom.com/status#{incident.id}",
+    )
+
+    return {
+        "id": incident.id,
+        "title": incident.title,
+        "severity": incident.severity.value,
+        "status": incident.status.value,
+        "created_at": incident.created_at.isoformat(),
+        "delivery": delivery,
+    }
+
+
+# System Overview (superuser)
 
 @router.get("/overview")
 async def system_overview(
@@ -262,7 +336,7 @@ async def system_overview(
 ):
     """Platform-wide stats for superuser admin dashboard."""
     total_workspaces = db.query(func.count(Workspace.id)).scalar() or 0
-    active_workspaces = db.query(func.count(Workspace.id)).filter(Workspace.is_active == True).scalar() or 0
+    active_workspaces = db.query(func.count(Workspace.id)).filter(Workspace.is_active.is_(True)).scalar() or 0
     total_users = db.query(func.count(User.id)).scalar() or 0
     total_jobs = db.query(func.count(Job.id)).scalar() or 0
     total_ai_ops = db.query(func.count(AIAuditLog.id)).scalar() or 0

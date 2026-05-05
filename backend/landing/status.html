@@ -1,1 +1,501 @@
-﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Veklom Status</title><meta name="robots" content="noindex, nofollow" /><link rel="icon" type="image/svg+xml" href="/favicon.svg" /><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="/app/app.css"><style>.status-shell { max-width: 980px; margin: 0 auto; padding: 64px 24px 96px; }.status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:20px; }.status-card { background:var(--ink-2); border:1px solid var(--rule); border-radius:6px; padding:20px; }.status-pill { display:inline-flex; padding:4px 10px; border:1px solid var(--ok); color:var(--ok); font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; border-radius:2px; }.status-row { display:flex; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--rule); }.status-row:last-child { border-bottom:0; }.status-title { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--mute); }.status-value { color:var(--bone); }.status-small { color:var(--bone-2); font-size:14px; line-height:1.6; }</style></head><body><main class="status-shell">  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Status</div>  <div class="status-card">    <div class="status-pill" id="status-pill">Loading</div>    <h1 class="app-h1" style="margin-top:14px;">Service status and incident feed</h1>    <p class="app-sub">Public uptime and incident view for API, Auth, Marketplace, and AI Proxy.</p>    <div id="status-root" class="status-small">Loading status...</div>  </div></main><script src="/app/auth.js"></script><script>async function loadStatus() {  const root = document.getElementById("status-root");  const pill = document.getElementById("status-pill");  try {    const statusApiBase = (VK.apiBase || "").replace(/\/api\/v1$/, "");    const statusResp = await fetch(`${statusApiBase}/status/data`);    if (!statusResp.ok) {      throw new Error(`status endpoint returned ${statusResp.status}`);    }    const out = await statusResp.json();    pill.textContent = "Operational";    root.innerHTML = [      '<div class="status-grid">' + out.services.map(service =>        '<div class="status-card">' +          '<div class="status-title">' + service.name + '</div>' +          '<div style="font-family:var(--serif); font-size:28px; margin:10px 0 6px;">' + Number(service.uptime_90d).toFixed(2) + '%</div>' +          '<div class="status-small">Status: ' + service.status + '</div>' +        '</div>'      ).join("") + '</div>',      '<div class="status-card" style="margin-top:18px;">' +        '<div class="status-title">Current Incidents</div>' +        (out.incidents.length ? out.incidents.map(i => '<div class="status-row"><div><strong>' + i.title + '</strong><div class="status-small">' + (i.description || "") + '</div></div><div class="status-value">' + i.severity + ' / ' + i.status + '</div></div>').join("") : '<p class="status-small" style="margin-top:12px;">No current incidents.</p>') +      '</div>',      '<div class="status-card" style="margin-top:18px;">' +        '<div class="status-title">Scheduled Maintenance</div>' +        (out.maintenance.length ? out.maintenance.map(i => '<div class="status-row"><div><strong>' + i.title + '</strong><div class="status-small">' + (i.description || "") + '</div></div><div class="status-value">' + i.severity + '</div></div>').join("") : '<p class="status-small" style="margin-top:12px;">No scheduled maintenance.</p>') +      '</div>'    ].join("");  } catch (err) {    pill.textContent = "Degraded";    root.innerHTML = '<div class="alert alert-error">' + (err.message || "Unable to load status") + '</div>';  }}loadStatus();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Veklom Status</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #080b12;
+      --panel: #121722;
+      --panel-2: #171d2a;
+      --rule: rgba(255,255,255,.08);
+      --text: #f6f2e8;
+      --muted: #9099ad;
+      --muted-2: #657086;
+      --green: #22c795;
+      --green-dim: rgba(34,199,149,.14);
+      --amber: #ffae24;
+      --red: #ff7777;
+      --brand: #ffad1f;
+      --shadow: 0 24px 80px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,173,31,.12), transparent 38rem),
+        radial-gradient(circle at 100% 10%, rgba(34,199,149,.08), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, sans-serif;
+      min-height: 100vh;
+    }
+    a { color: inherit; }
+    .shell { max-width: 1100px; margin: 0 auto; padding: 24px 24px 96px; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; letter-spacing: -.03em; }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: #050505;
+      color: var(--brand);
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 700;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    .nav { display: flex; gap: 10px; align-items: center; }
+    .nav button, .updates-btn, .copy-btn, .submit-btn {
+      border: 1px solid transparent;
+      border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      padding: 9px 13px;
+      font: 700 14px Inter, sans-serif;
+      cursor: pointer;
+    }
+    .nav button.active, .updates-btn {
+      background: rgba(255,255,255,.08);
+      border-color: var(--rule);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .hero { text-align: center; padding: 96px 0 58px; }
+    .state-icon {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 20px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid rgba(34,199,149,.22);
+      font-size: 30px;
+      font-weight: 900;
+    }
+    h1 {
+      margin: 0;
+      font-family: Newsreader, serif;
+      font-size: clamp(42px, 6vw, 68px);
+      letter-spacing: -.05em;
+      line-height: .95;
+    }
+    .updated { margin-top: 14px; color: var(--muted); font-weight: 600; }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02)), var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 26px 30px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .title { font-weight: 800; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 999px;
+      background: var(--green-dim);
+      color: var(--text);
+      padding: 7px 11px;
+      font-weight: 800;
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 18px var(--green); }
+    .service { padding: 24px 30px 26px; border-bottom: 1px solid var(--rule); }
+    .service:last-child { border-bottom: 0; }
+    .service-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+    .service-name { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800; }
+    .uptime { color: var(--green); font-weight: 900; }
+    .bars { display: grid; grid-template-columns: repeat(90, 1fr); gap: 3px; }
+    .bar { height: 30px; border-radius: 3px; background: var(--green); opacity: .95; }
+    .bar.warn { background: var(--amber); }
+    .bar.bad { background: var(--red); }
+    .bar.dim { opacity: .45; }
+    .range { display: flex; justify-content: space-between; color: var(--muted-2); margin-top: 12px; font-weight: 700; }
+    .section { margin-top: 74px; }
+    .section h2 { margin: 0 0 24px; font-family: Newsreader, serif; font-size: 38px; letter-spacing: -.04em; }
+    .timeline-card { padding: 0; }
+    .month { padding: 24px 28px; font-weight: 800; border-bottom: 1px solid var(--rule); }
+    .empty { min-height: 152px; display: grid; place-items: center; color: var(--muted); font-weight: 800; }
+    .incident { padding: 24px 28px 28px; border-top: 1px solid var(--rule); }
+    .incident-title { display: flex; justify-content: space-between; gap: 16px; align-items: center; font-weight: 900; font-size: 18px; }
+    .badge { border-radius: 999px; padding: 5px 10px; font: 800 12px "JetBrains Mono", monospace; text-transform: uppercase; }
+    .badge.degraded { color: var(--amber); background: rgba(255,174,36,.14); }
+    .incident-body { margin-top: 18px; padding: 18px; border-radius: 14px; background: var(--panel-2); color: var(--muted); line-height: 1.7; }
+    .updates-panel {
+      display: none;
+      margin-top: 22px;
+      border: 1px solid var(--rule);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+    .updates-panel.open { display: block; }
+    .updates-title { font-weight: 900; font-size: 20px; margin-bottom: 12px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tab {
+      border: 1px solid var(--rule);
+      background: rgba(255,255,255,.035);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: 800 12px "JetBrains Mono", monospace;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .tab.active { color: var(--brand); border-color: rgba(255,173,31,.45); background: rgba(255,173,31,.1); }
+    .form-row { display: flex; gap: 10px; align-items: stretch; }
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      background: #0c111b;
+      color: var(--text);
+      padding: 13px 14px;
+      font: 600 14px Inter, sans-serif;
+      outline: none;
+    }
+    input:focus { border-color: rgba(255,173,31,.5); box-shadow: 0 0 0 3px rgba(255,173,31,.08); }
+    .submit-btn { background: var(--brand); color: #111; border-color: transparent; padding: 0 18px; }
+    .copy-btn { background: rgba(255,255,255,.08); color: var(--text); border-color: var(--rule); }
+    .helper { margin-top: 10px; color: var(--muted); line-height: 1.6; }
+    .feed-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--rule);
+      border-radius: 14px;
+      padding: 13px;
+      background: #0c111b;
+      font-family: "JetBrains Mono", monospace;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .message { margin-top: 12px; font-weight: 800; }
+    .message.ok { color: var(--green); }
+    .message.err { color: var(--red); }
+    @media (max-width: 760px) {
+      .topbar, .nav, .form-row { flex-direction: column; align-items: stretch; }
+      .bars { grid-template-columns: repeat(45, 1fr); }
+      .hero { padding-top: 56px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">V</span>
+        <span>Veklom</span>
+      </a>
+      <nav class="nav" aria-label="Status sections">
+        <button data-view="status" class="active">Status</button>
+        <button data-view="maintenance">Maintenance</button>
+        <button data-view="incidents">Previous incidents</button>
+        <button class="updates-btn" id="updatesBtn" type="button">Get updates</button>
+      </nav>
+    </header>
+
+    <section id="updatesPanel" class="updates-panel" aria-live="polite">
+      <div class="updates-title">Get status updates</div>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-channel="email" type="button">E-mail</button>
+        <button class="tab" data-channel="rss" type="button">RSS</button>
+        <button class="tab" data-channel="json" type="button">JSON</button>
+        <button class="tab" data-channel="webhook" type="button">Webhook</button>
+        <button class="tab" data-channel="slack" type="button">Slack</button>
+      </div>
+      <div id="updatesBody"></div>
+      <div id="updatesMessage" class="message" aria-live="polite"></div>
+    </section>
+
+    <section class="hero">
+      <div class="state-icon" id="stateIcon">OK</div>
+      <h1 id="headline">Checking Veklom status</h1>
+      <div class="updated" id="updatedAt">Loading live status...</div>
+    </section>
+
+    <section id="statusView">
+      <div class="card">
+        <div class="card-head">
+          <div class="title">Veklom control plane</div>
+          <div class="pill"><span class="dot"></span><span id="overallPill">Loading</span></div>
+        </div>
+        <div id="services"></div>
+      </div>
+    </section>
+
+    <section id="maintenanceView" class="section" hidden>
+      <h2>Maintenance</h2>
+      <div id="maintenanceList"></div>
+    </section>
+
+    <section id="incidentsView" class="section" hidden>
+      <h2>Previous incidents</h2>
+      <div id="incidentList"></div>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE = location.hostname.startsWith("api.")
+      ? location.origin
+      : "https://api.veklom.com";
+    const JSON_URL = `${API_BASE}/status/data`;
+    const RSS_URL = `${API_BASE}/status/rss.xml`;
+    let activeChannel = "email";
+    let statusPayload = null;
+
+    const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[ch]));
+
+    function prettyTime(value) {
+      if (!value) return "just now";
+      try {
+        return new Intl.DateTimeFormat(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(new Date(value));
+      } catch {
+        return value;
+      }
+    }
+
+    function barsFor(service) {
+      const uptime = Number(service.uptime_90d || 99.99);
+      const warnEvery = uptime >= 99.9 ? 0 : Math.max(9, Math.round(100 - uptime));
+      return Array.from({ length: 90 }, (_, index) => {
+        const warn = warnEvery && index > 12 && index % warnEvery === 0;
+        return `<span class="bar ${warn ? "warn" : ""}" title="Day ${index + 1}"></span>`;
+      }).join("");
+    }
+
+    function renderServices(payload) {
+      const services = payload.services || [];
+      document.getElementById("services").innerHTML = services.map((service) => `
+        <div class="service">
+          <div class="service-row">
+            <div class="service-name"><span class="dot"></span>${esc(service.name)}</div>
+            <div class="uptime">${Number(service.uptime_90d || 0).toFixed(3)}% uptime</div>
+          </div>
+          <div class="bars" aria-label="${esc(service.name)} 90 day uptime">${barsFor(service)}</div>
+          <div class="range"><span>90 days ago</span><span>Today</span></div>
+        </div>
+      `).join("");
+    }
+
+    function renderMaintenance(payload) {
+      const items = payload.maintenance || [];
+      if (!items.length) {
+        document.getElementById("maintenanceList").innerHTML = `
+          <div class="card timeline-card">
+            <div class="month">May 2026</div>
+            <div class="empty">OK - No maintenance scheduled</div>
+          </div>`;
+        return;
+      }
+      document.getElementById("maintenanceList").innerHTML = items.map((item) => `
+        <div class="card timeline-card" id="${esc(item.id)}">
+          <div class="month">${prettyTime(item.created_at)}</div>
+          <div class="incident">
+            <div class="incident-title">
+              <span>${esc(item.title)}</span>
+              <span class="badge degraded">${esc(item.severity || "maintenance")}</span>
+            </div>
+            <div class="incident-body">${esc(item.description || "Scheduled maintenance window.")}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderIncidents(payload) {
+      const items = payload.incidents || [];
+      if (!items.length) {
+        document.getElementById("incidentList").innerHTML = `
+          <div class="card timeline-card">
+            <div class="month">May 2026</div>
+            <div class="empty">OK - No incidents reported</div>
+          </div>`;
+        return;
+      }
+      document.getElementById("incidentList").innerHTML = items.map((item) => `
+        <div class="card timeline-card" id="${esc(item.id)}">
+          <div class="month">${prettyTime(item.created_at)}</div>
+          <div class="incident">
+            <div class="incident-title">
+              <span>${esc(item.title)}</span>
+              <span class="badge degraded">${esc(item.severity || "degraded")}</span>
+            </div>
+            <div class="incident-body">
+              <strong>${esc(item.status || "open")}</strong><br />
+              ${esc(item.description || "Incident details pending.")}
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderUpdatesBody() {
+      const body = document.getElementById("updatesBody");
+      document.getElementById("updatesMessage").textContent = "";
+      document.getElementById("updatesMessage").className = "message";
+      if (activeChannel === "rss" || activeChannel === "json") {
+        const url = activeChannel === "rss" ? RSS_URL : JSON_URL;
+        body.innerHTML = `
+          <div class="feed-box">
+            <span>${esc(url)}</span>
+            <button class="copy-btn" type="button" data-copy="${esc(url)}">Copy</button>
+          </div>
+          <div class="helper">This feed is live and does not require an account.</div>
+        `;
+        return;
+      }
+      const placeholders = {
+        email: "you@yourdomain.com",
+        webhook: "https://yourdomain.com/veklom-status-webhook",
+        slack: "https://hooks.slack.com/services/...",
+      };
+      const labels = {
+        email: "Email address",
+        webhook: "Webhook URL",
+        slack: "Slack incoming webhook URL",
+      };
+      body.innerHTML = `
+        <form id="subscribeForm" class="form-row">
+          <input id="targetInput" name="target" type="${activeChannel === "email" ? "email" : "url"}"
+            placeholder="${placeholders[activeChannel]}" aria-label="${labels[activeChannel]}" required />
+          <button class="submit-btn" type="submit">Subscribe</button>
+        </form>
+        <div class="helper">${activeChannel === "slack"
+          ? "Slack URLs are verified with a confirmation message before activation."
+          : activeChannel === "webhook"
+            ? "Webhook endpoints must be public HTTPS URLs. Veklom stores the destination encrypted."
+            : "Email subscriptions send a confirmation through Veklom's configured mail provider."}</div>
+      `;
+    }
+
+    async function subscribe(target) {
+      const message = document.getElementById("updatesMessage");
+      message.textContent = "Subscribing...";
+      message.className = "message";
+      const response = await fetch(`${API_BASE}/status/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: activeChannel, target }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.detail || `Subscription failed (${response.status})`);
+      }
+      message.textContent = `Subscribed: ${payload.channel} ${payload.target} (${payload.verification_status})`;
+      message.className = "message ok";
+    }
+
+    async function loadStatus() {
+      try {
+        const response = await fetch(JSON_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error(`status endpoint returned ${response.status}`);
+        statusPayload = await response.json();
+        const hasIncidents = (statusPayload.incidents || []).length > 0;
+        document.getElementById("headline").textContent = hasIncidents ? "Veklom is degraded" : "All services are online";
+        document.getElementById("overallPill").textContent = hasIncidents ? "Degraded" : "Operational";
+        document.getElementById("updatedAt").textContent = `Last updated on ${prettyTime(statusPayload.timestamp)}`;
+        document.getElementById("stateIcon").textContent = hasIncidents ? "!" : "OK";
+        renderServices(statusPayload);
+        renderMaintenance(statusPayload);
+        renderIncidents(statusPayload);
+      } catch (error) {
+        document.getElementById("headline").textContent = "Status unavailable";
+        document.getElementById("overallPill").textContent = "Unavailable";
+        document.getElementById("updatedAt").textContent = error.message || "Unable to load status";
+        document.getElementById("services").innerHTML = `<div class="service"><div class="incident-body">${esc(error.message || "Unable to load status")}</div></div>`;
+      }
+    }
+
+    document.querySelectorAll(".nav button[data-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".nav button[data-view]").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        const view = button.dataset.view;
+        document.getElementById("statusView").hidden = view !== "status";
+        document.getElementById("maintenanceView").hidden = view !== "maintenance";
+        document.getElementById("incidentsView").hidden = view !== "incidents";
+      });
+    });
+
+    document.getElementById("updatesBtn").addEventListener("click", () => {
+      document.getElementById("updatesPanel").classList.toggle("open");
+      renderUpdatesBody();
+    });
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        activeChannel = tab.dataset.channel;
+        document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        renderUpdatesBody();
+      });
+    });
+
+    document.addEventListener("submit", async (event) => {
+      if (event.target && event.target.id === "subscribeForm") {
+        event.preventDefault();
+        try {
+          await subscribe(document.getElementById("targetInput").value);
+        } catch (error) {
+          const message = document.getElementById("updatesMessage");
+          message.textContent = error.message || "Subscription failed";
+          message.className = "message err";
+        }
+      }
+    });
+
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-copy]");
+      if (!button) return;
+      await navigator.clipboard.writeText(button.dataset.copy);
+      const message = document.getElementById("updatesMessage");
+      message.textContent = "Copied feed URL.";
+      message.className = "message ok";
+    });
+
+    renderUpdatesBody();
+    loadStatus();
+  </script>
+</body>
+</html>

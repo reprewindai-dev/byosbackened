@@ -19,6 +19,8 @@ _PUBLIC_PATHS = {
     "/status",      # system health - no auth required
     "/status.html",
     "/status/data", # public demo status payload
+    "/status/json",
+    "/status/subscribe",
     "/api/v1/edge/demo/summary",
     "/api/v1/edge/demo/infrastructure",
     "/api/v1/demo/pipeline/stream",

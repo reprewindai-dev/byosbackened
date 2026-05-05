@@ -56,6 +56,22 @@ interface TopupOptions {
   options: TopupOption[];
 }
 
+const FREE_EVALUATION_RUNS = 15;
+
+const PRICING_ROWS = [
+  { tier: "Free Evaluation", activation: "$0", reserve: "$0", runs: "15 governed runs", evidence: "Locked" },
+  { tier: "Founding", activation: "$395 one-time", reserve: "$150 min", runs: "$0.25 / run", evidence: "$99" },
+  { tier: "Standard", activation: "$795 one-time", reserve: "$300 min", runs: "$0.40 / run", evidence: "$149" },
+  { tier: "Regulated", activation: "From $2,500", reserve: "$2,500 min", runs: "Contact", evidence: "$199" },
+];
+
+const EVENT_PRICES = [
+  ["Compare run", "$0.75 Founding / $1.20 Standard"],
+  ["BYOK governance calls", "$6 Founding / $8 Standard per 1K"],
+  ["Managed governance calls", "$12 Founding / $16 Standard per 1K"],
+  ["Auditor bundle", "$249 Founding / $349 Standard / $499 Regulated"],
+];
+
 async function fetchBalance() {
   return (await api.get<WalletBalance>("/wallet/balance")).data;
 }
@@ -89,13 +105,10 @@ export function BillingPage() {
     },
   });
 
-  const monthlyPct = useMemo(() => {
-    if (!balance.data || !balance.data.monthly_credits_included) return 0;
-    return Math.min(
-      100,
-      Math.round((balance.data.monthly_credits_used / balance.data.monthly_credits_included) * 100),
-    );
-  }, [balance.data]);
+  const evaluationRunsUsed = useMemo(() => {
+    return (txns.data?.transactions ?? []).filter((txn) => txn.transaction_type === "usage").length;
+  }, [txns.data?.transactions]);
+  const evaluationPct = Math.min(100, Math.round((evaluationRunsUsed / FREE_EVALUATION_RUNS) * 100));
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -123,7 +136,7 @@ export function BillingPage() {
         <div className="v-card flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
           <AlertCircle className="mt-0.5 h-4 w-4" />
           <div className="flex-1">
-            <div className="font-semibold">Wallet unavailable</div>
+            <div className="font-semibold">Reserve unavailable</div>
             <div className="mt-1 text-xs opacity-80">
               {(balance.error as Error)?.message ?? "Unknown error"} · log in or confirm workspace is provisioned.
             </div>
@@ -159,22 +172,18 @@ export function BillingPage() {
 
           <div className="mt-5">
             <div className="mb-1 flex justify-between font-mono text-[11px] text-muted">
-              <span>Evaluation allowance used</span>
+              <span>Free Evaluation governed runs</span>
               <span className="text-bone">
-                {balance.data
-                  ? `${fmtNumber(balance.data.monthly_credits_used)} / ${fmtNumber(
-                      balance.data.monthly_credits_included,
-                    )}`
-                  : "-"}
+                {txns.isLoading ? "-" : `${Math.min(evaluationRunsUsed, FREE_EVALUATION_RUNS)} / ${FREE_EVALUATION_RUNS}`}
               </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded bg-rule">
               <div
                 className={cn(
                   "h-full rounded transition-all",
-                  monthlyPct > 80 ? "bg-crimson" : monthlyPct > 60 ? "bg-brass" : "bg-moss",
+                  evaluationPct > 80 ? "bg-crimson" : evaluationPct > 60 ? "bg-brass" : "bg-moss",
                 )}
-                style={{ width: `${monthlyPct}%` }}
+                style={{ width: `${evaluationPct}%` }}
               />
             </div>
             {balance.data?.monthly_period_end && (
@@ -202,17 +211,71 @@ export function BillingPage() {
           <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Quick actions</div>
           <button
             className="v-btn-primary w-full"
-            onClick={() => setSelectedPack(packs.data?.options[1]?.pack_name ?? "growth")}
+            onClick={() => setSelectedPack(packs.data?.options[0]?.pack_name ?? "founding")}
             disabled={packs.isLoading}
           >
             <Sparkles className="h-4 w-4" /> Add reserve
           </button>
-          <a href="#/settings" className="v-btn-ghost mt-2 w-full justify-center">
-            <CreditCard className="h-4 w-4" /> Manage payment method
-          </a>
+          <button
+            className="v-btn-ghost mt-2 w-full cursor-not-allowed justify-center opacity-70"
+            disabled
+            title="Stripe customer portal requires a completed billing account. Reserve checkout is live; portal access appears after account provisioning."
+          >
+            <CreditCard className="h-4 w-4" /> Customer portal locked
+          </button>
           <div className="mt-4 rounded-lg border border-rule p-3 text-[11px] text-bone-2">
             <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Burn-rate guard</div>
             <div>Spend caps, alerts, and auto-throttle live in <a href="#/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <div className="v-card p-0">
+          <header className="border-b border-rule px-5 py-3">
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Access model</div>
+            <h2 className="mt-1 text-lg font-semibold">Free lets you see governed AI. Paid lets you prove it.</h2>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead className="border-b border-rule font-mono text-[10px] uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-5 py-2 text-left font-medium">Tier</th>
+                  <th className="px-5 py-2 text-left font-medium">Activation</th>
+                  <th className="px-5 py-2 text-left font-medium">Reserve</th>
+                  <th className="px-5 py-2 text-left font-medium">Governed run</th>
+                  <th className="px-5 py-2 text-left font-medium">Evidence package</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PRICING_ROWS.map((row) => (
+                  <tr key={row.tier} className="border-b border-rule/60 last:border-0">
+                    <td className="px-5 py-2.5 font-semibold text-bone">{row.tier}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.activation}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.reserve}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.runs}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.evidence}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="v-card p-5">
+          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Paid-only evidence</div>
+          <h2 className="mt-1 text-lg font-semibold">Compliance exports stay locked until activation</h2>
+          <p className="mt-2 text-sm text-bone-2">
+            The free playground is for evaluation only. Signed artifacts, retention controls, evidence packs, and auditor
+            bundles require an activated workspace.
+          </p>
+          <div className="mt-4 space-y-2">
+            {EVENT_PRICES.map(([label, value]) => (
+              <div key={label} className="flex items-start justify-between gap-4 rounded-lg border border-rule bg-ink/35 px-3 py-2 text-[12px]">
+                <span className="text-muted">{label}</span>
+                <span className="text-right font-mono text-bone">{value}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -231,7 +294,7 @@ export function BillingPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {(packs.data?.options ?? []).map((p) => {
             const effectiveCredits = p.credits;
-            const pricePerK = (p.price_cents / (effectiveCredits / 1000)).toFixed(3);
+            const pricePerK = (p.price_cents / 100 / (effectiveCredits / 1000)).toFixed(2);
             const active = selectedPack === p.pack_name;
             return (
               <div

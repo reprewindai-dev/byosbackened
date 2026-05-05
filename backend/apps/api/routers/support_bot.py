@@ -23,13 +23,13 @@ QUICK REFERENCE:
 - API: https://api.veklom.com/api/v1 â€” Auth via Bearer JWT or API key (byos_ prefix)
 - Key endpoints: /v1/exec, /auth/login, /auth/register, /subscriptions/plans
 - Models: qwen2.5:3b (local) â†’ Groq llama-3.1-8b-instant fallback (self-healing)
-- Billing: Stripe, cancel anytime, token packs for overage, 14-day trial, no contracts
+- Billing: activate once, fund operating reserve, pay per governed execution, no subscription lock-in
 
 COMMON FIXES:
 - 401: Refresh token via POST /auth/refresh or regenerate API key
 - 429: Rate limit â†’ upgrade plan or wait for reset
 - 500: Check /status â€” Groq auto-activates if Ollama down
-- Empty wallet: Buy token pack or wait for monthly reset
+- Empty reserve: Fund operating reserve or wait for evaluation allowance reset
 - Kill switch: Admin must reset via dashboard
 
 MARKETPLACE:
@@ -192,4 +192,3 @@ async def support_chat(payload: SupportMessage, request: Request):
             conversation_id=conversation_id,
             timestamp=datetime.utcnow().isoformat(),
         )
-

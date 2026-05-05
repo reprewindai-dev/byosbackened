@@ -1,4 +1,4 @@
-"""Token wallet router - balance, transactions, and credit purchase."""
+"""Operating reserve router - balance, transactions, and reserve funding."""
 from datetime import datetime
 from typing import Optional
 
@@ -62,7 +62,7 @@ class TopupOptionsResponse(BaseModel):
 
 
 class CreateCheckoutRequest(BaseModel):
-    pack_name: str  # starter, growth, team, enterprise
+    pack_name: str  # founding, standard, regulated
     success_url: str
     cancel_url: str
 
@@ -72,32 +72,26 @@ class CreateCheckoutResponse(BaseModel):
     session_id: str
 
 
-# ─── Token Pack Definitions ───────────────────────────────────────────────────
+# ─── Operating Reserve Definitions ────────────────────────────────────────────
 
 TOKEN_PACKS = {
-    "starter": {
-        "name": "Starter Pack",
-        "price_cents": 2500,  # $25
-        "credits": 2_500_000,
+    "founding": {
+        "name": "Founding Reserve",
+        "price_cents": 15_000,  # $150 minimum reserve
+        "credits": 150_000,
         "bonus_percent": 0,
     },
-    "growth": {
-        "name": "Growth Pack",
-        "price_cents": 10000,  # $100
-        "credits": 12_000_000,
-        "bonus_percent": 20,
+    "standard": {
+        "name": "Standard Reserve",
+        "price_cents": 30_000,  # $300 minimum reserve
+        "credits": 300_000,
+        "bonus_percent": 0,
     },
-    "team": {
-        "name": "Team Pack",
-        "price_cents": 50000,  # $500
-        "credits": 75_000_000,
-        "bonus_percent": 50,
-    },
-    "enterprise": {
-        "name": "Enterprise Pack",
-        "price_cents": 200000,  # $2,000
-        "credits": 350_000_000,
-        "bonus_percent": 75,
+    "regulated": {
+        "name": "Regulated Reserve",
+        "price_cents": 250_000,  # $2,500 minimum reserve
+        "credits": 2_500_000,
+        "bonus_percent": 0,
     },
 }
 
@@ -162,7 +156,7 @@ async def get_balance(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
 ):
-    """Get current token wallet balance and stats."""
+    """Get current operating reserve balance and stats."""
     # Try cache first
     cached = _get_cached_balance(workspace_id)
     
@@ -192,7 +186,7 @@ async def get_transactions(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
 ):
-    """Get token transaction history."""
+    """Get operating reserve transaction history."""
     query = db.query(TokenTransaction).filter(
         TokenTransaction.workspace_id == workspace_id
     )
@@ -230,7 +224,7 @@ async def get_transactions(
 
 @router.get("/topup/options", response_model=TopupOptionsResponse)
 async def get_topup_options():
-    """Get available token pack options."""
+    """Get available operating reserve funding options."""
     return TopupOptionsResponse(
         options=[
             TopupOption(
@@ -250,7 +244,7 @@ async def create_topup_checkout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create Stripe checkout session for token pack purchase."""
+    """Create Stripe checkout session for operating reserve funding."""
     import stripe
     
     if not settings.stripe_secret_key:
@@ -261,7 +255,7 @@ async def create_topup_checkout(
     # Validate pack
     pack = TOKEN_PACKS.get(request.pack_name)
     if not pack:
-        raise HTTPException(status_code=400, detail="Invalid token pack")
+        raise HTTPException(status_code=400, detail="Invalid reserve pack")
     
     workspace_id = current_user.workspace_id
     
@@ -274,8 +268,8 @@ async def create_topup_checkout(
             "price_data": {
                 "currency": "usd",
                 "product_data": {
-                    "name": f"Veklom Token Pack - {pack['name']}",
-                    "description": f"{pack['credits']:,} API credits ({pack['bonus_percent']}% bonus)",
+                    "name": f"Veklom Operating Reserve - {pack['name']}",
+                    "description": f"{pack['credits']:,} reserve units for governed execution",
                 },
                 "unit_amount": pack["price_cents"],
             },
@@ -288,7 +282,7 @@ async def create_topup_checkout(
             "workspace_id": workspace_id,
             "pack_name": request.pack_name,
             "credits": str(pack["credits"]),
-            "type": "token_pack",
+            "type": "operating_reserve",
         },
     )
     

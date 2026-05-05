@@ -192,7 +192,7 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         amount=FREE_TRIAL_CREDITS,
         balance_before=0,
         balance_after=FREE_TRIAL_CREDITS,
-        description="Free workspace trial credits",
+            description="Free Evaluation governed-run allowance",
     ))
     try:
         license_payload = await issue_trial_license(
@@ -738,7 +738,7 @@ async def github_callback(
             amount=FREE_TRIAL_CREDITS,
             balance_before=0,
             balance_after=FREE_TRIAL_CREDITS,
-            description="Free GitHub workspace trial credits",
+            description="Free GitHub workspace governed-run allowance",
         ))
         db.commit()
         db.refresh(user)

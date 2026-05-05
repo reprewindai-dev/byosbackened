@@ -17,8 +17,7 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 # ─── Plan catalog ─────────────────────────────────────────────────────────────
 # IMPORTANT: Backend subscription pricing and landing/dashboard displays must
-# stay aligned. Token packs are separate one-time purchases handled by the
-# wallet router.
+# stay aligned. Operating reserve funding is handled by the wallet router.
 
 PLANS = {
     "starter": {
@@ -470,7 +469,7 @@ async def stripe_webhook(
                 db.commit()
 
     if event_type == "checkout.session.completed":
-        # Handle token pack purchases (one-time payments)
+        # Handle operating reserve funding (one-time payments)
         session = data
         if session.get("mode") == "payment":
             workspace_id = session.get("metadata", {}).get("workspace_id")
@@ -491,9 +490,9 @@ def _credit_token_wallet(
     credits: int,
     stripe_checkout_session_id: str = None,
     stripe_payment_intent_id: str = None,
-    description: str = "Token pack purchase"
+    description: str = "Operating reserve funding"
 ):
-    """Credit token wallet for a workspace."""
+    """Credit operating reserve for a workspace."""
     # Get or create wallet
     wallet = db.query(TokenWallet).filter(
         TokenWallet.workspace_id == workspace_id

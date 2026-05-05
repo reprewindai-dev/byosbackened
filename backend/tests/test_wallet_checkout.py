@@ -27,7 +27,7 @@ def test_topup_checkout_preserves_existing_success_query(monkeypatch):
     result = asyncio.run(
         create_topup_checkout(
             request=CreateCheckoutRequest(
-                pack_name="starter",
+                pack_name="founding",
                 success_url="https://veklom.com/workspace-app#/billing?topup=success",
                 cancel_url="https://veklom.com/workspace-app#/billing?topup=cancel",
             ),

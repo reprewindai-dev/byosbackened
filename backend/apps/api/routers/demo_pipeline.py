@@ -352,7 +352,7 @@ async def demo_pipeline_stream(
                 used_groq = True
                 provider = "groq"
 
-        if result is None and used_groq:
+        if result is None and used_groq and (force_fallback or circuit_was_open):
             yield _sse("provider_selected", {
                 "provider": "ollama",
                 "model": settings.llm_model_default,

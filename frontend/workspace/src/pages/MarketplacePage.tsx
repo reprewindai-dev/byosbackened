@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -231,7 +231,6 @@ function apiErrorMessage(error: unknown): string {
 }
 
 export function MarketplacePage() {
-  const qc = useQueryClient();
   const { slug } = useParams();
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -248,19 +247,6 @@ export function MarketplacePage() {
     queryKey: ["mkt-preflight", selected?.id],
     queryFn: () => fetchPreflight(selected!.id),
     enabled: !!selected,
-  });
-
-  const installMut = useMutation({
-    mutationFn: async (id: string) => {
-      const r = await api.post<{ pipeline_id: string; pipeline_slug: string; install_count: number }>(
-        `/marketplace/listings/${id}/install`,
-        {},
-      );
-      return r.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mkt-featured"] });
-    },
   });
 
   const providerMut = useMutation({
@@ -696,7 +682,7 @@ export function MarketplacePage() {
                 >
                   {checkoutMut.isPending ? "Redirecting..." : "Purchase"}
                 </button>
-              ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" && (selected.use_url || selected.source_url) ? (
+              ) : selected.use_url || selected.source_url ? (
                 <a
                   className="v-btn-primary"
                   href={selected.use_url ?? selected.source_url ?? "#"}
@@ -706,36 +692,17 @@ export function MarketplacePage() {
                   <Download className="h-4 w-4" />
                   Open product
                 </a>
-              ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" ? (
-                <button className="v-btn-ghost cursor-not-allowed opacity-70" disabled title="This listing has no live source URL yet.">
-                  Source unavailable
+              ) : selected.listing_type === "pipeline" || selected.listing_type === "agent" ? (
+                <button className="v-btn-ghost cursor-not-allowed opacity-70" disabled title="No live install endpoint exists for this listing yet.">
+                  Install unavailable
                 </button>
               ) : (
-                <button
-                  className="v-btn-primary"
-                  disabled={installMut.isPending}
-                  onClick={() => installMut.mutate(selected.id)}
-                >
-                  <Download className="h-4 w-4" />
-                  {installMut.isPending
-                    ? "Installing..."
-                    : installMut.isSuccess
-                    ? "Installed"
-                    : "One-click install"}
+                <button className="v-btn-ghost cursor-not-allowed opacity-70" disabled title="This listing has no live source URL yet.">
+                  Source unavailable
                 </button>
               )}
             </div>
 
-            {installMut.isSuccess && (
-              <div className="flex items-center gap-2 rounded-md border border-moss/40 bg-moss/5 px-3 py-2 text-[12px] text-moss">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Installed as pipeline{" "}
-                <span className="font-mono">{installMut.data?.pipeline_slug}</span>
-              </div>
-            )}
-            {installMut.isError && (
-              <div className="text-[12px] text-crimson">{apiErrorMessage(installMut.error)}</div>
-            )}
             {checkoutMut.isError && (
               <div className="text-[12px] text-crimson">{apiErrorMessage(checkoutMut.error)}</div>
             )}

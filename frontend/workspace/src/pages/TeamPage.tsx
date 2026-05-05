@@ -14,6 +14,7 @@ import {
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
 import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
+import { useAuthStore } from "@/store/auth-store";
 
 interface TeamUser {
   id: string;
@@ -35,6 +36,12 @@ interface Invite {
   expires_at: string;
   created_at: string;
   token?: string;
+}
+
+interface MfaSetup {
+  secret: string;
+  provisioning_uri: string;
+  qr_url: string;
 }
 
 async function listMembers(): Promise<TeamUser[]> {
@@ -105,12 +112,27 @@ function buildInviteLink(invite: Invite): string {
   return `${origin}/workspace-app#/accept-invite?invite_secret=${encodeURIComponent(invite.token ?? "")}`;
 }
 
+async function setupMfa(): Promise<MfaSetup> {
+  const resp = await api.post<MfaSetup>("/auth/mfa/setup", {});
+  return resp.data;
+}
+
+async function verifyMfa(code: string): Promise<{ message: string }> {
+  const resp = await api.post<{ message: string }>("/auth/mfa/verify", null, { params: { code } });
+  return resp.data;
+}
+
 export function TeamPage() {
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
   const [showInvite, setShowInvite] = useState(false);
+  const [showMfa, setShowMfa] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [issuedInvite, setIssuedInvite] = useState<Invite | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["team-members"],
@@ -139,6 +161,20 @@ export function TeamPage() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["team-invites"] }),
   });
 
+  const mfaSetupMut = useMutation({
+    mutationFn: setupMfa,
+  });
+
+  const mfaVerifyMut = useMutation({
+    mutationFn: verifyMfa,
+    onSuccess: () => {
+      if (user) setUser({ ...user, mfa_enabled: true });
+      qc.invalidateQueries({ queryKey: ["team-members"] });
+      setShowMfa(false);
+      setMfaCode("");
+    },
+  });
+
   const stats = useMemo(() => {
     const users = data ?? [];
     return {
@@ -156,6 +192,8 @@ export function TeamPage() {
   }, [isError, error]);
 
   const pendingInvites = (invitesQ.data ?? []).filter((i) => i.status === "pending");
+  const currentMember = (data ?? []).find((member) => member.id === user?.id || member.email === user?.email);
+  const currentMfaEnabled = currentMember?.mfa_enabled ?? user?.mfa_enabled ?? false;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -177,10 +215,44 @@ export function TeamPage() {
             <span className="v-chip">SAML / SCIM (coming)</span>
           </div>
         </div>
-        <button className="v-btn-primary" disabled={inviteRouteUnavailable} onClick={() => setShowInvite(true)}>
-          <Mail className="h-4 w-4" /> Invite member
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {!currentMfaEnabled && (
+            <button
+              className="v-btn-ghost"
+              onClick={() => {
+                setShowMfa(true);
+                mfaSetupMut.mutate();
+              }}
+            >
+              <ShieldCheck className="h-4 w-4" /> Set up MFA
+            </button>
+          )}
+          <button className="v-btn-primary" disabled={inviteRouteUnavailable} onClick={() => setShowInvite(true)}>
+            <Mail className="h-4 w-4" /> Invite member
+          </button>
+        </div>
       </header>
+
+      {!currentMfaEnabled && (
+        <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          <ShieldX className="mt-0.5 h-4 w-4" />
+          <div className="flex-1">
+            <div className="font-semibold">MFA is off for the signed-in account</div>
+            <div className="mt-0.5 text-xs text-bone-2">
+              Enable TOTP before showing regulated buyers this workspace. The setup flow writes to the live auth backend.
+            </div>
+          </div>
+          <button
+            className="v-btn-ghost"
+            onClick={() => {
+              setShowMfa(true);
+              mfaSetupMut.mutate();
+            }}
+          >
+            Set up now
+          </button>
+        </div>
+      )}
 
       {inviteRouteUnavailable && (
         <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
@@ -340,6 +412,78 @@ export function TeamPage() {
         </section>
       )}
 
+      {showMfa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm">
+          <div className="v-card w-full max-w-lg p-5">
+            <header className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Set up MFA</h3>
+                <p className="mt-1 text-sm text-bone-2">Scan the QR code with an authenticator app, then enter the 6-digit code.</p>
+              </div>
+              <button
+                className="text-muted hover:text-bone"
+                onClick={() => {
+                  setShowMfa(false);
+                  setMfaCode("");
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            {mfaSetupMut.isPending && <div className="py-8 text-center font-mono text-[12px] text-muted">creating MFA secret...</div>}
+            {mfaSetupMut.isError && (
+              <div className="text-[12px] text-crimson">{actionUnavailableMessage(mfaSetupMut.error, "MFA setup")}</div>
+            )}
+            {mfaSetupMut.data && (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-4 md:flex-row">
+                  <div className="rounded-md border border-rule bg-white p-2">
+                    <img src={mfaSetupMut.data.qr_url} alt="MFA QR code" className="h-40 w-40" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="v-label">Manual secret</div>
+                    <div className="break-all rounded-md border border-rule bg-ink-1/70 p-2 font-mono text-[11px] text-bone">
+                      {mfaSetupMut.data.secret}
+                    </div>
+                    <button
+                      className="v-btn-ghost mt-2 h-8 px-3 text-xs"
+                      onClick={() => navigator.clipboard?.writeText(mfaSetupMut.data!.secret)}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copy secret
+                    </button>
+                  </div>
+                </div>
+                <label className="block">
+                  <div className="v-label">Authenticator code</div>
+                  <input
+                    className="v-input w-full font-mono"
+                    inputMode="numeric"
+                    value={mfaCode}
+                    onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="123456"
+                  />
+                </label>
+                {mfaVerifyMut.isError && (
+                  <div className="text-[12px] text-crimson">{actionUnavailableMessage(mfaVerifyMut.error, "MFA verification")}</div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button className="v-btn-ghost" onClick={() => setShowMfa(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    className="v-btn-primary"
+                    disabled={mfaCode.length !== 6 || mfaVerifyMut.isPending}
+                    onClick={() => mfaVerifyMut.mutate(mfaCode)}
+                  >
+                    {mfaVerifyMut.isPending ? "Verifying..." : "Enable MFA"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 backdrop-blur-sm">
           <div className="v-card w-full max-w-md p-5">
@@ -370,9 +514,12 @@ export function TeamPage() {
                   />
                   <button
                     className="v-btn-ghost"
-                    onClick={() => navigator.clipboard?.writeText(buildInviteLink(issuedInvite))}
+                    onClick={() => {
+                      navigator.clipboard?.writeText(buildInviteLink(issuedInvite));
+                      setInviteCopied(true);
+                    }}
                   >
-                    <Copy className="h-3.5 w-3.5" /> Copy
+                    <Copy className="h-3.5 w-3.5" /> {inviteCopied ? "Copied" : "Copy"}
                   </button>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
@@ -380,6 +527,7 @@ export function TeamPage() {
                     className="v-btn-ghost"
                     onClick={() => {
                       setIssuedInvite(null);
+                      setInviteCopied(false);
                     }}
                   >
                     Invite another
@@ -389,6 +537,7 @@ export function TeamPage() {
                     onClick={() => {
                       setShowInvite(false);
                       setIssuedInvite(null);
+                      setInviteCopied(false);
                     }}
                   >
                     Done

@@ -20,7 +20,7 @@ jobs:
         run: pip install pip-audit cyclonedx-bom
 
       - name: Install project deps
-        run: pip install -r backend/requirements.txt
+        run: pip install -e backend
 
       - name: Generate SBOM (CycloneDX JSON)
         run: |
@@ -30,7 +30,7 @@ jobs:
 
       - name: Run vulnerability audit
         run: |
-          pip-audit -r backend/requirements.txt \
+          pip-audit \
             --output json \
             --output-file vuln-audit-$(date +%Y-%m-%d).json || true
           cat vuln-audit-$(date +%Y-%m-%d).json

@@ -24,7 +24,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install deps
-        run: pip install -r backend/requirements.txt
+        run: pip install -e backend
 
       - name: Build buyer package
         run: |

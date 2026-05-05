@@ -24,7 +24,8 @@ jobs:
             cd /opt/veklom-license || git clone ${{ github.server_url }}/${{ github.repository }} /opt/veklom-license
             cd /opt/veklom-license
             git pull origin main
-            pip install -r backend/requirements.txt
+            pip install -e backend
             systemctl restart veklom-license
             sleep 5
-            curl -f http://localhost:8001/health && echo "License server healthy" || echo "License server failed"
+            curl -f http://localhost:8001/health
+            echo "License server healthy"

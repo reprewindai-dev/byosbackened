@@ -10,9 +10,11 @@
 #   ghp_[A-Za-z0-9]{36}                       (GitHub personal access tokens)
 #   AIza[0-9A-Za-z_-]{35}                     (Google API keys)
 #   xox[baprs]-[A-Za-z0-9-]{10,}              (Slack tokens)
+#   cfat_                                     (Cloudflare API tokens)
+#   gsk_                                      (Groq API keys)
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path "$PSScriptRoot/..").Path
+$repoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
 Set-Location $repoRoot
 
 $patterns = @(
@@ -22,11 +24,13 @@ $patterns = @(
   '\bAKIA[0-9A-Z]{16}\b',
   '\bghp_[A-Za-z0-9]{36}\b',
   '\bAIza[0-9A-Za-z_-]{35}\b',
-  '\bxox[baprs]-[A-Za-z0-9-]{10,}'
+  '\bxox[baprs]-[A-Za-z0-9-]{10,}',
+  '\bcfat_[A-Za-z0-9_-]{20,}',
+  '\bgsk_[A-Za-z0-9]{20,}'
 )
 
 # Skip known-safe / generated locations
-$excludeDirs = @('node_modules', '.git', '.venv', 'venv', '__pycache__', '.pytest_cache')
+$excludeDirs = @('node_modules', '.git', '.venv', 'venv', '__pycache__', '.pytest_cache', 'dist', 'build')
 $excludeFiles = @('check_secrets.ps1', '*.lock', 'package-lock.json')
 
 $found = 0

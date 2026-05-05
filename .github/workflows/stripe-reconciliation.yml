@@ -2,54 +2,68 @@ name: Weekly Stripe Reconciliation
 
 on:
   schedule:
-    - cron: '0 8 * * 1'
+    - cron: "0 8 * * 1"
   workflow_dispatch:
 
 jobs:
   reconcile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install deps
+      - name: Install dependencies
         run: pip install stripe psycopg2-binary
 
-      - name: Run reconciliation
+      - name: Compare Stripe active subscriptions to Veklom records
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python - <<'EOF'
-          import stripe, psycopg2, os, sys
+          python - <<'PY'
+          import os
+          import sys
+          import stripe
+          import psycopg2
 
           stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur = conn.cursor()
 
-          stripe_active = set()
+          stripe_active_subscriptions = {}
           for sub in stripe.Subscription.list(status="active", limit=100).auto_paging_iter():
-              stripe_active.add(sub.customer)
+              customer_id = sub.get("customer")
+              if customer_id:
+                  stripe_active_subscriptions[str(customer_id)] = sub.get("id")
 
-          cur.execute("SELECT stripe_customer_id FROM subscriptions WHERE status = 'active'")
-          db_active = set(row[0] for row in cur.fetchall() if row[0])
+          cur.execute(
+              """
+              SELECT stripe_customer_id, stripe_subscription_id, workspace_id
+              FROM subscriptions
+              WHERE status IN ('ACTIVE', 'TRIALING', 'active', 'trialing')
+              """
+          )
+          db_rows = cur.fetchall()
+          db_active_customers = {row[0]: {"subscription_id": row[1], "workspace_id": row[2]} for row in db_rows if row[0]}
 
-          stripe_only = stripe_active - db_active
-          db_only = db_active - stripe_active
+          stripe_only = sorted(set(stripe_active_subscriptions) - set(db_active_customers))
+          db_only = sorted(set(db_active_customers) - set(stripe_active_subscriptions))
 
-          issues = []
-          if stripe_only:
-              issues.append(f"Stripe has {len(stripe_only)} customers with no DB record")
-          if db_only:
-              issues.append(f"DB has {len(db_only)} active records with no Stripe subscription")
-
-          if issues:
-              for i in issues:
-                  print(f"ISSUE: {i}")
+          if stripe_only or db_only:
+              if stripe_only:
+                  print(f"Stripe active customers missing in DB: {len(stripe_only)}")
+                  for customer_id in stripe_only[:25]:
+                      print(f"stripe_only customer={customer_id} subscription={stripe_active_subscriptions[customer_id]}")
+              if db_only:
+                  print(f"DB active subscriptions missing in Stripe: {len(db_only)}")
+                  for customer_id in db_only[:25]:
+                      row = db_active_customers[customer_id]
+                      print(
+                          f"db_only customer={customer_id} workspace={row['workspace_id']} "
+                          f"subscription={row['subscription_id']}"
+                      )
               sys.exit(1)
-          else:
-              print(f"Reconciliation clean - {len(stripe_active)} active Stripe subs match DB")
-          EOF
+
+          print(f"Reconciliation clean - {len(stripe_active_subscriptions)} active Stripe customers match DB")
+          PY

@@ -85,6 +85,22 @@ jobs:
           echo "$RESP" | grep -q '"services"' || (echo "Status check failed" && exit 1)
           echo "LLM proxy healthy"
 
+      - name: Health check - Edge Control Layer public demo
+        run: |
+          curl -fsS https://api.veklom.com/api/v1/edge/demo/summary | grep -q '"scenarios"'
+          curl -fsS "https://api.veklom.com/api/v1/edge/demo/infrastructure?scenario=network&live=false" | grep -q '"normalized"'
+          curl -fsS "https://api.veklom.com/api/v1/edge/demo/infrastructure?scenario=machine&live=false" | grep -q '"cost_control"'
+          echo "Edge public demo canaries healthy"
+
+      - name: Health check - protected protocol routes stay protected
+        run: |
+          SNMP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/api/v1/edge/protocol/snmp)
+          MODBUS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/api/v1/edge/protocol/modbus)
+          echo "SNMP protected status: $SNMP_STATUS"
+          echo "Modbus protected status: $MODBUS_STATUS"
+          test "$SNMP_STATUS" = "401"
+          test "$MODBUS_STATUS" = "401"
+
       - name: Health check - marketplace catalog
         run: |
           CATALOG=$(curl -fsS https://api.veklom.com/api/v1/marketplace/listings)

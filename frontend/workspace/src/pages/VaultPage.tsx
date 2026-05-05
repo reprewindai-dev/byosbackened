@@ -61,6 +61,7 @@ export function VaultPage() {
   const keys = useQuery({ queryKey: ["vault-api-keys"], queryFn: listKeys });
   const [creating, setCreating] = useState(false);
   const [justCreated, setJustCreated] = useState<ApiKeyCreateResponse | null>(null);
+  const [selectedKey, setSelectedKey] = useState<ApiKey | null>(null);
   const [search, setSearch] = useState("");
 
   const create = useMutation({
@@ -112,6 +113,7 @@ export function VaultPage() {
           revoked={revoked}
           expiring={expiring}
           revokePending={revoke.isPending}
+          onInspect={setSelectedKey}
           onRevoke={(key) => {
             if (window.confirm(`Revoke "${key.name}"? Active integrations using this key will fail.`)) {
               revoke.mutate(key.id);
@@ -133,6 +135,8 @@ export function VaultPage() {
           error={create.error ? (create.error as Error).message : null}
         />
       )}
+
+      {selectedKey && <KeyDetailDrawer item={selectedKey} onClose={() => setSelectedKey(null)} />}
     </div>
   );
 }
@@ -201,6 +205,7 @@ function SecretsTable({
   revoked,
   expiring,
   revokePending,
+  onInspect,
   onRevoke,
 }: {
   keys: ApiKey[];
@@ -211,6 +216,7 @@ function SecretsTable({
   revoked: number;
   expiring: number;
   revokePending: boolean;
+  onInspect: (key: ApiKey) => void;
   onRevoke: (key: ApiKey) => void;
 }) {
   return (
@@ -288,7 +294,7 @@ function SecretsTable({
                   </Badge>
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <button className="v-btn-ghost h-7 cursor-not-allowed px-2 opacity-70" disabled title="Secret detail drawer is not wired yet.">
+                  <button className="v-btn-ghost h-7 px-2" title="Inspect key metadata" onClick={() => onInspect(key)}>
                     <MoreHorizontal className="h-3.5 w-3.5" />
                   </button>
                   {key.is_active && (
@@ -383,6 +389,53 @@ function VaultPosture({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function KeyDetailDrawer({ item, onClose }: { item: ApiKey; onClose: () => void }) {
+  const rows = [
+    ["Prefix", `${item.key_prefix}...`],
+    ["Status", item.is_active ? "active" : "revoked"],
+    ["Scopes", item.scopes.join(", ") || "none"],
+    ["Rate limit", `${item.rate_limit_per_minute} / min`],
+    ["Created", relativeTime(item.created_at)],
+    ["Last used", item.last_used_at ? relativeTime(item.last_used_at) : "never"],
+    ["Expires", item.expires_at ? rotationLabel(item) : "manual rotation"],
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <button className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Close key details" />
+      <aside className="frame relative h-full w-full max-w-md overflow-y-auto rounded-none border-y-0 border-r-0 p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-eyebrow">Vault key detail</div>
+            <h2 className="font-display mt-1 text-xl font-semibold text-bone">{item.name}</h2>
+            <p className="mt-1 text-sm text-bone-2">
+              Metadata only. Raw secrets are shown once at issue time and are never recoverable from the vault.
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-2">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-3 rounded-md border border-rule bg-ink-1/45 px-3 py-2 text-[12px]">
+              <span className="text-muted">{label}</span>
+              <span className="max-w-[60%] truncate text-right font-mono text-bone">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-md border border-brass/30 bg-brass/5 p-3 text-[12px] text-bone-2">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-brass-2">Operational rule</div>
+          Rotate by issuing a replacement key, updating the integration, then revoking this key. Bulk rotation remains
+          disabled until the backend exposes a safe batch-rotation route.
+        </div>
+      </aside>
     </div>
   );
 }

@@ -73,6 +73,10 @@ class AICompleteResponse(BaseModel):
     model: str
     bedrock_model_id: str
     provider: str
+    requested_provider: str
+    requested_model: str
+    fallback_triggered: bool
+    routing_reason: str
     request_id: str
     audit_log_id: str
     audit_hash: str
@@ -161,6 +165,12 @@ def _request_input_text(payload: AICompleteRequest) -> str:
     return json.dumps(serialized, sort_keys=True, ensure_ascii=False)
 
 
+def _circuit_scope(model_row) -> str:
+    workspace_id = getattr(model_row, "workspace_id", "workspace")
+    model_slug = getattr(model_row, "model_slug", None) or getattr(model_row, "bedrock_model_id", "model")
+    return f"{workspace_id}:{model_slug}"
+
+
 def _call_runtime_model(
     model_row,
     payload: AICompleteRequest,
@@ -169,7 +179,8 @@ def _call_runtime_model(
     temperature = payload.temperature if payload.temperature is not None else 0.7
     if model_row.provider == "ollama":
         client = OllamaClient(model=model_row.bedrock_model_id)
-        use_groq = is_open()
+        circuit_scope = _circuit_scope(model_row)
+        use_groq = is_open(circuit_scope)
         if not use_groq:
             try:
                 result = client.generate(
@@ -177,10 +188,10 @@ def _call_runtime_model(
                     model=model_row.bedrock_model_id,
                     options={"num_predict": payload.max_tokens, "temperature": temperature},
                 )
-                record_success()
+                record_success(circuit_scope)
                 return result, "ollama"
             except OllamaError:
-                record_failure()
+                record_failure(circuit_scope)
                 use_groq = True
 
         if settings.llm_fallback != "groq" or not settings.groq_api_key:
@@ -286,7 +297,7 @@ async def complete(
 
     wallet = _get_or_create_wallet(db, current_user.workspace_id)
     if wallet.balance < reservation_tokens:
-        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient tokens")
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient operating reserve")
 
     request_id = getattr(request.state, "request_id", None) or f"ai-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
 
@@ -300,6 +311,9 @@ async def complete(
     try:
         response_text = (llm_result.get("response") or "").strip()
         executed_model = str(llm_result.get("model") or model_row.bedrock_model_id or payload.model)
+        requested_provider = str(model_row.provider or "").lower()
+        fallback_triggered = provider != requested_provider
+        routing_reason = "circuit_breaker_failover" if fallback_triggered else "primary_runtime"
         request_input_text = _request_input_text(payload)
         prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
@@ -310,7 +324,7 @@ async def complete(
 
         balance_before = wallet.balance
         if tokens_deducted > balance_before:
-            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient tokens")
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient operating reserve")
 
         previous_log = db.query(AIAuditLog).filter(
             AIAuditLog.workspace_id == current_user.workspace_id
@@ -334,6 +348,9 @@ async def complete(
                         "provider": provider,
                         "model": executed_model,
                         "requested_model": payload.model,
+                        "requested_provider": requested_provider,
+                        "fallback_triggered": fallback_triggered,
+                        "routing_reason": routing_reason,
                         "output_tokens": output_tokens,
                         "tokens_deducted": tokens_deducted,
                     },
@@ -360,7 +377,7 @@ async def complete(
             tokens_input=prompt_tokens,
             tokens_output=output_tokens,
             routing_decision_id=None,
-            routing_reasoning=None,
+            routing_reasoning=routing_reason,
             pii_detected=False,
             pii_types=[],
             sensitive_data_flags={},
@@ -396,6 +413,7 @@ async def complete(
             response_preview=response_text[:500],
             request_json={
                 "model": payload.model,
+                "requested_provider": requested_provider,
                 "resolved_model": executed_model,
                 "prompt": payload.prompt,
                 "messages": [{"role": msg.role, "content": msg.content} for msg in _conversation_messages(payload)],
@@ -407,6 +425,10 @@ async def complete(
                 "response_text": response_text,
                 "runtime_model_id": executed_model,
                 "provider": provider,
+                "requested_provider": requested_provider,
+                "requested_model": payload.model,
+                "fallback_triggered": fallback_triggered,
+                "routing_reason": routing_reason,
                 "prompt_tokens": prompt_tokens,
                 "output_tokens": output_tokens,
                 "total_tokens": total_tokens,
@@ -445,6 +467,10 @@ async def complete(
         model=executed_model,
         bedrock_model_id=executed_model,
         provider=provider,
+        requested_provider=requested_provider,
+        requested_model=payload.model,
+        fallback_triggered=fallback_triggered,
+        routing_reason=routing_reason,
         request_id=request_id,
         audit_log_id=str(audit_entry.id),
         audit_hash=audit_entry.log_hash,

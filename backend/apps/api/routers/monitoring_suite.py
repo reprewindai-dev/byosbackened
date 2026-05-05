@@ -11,7 +11,18 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user, require_admin
 from db.session import get_db
-from db.models import SystemMetrics, Alert, AlertSeverity, User, Job, AIAuditLog, Deployment, WorkspaceModelSetting
+from db.models import (
+    AIAuditLog,
+    Alert,
+    AlertSeverity,
+    Budget,
+    Deployment,
+    Job,
+    SystemMetrics,
+    User,
+    WorkspaceModelSetting,
+    WorkspaceRequestLog,
+)
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
@@ -329,7 +340,18 @@ async def workspace_overview(
     prev_hour = now - timedelta(hours=2)
     last_day = now - timedelta(days=1)
 
-    # Recent audit logs as the primary source of truth.
+    # Recent request logs carry runtime telemetry such as latency. Audit logs
+    # carry tamper-evident evidence and remain the audit source of truth.
+    recent_request_logs = (
+        db.query(WorkspaceRequestLog)
+        .filter(
+            WorkspaceRequestLog.workspace_id == workspace_id,
+            WorkspaceRequestLog.created_at >= last_day,
+        )
+        .order_by(WorkspaceRequestLog.created_at.desc())
+        .limit(500)
+        .all()
+    )
     recent_logs = (
         db.query(AIAuditLog)
         .filter(AIAuditLog.workspace_id == workspace_id, AIAuditLog.created_at >= last_day)
@@ -337,28 +359,55 @@ async def workspace_overview(
         .limit(500)
         .all()
     )
+    telemetry_logs = recent_request_logs or []
+    last_hour_requests = [l for l in telemetry_logs if l.created_at >= last_hour]
+    prev_hour_requests = [l for l in telemetry_logs if prev_hour <= l.created_at < last_hour]
     last_hour_logs = [l for l in recent_logs if l.created_at >= last_hour]
     prev_hour_logs = [l for l in recent_logs if prev_hour <= l.created_at < last_hour]
 
     # KPIs.
-    rpm = round(len(last_hour_logs) / 60, 2)
-    prev_rpm = round(len(prev_hour_logs) / 60, 2)
+    current_run_count = len(last_hour_requests) if telemetry_logs else len(last_hour_logs)
+    previous_run_count = len(prev_hour_requests) if telemetry_logs else len(prev_hour_logs)
+    rpm = round(current_run_count / 60, 2)
+    prev_rpm = round(previous_run_count / 60, 2)
     rpm_delta = ((rpm - prev_rpm) / prev_rpm * 100) if prev_rpm > 0 else 0.0
 
-    # AIAuditLog has no latency_ms column; we approximate via tokens (proxy) and let the
-    # frontend handle 0 latency cleanly.
-    p50 = 0
-    prev_p50 = 0
+    def _median_int(values: list[int]) -> int:
+        clean = sorted(v for v in values if v and v > 0)
+        if not clean:
+            return 0
+        return int(clean[len(clean) // 2])
+
+    p50 = _median_int([int(l.latency_ms or 0) for l in last_hour_requests])
+    prev_p50 = _median_int([int(l.latency_ms or 0) for l in prev_hour_requests])
 
     def _toks(l):
         return (l.tokens_input or 0) + (l.tokens_output or 0)
 
-    total_tokens_hr = sum(_toks(l) for l in last_hour_logs)
-    prev_tokens_hr = sum(_toks(l) for l in prev_hour_logs)
-    tps = round(total_tokens_hr / 3600, 2)
-    tps_delta = ((total_tokens_hr - prev_tokens_hr) / prev_tokens_hr * 100) if prev_tokens_hr > 0 else 0.0
+    def _units_from_request(l: WorkspaceRequestLog) -> int:
+        return int((l.tokens_in or 0) + (l.tokens_out or 0))
 
-    spend_today_cents = int(sum((float(l.cost or 0) * 100) for l in recent_logs if l.created_at.date() == now.date()))
+    total_units_hr = (
+        sum(_units_from_request(l) for l in last_hour_requests)
+        if telemetry_logs
+        else sum(_toks(l) for l in last_hour_logs)
+    )
+    prev_units_hr = (
+        sum(_units_from_request(l) for l in prev_hour_requests)
+        if telemetry_logs
+        else sum(_toks(l) for l in prev_hour_logs)
+    )
+    tps = round(total_units_hr / 3600, 2)
+    tps_delta = ((total_units_hr - prev_units_hr) / prev_units_hr * 100) if prev_units_hr > 0 else 0.0
+
+    spend_source = telemetry_logs if telemetry_logs else recent_logs
+    spend_today_cents = int(
+        sum(
+            (float(getattr(l, "cost_usd", getattr(l, "cost", 0)) or 0) * 100)
+            for l in spend_source
+            if l.created_at.date() == now.date()
+        )
+    )
     audit_count = len(recent_logs)
 
     active_models = db.query(WorkspaceModelSetting).filter(
@@ -368,21 +417,50 @@ async def workspace_overview(
     quantized = sum(1 for m in active_models if (m.bedrock_model_id or "").lower().endswith(("q4", "q5", "q8")))
 
     # Routing � split by provider.
-    primary_count = sum(1 for l in last_hour_logs if (l.provider or "").lower() == "ollama")
-    burst_count = sum(1 for l in last_hour_logs if (l.provider or "").lower() == "groq")
+    def _provider_name(row) -> str:
+        return (getattr(row, "provider", None) or "").lower()
+
+    def _provider_route(provider: str) -> str:
+        return "primary" if provider == "ollama" else "burst"
+
+    def _fallback_plane_name(rows) -> str:
+        providers = {_provider_name(row) for row in rows if _provider_name(row)}
+        if "bedrock" in providers:
+            return "AWS Bedrock"
+        if "groq" in providers:
+            return "Groq fallback"
+        return "Approved fallback"
+
+    route_source = last_hour_requests if telemetry_logs else last_hour_logs
+    primary_count = sum(1 for l in route_source if _provider_name(l) == "ollama")
+    burst_count = sum(1 for l in route_source if _provider_name(l) and _provider_name(l) != "ollama")
     total_route = primary_count + burst_count
     primary_util = round(primary_count / total_route * 100, 1) if total_route else 0.0
     burst_util = round(burst_count / total_route * 100, 1) if total_route else 0.0
+    fallback_plane = _fallback_plane_name(route_source or recent_request_logs or recent_logs)
 
     # Recent runs.
     recent_runs = []
-    for l in recent_logs[:10]:
-        is_burst = (l.provider or "").lower() == "groq"
+    if telemetry_logs:
+        for l in recent_request_logs[:10]:
+            provider = _provider_name(l)
+            recent_runs.append({
+                "id": l.id,
+                "model": l.model or "-",
+                "route": _provider_route(provider) if provider else "primary",
+                "latency_ms": int(l.latency_ms or 0),
+                "tokens": _units_from_request(l),
+                "cost_cents": int(float(l.cost_usd or 0) * 100),
+                "policy": "blocked" if l.status != "success" else "passed",
+                "when": l.created_at.isoformat(),
+            })
+    for l in recent_logs[: max(0, 10 - len(recent_runs))]:
+        provider = _provider_name(l)
         policy = "redacted" if l.pii_detected else "passed"
         recent_runs.append({
             "id": l.id,
             "model": l.model or "-",
-            "route": "burst" if is_burst else "primary",
+            "route": _provider_route(provider) if provider else "primary",
             "latency_ms": 0,
             "tokens": _toks(l),
             "cost_cents": int(float(l.cost or 0) * 100),
@@ -433,7 +511,7 @@ async def workspace_overview(
             "name": m.display_name or m.model_slug,
             "quant": (m.bedrock_model_id or "fp16").split("-")[-1][:8],
             "replicas": 1,
-            "route": "burst" if provider == "groq" else "primary",
+            "route": "primary" if provider == "ollama" else "burst",
             "p50_ms": p50 + i * 5 if p50 else 0,
         })
 
@@ -468,9 +546,28 @@ async def workspace_overview(
         for a in alert_rows
     ]
 
+    active_budget = (
+        db.query(Budget)
+        .filter(
+            Budget.workspace_id == workspace_id,
+            Budget.period_start <= now,
+            Budget.period_end >= now,
+        )
+        .order_by(Budget.period_end.asc())
+        .first()
+    )
+
     spend_cents = spend_today_cents
-    cap_cents = max(spend_cents * 4, 10000)  # placeholder cap if budget not configured
-    burn_per_min = int(sum(float(l.cost or 0) * 100 for l in last_hour_logs) / 60) if last_hour_logs else 0
+    cap_cents = int(float(active_budget.amount) * 100) if active_budget else 0
+    burn_source = last_hour_requests if telemetry_logs else last_hour_logs
+    burn_per_min = (
+        int(
+            sum(float(getattr(l, "cost_usd", getattr(l, "cost", 0)) or 0) * 100 for l in burn_source)
+            / 60
+        )
+        if burn_source
+        else 0
+    )
 
     # ─── Time-series: bucket the last 2h into 24 x 5-minute windows ────────────
     BUCKET_COUNT = 24
@@ -483,18 +580,19 @@ async def workspace_overview(
     primary_series: list[int] = [0] * BUCKET_COUNT
     burst_series: list[int] = [0] * BUCKET_COUNT
 
-    for log in recent_logs:
+    series_source = telemetry_logs if telemetry_logs else recent_logs
+    for log in series_source:
         if log.created_at < series_window_start:
             continue
         offset_min = (log.created_at - series_window_start).total_seconds() / 60.0
         idx = min(BUCKET_COUNT - 1, max(0, int(offset_min // BUCKET_MIN)))
         requests_series[idx] += 1
-        tokens_series[idx] += _toks(log)
-        spend_series[idx] += int(float(log.cost or 0) * 100)
-        provider = (log.provider or "").lower()
-        if provider == "groq":
+        tokens_series[idx] += _units_from_request(log) if telemetry_logs else _toks(log)
+        spend_series[idx] += int(float(getattr(log, "cost_usd", getattr(log, "cost", 0)) or 0) * 100)
+        provider = _provider_name(log)
+        if provider and provider != "ollama":
             burst_series[idx] += 1
-        else:
+        elif provider == "ollama":
             primary_series[idx] += 1
 
     # Normalize routing series to per-bucket utilization percentages.
@@ -532,21 +630,21 @@ async def workspace_overview(
         },
         "routing": {
             "primary_plane": "Hetzner primary",
-            "burst_plane": "AWS burst",
+            "burst_plane": fallback_plane,
             "primary_util_pct": primary_util,
             "burst_util_pct": burst_util,
             "primary_hosts": [
-                {"name": "hetzner-fsn1", "util_pct": primary_util, "detail": f"{primary_count} req / 1h"}
+                {"name": "hetzner-fsn1", "util_pct": primary_util, "detail": f"{primary_count} run(s) / 1h"}
             ],
             "series": routing_series,
         },
         "spend": {
             "spend_cents": spend_cents,
             "cap_cents": cap_cents,
-            "inference_cents": int(spend_cents * 0.75),
-            "embeddings_cents": int(spend_cents * 0.10),
-            "gpu_burst_cents": int(spend_cents * 0.10),
-            "storage_cents": int(spend_cents * 0.05),
+            "inference_cents": spend_cents,
+            "embeddings_cents": 0,
+            "gpu_burst_cents": 0,
+            "storage_cents": 0,
             "burn_rate_per_min_cents": burn_per_min,
             "forecast_eod_cents": int(spend_cents + burn_per_min * 60 * (24 - now.hour)),
             "forecast_cap_pct": round((spend_cents + burn_per_min * 60 * (24 - now.hour)) / cap_cents * 100, 1) if cap_cents else 0,

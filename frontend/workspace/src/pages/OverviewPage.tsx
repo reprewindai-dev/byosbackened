@@ -96,7 +96,7 @@ function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
     },
     routing: {
       primary_plane: "Hetzner primary",
-      burst_plane: "AWS burst",
+      burst_plane: "Approved fallback",
       primary_util_pct: calls ? 100 : 0,
       burst_util_pct: 0,
       primary_hosts: [{ name: "hetzner-fsn1", util_pct: calls ? 100 : 0, detail: `${calls} live call(s)` }],
@@ -128,7 +128,7 @@ function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
       ts: row.created_at ?? new Date().toISOString(),
       kind: "audit_signed",
       summary: row.status === "error" ? "Backend rejected request" : "Audit entry available",
-      detail: `${row.kind ?? "request"} · ${row.model ?? "unknown"}`,
+      detail: `${row.kind ?? "request"} - ${row.model ?? "unknown"}`,
     })),
     alerts: [],
     audit_trail: recent.map((row) => ({
@@ -208,7 +208,7 @@ export function OverviewPage() {
           <div>
             <div className="font-semibold">Failed to load overview</div>
             <div className="mt-1 text-xs opacity-80">
-              {(error as Error)?.message ?? "Unknown error"} · the backend endpoint{" "}
+              {(error as Error)?.message ?? "Unknown error"} - the backend endpoint{" "}
               <span className="font-mono">/api/v1/monitoring/overview</span> may not be implemented yet.
             </div>
           </div>
@@ -246,10 +246,10 @@ function PageHeader() {
   return (
     <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <div className="text-eyebrow">Workspace · Overview</div>
+        <div className="text-eyebrow">Workspace - Overview</div>
         <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">Sovereign control plane</h1>
         <p className="mt-2 max-w-2xl text-sm text-bone-2">
-          Every prompt routed, policed, and audited — across Hetzner primary and AWS burst — without leaving your
+          Every governed run routed, policed, and audited across Hetzner primary and approved fallback paths without leaving your
           perimeter.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -274,7 +274,7 @@ function PageHeader() {
 function KpiStrip({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
   const cards = [
     {
-      label: "Requests / min",
+      label: "Runs / min",
       value: data ? fmtNumber(data.kpi.requests_per_minute) : "-",
       delta: data ? fmtDelta(data.kpi.requests_delta_pct, "%") : undefined,
       positive: !data || data.kpi.requests_delta_pct >= 0,
@@ -290,7 +290,7 @@ function KpiStrip({ data, isLoading }: { data?: OverviewPayload; isLoading: bool
       icon: Gauge,
     },
     {
-      label: "Tokens / sec",
+      label: "Run units / sec",
       value: data ? fmtNumber(data.kpi.tokens_per_second) : "-",
       delta: data ? fmtDelta(data.kpi.tokens_delta_pct, "%") : undefined,
       positive: !data || data.kpi.tokens_delta_pct >= 0,
@@ -298,9 +298,9 @@ function KpiStrip({ data, isLoading }: { data?: OverviewPayload; isLoading: bool
       icon: Zap,
     },
     {
-      label: "Spend today",
+      label: "Reserve used",
       value: data ? fmtCents(data.kpi.spend_today_cents) : "-",
-      delta: data ? `${data.kpi.spend_cap_pct}% cap` : undefined,
+      delta: data ? `${data.kpi.spend_cap_pct}% reserve policy` : undefined,
       positive: !data || data.kpi.spend_cap_pct < 80,
       spark: data?.kpi.spend_series,
       icon: CircleDollarSign,
@@ -388,15 +388,15 @@ function RoutingPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: 
   return (
     <div className="frame col-span-12 lg:col-span-8">
       <PanelHeader
-        eyebrow="Routing · last 24h"
-        title={`${data?.routing.primary_plane ?? "Hetzner primary"} · ${data?.routing.burst_plane ?? "AWS burst"}`}
+        eyebrow="Routing - last 24h"
+        title={`${data?.routing.primary_plane ?? "Hetzner primary"} - ${data?.routing.burst_plane ?? "Approved fallback"}`}
         actions={
           <>
             <Badge tone="primary" dot>
               Hetzner {primaryPct}%
             </Badge>
             <Badge tone="info" dot>
-              AWS {burstPct}%
+              Fallback {burstPct}%
             </Badge>
             <a href="#/monitoring" className="v-btn-ghost h-7 px-2">
               <MoreHorizontal className="h-3.5 w-3.5" />
@@ -478,7 +478,7 @@ function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: 
         className="h-[220px] w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label="Hetzner primary versus AWS burst routing utilization"
+        aria-label="Hetzner primary versus approved fallback routing utilization"
       >
         {yTicks.map((tick) => (
           <g key={tick}>
@@ -521,7 +521,7 @@ function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: 
       {!isLoading && !hasActivity && (
         <div className="absolute inset-0 grid place-items-center text-center">
           <div className="rounded-md border border-rule bg-ink/80 px-3 py-2 font-mono text-[11px] text-muted">
-            No routing events yet. Run Playground to populate this chart.
+            No routing events yet. Run the Playground to populate this chart.
           </div>
         </div>
       )}
@@ -531,13 +531,15 @@ function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: 
 
 function SpendPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
   const spend = data?.spend;
-  const capText = spend?.cap_cents ? `${fmtCents(spend.spend_cents)} of ${fmtCents(spend.cap_cents)} cap` : `${fmtCents(spend?.spend_cents ?? 0)} spent`;
+  const capText = spend?.cap_cents
+    ? `${fmtCents(spend.spend_cents)} of ${fmtCents(spend.cap_cents)} reserve policy`
+    : `${fmtCents(spend?.spend_cents ?? 0)} reserve used`;
   const capPct = data?.kpi.spend_cap_pct ?? spend?.forecast_cap_pct ?? 0;
 
   return (
     <div className="frame col-span-12 lg:col-span-4">
       <PanelHeader
-        eyebrow="Spend · today"
+        eyebrow="Operating reserve - today"
         title={isLoading ? "Loading reserve ledger" : capText}
         actions={
           <Badge tone={capPct >= 90 ? "warn" : "success"} dot>
@@ -552,7 +554,7 @@ function SpendPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: bo
         <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
           <SpendRow label="Inference" cents={spend?.inference_cents} total={spend?.spend_cents} />
           <SpendRow label="Embeddings" cents={spend?.embeddings_cents} total={spend?.spend_cents} />
-          <SpendRow label="GPU burst" cents={spend?.gpu_burst_cents} total={spend?.spend_cents} />
+          <SpendRow label="Fallback compute" cents={spend?.gpu_burst_cents} total={spend?.spend_cents} />
           <SpendRow label="Storage" cents={spend?.storage_cents} total={spend?.spend_cents} />
         </div>
       </div>
@@ -564,7 +566,7 @@ function SpendPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: bo
         <div className="flex items-center justify-between">
           <span className="text-muted">Forecast EOD</span>
           <span className="font-mono text-bone">
-            {spend ? `${fmtCents(spend.forecast_eod_cents)} (${spend.forecast_cap_pct}% cap)` : "-"}
+            {spend ? `${fmtCents(spend.forecast_eod_cents)} (${spend.forecast_cap_pct}% reserve policy)` : "-"}
           </span>
         </div>
       </div>
@@ -589,8 +591,8 @@ function RecentRunsPanel({ rows, isLoading }: { rows: RecentRun[]; isLoading: bo
   return (
     <div className="frame col-span-12 lg:col-span-7">
       <PanelHeader
-        eyebrow="Recent runs · live"
-        title="Per-call routing, latency, cost"
+        eyebrow="Recent runs - live"
+        title="Per-run routing, latency, reserve impact"
         actions={
           <a href="#/playground" className="v-btn-ghost h-7 px-2 text-xs">
             Playground <ArrowRight className="h-3.5 w-3.5" />
@@ -604,8 +606,8 @@ function RecentRunsPanel({ rows, isLoading }: { rows: RecentRun[]; isLoading: bo
               <th className="px-4 py-2 text-left">Model</th>
               <th className="px-4 py-2 text-left">Route</th>
               <th className="px-4 py-2 text-right">Latency</th>
-              <th className="px-4 py-2 text-right">Tokens</th>
-              <th className="px-4 py-2 text-right">Cost</th>
+              <th className="px-4 py-2 text-right">Run units</th>
+              <th className="px-4 py-2 text-right">Reserve</th>
               <th className="px-4 py-2 text-left">Policy</th>
               <th className="px-4 py-2 text-right">When</th>
             </tr>
@@ -648,7 +650,7 @@ function RecentRunsPanel({ rows, isLoading }: { rows: RecentRun[]; isLoading: bo
 function PolicyTimelinePanel({ events, isLoading }: { events: PolicyEvent[]; isLoading: boolean }) {
   return (
     <div className="frame col-span-12 lg:col-span-5">
-      <PanelHeader eyebrow="Policy interception · live" title="Decision before execution" actions={<LiveBadge />} />
+      <PanelHeader eyebrow="Policy interception - live" title="Decision before execution" actions={<LiveBadge />} />
       <ol className="relative space-y-3 px-5 py-4">
         <span className="absolute bottom-3 left-7 top-3 w-px bg-rule" />
         {events.slice(0, 5).map((event) => (
@@ -733,7 +735,7 @@ function AlertsPanel({ alerts, isLoading }: { alerts: Alert[]; isLoading: boolea
               <div className="text-[12.5px] text-bone">{alert.title}</div>
               <div className="text-eyebrow mt-0.5 flex items-center gap-2">
                 <span>{alert.scope}</span>
-                <span>·</span>
+                <span>-</span>
                 <span>{relativeTime(alert.when)}</span>
               </div>
             </div>
@@ -754,7 +756,7 @@ function AuditTrailPanel({ entries, isLoading }: { entries: AuditEntry[]; isLoad
   return (
     <div className="frame col-span-12 lg:col-span-4">
       <PanelHeader
-        eyebrow="Audit trail · tamper-evident"
+        eyebrow="Audit trail - tamper-evident"
         title="Hash-chained"
         actions={
           <Badge tone="success" icon={<ShieldCheck className="h-3 w-3" />}>
@@ -771,7 +773,7 @@ function AuditTrailPanel({ entries, isLoading }: { entries: AuditEntry[]; isLoad
             </div>
             <div className="flex items-center justify-between gap-3 text-[11px] text-muted">
               <span className="truncate">
-                {entry.subject} · {entry.actor}
+                {entry.subject} - {entry.actor}
               </span>
               <span className="flex items-center gap-1 font-mono">
                 <Hash className="h-3 w-3" />
@@ -794,14 +796,14 @@ function AuditTrailPanel({ entries, isLoading }: { entries: AuditEntry[]; isLoad
 function FleetPanel({ fleet, isLoading }: { fleet: FleetModel[]; isLoading: boolean }) {
   return (
     <div className="frame col-span-12 lg:col-span-4">
-      <PanelHeader eyebrow="Fleet" title="Models · deployments" />
+      <PanelHeader eyebrow="Fleet" title="Models - deployments" />
       <div className="space-y-2 px-3 py-3">
         {fleet.slice(0, 4).map((model) => (
           <div key={model.id} className="flex items-center justify-between rounded-md border border-rule bg-ink/40 px-3 py-2">
             <div className="min-w-0">
               <div className="truncate text-[12.5px] text-bone">{model.name}</div>
               <div className="font-mono text-[10.5px] text-muted">
-                {model.quant} · {model.replicas} replicas
+                {model.quant} - {model.replicas} replicas
               </div>
             </div>
             <div className="flex items-center gap-1.5">
@@ -887,7 +889,7 @@ function LiveBadge({ label = "LIVE" }: { label?: string }) {
 }
 
 function RouteBadge({ route }: { route: "primary" | "burst" }) {
-  return route === "burst" ? <Badge tone="info">AWS burst</Badge> : <Badge tone="primary">HTZ primary</Badge>;
+  return route === "burst" ? <Badge tone="info">Fallback</Badge> : <Badge tone="primary">HTZ primary</Badge>;
 }
 
 function LatencyBadge({ ms }: { ms: number }) {
@@ -913,7 +915,7 @@ function getHostTiles(data?: OverviewPayload): Array<{
   if (!data) {
     return [
       { label: "Hetzner primary", value: "-", sub: "Loading host telemetry", tone: "primary", icon: Server },
-      { label: "AWS burst", value: "-", sub: "Loading burst telemetry", tone: "info", icon: Cloud },
+      { label: "Approved fallback", value: "-", sub: "Loading fallback telemetry", tone: "info", icon: Cloud },
       { label: "Workspace events", value: "-", sub: "Loading live run window", tone: "primary", icon: Database },
     ];
   }
@@ -927,9 +929,9 @@ function getHostTiles(data?: OverviewPayload): Array<{
   }));
 
   const burst = {
-    label: data.routing.burst_plane || "AWS burst",
+    label: data.routing.burst_plane || "Approved fallback",
     value: `${data.routing.burst_util_pct}% engaged`,
-    sub: "On-demand · gated by tenant policy",
+    sub: "On-demand - gated by tenant policy",
     tone: "info" as const,
     icon: Cloud,
   };

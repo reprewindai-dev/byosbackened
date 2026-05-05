@@ -129,14 +129,14 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             </span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
-            All requests evaluated by policy on Hetzner. AWS burst gated by tenant rule.
+            All runs are evaluated by policy on Hetzner first. Approved fallback is gated by tenant rule.
           </p>
           <div className="mt-2 flex gap-1.5">
             <span className="rounded border border-brass/30 bg-brass/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-brass-2">
               Hetzner
             </span>
             <span className="rounded border border-electric/30 bg-electric/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-electric">
-              AWS
+              Fallback
             </span>
           </div>
         </div>

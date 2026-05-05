@@ -115,6 +115,10 @@ interface AICompleteResponse {
   model: string;
   bedrock_model_id: string;
   provider?: string;
+  requested_provider?: string;
+  requested_model?: string;
+  fallback_triggered?: boolean;
+  routing_reason?: string;
   request_id?: string;
   audit_log_id?: string;
   audit_hash?: string;
@@ -169,8 +173,9 @@ const SAMPLE_PROMPTS: Record<Vertical, string> = {
 const EVENT_META: Record<string, { label: string; color: string; icon: string }> = {
   workspace_request: { label: "Workspace request", color: "text-bone", icon: "*" },
   auth_check: { label: "Auth check", color: "text-electric", icon: ">" },
-  wallet_check: { label: "Wallet check", color: "text-electric", icon: "$" },
+  wallet_check: { label: "Reserve check", color: "text-electric", icon: "$" },
   provider_selected: { label: "Provider chosen", color: "text-brass-2", icon: ">" },
+  circuit_breaker_triggered: { label: "Circuit breaker", color: "text-brass-2", icon: "!" },
   response_complete: { label: "Response complete", color: "text-moss", icon: "+" },
   audit_written: { label: "Audit written", color: "text-moss", icon: "+" },
   cost_recorded: { label: "Cost recorded", color: "text-moss", icon: "+" },
@@ -283,6 +288,10 @@ export function PlaygroundPage() {
     tokens_deducted?: number;
     wallet_balance?: number;
     cost_usd?: string;
+    requested_provider?: string;
+    requested_model?: string;
+    fallback_triggered?: boolean;
+    routing_reason?: string;
   }>({});
   const [error, setError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<PreflightState>({});
@@ -396,7 +405,7 @@ export function PlaygroundPage() {
       temperature,
     });
     appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace" });
-    appendEvent("wallet_check", { status: "reservation requested", model: selectedModel.slug });
+    appendEvent("wallet_check", { status: "reserve requested", model: selectedModel.slug });
     appendEvent("provider_selected", {
       provider: selectedModel.provider,
       model: selectedModel.slug,
@@ -432,6 +441,8 @@ export function PlaygroundPage() {
       const elapsedMs = Math.round(performance.now() - startedAt);
       const payload = resp.data;
       const provider = payload.provider ?? selectedModel.provider;
+      const requestedProvider = payload.requested_provider ?? selectedModel.provider;
+      const fallbackTriggered = payload.fallback_triggered ?? provider !== selectedModel.provider;
       const latency = payload.latency_ms ?? elapsedMs;
 
       setResponseText(payload.response_text);
@@ -448,6 +459,10 @@ export function PlaygroundPage() {
         tokens_deducted: payload.tokens_deducted,
         wallet_balance: payload.wallet_balance,
         cost_usd: payload.cost_usd,
+        requested_provider: requestedProvider,
+        requested_model: payload.requested_model ?? selectedModel.slug,
+        fallback_triggered: fallbackTriggered,
+        routing_reason: payload.routing_reason ?? (fallbackTriggered ? "circuit_breaker_failover" : "primary_runtime"),
       });
 
       // Append assistant turn to conversation thread
@@ -464,6 +479,16 @@ export function PlaygroundPage() {
       // Clear the prompt input so the user can type the next message naturally
       setPrompt("");
 
+      if (fallbackTriggered) {
+        appendEvent("circuit_breaker_triggered", {
+          intended_provider: requestedProvider,
+          intended_model: payload.requested_model ?? selectedModel.slug,
+          actual_provider: provider,
+          actual_model: payload.model,
+          reason: payload.routing_reason ?? "circuit_breaker_failover",
+        });
+      }
+
       appendEvent("response_complete", {
         provider,
         model: payload.model,
@@ -475,7 +500,7 @@ export function PlaygroundPage() {
         audit_hash: payload.audit_hash,
       });
       appendEvent("cost_recorded", {
-        credits_charged: payload.tokens_deducted,
+        reserve_debit: payload.tokens_deducted,
         wallet_balance: payload.wallet_balance,
         cost_usd: payload.cost_usd,
       });
@@ -1470,6 +1495,10 @@ export function PlaygroundPage() {
             <dl className="space-y-2.5 font-mono text-[12px]">
               <Stat label="request id" value={stats.request_id ?? "-"} mono />
               <Stat label="provider" value={stats.provider ?? "-"} />
+              <Stat
+                label="routing"
+                value={stats.fallback_triggered ? `${stats.requested_provider ?? "primary"} -> ${stats.provider ?? "fallback"}` : "primary"}
+              />
               <Stat label="model" value={stats.model ?? "-"} />
               <Stat label="runtime" value={stats.runtime_model_id ?? "-"} mono />
               <Stat label="input units" value={stats.prompt_tokens?.toString() ?? "-"} />
@@ -1826,6 +1855,10 @@ function TelemetryPanel({
     tokens_deducted?: number;
     wallet_balance?: number;
     cost_usd?: string;
+    requested_provider?: string;
+    requested_model?: string;
+    fallback_triggered?: boolean;
+    routing_reason?: string;
   };
   conversationLength: number;
 }) {
@@ -1837,6 +1870,10 @@ function TelemetryPanel({
       <dl className="space-y-2.5 font-mono text-[12px]">
         <Stat label="request id" value={stats.request_id ?? "-"} mono />
         <Stat label="provider" value={stats.provider ?? "-"} />
+        <Stat
+          label="routing"
+          value={stats.fallback_triggered ? `${stats.requested_provider ?? "primary"} -> ${stats.provider ?? "fallback"}` : "primary"}
+        />
         <Stat label="model" value={stats.model ?? "-"} />
         <Stat label="runtime" value={stats.runtime_model_id ?? "-"} mono />
         <Stat label="input units" value={stats.prompt_tokens?.toString() ?? "-"} />
@@ -1935,7 +1972,10 @@ function compactPayload(data: Record<string, unknown>): string {
     "runtime_model_id",
     "output_tokens",
     "latency_ms",
-    "credits_charged",
+    "reserve_debit",
+    "intended_provider",
+    "actual_provider",
+    "reason",
     "request_id",
     "message",
   ];

@@ -156,21 +156,22 @@ def _call_with_circuit_breaker(
     prompt: str,
     model: str,
     options: dict,
+    scope: str,
 ) -> tuple[dict, str]:
     """
     Try Ollama first, respecting circuit breaker state.
     Falls back to Groq if circuit is OPEN or Ollama fails.
     Returns (result_dict, provider_name).
     """
-    use_groq = is_open()
+    use_groq = is_open(scope)
 
     if not use_groq:
         try:
             result = ollama.generate(prompt=prompt, model=model, options=options or None)
-            record_success()
+            record_success(scope)
             return result, "ollama"
         except OllamaError as exc:
-            new_state = record_failure()
+            new_state = record_failure(scope)
             logger.warning("[CB] Ollama failed (%s), state now %s", exc, new_state)
             use_groq = True
 
@@ -248,8 +249,10 @@ def exec_llm(
 
     # 5. Call LLM (Ollama → Groq via circuit breaker)
     started = time.perf_counter()
-    result, provider = _call_with_circuit_breaker(ollama, effective_prompt, model, options)
+    circuit_scope = f"{workspace_id}:v1_exec:{model}"
+    result, provider = _call_with_circuit_breaker(ollama, effective_prompt, model, options, circuit_scope)
     latency_ms = int((time.perf_counter() - started) * 1000) or result["latency_ms"]
+    fallback_triggered = provider != "ollama"
 
     # 6. Persist conversation turn
     if mem is not None:
@@ -286,6 +289,7 @@ def exec_llm(
         request_json={
             "prompt": body.prompt,
             "model": body.model,
+            "requested_provider": "ollama",
             "conversation_id": body.conversation_id,
             "use_memory": body.use_memory,
             "temperature": body.temperature,
@@ -294,6 +298,9 @@ def exec_llm(
         response_json={
             "response": result["response"],
             "provider": provider,
+            "requested_provider": "ollama",
+            "fallback_triggered": fallback_triggered,
+            "routing_reason": "circuit_breaker_failover" if fallback_triggered else "primary_runtime",
             "prompt_tokens": result["prompt_tokens"],
             "completion_tokens": result["completion_tokens"],
             "total_tokens": result["total_tokens"],

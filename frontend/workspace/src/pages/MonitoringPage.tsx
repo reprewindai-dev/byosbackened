@@ -214,7 +214,7 @@ function ThroughputPanel({ buckets }: { buckets: Bucket[] }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-eyebrow">Throughput</div>
-          <div className="font-display text-[14px] text-bone">Primary vs burst · audit events</div>
+          <div className="font-display text-[14px] text-bone">Primary vs approved fallback - audit events</div>
         </div>
         <Badge tone="ok">healthy</Badge>
       </div>

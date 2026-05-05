@@ -247,7 +247,7 @@ def normalize_request_log(row: WorkspaceRequestLog) -> NormalizedLog:
         request_kind=row.request_kind,
         request_path=row.request_path,
         model=row.model,
-        provider=None,
+        provider=row.provider,
         status=row.status,
         prompt_preview=row.prompt_preview,
         response_preview=row.response_preview,

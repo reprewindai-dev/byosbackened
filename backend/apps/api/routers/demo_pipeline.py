@@ -148,7 +148,7 @@ def _chunk_text(text: str, size: int = 18) -> Iterable[str]:
 
 def _demo_groq_model() -> str:
     """Use the fastest configured Groq model for the public theater demo."""
-    return settings.groq_model_fast or settings.groq_model or settings.groq_model_smart
+    return settings.groq_model_smart or settings.groq_model or settings.groq_model_fast
 
 
 def _audit_hash(trace_id: str, model: str, provider: str, tokens: int) -> str:
@@ -468,7 +468,7 @@ async def demo_pipeline_stream(
             yield _sse("provider_selected", {
                 "provider": "groq",
                 "model": groq_model,
-                "reason": "fallback_fast_path",
+                "reason": "fallback_smart_path",
                 "sovereign": False,
             })
             time.sleep(0.02)
@@ -611,3 +611,4 @@ async def demo_pipeline_health():
             "rate_limit_per_minute": _DEMO_RATE_LIMIT_MAX_HITS,
         },
     }
+

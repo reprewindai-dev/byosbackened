@@ -1,0 +1,26 @@
+name: Background Job Runner Cron
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger job processor
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INTERNAL_API_KEY:-}" ]; then
+            echo "INTERNAL_API_KEY is not configured; skipping protected job processor."
+            exit 0
+          fi
+          curl -X POST "$BACKEND_URL/api/v1/jobs/process" \
+            -H "Authorization: Bearer $INTERNAL_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger":"cron"}' \
+            --fail --silent --show-error

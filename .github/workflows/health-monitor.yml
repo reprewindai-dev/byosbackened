@@ -1,0 +1,41 @@
+name: Backend Health Monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public backend health
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+        run: |
+          set -euo pipefail
+          for ROUTE in \
+            "/health" \
+            "/status" \
+            "/api/v1/demo/pipeline/health" \
+            "/api/v1/edge/demo/summary"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BACKEND_URL$ROUTE")
+            echo "$ROUTE -> HTTP $STATUS"
+            if [ "$STATUS" != "200" ]; then
+              echo "Health check FAILED for $ROUTE"
+              exit 1
+            fi
+          done
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d '{"text":"Veklom backend health check FAILED. Check production immediately."}'
+          else
+            echo "SLACK_WEBHOOK_URL is not configured; failure notification skipped."
+          fi

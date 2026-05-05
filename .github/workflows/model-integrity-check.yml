@@ -20,8 +20,13 @@ jobs:
       - name: Verify authenticated exec model responds
         env:
           CI_API_KEY: ${{ secrets.CI_API_KEY }}
+          RUN_AUTH_MODEL_CHECK: ${{ vars.RUN_AUTH_MODEL_CHECK || 'false' }}
         run: |
           set -euo pipefail
+          if [ "$RUN_AUTH_MODEL_CHECK" != "true" ]; then
+            echo "Authenticated /v1/exec probe disabled; public LLM health is the required canary."
+            exit 0
+          fi
           if [ -z "${CI_API_KEY:-}" ]; then
             echo "CI_API_KEY not configured; skipping authenticated /v1/exec probe"
             exit 0

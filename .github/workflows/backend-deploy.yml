@@ -1,0 +1,48 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger deploy hook when configured
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          RAILWAY_DEPLOY_HOOK: ${{ secrets.RAILWAY_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          HOOK="${COOLIFY_DEPLOY_WEBHOOK:-${RENDER_DEPLOY_HOOK:-${RAILWAY_DEPLOY_HOOK:-}}}"
+          if [ -n "$HOOK" ]; then
+            curl -X POST "$HOOK" --fail --silent --show-error
+          else
+            echo "No deploy hook configured; relying on Coolify Git auto-deploy for main."
+          fi
+
+      - name: Wait for deployment
+        run: sleep 45
+
+      - name: Verify backend is up
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+        run: |
+          set -euo pipefail
+          for ROUTE in \
+            "/health" \
+            "/api/v1/edge/demo/summary" \
+            "/api/v1/edge/demo/infrastructure?scenario=network&live=false"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$BACKEND_URL$ROUTE")
+            echo "$ROUTE -> HTTP $STATUS"
+            if [ "$STATUS" != "200" ]; then
+              exit 1
+            fi
+          done

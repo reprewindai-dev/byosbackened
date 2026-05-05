@@ -1,0 +1,27 @@
+name: Marketplace Automation Cron
+
+on:
+  schedule:
+    - cron: "15 */5 * * 1"
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-marketplace-automation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger marketplace automation endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INTERNAL_API_KEY:-}" ]; then
+            echo "INTERNAL_API_KEY is not configured; skipping protected marketplace automation."
+            exit 0
+          fi
+          curl -X POST "$BACKEND_URL/api/v1/marketplace/automation/run" \
+            -H "Authorization: Bearer $INTERNAL_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger":"cron","source":"github-actions"}' \
+            --fail --silent --show-error

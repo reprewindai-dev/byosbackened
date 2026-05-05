@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from apps.api.routers.ai import AICompleteRequest, complete
-from db.models import AIAuditLog, TokenWallet
+from db.models import AIAuditLog, Subscription, TokenTransaction, TokenWallet
 
 
 class _FakeQuery:
@@ -29,13 +29,22 @@ class _FakeQuery:
             return self._db.wallet
         if self._model is AIAuditLog:
             return self._db.previous_audit
+        if self._model is Subscription:
+            return self._db.subscription
         return None
+
+    def all(self):
+        if self._model is TokenTransaction:
+            return self._db.transactions
+        return []
 
 
 class _FakeDB:
-    def __init__(self, wallet=None, previous_audit=None):
+    def __init__(self, wallet=None, previous_audit=None, subscription=None, transactions=None):
         self.wallet = wallet
         self.previous_audit = previous_audit
+        self.subscription = subscription
+        self.transactions = transactions or []
         self.added = []
         self.committed = False
         self.rolled_back = False
@@ -86,12 +95,13 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
     wallet = SimpleNamespace(
         id="wallet-1",
         workspace_id="workspace-1",
-        balance=10,
+        balance=1000,
         monthly_credits_used=0,
         total_credits_used=0,
         updated_at=None,
     )
-    fake_db = _FakeDB(wallet=wallet)
+    subscription = SimpleNamespace(plan=SimpleNamespace(value="starter"))
+    fake_db = _FakeDB(wallet=wallet, subscription=subscription)
     runtime = _RuntimeCall(output_text="response text", output_tokens=151)
     monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
     monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
@@ -110,12 +120,15 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
     assert result.prompt_tokens == 17
     assert result.output_tokens == 151
     assert result.total_tokens == 168
-    assert result.cost_usd == "0.000020"
-    assert result.tokens_deducted == 2
-    assert result.wallet_balance == 8
-    assert wallet.balance == 8
-    assert wallet.monthly_credits_used == 2
-    assert wallet.total_credits_used == 2
+    assert result.cost_usd == "0.250000"
+    assert result.tokens_deducted == 250
+    assert result.reserve_debited == 250
+    assert result.billing_event_type == "governed_run"
+    assert result.pricing_tier == "founding"
+    assert result.wallet_balance == 750
+    assert wallet.balance == 750
+    assert wallet.monthly_credits_used == 250
+    assert wallet.total_credits_used == 250
     assert fake_db.committed is True
     assert any(obj.__class__.__name__ == "TokenTransaction" for obj in fake_db.added)
     assert any(obj.__class__.__name__ == "AIAuditLog" for obj in fake_db.added)
@@ -125,12 +138,13 @@ def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
     wallet = SimpleNamespace(
         id="wallet-1",
         workspace_id="workspace-1",
-        balance=1,
+        balance=100,
         monthly_credits_used=0,
         total_credits_used=0,
         updated_at=None,
     )
-    fake_db = _FakeDB(wallet=wallet)
+    subscription = SimpleNamespace(plan=SimpleNamespace(value="starter"))
+    fake_db = _FakeDB(wallet=wallet, subscription=subscription)
     runtime = _RuntimeCall()
     monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
     monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
@@ -145,6 +159,70 @@ def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
     assert exc.value.detail == "Insufficient operating reserve"
     assert runtime.called is False
     assert fake_db.committed is False
+
+
+def test_complete_records_free_evaluation_run_without_debit(monkeypatch):
+    wallet = SimpleNamespace(
+        id="wallet-1",
+        workspace_id="workspace-1",
+        balance=50000,
+        monthly_credits_used=0,
+        total_credits_used=0,
+        updated_at=None,
+    )
+    fake_db = _FakeDB(wallet=wallet, transactions=[])
+    runtime = _RuntimeCall(output_text="free evaluation response", output_tokens=42)
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-free"))
+    payload = AICompleteRequest(model="ollama-default", prompt="Run evaluation", max_tokens=512)
+
+    result = asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert runtime.called is True
+    assert result.pricing_tier == "free_evaluation"
+    assert result.billing_event_type == "governed_run"
+    assert result.reserve_debited == 0
+    assert result.tokens_deducted == 0
+    assert result.free_evaluation_remaining == 14
+    assert result.wallet_balance == 50000
+    assert wallet.balance == 50000
+    assert any(obj.__class__.__name__ == "TokenTransaction" and obj.amount == 0 for obj in fake_db.added)
+
+
+def test_complete_debits_compare_run_price(monkeypatch):
+    wallet = SimpleNamespace(
+        id="wallet-1",
+        workspace_id="workspace-1",
+        balance=1000,
+        monthly_credits_used=0,
+        total_credits_used=0,
+        updated_at=None,
+    )
+    subscription = SimpleNamespace(plan=SimpleNamespace(value="starter"))
+    fake_db = _FakeDB(wallet=wallet, subscription=subscription)
+    runtime = _RuntimeCall(output_text="compare response", output_tokens=64)
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-compare"))
+    payload = AICompleteRequest(
+        model="ollama-default",
+        prompt="Compare this answer",
+        max_tokens=512,
+        billing_event_type="compare_run",
+    )
+
+    result = asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert result.billing_event_type == "compare_run"
+    assert result.reserve_debited == 750
+    assert result.cost_usd == "0.750000"
+    assert result.wallet_balance == 250
+    assert wallet.balance == 250
 
 
 def test_complete_rejects_unknown_model_slug(monkeypatch):

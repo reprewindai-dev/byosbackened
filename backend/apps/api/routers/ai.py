@@ -5,7 +5,6 @@ import hashlib
 import hmac
 import json
 import logging
-import math
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
@@ -22,16 +21,55 @@ from core.llm.groq_fallback import GroqFallbackError, call_groq
 from core.llm.ollama_client import OllamaClient, OllamaError
 from core.privacy.pii_detection import detect_and_mask_pii, detect_pii
 from core.services.workspace_gateway import (
-    TOKEN_USD_RATE,
     get_model_setting,
     record_request_log,
 )
-from db.models import AIAuditLog, TokenTransaction, TokenWallet, User
+from db.models import AIAuditLog, Subscription, SubscriptionStatus, TokenTransaction, TokenWallet, User
 from db.session import get_db
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+RESERVE_UNITS_PER_USD = Decimal("1000")
+FREE_EVALUATION_GOVERNED_RUNS = 15
+FREE_EVALUATION_COMPARE_RUNS = 3
+
+BillingEventType = Literal[
+    "governed_run",
+    "compare_run",
+    "byok_governance_call",
+    "managed_governance_call",
+]
+
+
+EVENT_PRICING_UNITS: dict[str, dict[str, int]] = {
+    "governed_run": {
+        "free_evaluation": 0,
+        "founding": 250,   # $0.25
+        "standard": 400,   # $0.40
+        "regulated": 400,  # Default until an Order Form supplies custom pricing.
+    },
+    "compare_run": {
+        "free_evaluation": 0,
+        "founding": 750,    # $0.75
+        "standard": 1200,   # $1.20
+        "regulated": 1200,  # Default until an Order Form supplies custom pricing.
+    },
+    "byok_governance_call": {
+        "free_evaluation": 0,
+        "founding": 6,    # $6 / 1K
+        "standard": 8,    # $8 / 1K
+        "regulated": 10,  # $10 / 1K
+    },
+    "managed_governance_call": {
+        "free_evaluation": 0,
+        "founding": 12,   # $12 / 1K
+        "standard": 16,   # $16 / 1K
+        "regulated": 20,  # $20 / 1K
+    },
+}
+
 
 class AIMessage(BaseModel):
     role: Literal["user", "assistant"] = "user"
@@ -60,6 +98,7 @@ class AICompleteRequest(BaseModel):
     response_format: Literal["text", "json", "json-schema"] = "text"
     seed: Optional[int] = Field(default=None, ge=0, le=2147483647)
     session_tag: Literal["Standard", "PHI", "PII", "HIPAA", "PCI", "SOC2"] = "Standard"
+    billing_event_type: BillingEventType = "governed_run"
     auto_redact: bool = True
     sign_audit_on_export: bool = True
     lock_to_on_prem: bool = False
@@ -99,6 +138,10 @@ class AICompleteResponse(BaseModel):
     latency_ms: int
     cost_usd: str
     wallet_balance: int
+    reserve_debited: int
+    billing_event_type: str
+    pricing_tier: str
+    free_evaluation_remaining: int | None = None
     timestamp: str
 
 
@@ -146,6 +189,90 @@ def _get_or_create_wallet(db: Session, workspace_id: str) -> TokenWallet:
     db.add(wallet)
     db.flush()
     return wallet
+
+
+def _active_subscription(db: Session, workspace_id: str) -> Optional[Subscription]:
+    return (
+        db.query(Subscription)
+        .filter(Subscription.workspace_id == workspace_id)
+        .filter(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]))
+        .first()
+    )
+
+
+def _pricing_tier(db: Session, workspace_id: str) -> str:
+    sub = _active_subscription(db, workspace_id)
+    if not sub:
+        return "free_evaluation"
+
+    plan = getattr(sub.plan, "value", str(sub.plan or "")).lower()
+    if plan == "starter":
+        return "founding"
+    if plan == "pro":
+        return "standard"
+    if plan in {"sovereign", "enterprise"}:
+        return "regulated"
+    return "founding"
+
+
+def _reserve_units_for_event(event_type: str, pricing_tier: str) -> int:
+    return EVENT_PRICING_UNITS.get(event_type, EVENT_PRICING_UNITS["governed_run"]).get(pricing_tier, 0)
+
+
+def _reserve_units_to_usd(units: int) -> Decimal:
+    return (Decimal(units) / RESERVE_UNITS_PER_USD).quantize(Decimal("0.000001"))
+
+
+def _free_usage_count(db: Session, workspace_id: str, event_type: str) -> int:
+    rows = (
+        db.query(TokenTransaction)
+        .filter(TokenTransaction.workspace_id == workspace_id)
+        .filter(TokenTransaction.transaction_type == "usage")
+        .filter(TokenTransaction.endpoint_path == "/api/v1/ai/complete")
+        .all()
+    )
+    count = 0
+    marker = f'"billing_event_type": "{event_type}"'
+    for row in rows:
+        metadata = row.metadata_json or ""
+        if '"pricing_tier": "free_evaluation"' in metadata and marker in metadata:
+            count += 1
+    return count
+
+
+def _free_event_limit(event_type: str) -> int | None:
+    if event_type == "governed_run":
+        return FREE_EVALUATION_GOVERNED_RUNS
+    if event_type == "compare_run":
+        return FREE_EVALUATION_COMPARE_RUNS
+    return None
+
+
+def _enforce_free_quota(db: Session, workspace_id: str, event_type: str) -> int | None:
+    limit = _free_event_limit(event_type)
+    if limit is None:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="This governed execution type requires an activated workspace and funded operating reserve.",
+        )
+    used = _free_usage_count(db, workspace_id, event_type)
+    remaining = max(0, limit - used)
+    if remaining <= 0:
+        label = "governed runs" if event_type == "governed_run" else "compare runs"
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Free evaluation {label} exhausted. Activate the workspace and fund operating reserve.",
+        )
+    return remaining - 1
+
+
+def _invalidate_wallet_cache(workspace_id: str) -> None:
+    try:
+        from core.redis_pool import get_redis
+
+        get_redis().delete(f"wallet:balance:{workspace_id}")
+    except Exception:
+        pass
 
 
 def _conversation_messages(payload: AICompleteRequest) -> list[AIMessage]:
@@ -397,10 +524,17 @@ async def complete(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Model disabled for this workspace")
     if not model_row.connected:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model is not connected")
-    reservation_tokens = max(1, math.ceil(payload.max_tokens / 100))
 
+    pricing_tier = _pricing_tier(db, current_user.workspace_id)
+    billing_event_type = payload.billing_event_type
+    reserve_units_debited = _reserve_units_for_event(billing_event_type, pricing_tier)
+    free_evaluation_remaining = (
+        _enforce_free_quota(db, current_user.workspace_id, billing_event_type)
+        if pricing_tier == "free_evaluation"
+        else None
+    )
     wallet = _get_or_create_wallet(db, current_user.workspace_id)
-    if wallet.balance < reservation_tokens:
+    if reserve_units_debited > wallet.balance:
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient operating reserve")
 
     request_id = getattr(request.state, "request_id", None) or f"ai-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
@@ -428,12 +562,12 @@ async def complete(
         prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
         total_tokens = int(llm_result.get("total_tokens") or (prompt_tokens + output_tokens))
-        tokens_deducted = math.ceil(output_tokens / 100) if output_tokens > 0 else 0
-        cost_usd = (Decimal(tokens_deducted) * TOKEN_USD_RATE).quantize(Decimal("0.000001"))
+        tokens_deducted = reserve_units_debited
+        cost_usd = _reserve_units_to_usd(reserve_units_debited)
         latency_ms = int((datetime.utcnow() - started_at).total_seconds() * 1000)
 
         balance_before = wallet.balance
-        if tokens_deducted > balance_before:
+        if reserve_units_debited > balance_before:
             raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient operating reserve")
 
         previous_log = db.query(AIAuditLog).filter(
@@ -441,38 +575,44 @@ async def complete(
         ).order_by(desc(AIAuditLog.created_at)).first()
         previous_log_hash = previous_log.log_hash if previous_log else None
 
-        if tokens_deducted > 0:
-            transaction = TokenTransaction(
-                wallet_id=wallet.id,
-                workspace_id=current_user.workspace_id,
-                transaction_type="usage",
-                amount=-tokens_deducted,
-                balance_before=balance_before,
-                balance_after=balance_before - tokens_deducted,
-                endpoint_path="/api/v1/ai/complete",
-                endpoint_method="POST",
-                request_id=request_id,
-                description=f"{provider.upper()} AI completion via {payload.model}",
-                metadata_json=json.dumps(
-                    {
-                        "provider": provider,
-                        "model": executed_model,
-                        "requested_model": payload.model,
-                        "requested_provider": requested_provider,
-                        "fallback_triggered": fallback_triggered,
-                        "routing_reason": routing_reason,
-                        "output_tokens": output_tokens,
-                        "tokens_deducted": tokens_deducted,
-                        "governance_controls": governance_controls,
-                    },
-                    sort_keys=True,
-                ),
-            )
-            db.add(transaction)
-            wallet.balance = balance_before - tokens_deducted
-            wallet.monthly_credits_used = (wallet.monthly_credits_used or 0) + tokens_deducted
-            wallet.total_credits_used = (wallet.total_credits_used or 0) + tokens_deducted
-            wallet.updated_at = datetime.utcnow()
+        balance_after = balance_before - reserve_units_debited
+        transaction = TokenTransaction(
+            wallet_id=wallet.id,
+            workspace_id=current_user.workspace_id,
+            transaction_type="usage",
+            amount=-reserve_units_debited,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            endpoint_path="/api/v1/ai/complete",
+            endpoint_method="POST",
+            request_id=request_id,
+            description=f"{billing_event_type.replace('_', ' ').title()} via {provider.upper()} ({pricing_tier})",
+            metadata_json=json.dumps(
+                {
+                    "provider": provider,
+                    "model": executed_model,
+                    "requested_model": payload.model,
+                    "requested_provider": requested_provider,
+                    "fallback_triggered": fallback_triggered,
+                    "routing_reason": routing_reason,
+                    "prompt_tokens": prompt_tokens,
+                    "output_tokens": output_tokens,
+                    "billing_event_type": billing_event_type,
+                    "pricing_tier": pricing_tier,
+                    "reserve_units_debited": reserve_units_debited,
+                    "reserve_units_per_usd": int(RESERVE_UNITS_PER_USD),
+                    "cost_usd": str(cost_usd),
+                    "free_evaluation_remaining": free_evaluation_remaining,
+                    "governance_controls": governance_controls,
+                },
+                sort_keys=True,
+            ),
+        )
+        db.add(transaction)
+        wallet.balance = balance_after
+        wallet.monthly_credits_used = (wallet.monthly_credits_used or 0) + reserve_units_debited
+        wallet.total_credits_used = (wallet.total_credits_used or 0) + reserve_units_debited
+        wallet.updated_at = datetime.utcnow()
 
         audit_entry = AIAuditLog(
             workspace_id=current_user.workspace_id,
@@ -541,6 +681,9 @@ async def complete(
                 "stream": payload.stream,
                 "response_format": payload.response_format,
                 "seed": payload.seed,
+                "billing_event_type": billing_event_type,
+                "pricing_tier": pricing_tier,
+                "reserve_units_debited": reserve_units_debited,
                 "governance_controls": governance_controls,
             },
             response_json={
@@ -555,7 +698,11 @@ async def complete(
                 "output_tokens": output_tokens,
                 "total_tokens": total_tokens,
                 "tokens_deducted": tokens_deducted,
+                "reserve_debited": reserve_units_debited,
                 "wallet_balance": wallet.balance,
+                "billing_event_type": billing_event_type,
+                "pricing_tier": pricing_tier,
+                "free_evaluation_remaining": free_evaluation_remaining,
                 "audit_hash": audit_entry.log_hash,
                 "governance_controls": governance_controls,
                 "pii_detected": pii_detected,
@@ -570,6 +717,7 @@ async def complete(
             user_id=current_user.id,
             error_message=None,
         )
+        _invalidate_wallet_cache(current_user.workspace_id)
     except HTTPException:
         db.rollback()
         raise
@@ -606,5 +754,9 @@ async def complete(
         latency_ms=latency_ms,
         cost_usd=str(cost_usd),
         wallet_balance=wallet.balance,
+        reserve_debited=reserve_units_debited,
+        billing_event_type=billing_event_type,
+        pricing_tier=pricing_tier,
+        free_evaluation_remaining=free_evaluation_remaining,
         timestamp=started_at.isoformat(),
     )

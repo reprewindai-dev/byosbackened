@@ -52,14 +52,17 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /status/         /status/index.html  200
 /status.html     /status/index.html  301
 
-# Legal short paths
-/legal/terms     /legal/terms.html     301
-/legal/privacy   /legal/privacy.html   301
-/legal/sla       /legal/sla.html       301
-/legal/license   /legal/license.html   301
-/legal/vendor-agreement  /legal/vendor-agreement.html  301
-/legal/refunds   /legal/refunds.html   301
-/legal/acceptable-use  /legal/acceptable-use.html  301
+# Legal canonical paths. Cloudflare Pages serves the .html file for the
+# extensionless URL; only legacy aliases redirect to the canonical path.
+/legal/terms.html     /legal/terms     301
+/legal/privacy.html   /legal/privacy   301
+/legal/sla.html       /legal/sla       301
+/legal/license.html   /legal/license   301
+/legal/vendor-agreement.html  /legal/vendor-agreement  301
+/legal/vendor.html    /legal/vendor-agreement  301
+/vendor-agreement     /legal/vendor-agreement  301
+/legal/refunds.html   /legal/refunds   301
+/legal/acceptable-use.html  /legal/acceptable-use  301
 
 # Old workers.dev preview URL -> canonical
 https://veklom.pages.dev/*  https://veklom.com/:splat  301

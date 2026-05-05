@@ -138,6 +138,10 @@ interface AICompleteResponse {
   latency_ms?: number;
   cost_usd?: string;
   wallet_balance: number;
+  reserve_debited?: number;
+  billing_event_type?: "governed_run" | "compare_run" | "byok_governance_call" | "managed_governance_call";
+  pricing_tier?: string;
+  free_evaluation_remaining?: number | null;
   timestamp: string;
 }
 
@@ -364,6 +368,10 @@ export function PlaygroundPage() {
     audit_hash?: string;
     tokens_deducted?: number;
     wallet_balance?: number;
+    reserve_debited?: number;
+    billing_event_type?: string;
+    pricing_tier?: string;
+    free_evaluation_remaining?: number | null;
     cost_usd?: string;
     requested_provider?: string;
     requested_model?: string;
@@ -601,6 +609,7 @@ export function PlaygroundPage() {
           lock_to_on_prem: effectiveLockToOnPrem,
           auto_redact: autoRedact,
           sign_audit_on_export: auditExportPinned,
+          billing_event_type: compareOpen ? "compare_run" : "governed_run",
           max_tokens: maxTokens,
         },
         { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS },
@@ -623,8 +632,12 @@ export function PlaygroundPage() {
         latency_ms: latency,
         request_id: payload.request_id,
         audit_hash: payload.audit_hash,
-        tokens_deducted: payload.tokens_deducted,
+        tokens_deducted: payload.reserve_debited ?? payload.tokens_deducted,
         wallet_balance: payload.wallet_balance,
+        reserve_debited: payload.reserve_debited ?? payload.tokens_deducted,
+        billing_event_type: payload.billing_event_type ?? (compareOpen ? "compare_run" : "governed_run"),
+        pricing_tier: payload.pricing_tier,
+        free_evaluation_remaining: payload.free_evaluation_remaining,
         cost_usd: payload.cost_usd,
         requested_provider: requestedProvider,
         requested_model: payload.requested_model ?? selectedModel.slug,
@@ -667,7 +680,10 @@ export function PlaygroundPage() {
         audit_hash: payload.audit_hash,
       });
       appendEvent("cost_recorded", {
-        reserve_debit: payload.tokens_deducted,
+        reserve_debit: payload.reserve_debited ?? payload.tokens_deducted,
+        billing_event_type: payload.billing_event_type ?? (compareOpen ? "compare_run" : "governed_run"),
+        pricing_tier: payload.pricing_tier,
+        free_evaluation_remaining: payload.free_evaluation_remaining,
         wallet_balance: payload.wallet_balance,
         cost_usd: payload.cost_usd,
       });
@@ -692,6 +708,7 @@ export function PlaygroundPage() {
     appendTurn,
     auditExportPinned,
     autoRedact,
+    compareOpen,
     conversation,
     effectiveLockToOnPrem,
     frequencyPenalty,
@@ -1781,8 +1798,11 @@ export function PlaygroundPage() {
               <Stat label="output units" value={stats.completion_tokens?.toString() ?? "-"} />
               <Stat label="total units" value={stats.total_tokens?.toString() ?? "-"} />
               <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "-"} />
-              <Stat label="reserve debit" value={stats.tokens_deducted?.toString() ?? "-"} />
+              <Stat label="billing event" value={stats.billing_event_type?.replace(/_/g, " ") ?? "-"} />
+              <Stat label="pricing tier" value={stats.pricing_tier?.replace(/_/g, " ") ?? "-"} />
+              <Stat label="reserve debit" value={(stats.reserve_debited ?? stats.tokens_deducted)?.toString() ?? "-"} />
               <Stat label="reserve balance" value={stats.wallet_balance?.toString() ?? "-"} />
+              <Stat label="free runs left" value={stats.free_evaluation_remaining?.toString() ?? "-"} />
               <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash!.slice(0, 12)}...` : "-"} mono />
               <Stat label="turns" value={conversation.length.toString()} />
             </dl>
@@ -2137,6 +2157,10 @@ function TelemetryPanel({
     audit_hash?: string;
     tokens_deducted?: number;
     wallet_balance?: number;
+    reserve_debited?: number;
+    billing_event_type?: string;
+    pricing_tier?: string;
+    free_evaluation_remaining?: number | null;
     cost_usd?: string;
     requested_provider?: string;
     requested_model?: string;
@@ -2163,8 +2187,11 @@ function TelemetryPanel({
         <Stat label="output units" value={stats.completion_tokens?.toString() ?? "-"} />
         <Stat label="total units" value={stats.total_tokens?.toString() ?? "-"} />
         <Stat label="latency" value={stats.latency_ms ? `${stats.latency_ms} ms` : "-"} />
-        <Stat label="reserve debit" value={stats.tokens_deducted?.toString() ?? "-"} />
+        <Stat label="billing event" value={stats.billing_event_type?.replace(/_/g, " ") ?? "-"} />
+        <Stat label="pricing tier" value={stats.pricing_tier?.replace(/_/g, " ") ?? "-"} />
+        <Stat label="reserve debit" value={(stats.reserve_debited ?? stats.tokens_deducted)?.toString() ?? "-"} />
         <Stat label="reserve balance" value={stats.wallet_balance?.toString() ?? "-"} />
+        <Stat label="free runs left" value={stats.free_evaluation_remaining?.toString() ?? "-"} />
         <Stat label="audit hash" value={stats.audit_hash ? `${stats.audit_hash.slice(0, 12)}...` : "-"} mono />
         <Stat label="turns" value={conversationLength.toString()} />
       </dl>

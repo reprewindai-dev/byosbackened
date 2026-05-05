@@ -244,7 +244,7 @@ def _governance_controls(payload: AICompleteRequest) -> dict:
 def _call_runtime_model(
     model_row,
     payload: AICompleteRequest,
-) -> tuple[dict, str]:
+) -> tuple[dict, str, str]:
     prompt = _compose_prompt(payload)
     temperature = payload.temperature if payload.temperature is not None else 0.7
     if _effective_on_prem_lock(payload) and model_row.provider != "ollama":
@@ -253,9 +253,15 @@ def _call_runtime_model(
             detail="On-prem lock is enabled for this request. Select an Ollama/Hetzner runtime.",
         )
     if model_row.provider == "ollama":
-        client = OllamaClient(model=model_row.bedrock_model_id)
+        timeout_seconds = (
+            settings.llm_on_prem_timeout_seconds
+            if _effective_on_prem_lock(payload)
+            else settings.llm_latency_budget_seconds
+        )
+        client = OllamaClient(model=model_row.bedrock_model_id, timeout=timeout_seconds)
         circuit_scope = _circuit_scope(model_row)
         use_groq = is_open(circuit_scope)
+        routing_reason = "circuit_open" if use_groq else "primary_runtime"
         if not use_groq:
             try:
                 result = client.generate(
@@ -264,9 +270,15 @@ def _call_runtime_model(
                     options=_ollama_options(payload, temperature),
                 )
                 record_success(circuit_scope)
-                return result, "ollama"
-            except OllamaError:
+                return result, "ollama", "primary_runtime"
+            except OllamaError as exc:
                 record_failure(circuit_scope)
+                reason_text = str(exc).lower()
+                routing_reason = (
+                    "ollama_latency_budget_exceeded"
+                    if "timed out" in reason_text or "timeout" in reason_text
+                    else "ollama_unavailable"
+                )
                 use_groq = True
 
         if _effective_on_prem_lock(payload):
@@ -286,7 +298,8 @@ def _call_runtime_model(
                 temperature=temperature,
                 top_p=payload.top_p,
                 seed=payload.seed,
-            ), "groq"
+                timeout_seconds=settings.groq_timeout_seconds,
+            ), "groq", routing_reason
         except GroqFallbackError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -302,7 +315,8 @@ def _call_runtime_model(
                 temperature=temperature,
                 top_p=payload.top_p,
                 seed=payload.seed,
-            ), "groq"
+                timeout_seconds=settings.groq_timeout_seconds,
+            ), "groq", "primary_runtime"
         except GroqFallbackError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
@@ -362,7 +376,7 @@ def _call_runtime_model(
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
-        }, "bedrock"
+        }, "bedrock", "primary_runtime"
 
     raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Selected model provider is not available")
 
@@ -393,7 +407,7 @@ async def complete(
 
     started_at = datetime.utcnow()
     try:
-        llm_result, provider = _call_runtime_model(model_row, payload)
+        llm_result, provider, runtime_routing_reason = _call_runtime_model(model_row, payload)
     except HTTPException:
         db.rollback()
         raise
@@ -404,7 +418,7 @@ async def complete(
         executed_model = str(llm_result.get("model") or model_row.bedrock_model_id or payload.model)
         requested_provider = str(model_row.provider or "").lower()
         fallback_triggered = provider != requested_provider
-        routing_reason = "circuit_breaker_failover" if fallback_triggered else "primary_runtime"
+        routing_reason = runtime_routing_reason if fallback_triggered else "primary_runtime"
         request_input_text = _request_input_text(payload)
         input_preview, input_pii = _safe_preview(payload.prompt, payload)
         output_preview, output_pii = _safe_preview(response_text, payload)

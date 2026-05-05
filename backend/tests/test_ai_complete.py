@@ -62,13 +62,13 @@ class _RuntimeCall:
         self.output_tokens = output_tokens
         self.called = False
 
-    def __call__(self, model_row, prompt, max_tokens):
+    def __call__(self, model_row, payload):
         self.called = True
         return {
             "response": self.output_text,
             "completion_tokens": self.output_tokens,
             "prompt_tokens": 17,
-        }, model_row.provider
+        }, model_row.provider, "primary_runtime"
 
 
 def _model_row():
@@ -142,7 +142,7 @@ def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
         asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
 
     assert exc.value.status_code == 402
-    assert exc.value.detail == "Insufficient tokens"
+    assert exc.value.detail == "Insufficient operating reserve"
     assert runtime.called is False
     assert fake_db.committed is False
 

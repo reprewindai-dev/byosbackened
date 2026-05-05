@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     llm_model_default: str = "qwen2.5:1.5b"
     llm_fallback: str = "groq"  # "off" | "groq" â€” groq enables self-healing fallback
     llm_timeout_seconds: int = 60
+    llm_latency_budget_seconds: float = 2.5
+    llm_on_prem_timeout_seconds: float = 20.0
     llm_max_tokens: int = 2048
 
     # â”€â”€ Groq fallback (self-healing circuit breaker) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -78,6 +80,7 @@ class Settings(BaseSettings):
     groq_model_fast: str = "llama-3.1-8b-instant"
     groq_model_smart: str = "llama-3.3-70b-versatile"
     groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_timeout_seconds: float = 10.0
 
     # Circuit breaker â€” opens after N failures, resets after cooldown_seconds
     circuit_breaker_failure_threshold: int = 3

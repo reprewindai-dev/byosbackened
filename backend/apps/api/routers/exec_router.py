@@ -157,22 +157,30 @@ def _call_with_circuit_breaker(
     model: str,
     options: dict,
     scope: str,
-) -> tuple[dict, str]:
+) -> tuple[dict, str, str]:
     """
     Try Ollama first, respecting circuit breaker state.
     Falls back to Groq if circuit is OPEN or Ollama fails.
-    Returns (result_dict, provider_name).
+    Returns (result_dict, provider_name, routing_reason).
     """
     use_groq = is_open(scope)
+    routing_reason = "circuit_open" if use_groq else "primary_runtime"
 
     if not use_groq:
         try:
-            result = ollama.generate(prompt=prompt, model=model, options=options or None)
+            fast_ollama = (
+                OllamaClient(base_url=ollama.base_url, model=model, timeout=settings.llm_latency_budget_seconds)
+                if isinstance(getattr(ollama, "base_url", None), str)
+                else ollama
+            )
+            result = fast_ollama.generate(prompt=prompt, model=model, options=options or None)
             record_success(scope)
-            return result, "ollama"
+            return result, "ollama", "primary_runtime"
         except OllamaError as exc:
             new_state = record_failure(scope)
             logger.warning("[CB] Ollama failed (%s), state now %s", exc, new_state)
+            text = str(exc).lower()
+            routing_reason = "ollama_latency_budget_exceeded" if "timed out" in text or "timeout" in text else "ollama_unavailable"
             use_groq = True
 
     # ── Groq fallback path ────────────────────────────────────────────────────
@@ -187,8 +195,9 @@ def _call_with_circuit_breaker(
                 prompt=prompt,
                 max_tokens=options.get("num_predict"),
                 temperature=options.get("temperature"),
+                timeout_seconds=settings.groq_timeout_seconds,
             )
-            return result, "groq"
+            return result, "groq", routing_reason
         except GroqFallbackError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -250,7 +259,7 @@ def exec_llm(
     # 5. Call LLM (Ollama → Groq via circuit breaker)
     started = time.perf_counter()
     circuit_scope = f"{workspace_id}:v1_exec:{model}"
-    result, provider = _call_with_circuit_breaker(ollama, effective_prompt, model, options, circuit_scope)
+    result, provider, routing_reason = _call_with_circuit_breaker(ollama, effective_prompt, model, options, circuit_scope)
     latency_ms = int((time.perf_counter() - started) * 1000) or result["latency_ms"]
     fallback_triggered = provider != "ollama"
 
@@ -300,7 +309,7 @@ def exec_llm(
             "provider": provider,
             "requested_provider": "ollama",
             "fallback_triggered": fallback_triggered,
-            "routing_reason": "circuit_breaker_failover" if fallback_triggered else "primary_runtime",
+            "routing_reason": routing_reason if fallback_triggered else "primary_runtime",
             "prompt_tokens": result["prompt_tokens"],
             "completion_tokens": result["completion_tokens"],
             "total_tokens": result["total_tokens"],

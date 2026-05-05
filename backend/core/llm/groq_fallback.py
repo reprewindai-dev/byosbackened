@@ -23,6 +23,7 @@ def call_groq(
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
     seed: Optional[int] = None,
+    timeout_seconds: Optional[float] = None,
 ) -> dict:
     """
     Call Groq /chat/completions synchronously.
@@ -50,7 +51,7 @@ def call_groq(
 
     start = time.monotonic()
     try:
-        with httpx.Client(timeout=30) as client:
+        with httpx.Client(timeout=timeout_seconds or settings.groq_timeout_seconds) as client:
             resp = client.post(
                 f"{settings.groq_base_url}/chat/completions",
                 json=payload,

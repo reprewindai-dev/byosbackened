@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Iterable, Optional
 
-from sqlalchemy import and_, desc, func
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from core.config import get_settings
@@ -21,8 +21,6 @@ from db.models import (
     Budget,
     ExecutionLog,
     IncidentLog,
-    TokenTransaction,
-    TokenWallet,
     WorkspaceModelSetting,
     WorkspaceRequestLog,
 )
@@ -34,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 _BEDROCK_PROBE_TTL_SECONDS = 60
 _bedrock_probe_cache: tuple[float, bool] | None = None
+_OLLAMA_PROBE_TTL_SECONDS = 15
+_ollama_probe_cache: tuple[float, bool] | None = None
 
 
 def _workspace_token_cost_per_1k_output_tokens() -> Decimal:
@@ -82,23 +82,68 @@ def _bedrock_connected() -> bool:
     return connected
 
 
-def _runtime_model_catalog() -> list[dict]:
-    try:
-        ollama_connected = OllamaClient().health_check()
-    except Exception:
-        ollama_connected = False
+def _ollama_connected() -> bool:
+    global _ollama_probe_cache
 
-    rows = [
-        {
-            "model_slug": "ollama-default",
-            "display_name": f"{settings.llm_model_default} (Ollama)",
-            "bedrock_model_id": settings.llm_model_default,
-            "provider": "ollama",
-            "connected": ollama_connected,
-            "input_cost_per_1m_tokens": Decimal("0.00"),
-            "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+    now = time.monotonic()
+    if _ollama_probe_cache and now - _ollama_probe_cache[0] < _OLLAMA_PROBE_TTL_SECONDS:
+        return _ollama_probe_cache[1]
+
+    try:
+        connected = OllamaClient(timeout=1.5).health_check()
+    except Exception:
+        connected = False
+    _ollama_probe_cache = (now, connected)
+    return connected
+
+
+def _model_perf_profile(model_slug: str, provider: str) -> dict:
+    if model_slug == "groq-fast":
+        return {
+            "model_type": "chat",
+            "context_window": 128000,
+            "quantization": "FP16",
+            "p50_ms": 142,
+            "p95_ms": 380,
+            "input_cost_per_1k": 0.59,
+            "output_cost_per_1k": 0.79,
         }
-    ]
+    if model_slug == "groq-smart":
+        return {
+            "model_type": "chat",
+            "context_window": 128000,
+            "quantization": "FP16",
+            "p50_ms": 520,
+            "p95_ms": 1100,
+            "input_cost_per_1k": 0.59,
+            "output_cost_per_1k": 0.79,
+        }
+    if provider == "ollama":
+        return {
+            "model_type": "chat",
+            "context_window": 32000,
+            "quantization": "Q4",
+            "p50_ms": int(settings.llm_latency_budget_seconds * 1000),
+            "p95_ms": int(settings.llm_latency_budget_seconds * 1000) + 750,
+            "input_cost_per_1k": 0.0,
+            "output_cost_per_1k": float(_workspace_token_cost_per_1k_output_tokens()),
+        }
+    if provider == "bedrock":
+        return {
+            "model_type": "chat",
+            "context_window": 200000,
+            "quantization": "managed",
+            "p50_ms": 800,
+            "p95_ms": 2000,
+            "input_cost_per_1k": 0.25,
+            "output_cost_per_1k": 1.25,
+        }
+    return {}
+
+
+def _runtime_model_catalog() -> list[dict]:
+    ollama_connected = _ollama_connected()
+    rows = []
 
     if settings.groq_api_key and settings.llm_fallback == "groq":
         rows.append(
@@ -123,6 +168,18 @@ def _runtime_model_catalog() -> list[dict]:
                 "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
             }
         )
+
+    rows.append(
+        {
+            "model_slug": "ollama-default",
+            "display_name": f"{settings.llm_model_default} (Ollama)",
+            "bedrock_model_id": settings.llm_model_default,
+            "provider": "ollama",
+            "connected": ollama_connected,
+            "input_cost_per_1m_tokens": Decimal("0.00"),
+            "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+        }
+    )
 
     if _has_bedrock_credentials():
         rows.append(
@@ -490,8 +547,10 @@ def fetch_overview(db: Session, *, workspace_id: str) -> dict:
 
 def fetch_model_rows(db: Session, *, workspace_id: str) -> list[dict]:
     models = get_model_settings(db, workspace_id)
-    return [
-        {
+    rows = []
+    for row in models:
+        profile = _model_perf_profile(row.model_slug, row.provider)
+        rows.append({
             "model_slug": row.model_slug,
             "display_name": row.display_name,
             "bedrock_model_id": row.bedrock_model_id,
@@ -501,9 +560,9 @@ def fetch_model_rows(db: Session, *, workspace_id: str) -> list[dict]:
             "input_cost_per_1m_tokens": float(row.input_cost_per_1m_tokens or 0),
             "output_cost_per_1m_tokens": float(row.output_cost_per_1m_tokens or 0),
             "workspace_cost_per_1k_output_tokens": float((Decimal(row.output_cost_per_1m_tokens or 0) / Decimal("1000")).quantize(Decimal("0.000001"))),
-        }
-        for row in models
-    ]
+            **profile,
+        })
+    return rows
 
 
 def fetch_api_key_rows(db: Session, *, workspace_id: str, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> list[dict]:

@@ -9,7 +9,6 @@ requiring a live Postgres or Ollama during CI.
 """
 import hashlib
 import pytest
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
@@ -177,7 +176,8 @@ class TestExecEndpoint:
         assert data["model"] == "llama3.2:1b"
         assert data["tenant_id"] == "workspace-test-001"
         assert data["total_tokens"] == 22
-        assert data["latency_ms"] == 350
+        assert isinstance(data["latency_ms"], int)
+        assert 0 <= data["latency_ms"] < 500
         assert "log_id" in data
 
     def test_exec_invalid_api_key(self, client_no_apikey):

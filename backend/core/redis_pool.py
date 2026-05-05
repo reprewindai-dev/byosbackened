@@ -7,6 +7,9 @@ Prevents connection exhaustion at scale (5000+ concurrent users).
 import redis
 from core.config import get_settings
 import logging
+import os
+from pathlib import Path
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -25,13 +28,17 @@ def get_redis() -> redis.Redis:
     global _redis_pool
     
     if _redis_pool is None:
+        parsed = urlparse(settings.redis_url or "")
+        inside_docker = Path("/.dockerenv").exists() or os.getenv("DOCKER_CONTAINER") == "true"
+        if parsed.hostname == "redis" and not inside_docker:
+            raise redis.ConnectionError("Redis service hostname is only resolvable inside the container network")
         _redis_pool = redis.from_url(
             settings.redis_url,
             decode_responses=True,
-            socket_connect_timeout=2,
-            socket_timeout=5,
+            socket_connect_timeout=0.25,
+            socket_timeout=0.75,
             max_connections=100,  # Support 100 concurrent connections
-            retry_on_timeout=True,
+            retry_on_timeout=False,
             health_check_interval=30,
         )
         logger.info("[RedisPool] Initialized connection pool (max_connections=100)")

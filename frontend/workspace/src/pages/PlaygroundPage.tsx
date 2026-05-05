@@ -192,14 +192,14 @@ const EVENT_META: Record<string, { label: string; color: string; icon: string }>
   error: { label: "Error", color: "text-crimson", icon: "!" },
 };
 
-const DEFAULT_MAX_TOKENS = 1024;
+const DEFAULT_MAX_TOKENS = 512;
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_TOP_P = 0.95;
 const DEFAULT_TOP_K = 40;
 const DEFAULT_SEED = 42;
-const REQUEST_TIMEOUT_MS = 90_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_CONVERSATION_TURNS = 20; // safety cap — keeps context window sane
-const PLAYGROUND_STORAGE_KEY = "veklom.workspace.playground.v2";
+const PLAYGROUND_STORAGE_KEY = "veklom.workspace.playground.v3";
 const SESSION_TAGS: SessionTag[] = ["Standard", "PHI", "PII", "HIPAA", "PCI", "SOC2"];
 
 const QUICK_PROMPTS: { label: string; prompt: string; tag?: SessionTag; vertical?: Vertical }[] = [
@@ -407,15 +407,32 @@ export function PlaygroundPage() {
   });
 
   const runnableModels = useMemo(
-    () => (models.data ?? []).filter((model) => model.enabled && model.connected),
+    () =>
+      (models.data ?? [])
+        .filter((model) => model.enabled && model.connected)
+        .sort((a, b) => {
+          const score = (model: WorkspaceModel) =>
+            model.slug === "groq-fast" ? 0 : model.provider === "groq" ? 1 : model.provider === "ollama" ? 2 : 3;
+          return score(a) - score(b);
+        }),
     [models.data],
   );
 
-  useEffect(() => {
-    if (!selectedModelSlug && runnableModels.length > 0) {
-      setSelectedModelSlug(runnableModels[0]!.slug);
+  const preferredModel = useMemo(() => {
+    if (!runnableModels.length) return undefined;
+    if (effectiveLockToOnPrem) {
+      return runnableModels.find((model) => model.provider === "ollama") ?? runnableModels[0];
     }
-  }, [runnableModels, selectedModelSlug]);
+    return runnableModels.find((model) => model.slug === "groq-fast") ?? runnableModels.find((model) => model.provider === "groq") ?? runnableModels[0];
+  }, [effectiveLockToOnPrem, runnableModels]);
+
+  useEffect(() => {
+    const current = runnableModels.find((model) => model.slug === selectedModelSlug);
+    if (!preferredModel) return;
+    if (!current || (effectiveLockToOnPrem && current.provider !== "ollama")) {
+      setSelectedModelSlug(preferredModel.slug);
+    }
+  }, [effectiveLockToOnPrem, preferredModel, runnableModels, selectedModelSlug]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -466,8 +483,8 @@ export function PlaygroundPage() {
   ]);
 
   const selectedModel = useMemo(
-    () => runnableModels.find((model) => model.slug === selectedModelSlug) ?? runnableModels[0],
-    [runnableModels, selectedModelSlug],
+    () => runnableModels.find((model) => model.slug === selectedModelSlug) ?? preferredModel ?? runnableModels[0],
+    [preferredModel, runnableModels, selectedModelSlug],
   );
 
   const appendEvent = useCallback((event: string, data: Record<string, unknown> = {}) => {

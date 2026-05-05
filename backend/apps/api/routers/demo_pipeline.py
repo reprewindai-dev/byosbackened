@@ -49,6 +49,8 @@ _DEMO_OUTPUT_MAX_TOKENS = 250
 _DEMO_RATE_LIMIT_WINDOW_SEC = 60
 _DEMO_RATE_LIMIT_MAX_HITS = 5
 _DEMO_EPHEMERAL_TTL_SEC = 60
+_DEMO_HOT_CACHE_TTL_SEC = 300
+_DEMO_OLLAMA_LATENCY_BUDGET_SECONDS = 2.0
 
 _VERTICAL_SYSTEM_PROMPTS = {
     "legal": (
@@ -143,13 +145,41 @@ def _chunk_text(text: str, size: int = 18) -> Iterable[str]:
 
 
 def _demo_groq_model() -> str:
-    """Use the strongest configured Groq model for the public theater demo."""
-    return settings.groq_model_smart or settings.groq_model or settings.groq_model_fast
+    """Use the fastest configured Groq model for the public theater demo."""
+    return settings.groq_model_fast or settings.groq_model or settings.groq_model_smart
 
 
 def _audit_hash(trace_id: str, model: str, provider: str, tokens: int) -> str:
     raw = f"{trace_id}|{model}|{provider}|{tokens}|{int(time.time())}"
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _demo_cache_key(vertical: str, prompt: str, force_fallback: bool) -> str:
+    digest = hashlib.sha256(f"{vertical}|{force_fallback}|{prompt}".encode("utf-8")).hexdigest()
+    return f"veklom:demo:hot:{digest}"
+
+
+def _get_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool) -> Optional[dict]:
+    try:
+        raw = get_redis().get(_demo_cache_key(vertical, prompt, force_fallback))
+        if not raw:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _set_demo_hot_cache(vertical: str, prompt: str, force_fallback: bool, provider: str, result: dict) -> None:
+    try:
+        get_redis().setex(
+            _demo_cache_key(vertical, prompt, force_fallback),
+            _DEMO_HOT_CACHE_TTL_SEC,
+            json.dumps({"provider": provider, "result": result}, separators=(",", ":"), default=str),
+        )
+    except Exception:
+        pass
 
 
 # ?? Endpoint ??????????????????????????????????????????????????????????????????
@@ -169,7 +199,6 @@ async def demo_pipeline_stream(
     trace_id = uuid.uuid4().hex[:12]
     ip = _client_ip(request)
     ip_h = _ip_hash(ip)
-    t0 = time.perf_counter()
 
     allowed, hits, window_ttl = _rate_limit(ip)
     if not allowed:
@@ -235,101 +264,127 @@ async def demo_pipeline_stream(
         })
         time.sleep(0.05)
 
-        # 6/7. provider selection + attempt
         provider = "ollama"
         result: Optional[dict] = None
-        used_groq = force_fallback or (cb_get_state().value == "open")
+        circuit_was_open = cb_get_state().value == "open"
+        used_groq = force_fallback or circuit_was_open
+        cached = _get_demo_hot_cache(vertical, effective_prompt, force_fallback)
 
-        if not used_groq:
+        if cached:
+            provider = str(cached.get("provider") or "cache")
+            result = cached.get("result") or {}
+            yield _sse("hot_cache_check", {
+                "status": "hit",
+                "store": "redis",
+                "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
+                "provider": provider,
+                "model": result.get("model"),
+            })
+            yield _sse("redis_memory_check", {
+                "demo_ephemeral": True,
+                "ttl_sec": _DEMO_EPHEMERAL_TTL_SEC,
+                "tenant_scope": "public_demo",
+                "hot_cache": True,
+            })
+            for delta in _chunk_text(str(result.get("response") or ""), 28):
+                time.sleep(0.008)
+                yield _sse("token_delta", {"delta": delta, "provider": provider, "cache": "hit"})
+        else:
+            yield _sse("hot_cache_check", {
+                "status": "miss",
+                "store": "redis",
+                "ttl_sec": _DEMO_HOT_CACHE_TTL_SEC,
+            })
+
+        if result is None and not used_groq:
             yield _sse("provider_selected", {
                 "provider": "ollama",
                 "model": settings.llm_model_default,
-                "reason": "circuit_closed",
+                "reason": "latency_budget_probe",
                 "sovereign": True,
+                "latency_budget_ms": int(_DEMO_OLLAMA_LATENCY_BUDGET_SECONDS * 1000),
             })
-            time.sleep(0.05)
+            time.sleep(0.02)
             yield _sse("ollama_attempt", {
                 "model": settings.llm_model_default,
                 "base_url": settings.llm_base_url,
-                "stream": True,
+                "stream": False,
+                "latency_budget_ms": int(_DEMO_OLLAMA_LATENCY_BUDGET_SECONDS * 1000),
             })
 
             try:
-                ollama = OllamaClient()
-                sdk = ollama._client  # direct stream iterator
-                stream = sdk.generate(
-                    model=settings.llm_model_default,
+                ollama = OllamaClient(timeout=_DEMO_OLLAMA_LATENCY_BUDGET_SECONDS)
+                ollama_result = ollama.generate(
                     prompt=effective_prompt,
-                    stream=True,
+                    model=settings.llm_model_default,
+                    stream=False,
                     options={"num_predict": _DEMO_OUTPUT_MAX_TOKENS, "temperature": 0.5},
                 )
-                # 8. memory check (demo ephemeral)
+                text = (ollama_result.get("response") or "").strip() or "(no content)"
                 yield _sse("redis_memory_check", {
                     "demo_ephemeral": True,
                     "ttl_sec": _DEMO_EPHEMERAL_TTL_SEC,
                     "tenant_scope": "public_demo",
                 })
-
-                acc = []
-                total_tokens = 0
-                for chunk in stream:
-                    text = getattr(chunk, "response", "") or ""
-                    if text:
-                        acc.append(text)
-                        yield _sse("token_delta", {"delta": text, "provider": "ollama"})
-                    if getattr(chunk, "done", False):
-                        total_tokens = (chunk.prompt_eval_count or 0) + (chunk.eval_count or 0)
-                response_text = "".join(acc).strip() or "(no content)"
+                for delta in _chunk_text(text, 26):
+                    time.sleep(0.01)
+                    yield _sse("token_delta", {"delta": delta, "provider": "ollama"})
                 result = {
-                    "response": response_text,
-                    "model": settings.llm_model_default,
-                    "total_tokens": total_tokens or max(1, len(response_text) // 4),
-                    "prompt_tokens": 0,
-                    "completion_tokens": total_tokens or max(1, len(response_text) // 4),
+                    "response": text,
+                    "model": ollama_result.get("model") or settings.llm_model_default,
+                    "total_tokens": ollama_result.get("total_tokens") or max(1, len(text) // 4),
+                    "prompt_tokens": ollama_result.get("prompt_tokens") or 0,
+                    "completion_tokens": ollama_result.get("completion_tokens") or max(1, len(text) // 4),
                 }
             except OllamaError as exc:
-                # graceful pivot to Groq
+                reason = str(exc)[:200]
+                event_reason = "latency_budget_exceeded" if "timed out" in reason.lower() or "timeout" in reason.lower() else reason
                 yield _sse("ollama_unavailable", {
-                    "reason": str(exc)[:200],
+                    "reason": event_reason,
                     "simulated": False,
+                    "latency_budget_ms": int(_DEMO_OLLAMA_LATENCY_BUDGET_SECONDS * 1000),
                 })
-                time.sleep(0.05)
                 yield _sse("circuit_breaker_opened", {
                     "simulated": False,
-                    "note": "Demo observer only ? production CB is per-tenant.",
+                    "note": "Demo observer only - production CB is per-tenant.",
+                    "reason": event_reason,
                 })
                 used_groq = True
                 provider = "groq"
-        else:
-            # Forced fallback ? theatrically show the circuit breaker path.
+
+        if result is None and used_groq:
             yield _sse("provider_selected", {
                 "provider": "ollama",
                 "model": settings.llm_model_default,
-                "reason": "circuit_closed",
+                "reason": "simulated_outage" if force_fallback else "circuit_open",
                 "sovereign": True,
             })
-            time.sleep(0.1)
-            yield _sse("ollama_unavailable", {
-                "reason": "Simulated outage (force_fallback=true)",
-                "simulated": True,
-            })
-            time.sleep(0.08)
-            yield _sse("circuit_breaker_opened", {
-                "simulated": True,
-                "note": "Real production CB was NOT toggled.",
-            })
-            provider = "groq"
+            time.sleep(0.02)
+            if force_fallback:
+                yield _sse("ollama_unavailable", {
+                    "reason": "Simulated outage (force_fallback=true)",
+                    "simulated": True,
+                })
+                yield _sse("circuit_breaker_opened", {
+                    "simulated": True,
+                    "note": "Real production CB was NOT toggled.",
+                })
+            elif circuit_was_open:
+                yield _sse("circuit_breaker_opened", {
+                    "simulated": False,
+                    "note": "Demo observer circuit was already open; routing directly to fallback.",
+                    "reason": "circuit_open",
+                })
 
-        # Groq fallback path
-        if used_groq or result is None:
+        if result is None:
             groq_model = _demo_groq_model()
             yield _sse("provider_selected", {
                 "provider": "groq",
                 "model": groq_model,
-                "reason": "fallback",
+                "reason": "fallback_fast_path",
                 "sovereign": False,
             })
-            time.sleep(0.05)
+            time.sleep(0.02)
             yield _sse("redis_memory_check", {
                 "demo_ephemeral": True,
                 "ttl_sec": _DEMO_EPHEMERAL_TTL_SEC,
@@ -341,15 +396,14 @@ async def demo_pipeline_stream(
                     "stage": "groq_fallback",
                     "message": "Groq fallback not configured on this deployment.",
                 })
-                # still emit a synthetic completion so the UI locks in a final state
                 synthetic = (
                     "Veklom would route this request to Groq here. In this deployment the "
                     "GROQ_API_KEY is not set, so the fallback leg is observable but not "
                     "executed. On production the circuit breaker would complete the call "
                     "and record the failover in the audit trail."
                 )
-                for delta in _chunk_text(synthetic, 22):
-                    time.sleep(0.04)
+                for delta in _chunk_text(synthetic, 26):
+                    time.sleep(0.012)
                     yield _sse("token_delta", {"delta": delta, "provider": "groq_simulated"})
                 result = {
                     "response": synthetic,
@@ -366,10 +420,11 @@ async def demo_pipeline_stream(
                         model=groq_model,
                         max_tokens=_DEMO_OUTPUT_MAX_TOKENS,
                         temperature=0.5,
+                        timeout_seconds=8.0,
                     )
                     text = groq_result["response"].strip() or "(no content)"
-                    for delta in _chunk_text(text, 22):
-                        time.sleep(0.03)
+                    for delta in _chunk_text(text, 26):
+                        time.sleep(0.008)
                         yield _sse("token_delta", {"delta": delta, "provider": "groq"})
                     result = {
                         "response": text,
@@ -391,6 +446,9 @@ async def demo_pipeline_stream(
                         "prompt_tokens": 0,
                         "completion_tokens": 0,
                     }
+
+        if result is not None and not cached:
+            _set_demo_hot_cache(vertical, effective_prompt, force_fallback, provider, result)
 
         latency_ms = int((time.perf_counter() - started) * 1000)
 

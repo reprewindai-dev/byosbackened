@@ -1,0 +1,28 @@
+{
+  "name": "@veklom/sdk",
+  "version": "0.1.0",
+  "description": "Official JavaScript/TypeScript SDK for the Veklom governed inference platform",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "keywords": ["veklom", "ai", "governed-inference", "llm", "sdk"],
+  "author": "Veklom <dev@veklom.com>",
+  "license": "MIT",
+  "homepage": "https://veklom.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/reprewindai-dev/veklom-js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "node": ">=18"
+  }
+}

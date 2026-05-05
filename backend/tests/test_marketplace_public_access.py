@@ -16,6 +16,7 @@ except FileNotFoundError:
 
 from apps.api.main import app
 from apps.api.deps import get_current_user
+from core.services.marketplace_catalog import real_marketplace_catalog
 from core.security import create_access_token
 from db.models import Listing, MarketplaceOrder, User, Vendor, Workspace
 from db.session import Base, SessionLocal, engine
@@ -62,6 +63,9 @@ def test_public_marketplace_listings_do_not_require_auth():
         "step-security-harden-runner",
     }
     assert all(row["source_url"].startswith("https://") for row in payload)
+    assert all(row.get("source_verified") is True for row in payload)
+    assert all(row.get("rating_count", 0) == 0 for row in payload if row["id"] != "checkout-listing")
+    assert all(row.get("install_count", 0) == 0 for row in payload if row["id"] != "checkout-listing")
 
 
 def test_public_marketplace_aliases_return_real_catalog():
@@ -79,6 +83,20 @@ def test_public_marketplace_aliases_return_real_catalog():
     assert detail.status_code == 200
     assert detail.json()["use_url"] == "https://github.com/marketplace/actions/checkout"
     assert any(row["label"] == "SDK Extensions" for row in categories.json())
+
+
+def test_curated_marketplace_catalog_uses_live_official_sources():
+    catalog = {row["id"]: row for row in real_marketplace_catalog()}
+    slack = catalog["slack-send-github-action"]
+
+    assert slack["source_url"] == "https://github.com/slackapi/slack-github-action"
+    assert slack["use_url"] == "https://docs.slack.dev/tools/slack-github-action/"
+    assert slack["usage"] == "uses: slackapi/slack-github-action@v3"
+    assert "slack-send-to-slack" not in slack["source_url"]
+    assert all(row["source_url"].startswith("https://") for row in catalog.values())
+    assert all(row["source_verified"] is True for row in catalog.values())
+    assert all(row["rating_count"] == 0 for row in catalog.values())
+    assert all(row["install_count"] == 0 for row in catalog.values())
 
 
 def _seed_paid_listing():

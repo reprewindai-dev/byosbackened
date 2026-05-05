@@ -12,7 +12,6 @@ import {
   Star,
   Store,
   Tag,
-  TrendingUp,
   X,
   Zap,
 } from "lucide-react";
@@ -23,6 +22,7 @@ interface ListingCard {
   id: string;
   slug?: string | null;
   title: string;
+  provider?: string | null;
   summary?: string | null;
   listing_type: string;
   category?: string | null;
@@ -37,6 +37,10 @@ interface ListingCard {
   is_featured: boolean;
   source_url?: string | null;
   use_url?: string | null;
+  source_verified: boolean;
+  verification_note?: string | null;
+  billing?: string | null;
+  usage?: string | null;
 }
 
 interface FeaturedResp {
@@ -109,7 +113,8 @@ async function fetchFeatured(): Promise<FeaturedResp> {
   const cards = normalizeListings(r.data);
   const featured = cards.filter((card) => card.is_featured).slice(0, 8);
   const trending = [...cards]
-    .sort((a, b) => b.install_count - a.install_count || b.rating_avg - a.rating_avg)
+    .filter((card) => card.source_verified)
+    .sort((a, b) => Number(b.is_featured) - Number(a.is_featured) || a.title.localeCompare(b.title))
     .slice(0, 8);
   return {
     featured: featured.length ? featured : cards.slice(0, 4),
@@ -148,13 +153,15 @@ function normalizeListing(raw: unknown): ListingCard {
   const inferredType = inferListingType(category, String(row.install ?? ""));
   const tags = arrayOfStrings(row.tags ?? row.target ?? []);
   const badges = arrayOfStrings(row.compliance_badges ?? row.compliance ?? row.badges ?? []);
-  const rating = Number(row.rating_avg ?? row.rating ?? 0);
-  const installs = Number(row.install_count ?? row.installs ?? 0);
+  const ratingCount = Number(row.rating_count ?? 0);
+  const rating = ratingCount > 0 ? Number(row.rating_avg ?? row.rating ?? 0) : 0;
+  const installs = Number(row.install_count ?? 0);
 
   return {
     id: String(row.id ?? row.slug ?? row.title ?? ""),
     slug: row.slug ? String(row.slug) : String(row.id ?? ""),
     title: String(row.title ?? row.name ?? ""),
+    provider: row.provider ? String(row.provider) : null,
     summary: row.summary ? String(row.summary) : String(row.description ?? row.positioning ?? ""),
     listing_type: String(row.listing_type ?? inferredType),
     category,
@@ -164,11 +171,15 @@ function normalizeListing(raw: unknown): ListingCard {
     currency: String(row.currency ?? "usd"),
     predicted_cost_per_run_usd: row.predicted_cost_per_run_usd != null ? Number(row.predicted_cost_per_run_usd) : null,
     rating_avg: rating,
-    rating_count: Number(row.rating_count ?? (rating ? 1 : 0)),
+    rating_count: ratingCount,
     install_count: installs,
     is_featured: Boolean(row.is_featured ?? row.featured),
     source_url: row.source_url ? String(row.source_url) : null,
     use_url: row.use_url ? String(row.use_url) : row.source_url ? String(row.source_url) : null,
+    source_verified: Boolean(row.source_verified ?? row.source_url),
+    verification_note: row.verification_note ? String(row.verification_note) : null,
+    billing: row.billing ? String(row.billing) : null,
+    usage: row.usage ? String(row.usage) : null,
   };
 }
 
@@ -359,8 +370,8 @@ export function MarketplacePage() {
             Sovereign-ready assets, governed distribution
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-bone-2">
-            Models, pipelines, compliance packs, connectors, and managed services - every listing inherits Veklom's
-            policy engine and audit trail.
+            Source-verified actions, connectors, compliance packs, and managed services that can be wrapped by
+            Veklom's policy engine and audit trail. Native pipeline templates live in Pipelines.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
@@ -436,7 +447,7 @@ export function MarketplacePage() {
         </aside>
 
         <div className="space-y-6">
-          {/* Featured / Trending strip — only when no filters active */}
+          {/* Featured / verified-source strip - only when no filters active */}
           {!selectedType && !selectedCategory && !query && (
             <>
               {featuredQ.data?.featured?.length ? (
@@ -453,8 +464,8 @@ export function MarketplacePage() {
               {featuredQ.data?.trending?.length ? (
                 <section>
                   <SectionHeader
-                    icon={<TrendingUp className="h-4 w-4 text-electric" />}
-                    title="Trending"
+                    icon={<CheckCircle2 className="h-4 w-4 text-electric" />}
+                    title="Source verified"
                   />
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {featuredQ.data.trending.map((card) => (
@@ -608,8 +619,14 @@ export function MarketplacePage() {
             </section>
 
             {/* Compliance badges */}
-            {selected.compliance_badges?.length ? (
+            {(selected.source_verified || selected.compliance_badges?.length) ? (
               <div className="flex flex-wrap gap-1.5">
+                {selected.source_verified && (
+                  <span className="v-chip v-chip-ok font-mono text-[10px]" title={selected.verification_note ?? undefined}>
+                    <CheckCircle2 className="h-3 w-3" />
+                    Source verified
+                  </span>
+                )}
                 {selected.compliance_badges.map((b) => (
                   <span key={b} className="v-chip v-chip-brass font-mono text-[10px]">
                     <ShieldCheck className="h-3 w-3" />
@@ -630,17 +647,26 @@ export function MarketplacePage() {
               </div>
             ) : null}
 
-            {/* Stats */}
+            {selected.usage && (
+              <div className="rounded-md border border-rule/70 bg-ink-1/60 p-3">
+                <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  Usage
+                </div>
+                <code className="font-mono text-[12px] text-bone">{selected.usage}</code>
+              </div>
+            )}
+
+            {/* Facts */}
             <div className="grid grid-cols-3 gap-3 border-t border-rule/50 pt-3 text-center font-mono text-[11px] text-muted">
               <div>
-                <div className="text-bone">{selected.install_count}</div>
-                installs
+                <div className="truncate text-bone">{selected.provider ?? "External"}</div>
+                provider
               </div>
               <div>
-                <div className="text-bone">
-                  {selected.rating_avg ? selected.rating_avg.toFixed(1) : "—"}
+                <div className={selected.source_verified ? "text-moss" : "text-brass-2"}>
+                  {selected.source_verified ? "verified" : "pending"}
                 </div>
-                rating ({selected.rating_count})
+                source
               </div>
               <div>
                 <div className="text-bone">
@@ -940,16 +966,11 @@ function ListingCardView({ card, onClick }: { card: ListingCard; onClick: () => 
 
       <div className="flex items-center justify-between border-t border-rule/40 pt-2 font-mono text-[10px] text-muted">
         <div className="flex items-center gap-2">
-          <span>
-            <Download className="mr-0.5 inline h-3 w-3" />
-            {card.install_count}
+          <span className={card.source_verified ? "text-moss" : "text-brass-2"}>
+            <CheckCircle2 className="mr-0.5 inline h-3 w-3" />
+            {card.source_verified ? "source verified" : "source pending"}
           </span>
-          {card.rating_count > 0 && (
-            <span>
-              <Star className="mr-0.5 inline h-3 w-3 text-brass-2" />
-              {card.rating_avg.toFixed(1)}
-            </span>
-          )}
+          {card.provider && <span>{card.provider}</span>}
         </div>
         <div>
           {card.predicted_cost_per_run_usd != null ? (

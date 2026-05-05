@@ -244,14 +244,28 @@ REAL_MARKETPLACE_CATALOG = [
         "badges": ["Verified creator", "Notifications", "Workflow Builder"],
         "featured": False,
         "compliance": ["SOC2"],
-        "source_url": "https://github.com/marketplace/actions/slack-send-to-slack",
-        "use_url": "https://github.com/marketplace/actions/slack-send-to-slack",
-        "usage": "uses: slackapi/slack-github-action@v2",
+        "source_url": "https://github.com/slackapi/slack-github-action",
+        "use_url": "https://docs.slack.dev/tools/slack-github-action/",
+        "usage": "uses: slackapi/slack-github-action@v3",
         "status": "active",
     },
 ]
 
 
 def real_marketplace_catalog() -> list[dict]:
-    """Return a copy so route handlers can enrich safely."""
-    return deepcopy(REAL_MARKETPLACE_CATALOG)
+    """Return a copy so route handlers can enrich safely.
+
+    Install and rating counts are not returned for curated external listings
+    unless Veklom has a live source for that metric. The marketplace should
+    only show factual source, billing, and usage data as available today.
+    """
+    catalog = deepcopy(REAL_MARKETPLACE_CATALOG)
+    for item in catalog:
+        item["source_verified"] = True
+        item["verification_note"] = "Official public source verified by Veklom catalog review."
+        item["rating_avg"] = 0
+        item["rating_count"] = 0
+        item["install_count"] = 0
+        item.pop("rating", None)
+        item.pop("installs", None)
+    return catalog

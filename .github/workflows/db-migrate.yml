@@ -25,6 +25,15 @@ jobs:
           cd backend
           pip install -e ".[dev]"
 
+      - name: Validate migration database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          case "$DATABASE_URL" in
+            postgresql://*|postgres://*) echo "Migration database is Postgres" ;;
+            *) echo "DATABASE_URL must be a live Postgres URL, not empty or SQLite"; exit 1 ;;
+          esac
+
       - name: Run Alembic migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

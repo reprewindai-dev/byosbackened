@@ -53,6 +53,8 @@ _DEMO_HOT_CACHE_TTL_SEC = 300
 _DEMO_MIRROR_LOCK_TTL_SEC = 15
 _DEMO_MIRROR_WAIT_TIMEOUT_SEC = 7.5
 _DEMO_OLLAMA_LATENCY_BUDGET_SECONDS = 2.0
+_DEMO_SMART_GROQ_QUOTA_WINDOW_SEC = 3600
+_DEMO_SMART_GROQ_QUOTA_MAX_HITS = 3
 
 _VERTICAL_SYSTEM_PROMPTS = {
     "legal": (
@@ -126,6 +128,37 @@ def _rate_limit(ip: str) -> tuple[bool, int, int]:
         return True, 0, _DEMO_RATE_LIMIT_WINDOW_SEC
 
 
+def _smart_groq_quota(ip: str) -> tuple[bool, int, int]:
+    """
+    Separate spend guard for the public smart-model theater path.
+
+    The normal request limiter still protects the endpoint from hammering. This
+    quota protects paid Groq fallback calls from being drained by one visitor.
+    If Redis is unavailable, degrade to synthetic output instead of failing open.
+    """
+    try:
+        r = get_redis()
+        key = f"veklom:demo:smart_groq:{_ip_hash(ip)}"
+        hits = r.incr(key)
+        if hits == 1:
+            r.expire(key, _DEMO_SMART_GROQ_QUOTA_WINDOW_SEC)
+        ttl = r.ttl(key) or _DEMO_SMART_GROQ_QUOTA_WINDOW_SEC
+        return hits <= _DEMO_SMART_GROQ_QUOTA_MAX_HITS, int(hits), int(ttl)
+    except Exception as exc:  # pragma: no cover - spend guard fails closed
+        logger.warning("[demo/stream] Redis unavailable for smart Groq quota: %s", exc)
+        return False, _DEMO_SMART_GROQ_QUOTA_MAX_HITS + 1, _DEMO_SMART_GROQ_QUOTA_WINDOW_SEC
+
+
+def _synthetic_governed_response(reason: str) -> str:
+    return (
+        "Veklom keeps the public demo governed before execution: the request is "
+        "validated, policy-checked, budget-guarded, and audit-ready. "
+        f"{reason} The system serves this deterministic response instead of "
+        "spending another smart-model call, preserving the same control-plane "
+        "trace without exposing customer data or secrets."
+    )
+
+
 def _record_demo_echo(trace_id: str, prompt_preview: str, response_preview: str) -> None:
     """Ephemeral demo echo ? last turn only, 60s TTL, no tenant linkage."""
     try:
@@ -147,7 +180,7 @@ def _chunk_text(text: str, size: int = 18) -> Iterable[str]:
 
 
 def _demo_groq_model() -> str:
-    """Use the fastest configured Groq model for the public theater demo."""
+    """Use the strongest configured Groq model for the public theater demo."""
     return settings.groq_model_smart or settings.groq_model or settings.groq_model_fast
 
 
@@ -483,11 +516,8 @@ async def demo_pipeline_stream(
                     "stage": "groq_fallback",
                     "message": "Groq fallback not configured on this deployment.",
                 })
-                synthetic = (
-                    "Veklom would route this request to Groq here. In this deployment the "
-                    "GROQ_API_KEY is not set, so the fallback leg is observable but not "
-                    "executed. On production the circuit breaker would complete the call "
-                    "and record the failover in the audit trail."
+                synthetic = _synthetic_governed_response(
+                    "Groq fallback is not configured on this deployment."
                 )
                 for delta in _chunk_text(synthetic, 26):
                     time.sleep(0.012)
@@ -501,26 +531,69 @@ async def demo_pipeline_stream(
                 }
                 provider = "groq_simulated"
             else:
-                try:
-                    groq_result = call_groq(
-                        prompt=effective_prompt,
-                        model=groq_model,
-                        max_tokens=_DEMO_OUTPUT_MAX_TOKENS,
-                        temperature=0.5,
-                        timeout_seconds=8.0,
+                quota_allowed, quota_hits, quota_ttl = _smart_groq_quota(ip)
+                if not quota_allowed:
+                    logger.info(
+                        "[demo/stream] smart Groq quota hit ip_hash=%s hits=%s ttl=%s",
+                        ip_h,
+                        quota_hits,
+                        quota_ttl,
                     )
-                    text = groq_result["response"].strip() or "(no content)"
-                    for delta in _chunk_text(text, 26):
-                        time.sleep(0.008)
-                        yield _sse("token_delta", {"delta": delta, "provider": "groq"})
+                    yield _sse("smart_groq_quota_check", {
+                        "status": "limited",
+                        "hits": quota_hits,
+                        "limit": _DEMO_SMART_GROQ_QUOTA_MAX_HITS,
+                        "window_sec": _DEMO_SMART_GROQ_QUOTA_WINDOW_SEC,
+                        "retry_after_sec": quota_ttl,
+                        "fallback": "synthetic_governed_response",
+                    })
+                    synthetic = _synthetic_governed_response(
+                        "The public smart-model quota for this IP is temporarily exhausted."
+                    )
+                    for delta in _chunk_text(synthetic, 26):
+                        time.sleep(0.012)
+                        yield _sse("token_delta", {
+                            "delta": delta,
+                            "provider": "groq_quota_guard",
+                            "quota": "limited",
+                        })
                     result = {
-                        "response": text,
-                        "model": groq_result["model"],
-                        "total_tokens": groq_result["total_tokens"],
-                        "prompt_tokens": groq_result["prompt_tokens"],
-                        "completion_tokens": groq_result["completion_tokens"],
+                        "response": synthetic,
+                        "model": f"groq/{groq_model}",
+                        "total_tokens": len(synthetic) // 4,
+                        "prompt_tokens": 0,
+                        "completion_tokens": len(synthetic) // 4,
                     }
-                    provider = "groq"
+                    provider = "groq_quota_guard"
+                else:
+                    yield _sse("smart_groq_quota_check", {
+                        "status": "passed",
+                        "hits": quota_hits,
+                        "limit": _DEMO_SMART_GROQ_QUOTA_MAX_HITS,
+                        "window_sec": _DEMO_SMART_GROQ_QUOTA_WINDOW_SEC,
+                        "remaining": max(0, _DEMO_SMART_GROQ_QUOTA_MAX_HITS - quota_hits),
+                    })
+                try:
+                    if result is None:
+                        groq_result = call_groq(
+                            prompt=effective_prompt,
+                            model=groq_model,
+                            max_tokens=_DEMO_OUTPUT_MAX_TOKENS,
+                            temperature=0.5,
+                            timeout_seconds=8.0,
+                        )
+                        text = groq_result["response"].strip() or "(no content)"
+                        for delta in _chunk_text(text, 26):
+                            time.sleep(0.008)
+                            yield _sse("token_delta", {"delta": delta, "provider": "groq"})
+                        result = {
+                            "response": text,
+                            "model": groq_result["model"],
+                            "total_tokens": groq_result["total_tokens"],
+                            "prompt_tokens": groq_result["prompt_tokens"],
+                            "completion_tokens": groq_result["completion_tokens"],
+                        }
+                        provider = "groq"
                 except GroqFallbackError as exc:
                     yield _sse("error", {
                         "stage": "groq_fallback",
@@ -609,6 +682,7 @@ async def demo_pipeline_health():
             "prompt_max_chars": _DEMO_PROMPT_MAX_CHARS,
             "output_max_tokens": _DEMO_OUTPUT_MAX_TOKENS,
             "rate_limit_per_minute": _DEMO_RATE_LIMIT_MAX_HITS,
+            "smart_groq_per_hour": _DEMO_SMART_GROQ_QUOTA_MAX_HITS,
         },
     }
 

@@ -7,28 +7,99 @@ on:
 jobs:
   verify-deploy:
     runs-on: ubuntu-latest
+    env:
+      VEKLOM_HOST: 5.78.135.11
+      VEKLOM_APP_ID: zjhp30ys1jlk8yaoxc96h2zd
+      VEKLOM_APP_DIR: /data/coolify/applications/zjhp30ys1jlk8yaoxc96h2zd
     steps:
-      - name: Wait for Coolify to deploy
-        run: sleep 45
+      - uses: actions/checkout@v4
 
-      - name: Health check — Main API
+      - name: Configure SSH
+        env:
+          HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/health)
-          echo "Main API status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "DEPLOY FAILED - api.veklom.com/health returned $STATUS"
-            exit 1
-          fi
-          echo "api.veklom.com healthy"
+          test -n "$HETZNER_SSH_PRIVATE_KEY" || (echo "HETZNER_SSH_PRIVATE_KEY is missing" && exit 1)
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_PRIVATE_KEY" > ~/.ssh/veklom-deploy
+          chmod 600 ~/.ssh/veklom-deploy
+          ssh-keyscan -H "$VEKLOM_HOST" >> ~/.ssh/known_hosts
 
-      - name: Health check — LLM status
+      - name: Build and apply live API image
         run: |
-          RESP=$(curl -s https://api.veklom.com/status/data)
+          set -euo pipefail
+          archive="$RUNNER_TEMP/backend-${GITHUB_SHA}.tar"
+          git archive --format=tar -o "$archive" HEAD backend
+          scp -i ~/.ssh/veklom-deploy "$archive" "root@${VEKLOM_HOST}:/tmp/backend-${GITHUB_SHA}.tar"
+          ssh -i ~/.ssh/veklom-deploy "root@${VEKLOM_HOST}" \
+            "COMMIT_SHA='${GITHUB_SHA}' APP_ID='${VEKLOM_APP_ID}' APP_DIR='${VEKLOM_APP_DIR}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          build_dir="/tmp/veklom-build-${COMMIT_SHA}"
+          rm -rf "$build_dir"
+          mkdir -p "$build_dir"
+          tar -xf "/tmp/backend-${COMMIT_SHA}.tar" -C "$build_dir"
+          cd "$build_dir/backend"
+          docker build -f infra/docker/Dockerfile.api -t "${APP_ID}:${COMMIT_SHA}" .
+          cd "$APP_DIR"
+          cp docker-compose.yaml "docker-compose.yaml.bak-actions-${COMMIT_SHA}-$(date +%Y%m%d%H%M%S)"
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          app_id = os.environ["APP_ID"]
+          commit_sha = os.environ["COMMIT_SHA"]
+          compose_path = Path("docker-compose.yaml")
+          compose = compose_path.read_text()
+          compose, count = re.subn(
+              r"image: '[^']+'",
+              f"image: '{app_id}:{commit_sha}'",
+              compose,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update live compose image tag")
+          compose_path.write_text(compose)
+          PY
+          docker compose up -d --remove-orphans
+          rm -rf "$build_dir" "/tmp/backend-${COMMIT_SHA}.tar"
+          REMOTE
+
+      - name: Wait for live API health
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/health || true)
+            echo "Main API status attempt $i: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "DEPLOY FAILED - api.veklom.com/health did not return 200"
+          exit 1
+
+      - name: Health check - status data
+        run: |
+          RESP=$(curl -fsS https://api.veklom.com/status/data)
           echo "Status response: $RESP"
           echo "$RESP" | grep -q '"services"' || (echo "Status check failed" && exit 1)
           echo "LLM proxy healthy"
 
-      - name: Health check — Engine
+      - name: Health check - marketplace catalog
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://5.78.153.146:8000/health || echo "000")
+          CATALOG=$(curl -fsS https://api.veklom.com/api/v1/marketplace/listings)
+          echo "$CATALOG" | grep -q 'https://github.com/slackapi/slack-github-action' || (
+            echo "Marketplace catalog is stale: Slack source URL was not updated" && exit 1
+          )
+          echo "$CATALOG" | grep -q '"source_verified":true' || (
+            echo "Marketplace catalog is missing source_verified=true" && exit 1
+          )
+          echo "$CATALOG" | grep -q '"install_count":0' || (
+            echo "Marketplace catalog is exposing unverified install counts" && exit 1
+          )
+          echo "Marketplace catalog healthy"
+
+      - name: Health check - Engine
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://5.78.153.146:8000/health || echo "000")
           echo "Engine status: $STATUS"

@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func, desc
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from apps.api.deps import get_current_user, require_admin
 from db.session import get_db
@@ -27,6 +27,8 @@ from db.models import (
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 _START_TIME = time.time()
+_OVERVIEW_CACHE_TTL_SECONDS = 6
+_overview_cache: dict[str, tuple[float, dict]] = {}
 
 
 # --- Schemas ------------------------------------------------------------------
@@ -331,10 +333,16 @@ async def workspace_overview(
     """OverviewPayload for the Overview dashboard.
 
     Synthesizes KPIs, routing, spend, recent runs, policy events, alerts, audit,
-    and fleet from the real audit log + deployments + workspace_model_settings.
-    Best-effort shape � every section degrades to safe defaults if data is missing.
+    and fleet from real request logs, audit logs, alerts, budget rows, and model
+    settings. A short workspace-scoped hot cache prevents repeated dashboard
+    reloads from hammering the database.
     """
     workspace_id = current_user.workspace_id
+    cache_key = f"overview:{workspace_id}"
+    cached = _overview_cache.get(cache_key)
+    if cached and time.time() - cached[0] < _OVERVIEW_CACHE_TTL_SECONDS:
+        return cached[1]
+
     now = datetime.utcnow()
     last_hour = now - timedelta(hours=1)
     prev_hour = now - timedelta(hours=2)
@@ -344,6 +352,20 @@ async def workspace_overview(
     # carry tamper-evident evidence and remain the audit source of truth.
     recent_request_logs = (
         db.query(WorkspaceRequestLog)
+        .options(
+            load_only(
+                WorkspaceRequestLog.id,
+                WorkspaceRequestLog.workspace_id,
+                WorkspaceRequestLog.provider,
+                WorkspaceRequestLog.model,
+                WorkspaceRequestLog.status,
+                WorkspaceRequestLog.tokens_in,
+                WorkspaceRequestLog.tokens_out,
+                WorkspaceRequestLog.latency_ms,
+                WorkspaceRequestLog.cost_usd,
+                WorkspaceRequestLog.created_at,
+            )
+        )
         .filter(
             WorkspaceRequestLog.workspace_id == workspace_id,
             WorkspaceRequestLog.created_at >= last_day,
@@ -354,6 +376,22 @@ async def workspace_overview(
     )
     recent_logs = (
         db.query(AIAuditLog)
+        .options(
+            load_only(
+                AIAuditLog.id,
+                AIAuditLog.workspace_id,
+                AIAuditLog.user_id,
+                AIAuditLog.operation_type,
+                AIAuditLog.provider,
+                AIAuditLog.model,
+                AIAuditLog.cost,
+                AIAuditLog.tokens_input,
+                AIAuditLog.tokens_output,
+                AIAuditLog.pii_detected,
+                AIAuditLog.log_hash,
+                AIAuditLog.created_at,
+            )
+        )
         .filter(AIAuditLog.workspace_id == workspace_id, AIAuditLog.created_at >= last_day)
         .order_by(AIAuditLog.created_at.desc())
         .limit(500)
@@ -416,7 +454,7 @@ async def workspace_overview(
     ).all()
     quantized = sum(1 for m in active_models if (m.bedrock_model_id or "").lower().endswith(("q4", "q5", "q8")))
 
-    # Routing � split by provider.
+    # Routing split by actual executed provider.
     def _provider_name(row) -> str:
         return (getattr(row, "provider", None) or "").lower()
 
@@ -473,7 +511,7 @@ async def workspace_overview(
         {
             "id": l.id,
             "kind": l.operation_type or "exec",
-            "subject": (l.model or "�")[:80],
+            "subject": (l.model or "unknown")[:80],
             "actor": l.user_id or "system",
             "ts": l.created_at.isoformat(),
             "hash_prefix": (l.log_hash or "")[:12] if hasattr(l, "log_hash") else "",
@@ -499,7 +537,7 @@ async def workspace_overview(
             "ts": l.created_at.isoformat(),
             "kind": "audit_signed",
             "summary": "Audit entry signed",
-            "detail": f"hash {(getattr(l, 'log_hash', '') or '')[:12]}�",
+            "detail": f"hash {(getattr(l, 'log_hash', '') or '')[:12]}",
         })
 
     # Fleet from workspace_model_settings.
@@ -609,7 +647,7 @@ async def workspace_overview(
                 "burst": round(burst_series[i] / bucket_total * 100, 1),
             })
 
-    return {
+    payload = {
         "kpi": {
             "requests_per_minute": rpm,
             "requests_delta_pct": round(rpm_delta, 1),
@@ -655,3 +693,5 @@ async def workspace_overview(
         "audit_trail": audit_trail,
         "fleet": fleet,
     }
+    _overview_cache[cache_key] = (time.time(), payload)
+    return payload

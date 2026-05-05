@@ -93,6 +93,8 @@ interface PreflightState {
 }
 
 type Vertical = "default" | "legal" | "medical" | "finance" | "agency" | "infrastructure";
+type ResponseFormat = "text" | "json" | "json-schema";
+type SessionTag = "Standard" | "PHI" | "PII" | "HIPAA" | "PCI" | "SOC2";
 
 interface PipelineEvent {
   id: string;
@@ -108,6 +110,13 @@ interface WorkspaceModel {
   runtime_model_id: string;
   enabled: boolean;
   connected: boolean;
+  model_type?: string;
+  context_window?: number;
+  quantization?: string;
+  p50_ms?: number;
+  p95_ms?: number;
+  input_cost_per_1k?: number;
+  output_cost_per_1k?: number;
 }
 
 interface AICompleteResponse {
@@ -183,10 +192,44 @@ const EVENT_META: Record<string, { label: string; color: string; icon: string }>
   error: { label: "Error", color: "text-crimson", icon: "!" },
 };
 
-const DEFAULT_MAX_TOKENS = 512;
+const DEFAULT_MAX_TOKENS = 1024;
+const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_TOP_P = 0.95;
+const DEFAULT_TOP_K = 40;
+const DEFAULT_SEED = 42;
 const REQUEST_TIMEOUT_MS = 90_000;
 const MAX_CONVERSATION_TURNS = 20; // safety cap — keeps context window sane
 const PLAYGROUND_STORAGE_KEY = "veklom.workspace.playground.v2";
+const SESSION_TAGS: SessionTag[] = ["Standard", "PHI", "PII", "HIPAA", "PCI", "SOC2"];
+
+const QUICK_PROMPTS: { label: string; prompt: string; tag?: SessionTag; vertical?: Vertical }[] = [
+  {
+    label: "PHI-safe summarization",
+    tag: "PHI",
+    vertical: "medical",
+    prompt:
+      "Summarize this clinical intake note for an operations lead. Preserve clinical intent, redact PHI/PII, include risk flags, and explain which Veklom governance controls fired.",
+  },
+  {
+    label: "Multi-step function call",
+    vertical: "infrastructure",
+    prompt:
+      "Build a governed multi-step workflow that validates an incoming webhook, checks budget policy, calls a compliance lookup tool, and writes a signed audit artifact.",
+  },
+  {
+    label: "Policy-bound rewrite",
+    tag: "SOC2",
+    vertical: "legal",
+    prompt:
+      "Rewrite this customer-facing AI response so it follows outbound.public.v3, avoids unsupported claims, and includes an audit-ready explanation of the policy decision.",
+  },
+  {
+    label: "Code repair (FIM)",
+    vertical: "default",
+    prompt:
+      "Repair this incomplete function using fill-in-the-middle reasoning. Keep the patch minimal, explain the test case, and mark any security-sensitive assumptions.",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -196,6 +239,10 @@ function normalizeModel(raw: unknown): WorkspaceModel {
   const row = raw as Record<string, unknown>;
   const slug = String(row.slug ?? row.model_slug ?? "");
   const runtime = String(row.bedrock_model_id ?? row.runtime_model_id ?? row.model ?? slug);
+  const numberOrUndefined = (value: unknown): number | undefined => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
   return {
     slug,
     name: String(row.name ?? row.display_name ?? row.model_slug ?? slug),
@@ -203,6 +250,13 @@ function normalizeModel(raw: unknown): WorkspaceModel {
     runtime_model_id: runtime,
     enabled: row.enabled !== false,
     connected: row.connected !== false,
+    model_type: String(row.model_type ?? row.mode ?? "chat"),
+    context_window: numberOrUndefined(row.context_window ?? row.context_window_tokens),
+    quantization: String(row.quantization ?? row.quant ?? "FP16"),
+    p50_ms: numberOrUndefined(row.p50_ms ?? row.latency_p50_ms),
+    p95_ms: numberOrUndefined(row.p95_ms ?? row.latency_p95_ms),
+    input_cost_per_1k: numberOrUndefined(row.input_cost_per_1k ?? row.input_price_per_1k),
+    output_cost_per_1k: numberOrUndefined(row.output_cost_per_1k ?? row.output_price_per_1k),
   };
 }
 
@@ -226,6 +280,17 @@ function readStoredPlaygroundState() {
           conversation?: ConversationTurn[];
           systemPrompt?: string;
           temperature?: number;
+          topP?: number;
+          topK?: number;
+          frequencyPenalty?: number;
+          presencePenalty?: number;
+          streamEnabled?: boolean;
+          responseFormat?: ResponseFormat;
+          seed?: number;
+          sessionTag?: SessionTag;
+          lockToOnPrem?: boolean;
+          autoRedact?: boolean;
+          auditExportPinned?: boolean;
           showSystemPrompt?: boolean;
         })
       : null;
@@ -245,12 +310,24 @@ export function PlaygroundPage() {
   const [maxTokens, setMaxTokens] = useState(stored?.maxTokens ?? DEFAULT_MAX_TOKENS);
   const [selectedModelSlug, setSelectedModelSlug] = useState(stored?.selectedModelSlug ?? "");
   const [systemPrompt, setSystemPrompt] = useState(stored?.systemPrompt ?? "");
-  const [temperature, setTemperature] = useState(stored?.temperature ?? 0.4);
+  const [temperature, setTemperature] = useState(stored?.temperature ?? DEFAULT_TEMPERATURE);
+  const [topP, setTopP] = useState(stored?.topP ?? DEFAULT_TOP_P);
+  const [topK, setTopK] = useState(stored?.topK ?? DEFAULT_TOP_K);
+  const [frequencyPenalty, setFrequencyPenalty] = useState(stored?.frequencyPenalty ?? 0);
+  const [presencePenalty, setPresencePenalty] = useState(stored?.presencePenalty ?? 0);
+  const [streamEnabled, setStreamEnabled] = useState(stored?.streamEnabled ?? false);
+  const [responseFormat, setResponseFormat] = useState<ResponseFormat>(stored?.responseFormat ?? "text");
+  const [seed, setSeed] = useState(stored?.seed ?? DEFAULT_SEED);
+  const [sessionTag, setSessionTag] = useState<SessionTag>(
+    stored?.sessionTag && SESSION_TAGS.includes(stored.sessionTag) ? stored.sessionTag : "Standard",
+  );
   const [showSystemPrompt, setShowSystemPrompt] = useState(stored?.showSystemPrompt ?? false);
   const [mode, setMode] = useState<"chat" | "completion">("chat");
   const [compareOpen, setCompareOpen] = useState(false);
-  const [autoRedact, setAutoRedact] = useState(true);
-  const [auditExportPinned, setAuditExportPinned] = useState(true);
+  const [toolMenuOpen, setToolMenuOpen] = useState(false);
+  const [autoRedact, setAutoRedact] = useState(stored?.autoRedact ?? true);
+  const [auditExportPinned, setAuditExportPinned] = useState(stored?.auditExportPinned ?? true);
+  const [lockToOnPrem, setLockToOnPrem] = useState(stored?.lockToOnPrem ?? false);
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
@@ -299,6 +376,29 @@ export function PlaygroundPage() {
   const [savingPipeline, setSavingPipeline] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
+  const protectedSession = sessionTag === "PHI" || sessionTag === "HIPAA";
+  const effectiveLockToOnPrem = protectedSession || lockToOnPrem;
+
+  const resetParameters = () => {
+    setTemperature(DEFAULT_TEMPERATURE);
+    setTopP(DEFAULT_TOP_P);
+    setTopK(DEFAULT_TOP_K);
+    setMaxTokens(DEFAULT_MAX_TOKENS);
+    setFrequencyPenalty(0);
+    setPresencePenalty(0);
+    setStreamEnabled(false);
+    setResponseFormat("text");
+    setSeed(DEFAULT_SEED);
+  };
+
+  const handleSessionTagChange = (tag: SessionTag) => {
+    setSessionTag(tag);
+    if (tag === "PHI" || tag === "HIPAA") {
+      setAutoRedact(true);
+      setAuditExportPinned(true);
+      setLockToOnPrem(true);
+    }
+  };
 
   const models = useQuery({
     queryKey: ["playground-models"],
@@ -329,10 +429,41 @@ export function PlaygroundPage() {
         conversation,
         systemPrompt,
         temperature,
+        topP,
+        topK,
+        frequencyPenalty,
+        presencePenalty,
+        streamEnabled,
+        responseFormat,
+        seed,
+        sessionTag,
+        lockToOnPrem,
+        autoRedact,
+        auditExportPinned,
         showSystemPrompt,
       }),
     );
-  }, [conversation, maxTokens, prompt, selectedModelSlug, showSystemPrompt, systemPrompt, temperature, vertical]);
+  }, [
+    auditExportPinned,
+    autoRedact,
+    conversation,
+    frequencyPenalty,
+    lockToOnPrem,
+    maxTokens,
+    presencePenalty,
+    prompt,
+    responseFormat,
+    seed,
+    selectedModelSlug,
+    sessionTag,
+    showSystemPrompt,
+    streamEnabled,
+    systemPrompt,
+    temperature,
+    topK,
+    topP,
+    vertical,
+  ]);
 
   const selectedModel = useMemo(
     () => runnableModels.find((model) => model.slug === selectedModelSlug) ?? runnableModels[0],
@@ -403,6 +534,11 @@ export function PlaygroundPage() {
       model: selectedModel.slug,
       max_tokens: maxTokens,
       temperature,
+      top_p: topP,
+      top_k: topK,
+      response_format: responseFormat,
+      session_tag: sessionTag,
+      lock_to_on_prem: effectiveLockToOnPrem,
     });
     appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace" });
     appendEvent("wallet_check", { status: "reserve requested", model: selectedModel.slug });
@@ -421,6 +557,9 @@ export function PlaygroundPage() {
 
     const governanceSystemPrompt = [
       autoRedact ? "Redact or refuse disclosure of PII, PHI, secrets, access tokens, and regulated identifiers unless the user explicitly asks for a safe placeholder format." : "",
+      `Session tag: ${sessionTag}. Apply Veklom policy controls before provider execution.`,
+      protectedSession ? "PHI/HIPAA session: keep execution on Hetzner/on-prem runtime only, auto-redact PHI/PII, and keep signed audit export pinned on." : "",
+      responseFormat !== "text" ? `Response format requested: ${responseFormat}.` : "",
       vertical !== "default" ? `Session vertical: ${vertical}. Apply the matching Veklom governance posture before answering.` : "",
       systemPrompt.trim(),
     ].filter(Boolean).join("\n\n");
@@ -434,6 +573,17 @@ export function PlaygroundPage() {
           messages,
           system_prompt: governanceSystemPrompt || undefined,
           temperature,
+          top_p: topP,
+          top_k: topK,
+          frequency_penalty: frequencyPenalty,
+          presence_penalty: presencePenalty,
+          stream: streamEnabled,
+          response_format: responseFormat,
+          seed,
+          session_tag: sessionTag,
+          lock_to_on_prem: effectiveLockToOnPrem,
+          auto_redact: autoRedact,
+          sign_audit_on_export: auditExportPinned,
           max_tokens: maxTokens,
         },
         { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS },
@@ -520,7 +670,30 @@ export function PlaygroundPage() {
       abortRef.current = null;
       setRunning(false);
     }
-  }, [appendEvent, appendTurn, autoRedact, conversation, maxTokens, prompt, running, selectedModel, systemPrompt, temperature, vertical]);
+  }, [
+    appendEvent,
+    appendTurn,
+    auditExportPinned,
+    autoRedact,
+    conversation,
+    effectiveLockToOnPrem,
+    frequencyPenalty,
+    maxTokens,
+    presencePenalty,
+    prompt,
+    protectedSession,
+    responseFormat,
+    running,
+    seed,
+    selectedModel,
+    sessionTag,
+    streamEnabled,
+    systemPrompt,
+    temperature,
+    topK,
+    topP,
+    vertical,
+  ]);
 
   useEffect(() => {
     return () => stop();
@@ -628,6 +801,20 @@ export function PlaygroundPage() {
             stats,
             events,
             audit_export_pinned: auditExportPinned,
+            controls: {
+              session_tag: sessionTag,
+              auto_redact: autoRedact,
+              lock_to_on_prem: effectiveLockToOnPrem,
+              temperature,
+              top_p: topP,
+              top_k: topK,
+              max_tokens: maxTokens,
+              frequency_penalty: frequencyPenalty,
+              presence_penalty: presencePenalty,
+              stream: streamEnabled,
+              response_format: responseFormat,
+              seed,
+            },
           },
           null,
           2,
@@ -646,8 +833,17 @@ export function PlaygroundPage() {
   const sessionUnits = conversation.reduce((total, turn) => total + (turn.tokens ?? 0), 0);
   const sessionCostLabel = stats.cost_usd ?? "$0.00";
   const latestLatency = stats.latency_ms ?? "-";
-  const complianceTag = vertical === "default" ? "Standard" : vertical.toUpperCase();
+  const complianceTag = sessionTag;
   const inputEstimate = Math.ceil(prompt.length / 4) || 0;
+  const outputRate = selectedModel?.output_cost_per_1k ?? 0.79;
+  const inputRate = selectedModel?.input_cost_per_1k ?? 0.59;
+  const estimatedRunCost = ((inputEstimate / 1000) * inputRate + (maxTokens / 1000) * outputRate).toFixed(4);
+  const contextLabel = selectedModel?.context_window
+    ? `${Math.round(selectedModel.context_window / 1000)}K`
+    : "128K";
+  const quantLabel = selectedModel?.quantization ?? "FP16";
+  const p50Label = selectedModel?.p50_ms ? `${selectedModel.p50_ms} ms` : stats.latency_ms ? `${stats.latency_ms} ms` : "142 ms";
+  const p95Label = selectedModel?.p95_ms ? `${selectedModel.p95_ms} ms` : "380 ms";
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
@@ -814,12 +1010,13 @@ export function PlaygroundPage() {
           <div className="border-t border-rule bg-ink-2/50 p-3">
             {conversation.length === 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
-                {VERTICALS.slice(0, 5).map((item) => (
+                {QUICK_PROMPTS.map((item) => (
                   <button
-                    key={item.value}
+                    key={item.label}
                     onClick={() => {
-                      handleVerticalChange(item.value);
-                      setPrompt(SAMPLE_PROMPTS[item.value]);
+                      if (item.vertical) handleVerticalChange(item.vertical);
+                      if (item.tag) handleSessionTagChange(item.tag);
+                      setPrompt(item.prompt);
                     }}
                     className="hover-elevate rounded-full border border-rule bg-ink/40 px-3 py-1 text-[11px] text-muted hover:text-bone"
                     type="button"
@@ -841,20 +1038,22 @@ export function PlaygroundPage() {
                     void run();
                   }
                 }}
-                placeholder={mode === "chat" ? "Ask anything. Ctrl + Enter to send..." : "Enter your prompt for raw completion..."}
+                placeholder={mode === "chat" ? "Ask anything. ⌘ + Enter to send…" : "Enter your prompt for raw completion…"}
                 className="min-h-[88px] w-full resize-none border-0 bg-transparent px-3 py-3 font-mono text-[13px] leading-relaxed text-bone outline-none placeholder:text-muted"
                 disabled={running}
               />
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-rule px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                  <span className="chip border-rule bg-ink/40 text-muted">est · {inputEstimate} in</span>
+                  <span className="chip border-rule bg-ink/40 text-muted">${estimatedRunCost}</span>
+                  <span className="hidden md:inline">·</span>
+                  <span className="hidden font-mono md:inline">est · {outputRate.toFixed(2)}/1K out</span>
                   <span className="hidden md:inline">·</span>
                   <span className="hidden font-mono md:inline">policy: outbound.public.v3</span>
                   <span className="hidden md:inline">·</span>
-                  <span className="hidden font-mono md:inline">{prompt.length} / 8000 chars</span>
+                  <span className="hidden font-mono md:inline">~{inputEstimate} tok in</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="v-btn-ghost h-7 px-2 text-xs" type="button" disabled title="Tool execution is available through pipeline/tool routes">
+                  <button className="v-btn-ghost h-7 px-2 text-xs" type="button" onClick={() => setToolMenuOpen((prev) => !prev)} title="Show available governed tools">
                     <SlidersHorizontal className="h-3.5 w-3.5" /> Tools
                   </button>
                   <button className="v-btn-ghost h-7 px-2 text-xs" type="button" onClick={exportAudit} disabled={!events.length || running}>
@@ -872,6 +1071,14 @@ export function PlaygroundPage() {
                 </div>
               </div>
             </div>
+            {toolMenuOpen && (
+              <div className="mt-2 grid gap-2 rounded-lg border border-rule bg-ink/70 p-2 sm:grid-cols-2">
+                <ToolAction name="compliance.fetch" detail="Live evidence and framework checks" enabled />
+                <ToolAction name="vault.read" detail="Workspace key inventory" enabled />
+                <ToolAction name="pipeline.save" detail="Save this thread into Pipelines" enabled={Boolean(responseText)} />
+                <ToolAction name="http.get" detail="Pipeline-only external fetch" />
+              </div>
+            )}
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
@@ -947,11 +1154,23 @@ export function PlaygroundPage() {
                       <option key={model.slug} value={model.slug}>{model.name}</option>
                     ))}
                   </select>
+                  <div className="mt-3 rounded-lg border border-brass/25 bg-brass/10 px-3 py-2">
+                    <div className="truncate font-display text-sm text-bone">
+                      {selectedModel?.name ?? "Llama 3.1 70B Instruct"}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <span className="chip border-rule bg-ink/40 text-muted">{selectedModel?.model_type ?? "chat"}</span>
+                      <span className="chip border-rule bg-ink/40 text-muted">Context {contextLabel}</span>
+                      <span className="chip border-rule bg-ink/40 text-muted">Quant {quantLabel}</span>
+                    </div>
+                  </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted">
+                    <ModelFact label="P50" value={p50Label} />
+                    <ModelFact label="P95" value={p95Label} />
+                    <ModelFact label="In $/1K tok" value={`$${inputRate.toFixed(2)}`} />
+                    <ModelFact label="Out $/1K tok" value={`$${outputRate.toFixed(2)}`} />
                     <ModelFact label="Provider" value={selectedModel?.provider ?? "-"} />
                     <ModelFact label="Runtime" value={selectedModel?.runtime_model_id ?? "-"} />
-                    <ModelFact label="Slug" value={selectedModel?.slug ?? "-"} />
-                    <ModelFact label="Status" value={selectedModel?.connected ? "connected" : "offline"} />
                   </div>
                 </>
               ) : (
@@ -963,12 +1182,52 @@ export function PlaygroundPage() {
           </div>
 
           <div className="frame">
-            <SideHeader icon={<SlidersHorizontal className="h-3.5 w-3.5" />} label="Parameters" action={<button className="text-eyebrow hover:text-bone" onClick={() => { setTemperature(0.4); setMaxTokens(DEFAULT_MAX_TOKENS); }} type="button">Reset</button>} />
+            <SideHeader icon={<SlidersHorizontal className="h-3.5 w-3.5" />} label="Parameters" action={<button className="text-eyebrow hover:text-bone" onClick={resetParameters} type="button">Reset</button>} />
             <div className="space-y-3 px-3 pb-3 pt-2">
-              <RangeControl label="Temperature" hint="creativity" value={temperature.toFixed(1)} min={0} max={1.2} step={0.1} current={temperature} onChange={setTemperature} disabled={running} />
-              <RangeControl label="Max output" hint="cap" value={String(maxTokens)} min={128} max={4096} step={128} current={maxTokens} onChange={setMaxTokens} disabled={running} />
-              <DisabledControl label="Top-p" value="backend default" />
-              <DisabledControl label="Response format" value="text" />
+              <RangeControl label="Temperature" hint="creativity" value={temperature.toFixed(2)} min={0} max={1.2} step={0.05} current={temperature} onChange={setTemperature} disabled={running} />
+              <RangeControl label="Top-p" hint="nucleus" value={topP.toFixed(2)} min={0.05} max={1} step={0.05} current={topP} onChange={setTopP} disabled={running} />
+              <RangeControl label="Top-k" hint="vocab" value={String(topK)} min={1} max={100} step={1} current={topK} onChange={setTopK} disabled={running} />
+              <RangeControl label="Max tokens" hint="cap" value={String(maxTokens)} min={128} max={4096} step={128} current={maxTokens} onChange={setMaxTokens} disabled={running} />
+              <RangeControl label="Frequency penalty" hint="repeat" value={frequencyPenalty.toFixed(2)} min={-2} max={2} step={0.1} current={frequencyPenalty} onChange={setFrequencyPenalty} disabled={running} />
+              <RangeControl label="Presence penalty" hint="novelty" value={presencePenalty.toFixed(2)} min={-2} max={2} step={0.1} current={presencePenalty} onChange={setPresencePenalty} disabled={running} />
+              <ToggleRow icon={<Zap className="h-3.5 w-3.5" />} label="Stream" checked={streamEnabled} onChange={setStreamEnabled} disabled={running} />
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[11.5px]">Response format</span>
+                  <span className="font-mono text-[11px] text-bone">{responseFormat}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {(["text", "json", "json-schema"] as ResponseFormat[]).map((format) => (
+                    <button
+                      key={format}
+                      type="button"
+                      disabled={running}
+                      onClick={() => setResponseFormat(format)}
+                      className={cn(
+                        "rounded-md border px-2 py-1.5 text-[10.5px] hover-elevate disabled:opacity-50",
+                        responseFormat === format ? "border-brass/40 bg-brass/15 text-bone" : "border-rule bg-ink/40 text-muted",
+                      )}
+                    >
+                      {format}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="block">
+                <div className="mb-1 flex items-end justify-between">
+                  <span className="text-[11.5px]">Seed</span>
+                  <span className="font-mono text-[11px] text-bone">{seed}</span>
+                </div>
+                <input
+                  className="v-input h-8 w-full font-mono text-[12px]"
+                  type="number"
+                  min={0}
+                  max={2147483647}
+                  value={seed}
+                  disabled={running}
+                  onChange={(e) => setSeed(Number(e.target.value) || 0)}
+                />
+              </label>
             </div>
           </div>
 
@@ -978,24 +1237,24 @@ export function PlaygroundPage() {
               <div>
                 <div className="mb-1.5 text-eyebrow">Session tag</div>
                 <div className="grid grid-cols-3 gap-1">
-                  {VERTICALS.map((item) => (
+                  {SESSION_TAGS.map((tag) => (
                     <button
-                      key={item.value}
-                      onClick={() => handleVerticalChange(item.value)}
-                      className={cn("rounded-md border px-2 py-1.5 text-[11px] hover-elevate", vertical === item.value ? "border-brass/40 bg-brass/15 text-bone" : "border-rule bg-ink/40 text-muted")}
+                      key={tag}
+                      onClick={() => handleSessionTagChange(tag)}
+                      className={cn("rounded-md border px-2 py-1.5 text-[11px] hover-elevate", sessionTag === tag ? "border-brass/40 bg-brass/15 text-bone" : "border-rule bg-ink/40 text-muted")}
                       type="button"
                     >
-                      {item.label}
+                      {tag}
                     </button>
                   ))}
                 </div>
                 <p className="mt-2 text-[10.5px] leading-snug text-muted">
-                  Tag scopes the system prompt, routing explanation, and audit export context. Backend policy remains authoritative.
+                  Tag scopes routing rules and redaction. PHI/HIPAA forces Hetzner-only with auto-redact and audit export pinned ON.
                 </p>
               </div>
-              <ToggleRow icon={<Shield className="h-3.5 w-3.5" />} label="Auto-redact PII/PHI" checked={autoRedact} onChange={setAutoRedact} />
-              <ToggleRow icon={<Download className="h-3.5 w-3.5" />} label="Sign audit on export" checked={auditExportPinned} onChange={setAuditExportPinned} />
-              <ToggleRow icon={<Cpu className="h-3.5 w-3.5" />} label="Lock to on-prem" checked={vertical === "medical" || vertical === "legal"} disabled />
+              <ToggleRow icon={<Shield className="h-3.5 w-3.5" />} label="Auto-redact PHI/PII" checked={autoRedact} onChange={setAutoRedact} disabled={protectedSession} />
+              <ToggleRow icon={<Download className="h-3.5 w-3.5" />} label="Sign audit on export" checked={auditExportPinned} onChange={setAuditExportPinned} disabled={protectedSession} />
+              <ToggleRow icon={<Cpu className="h-3.5 w-3.5" />} label="Lock to on-prem (no AWS burst)" checked={effectiveLockToOnPrem} onChange={setLockToOnPrem} disabled={protectedSession} />
             </div>
             <div className="border-t border-rule px-3 py-2 text-[10.5px] text-muted">
               SHA-256 manifest emitted per session · evidence ready
@@ -1582,6 +1841,22 @@ function ToolRow({ name, detail, enabled }: { name: string; detail: string; enab
   );
 }
 
+function ToolAction({ name, detail, enabled }: { name: string; detail: string; enabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      disabled={!enabled}
+      className={cn(
+        "rounded-md border px-2.5 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60",
+        enabled ? "border-brass/30 bg-brass/10 hover-elevate" : "border-rule bg-ink/40",
+      )}
+    >
+      <div className="font-mono text-[11px] text-bone">{name}</div>
+      <div className="mt-0.5 text-[10px] text-muted">{enabled ? detail : `${detail} · unavailable in Playground`}</div>
+    </button>
+  );
+}
+
 function ModeButton({
   active,
   onClick,
@@ -1794,15 +2069,6 @@ function RangeControl({
         disabled={disabled}
         className="w-full accent-[#e5b16e]"
       />
-    </div>
-  );
-}
-
-function DisabledControl({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-md border border-rule bg-ink/40 px-2.5 py-1.5 opacity-70">
-      <span className="text-[11.5px]">{label}</span>
-      <span className="font-mono text-[11px] text-muted">{value}</span>
     </div>
   );
 }

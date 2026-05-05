@@ -21,6 +21,8 @@ def call_groq(
     model: Optional[str] = None,
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
+    top_p: Optional[float] = None,
+    seed: Optional[int] = None,
 ) -> dict:
     """
     Call Groq /chat/completions synchronously.
@@ -41,6 +43,10 @@ def call_groq(
         "temperature": temperature if temperature is not None else 0.7,
         "stream": False,
     }
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if seed is not None:
+        payload["seed"] = seed
 
     start = time.monotonic()
     try:

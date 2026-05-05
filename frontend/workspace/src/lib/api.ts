@@ -31,16 +31,17 @@ export function resolveStripePk(): string {
 
 const API_BASE = resolveApiBase();
 const API_PREFIX = "/api/v1";
+const DEFAULT_API_TIMEOUT_MS = 7_000;
 
 export const api: AxiosInstance = axios.create({
   baseURL: `${API_BASE}${API_PREFIX}`,
-  timeout: 20_000,
+  timeout: DEFAULT_API_TIMEOUT_MS,
   withCredentials: false,
 });
 
 export const apiRoot: AxiosInstance = axios.create({
   baseURL: API_BASE || "/",
-  timeout: 20_000,
+  timeout: DEFAULT_API_TIMEOUT_MS,
 });
 
 function attachAuthHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
@@ -66,9 +67,11 @@ async function refreshAccessToken(): Promise<string | null> {
   }
   refreshInFlight = (async () => {
     try {
-      const resp = await axios.post(`${API_BASE}${API_PREFIX}/auth/refresh`, {
-        refresh_token: refreshToken,
-      });
+      const resp = await axios.post(
+        `${API_BASE}${API_PREFIX}/auth/refresh`,
+        { refresh_token: refreshToken },
+        { timeout: DEFAULT_API_TIMEOUT_MS },
+      );
       const { access_token, refresh_token, expires_in } = resp.data as {
         access_token: string;
         refresh_token?: string;

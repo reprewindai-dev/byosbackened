@@ -20,6 +20,7 @@ from core.config import get_settings
 from core.llm.circuit_breaker import is_open, record_failure, record_success
 from core.llm.groq_fallback import GroqFallbackError, call_groq
 from core.llm.ollama_client import OllamaClient, OllamaError
+from core.privacy.pii_detection import detect_and_mask_pii, detect_pii
 from core.services.workspace_gateway import (
     TOKEN_USD_RATE,
     get_model_setting,
@@ -51,6 +52,17 @@ class AICompleteRequest(BaseModel):
     messages: list[AIMessage] = Field(default_factory=list, max_length=40)
     system_prompt: Optional[str] = Field(default=None, max_length=12000)
     temperature: Optional[float] = Field(default=None, ge=0, le=2)
+    top_p: Optional[float] = Field(default=None, ge=0, le=1)
+    top_k: Optional[int] = Field(default=None, ge=1, le=200)
+    frequency_penalty: Optional[float] = Field(default=None, ge=-2, le=2)
+    presence_penalty: Optional[float] = Field(default=None, ge=-2, le=2)
+    stream: bool = False
+    response_format: Literal["text", "json", "json-schema"] = "text"
+    seed: Optional[int] = Field(default=None, ge=0, le=2147483647)
+    session_tag: Literal["Standard", "PHI", "PII", "HIPAA", "PCI", "SOC2"] = "Standard"
+    auto_redact: bool = True
+    sign_audit_on_export: bool = True
+    lock_to_on_prem: bool = False
 
     @field_validator("prompt")
     @classmethod
@@ -146,10 +158,10 @@ def _conversation_messages(payload: AICompleteRequest) -> list[AIMessage]:
 def _compose_prompt(payload: AICompleteRequest) -> str:
     parts: list[str] = []
     if payload.system_prompt:
-        parts.append(f"System:\n{payload.system_prompt}")
+        parts.append(f"System:\n{_safe_log_text(payload.system_prompt, payload)}")
     for msg in _conversation_messages(payload):
         role = "User" if msg.role == "user" else "Assistant"
-        parts.append(f"{role}:\n{msg.content}")
+        parts.append(f"{role}:\n{_safe_log_text(msg.content, payload)}")
     parts.append("Assistant:")
     return "\n\n".join(parts).strip()
 
@@ -161,6 +173,17 @@ def _request_input_text(payload: AICompleteRequest) -> str:
         "prompt": payload.prompt,
         "max_tokens": payload.max_tokens,
         "temperature": payload.temperature,
+        "top_p": payload.top_p,
+        "top_k": payload.top_k,
+        "frequency_penalty": payload.frequency_penalty,
+        "presence_penalty": payload.presence_penalty,
+        "stream": payload.stream,
+        "response_format": payload.response_format,
+        "seed": payload.seed,
+        "session_tag": payload.session_tag,
+        "auto_redact": payload.auto_redact,
+        "sign_audit_on_export": payload.sign_audit_on_export,
+        "lock_to_on_prem": payload.lock_to_on_prem,
     }
     return json.dumps(serialized, sort_keys=True, ensure_ascii=False)
 
@@ -171,12 +194,64 @@ def _circuit_scope(model_row) -> str:
     return f"{workspace_id}:{model_slug}"
 
 
+def _protected_session(payload: AICompleteRequest) -> bool:
+    return payload.session_tag in {"PHI", "HIPAA"}
+
+
+def _effective_on_prem_lock(payload: AICompleteRequest) -> bool:
+    return payload.lock_to_on_prem or _protected_session(payload)
+
+
+def _ollama_options(payload: AICompleteRequest, temperature: float) -> dict:
+    options = {"num_predict": payload.max_tokens, "temperature": temperature}
+    if payload.top_p is not None:
+        options["top_p"] = payload.top_p
+    if payload.top_k is not None:
+        options["top_k"] = payload.top_k
+    if payload.seed is not None:
+        options["seed"] = payload.seed
+    if payload.frequency_penalty is not None:
+        options["repeat_penalty"] = max(0.1, 1 + payload.frequency_penalty)
+    return options
+
+
+def _safe_preview(text: str, payload: AICompleteRequest) -> tuple[str, list[dict[str, str]]]:
+    detected = detect_pii(text)
+    if payload.auto_redact or _protected_session(payload):
+        masked, detected_masked = detect_and_mask_pii(text, "full")
+        return masked[:500], detected_masked
+    return text[:500], detected
+
+
+def _safe_log_text(text: str, payload: AICompleteRequest) -> str:
+    if payload.auto_redact or _protected_session(payload):
+        masked, _ = detect_and_mask_pii(text, "full")
+        return masked
+    return text
+
+
+def _governance_controls(payload: AICompleteRequest) -> dict:
+    return {
+        "session_tag": payload.session_tag,
+        "auto_redact": payload.auto_redact or _protected_session(payload),
+        "sign_audit_on_export": payload.sign_audit_on_export or _protected_session(payload),
+        "lock_to_on_prem": _effective_on_prem_lock(payload),
+        "response_format": payload.response_format,
+        "stream_requested": payload.stream,
+    }
+
+
 def _call_runtime_model(
     model_row,
     payload: AICompleteRequest,
 ) -> tuple[dict, str]:
     prompt = _compose_prompt(payload)
     temperature = payload.temperature if payload.temperature is not None else 0.7
+    if _effective_on_prem_lock(payload) and model_row.provider != "ollama":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="On-prem lock is enabled for this request. Select an Ollama/Hetzner runtime.",
+        )
     if model_row.provider == "ollama":
         client = OllamaClient(model=model_row.bedrock_model_id)
         circuit_scope = _circuit_scope(model_row)
@@ -186,7 +261,7 @@ def _call_runtime_model(
                 result = client.generate(
                     prompt=prompt,
                     model=model_row.bedrock_model_id,
-                    options={"num_predict": payload.max_tokens, "temperature": temperature},
+                    options=_ollama_options(payload, temperature),
                 )
                 record_success(circuit_scope)
                 return result, "ollama"
@@ -194,13 +269,24 @@ def _call_runtime_model(
                 record_failure(circuit_scope)
                 use_groq = True
 
+        if _effective_on_prem_lock(payload):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="On-prem lock is enabled and the Hetzner/Ollama runtime is unavailable.",
+            )
         if settings.llm_fallback != "groq" or not settings.groq_api_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="LLM unavailable: Ollama down and Groq fallback not configured.",
             )
         try:
-            return call_groq(prompt=prompt, max_tokens=payload.max_tokens, temperature=temperature), "groq"
+            return call_groq(
+                prompt=prompt,
+                max_tokens=payload.max_tokens,
+                temperature=temperature,
+                top_p=payload.top_p,
+                seed=payload.seed,
+            ), "groq"
         except GroqFallbackError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -214,6 +300,8 @@ def _call_runtime_model(
                 model=model_row.bedrock_model_id,
                 max_tokens=payload.max_tokens,
                 temperature=temperature,
+                top_p=payload.top_p,
+                seed=payload.seed,
             ), "groq"
         except GroqFallbackError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
@@ -241,6 +329,8 @@ def _call_runtime_model(
             for msg in _conversation_messages(payload)
         ]
         inference_config = {"maxTokens": payload.max_tokens, "temperature": temperature}
+        if payload.top_p is not None:
+            inference_config["topP"] = payload.top_p
         converse_args = {
             "modelId": model_row.bedrock_model_id,
             "messages": bedrock_messages,
@@ -309,12 +399,18 @@ async def complete(
         raise
 
     try:
-        response_text = (llm_result.get("response") or "").strip()
+        raw_response_text = (llm_result.get("response") or "").strip()
+        response_text = _safe_log_text(raw_response_text, payload)
         executed_model = str(llm_result.get("model") or model_row.bedrock_model_id or payload.model)
         requested_provider = str(model_row.provider or "").lower()
         fallback_triggered = provider != requested_provider
         routing_reason = "circuit_breaker_failover" if fallback_triggered else "primary_runtime"
         request_input_text = _request_input_text(payload)
+        input_preview, input_pii = _safe_preview(payload.prompt, payload)
+        output_preview, output_pii = _safe_preview(response_text, payload)
+        pii_types = sorted({item["type"] for item in input_pii + output_pii if item.get("type")})
+        pii_detected = bool(pii_types)
+        governance_controls = _governance_controls(payload)
         prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
         total_tokens = int(llm_result.get("total_tokens") or (prompt_tokens + output_tokens))
@@ -353,6 +449,7 @@ async def complete(
                         "routing_reason": routing_reason,
                         "output_tokens": output_tokens,
                         "tokens_deducted": tokens_deducted,
+                        "governance_controls": governance_controls,
                     },
                     sort_keys=True,
                 ),
@@ -371,16 +468,16 @@ async def complete(
             model=executed_model,
             input_hash=_sha256(request_input_text),
             output_hash=_sha256(response_text),
-            input_preview=payload.prompt[:500],
-            output_preview=response_text[:500],
+            input_preview=input_preview,
+            output_preview=output_preview,
             cost=cost_usd,
             tokens_input=prompt_tokens,
             tokens_output=output_tokens,
             routing_decision_id=None,
             routing_reasoning=routing_reason,
-            pii_detected=False,
-            pii_types=[],
-            sensitive_data_flags={},
+            pii_detected=pii_detected,
+            pii_types=pii_types,
+            sensitive_data_flags=governance_controls,
             created_at=datetime.utcnow(),
             log_hash="",
             previous_log_hash=previous_log_hash,
@@ -409,20 +506,31 @@ async def complete(
             model=executed_model,
             provider=provider,
             status="success",
-            prompt_preview=payload.prompt[:500],
-            response_preview=response_text[:500],
+            prompt_preview=input_preview,
+            response_preview=output_preview,
             request_json={
                 "model": payload.model,
                 "requested_provider": requested_provider,
                 "resolved_model": executed_model,
-                "prompt": payload.prompt,
-                "messages": [{"role": msg.role, "content": msg.content} for msg in _conversation_messages(payload)],
-                "system_prompt": payload.system_prompt,
+                "prompt": _safe_log_text(payload.prompt, payload),
+                "messages": [
+                    {"role": msg.role, "content": _safe_log_text(msg.content, payload)}
+                    for msg in _conversation_messages(payload)
+                ],
+                "system_prompt": _safe_log_text(payload.system_prompt, payload) if payload.system_prompt else None,
                 "max_tokens": payload.max_tokens,
                 "temperature": payload.temperature,
+                "top_p": payload.top_p,
+                "top_k": payload.top_k,
+                "frequency_penalty": payload.frequency_penalty,
+                "presence_penalty": payload.presence_penalty,
+                "stream": payload.stream,
+                "response_format": payload.response_format,
+                "seed": payload.seed,
+                "governance_controls": governance_controls,
             },
             response_json={
-                "response_text": response_text,
+                "response_text": _safe_log_text(response_text, payload),
                 "runtime_model_id": executed_model,
                 "provider": provider,
                 "requested_provider": requested_provider,
@@ -435,6 +543,9 @@ async def complete(
                 "tokens_deducted": tokens_deducted,
                 "wallet_balance": wallet.balance,
                 "audit_hash": audit_entry.log_hash,
+                "governance_controls": governance_controls,
+                "pii_detected": pii_detected,
+                "pii_types": pii_types,
             },
             tokens_in=prompt_tokens,
             tokens_out=output_tokens,

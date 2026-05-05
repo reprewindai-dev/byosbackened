@@ -12,6 +12,7 @@ const assetTarget = resolve(landingRoot, "workspace-assets");
 const workspaceShell = resolve(landingRoot, "workspace-app.html");
 
 const routeShells = [
+  "control-center",
   "dashboard",
   "playground",
   "marketplace",

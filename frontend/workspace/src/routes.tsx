@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ControlCenterPage } from "./pages/ControlCenterPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
@@ -22,8 +23,9 @@ export function AppRoutes() {
       <Route path="/register" element={<RegisterPage />} />
 
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/overview" replace />} />
-        <Route path="/dashboard" element={<OverviewPage />} />
+        <Route index element={<Navigate to="/control-center" replace />} />
+        <Route path="/dashboard" element={<ControlCenterPage />} />
+        <Route path="/control-center" element={<ControlCenterPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />

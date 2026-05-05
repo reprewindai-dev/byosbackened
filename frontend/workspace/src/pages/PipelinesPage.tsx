@@ -85,6 +85,21 @@ interface PipelineRun {
   created_at: string;
 }
 
+interface CreatePipelinePayload {
+  name: string;
+  description?: string;
+  graph: PipelineGraph;
+  policy_refs?: string[];
+}
+
+interface PipelineTemplate {
+  key: string;
+  name: string;
+  description: string;
+  policyRefs: string[];
+  graph: PipelineGraph;
+}
+
 async function fetchPipelines(): Promise<PipelineSummary[]> {
   const r = await api.get<{ items: PipelineSummary[] }>("/pipelines", { params: { limit: 50 } });
   return r.data.items ?? [];
@@ -112,14 +127,104 @@ const STARTER_GRAPH: PipelineGraph = {
   ],
 };
 
+const PIPELINE_TEMPLATES: PipelineTemplate[] = [
+  {
+    key: "phi-safe-summarization",
+    name: "PHI-safe summarization",
+    description: "Redact sensitive health data, enforce Hetzner-only routing, summarize, and sign the run.",
+    policyRefs: ["hipaa-aware", "on-prem-only", "audit-export"],
+    graph: {
+      nodes: [
+        { id: "input", type: "prompt", label: "Clinical document", prompt: "{{input}}" },
+        { id: "redact", type: "tool", label: "PHI/PII redaction", tool: "pii-redactor" },
+        { id: "policy", type: "gate", label: "HIPAA policy gate", policy: "hipaa-aware.onprem" },
+        { id: "summary", type: "model", label: "Summarize", model: "qwen2.5:3b" },
+        { id: "audit", type: "tool", label: "Signed manifest", tool: "audit-signer" },
+      ],
+      edges: [
+        { from: "input", to: "redact" },
+        { from: "redact", to: "policy" },
+        { from: "policy", to: "summary" },
+        { from: "summary", to: "audit" },
+      ],
+    },
+  },
+  {
+    key: "multi-step-function-call",
+    name: "Multi-step function call",
+    description: "Validate input, choose a governed model, call an approved tool, and write a trace.",
+    policyRefs: ["tool-allowlist", "cost-cap", "audit-required"],
+    graph: {
+      nodes: [
+        { id: "input", type: "prompt", label: "Task input", prompt: "{{input}}" },
+        { id: "policy", type: "gate", label: "Tool policy gate", policy: "tools.approved" },
+        { id: "planner", type: "model", label: "Plan call", model: "llama-3.1-8b-instant" },
+        { id: "tool", type: "tool", label: "HTTP tool", tool: "http-approved" },
+        { id: "final", type: "model", label: "Final answer", model: "llama-3.1-8b-instant" },
+      ],
+      edges: [
+        { from: "input", to: "policy" },
+        { from: "policy", to: "planner" },
+        { from: "planner", to: "tool" },
+        { from: "tool", to: "final" },
+      ],
+    },
+  },
+  {
+    key: "policy-bound-rewrite",
+    name: "Policy-bound rewrite",
+    description: "Rewrite content under compliance policy, redaction controls, and signed output capture.",
+    policyRefs: ["outbound.public.v3", "pii-clean", "signed-output"],
+    graph: {
+      nodes: [
+        { id: "draft", type: "prompt", label: "Draft content", prompt: "{{input}}" },
+        { id: "policy", type: "gate", label: "Outbound policy", policy: "outbound.public.v3" },
+        { id: "rewrite", type: "model", label: "Rewrite", model: "qwen2.5:3b" },
+        { id: "redact", type: "tool", label: "Redaction pass", tool: "pii-redactor" },
+        { id: "manifest", type: "tool", label: "Manifest", tool: "audit-signer" },
+      ],
+      edges: [
+        { from: "draft", to: "policy" },
+        { from: "policy", to: "rewrite" },
+        { from: "rewrite", to: "redact" },
+        { from: "redact", to: "manifest" },
+      ],
+    },
+  },
+  {
+    key: "code-repair-fim",
+    name: "Code repair (FIM)",
+    description: "Route a code repair through policy, context validation, model execution, and audit capture.",
+    policyRefs: ["repo-context", "secret-scan", "audit-required"],
+    graph: {
+      nodes: [
+        { id: "code", type: "prompt", label: "Code context", prompt: "{{input}}" },
+        { id: "scan", type: "tool", label: "Secret scan", tool: "secret-scanner" },
+        { id: "policy", type: "gate", label: "Repo policy", policy: "repo-context.safe" },
+        { id: "repair", type: "model", label: "FIM repair", model: "llama-3.3-70b-versatile" },
+        { id: "audit", type: "tool", label: "Audit trace", tool: "audit-signer" },
+      ],
+      edges: [
+        { from: "code", to: "scan" },
+        { from: "scan", to: "policy" },
+        { from: "policy", to: "repair" },
+        { from: "repair", to: "audit" },
+      ],
+    },
+  },
+];
+
 export function PipelinesPage() {
   const qc = useQueryClient();
   const [showNew, setShowNew] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState<string | null>(null);
+  const [deploying, setDeploying] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nodeSearch, setNodeSearch] = useState("");
+  const [actionError, setActionError] = useState<unknown>(null);
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
@@ -136,21 +241,20 @@ export function PipelinesPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: async (payload: { name: string; description?: string }) => {
-      const r = await api.post<PipelineSummary>("/pipelines", {
-        name: payload.name,
-        description: payload.description,
-        graph: STARTER_GRAPH,
-      });
+    mutationFn: async (payload: CreatePipelinePayload) => {
+      const r = await api.post<PipelineSummary>("/pipelines", payload);
       return r.data;
     },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["pipelines"] });
       setSelectedId(created.id);
       setShowNew(false);
+      setShowTemplates(false);
       setNewName("");
       setNewDesc("");
+      setActionError(null);
     },
+    onError: (error) => setActionError(error),
   });
 
   const executeMut = useMutation({
@@ -163,6 +267,33 @@ export function PipelinesPage() {
       setCreating(null);
       qc.invalidateQueries({ queryKey: ["pipelines-runs"] });
     },
+    onError: (error) => setActionError(error),
+  });
+
+  const deployMut = useMutation({
+    mutationFn: async ({ pipeline, graph }: { pipeline: PipelineSummary; graph?: PipelineGraph }) => {
+      setDeploying(true);
+      const modelNode = graph?.nodes.find((node) => node.type === "model" && node.model);
+      const modelSlug = modelNode?.model ?? "qwen2.5:3b";
+      const provider = modelSlug.includes("llama-3") ? "groq" : "ollama";
+      const r = await api.post("/deployments", {
+        name: `${pipeline.slug}-endpoint`,
+        region: "hetzner-fsn1",
+        service_type: "pipeline",
+        model_slug: modelSlug,
+        provider,
+        version: `pipeline-v${pipeline.current_version}`,
+        strategy: "direct",
+        traffic_percent: 100,
+      });
+      return r.data;
+    },
+    onSuccess: () => {
+      setActionError(null);
+      qc.invalidateQueries({ queryKey: ["deployments"] });
+    },
+    onError: (error) => setActionError(error),
+    onSettled: () => setDeploying(false),
   });
 
   const graph = detail.data?.graph ?? (!selectedPipeline ? STARTER_GRAPH : undefined);
@@ -179,6 +310,7 @@ export function PipelinesPage() {
         pipelineCount={pipelines.data?.length ?? 0}
         routeUnavailable={pipelineRoutesUnavailable}
         onNew={() => setShowNew(true)}
+        onTemplates={() => setShowTemplates(true)}
       />
 
       {pipelineRoutesUnavailable && (
@@ -191,6 +323,13 @@ export function PipelinesPage() {
         </div>
       )}
 
+      {Boolean(actionError) && (
+        <div className="frame mb-4 flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <div>{actionUnavailableMessage(actionError, "Pipeline action")}</div>
+        </div>
+      )}
+
       <section>
         <div className="grid grid-cols-12 gap-4">
           <BuilderPanel
@@ -199,7 +338,9 @@ export function PipelinesPage() {
             loading={Boolean(selectedPipeline) && detail.isLoading}
             routeUnavailable={pipelineRoutesUnavailable}
             executing={creating === selectedPipeline?.id || executeMut.isPending}
+            deploying={deploying || deployMut.isPending}
             onExecute={() => selectedPipeline && executeMut.mutate(selectedPipeline.id)}
+            onDeploy={() => selectedPipeline && deployMut.mutate({ pipeline: selectedPipeline, graph })}
           />
           <NodePalette search={nodeSearch} onSearch={setNodeSearch} />
         </div>
@@ -227,9 +368,32 @@ export function PipelinesPage() {
           onName={setNewName}
           onDescription={setNewDesc}
           onClose={() => setShowNew(false)}
-          onCreate={() => createMut.mutate({ name: newName, description: newDesc || undefined })}
+          onCreate={() =>
+            createMut.mutate({
+              name: newName,
+              description: newDesc || undefined,
+              graph: STARTER_GRAPH,
+              policy_refs: ["default"],
+            })
+          }
           pending={createMut.isPending}
           error={createMut.error}
+        />
+      )}
+      {showTemplates && (
+        <TemplateModal
+          templates={PIPELINE_TEMPLATES}
+          pending={createMut.isPending}
+          error={createMut.error}
+          onClose={() => setShowTemplates(false)}
+          onCreate={(template) =>
+            createMut.mutate({
+              name: template.name,
+              description: template.description,
+              graph: template.graph,
+              policy_refs: template.policyRefs,
+            })
+          }
         />
       )}
     </div>
@@ -240,10 +404,12 @@ function PageHeader({
   pipelineCount,
   routeUnavailable,
   onNew,
+  onTemplates,
 }: {
   pipelineCount: number;
   routeUnavailable: boolean;
   onNew: () => void;
+  onTemplates: () => void;
 }) {
   return (
     <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -265,9 +431,10 @@ function PageHeader({
       </div>
       <div className="flex flex-wrap gap-2">
         <button
-          className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70"
-          disabled
-          title="Template installation is not wired to the backend yet."
+          className="v-btn-ghost h-8 px-3 text-xs"
+          disabled={routeUnavailable}
+          onClick={onTemplates}
+          title="Create a real persisted pipeline from a governed template."
         >
           <GitBranch className="h-3.5 w-3.5" /> Templates
         </button>
@@ -285,14 +452,18 @@ function BuilderPanel({
   loading,
   routeUnavailable,
   executing,
+  deploying,
   onExecute,
+  onDeploy,
 }: {
   selected: PipelineSummary | null;
   graph?: PipelineGraph;
   loading: boolean;
   routeUnavailable: boolean;
   executing: boolean;
+  deploying: boolean;
   onExecute: () => void;
+  onDeploy: () => void;
 }) {
   const nodeCount = graph?.nodes.length ?? selected?.latest_version?.node_count ?? 0;
   const edgeCount = graph?.edges.length ?? 0;
@@ -318,11 +489,12 @@ function BuilderPanel({
             <Play className="h-3.5 w-3.5" /> {executing ? "Running..." : "Test"}
           </button>
           <button
-            className="v-btn-primary h-7 cursor-not-allowed px-2 text-xs opacity-70"
-            disabled
-            title="Pipeline-to-endpoint deployment is not exposed by the backend yet."
+            className="v-btn-primary h-7 px-2 text-xs"
+            disabled={!selected || routeUnavailable || deploying}
+            onClick={onDeploy}
+            title="Create a live deployment record for this pipeline."
           >
-            <RocketIcon /> Deploy as endpoint
+            <RocketIcon /> {deploying ? "Deploying..." : "Deploy as endpoint"}
           </button>
         </div>
       </div>
@@ -673,6 +845,62 @@ function CreatePipelineModal({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TemplateModal({
+  templates,
+  pending,
+  error,
+  onClose,
+  onCreate,
+}: {
+  templates: PipelineTemplate[];
+  pending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onCreate: (template: PipelineTemplate) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm">
+      <div className="frame w-full max-w-3xl p-5">
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-display text-lg font-semibold text-bone">Install governed pipeline template</h3>
+            <p className="mt-1 text-[12px] text-muted">
+              Each template creates a real persisted pipeline with versioned graph and policy references.
+            </p>
+          </div>
+          <button className="text-muted hover:text-bone" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="grid gap-3 md:grid-cols-2">
+          {templates.map((template) => (
+            <button
+              key={template.key}
+              className="rounded-lg border border-rule bg-ink-1/60 p-4 text-left transition hover:border-brass/50 hover:bg-brass/5 disabled:cursor-wait disabled:opacity-60"
+              disabled={pending}
+              onClick={() => onCreate(template)}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-display text-[14px] font-semibold text-bone">{template.name}</div>
+                <Badge tone="primary">{template.graph.nodes.length} nodes</Badge>
+              </div>
+              <p className="mt-2 min-h-10 text-[12px] leading-relaxed text-bone-2">{template.description}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {template.policyRefs.map((policy) => (
+                  <Badge key={policy} tone="muted">
+                    {policy}
+                  </Badge>
+                ))}
+              </div>
+            </button>
+          ))}
+        </div>
+        {Boolean(error) && <div className="mt-3 text-[12px] text-crimson">{actionUnavailableMessage(error, "Template install")}</div>}
       </div>
     </div>
   );

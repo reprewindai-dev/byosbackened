@@ -60,7 +60,8 @@ async function fetchModels(): Promise<ModelEntry[]> {
 }
 
 async function toggleModel({ slug, enabled }: { slug: string; enabled: boolean }) {
-  await api.patch(`/workspace/models/${encodeURIComponent(slug)}`, { enabled });
+  const resp = await api.patch<{ model_slug: string; enabled: boolean }>(`/workspace/models/${encodeURIComponent(slug)}`, { enabled });
+  return resp.data;
 }
 
 function normalizeModel(raw: unknown): ModelEntry {
@@ -157,7 +158,18 @@ export function ModelsPage() {
 
   const toggler = useMutation({
     mutationFn: toggleModel,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["models-fleet"] }),
+    onMutate: async ({ slug, enabled }) => {
+      await qc.cancelQueries({ queryKey: ["models-fleet"] });
+      const previous = qc.getQueryData<ModelEntry[]>(["models-fleet"]);
+      qc.setQueryData<ModelEntry[]>(["models-fleet"], (current) =>
+        (current ?? []).map((model) => (model.slug === slug ? { ...model, enabled } : model)),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(["models-fleet"], context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["models-fleet"] }),
   });
 
   const models = data ?? [];
@@ -224,6 +236,16 @@ export function ModelsPage() {
           </div>
         )}
 
+        {toggler.isError && (
+          <div className="frame mb-4 flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+            <AlertCircle className="mt-0.5 h-4 w-4" />
+            <div className="flex-1">
+              <div className="font-semibold">Model toggle failed</div>
+              <div className="mt-1 text-xs opacity-80">{(toggler.error as Error)?.message ?? "The backend rejected the model update."}</div>
+            </div>
+          </div>
+        )}
+
         {isLoading && <LoadingGrid />}
 
         {!isLoading && !isError && filteredModels.length === 0 && (
@@ -246,7 +268,7 @@ export function ModelsPage() {
                   key={model.slug}
                   model={model}
                   onToggle={() => toggler.mutate({ slug: model.slug, enabled: !model.enabled })}
-                  toggling={toggler.isPending}
+                  toggling={toggler.isPending && toggler.variables?.slug === model.slug}
                 />
               ))}
             </div>
@@ -254,7 +276,7 @@ export function ModelsPage() {
             <ModelTable
               models={filteredModels}
               onToggle={(model) => toggler.mutate({ slug: model.slug, enabled: !model.enabled })}
-              toggling={toggler.isPending}
+              togglingSlug={toggler.isPending ? toggler.variables?.slug : undefined}
             />
           )
         )}
@@ -496,11 +518,11 @@ function ModelCard({
 function ModelTable({
   models,
   onToggle,
-  toggling,
+  togglingSlug,
 }: {
   models: ModelEntry[];
   onToggle: (model: ModelEntry) => void;
-  toggling: boolean;
+  togglingSlug?: string;
 }) {
   return (
     <div className="frame overflow-hidden">
@@ -531,7 +553,7 @@ function ModelTable({
           <div className="font-mono text-muted">
             {model.output_cost_per_1k !== undefined ? `$${model.output_cost_per_1k.toFixed(3)}` : "not set"}
           </div>
-          <ToggleSwitch enabled={model.enabled} disabled={toggling} onClick={() => onToggle(model)} />
+          <ToggleSwitch enabled={model.enabled} disabled={togglingSlug === model.slug} onClick={() => onToggle(model)} />
         </div>
       ))}
     </div>

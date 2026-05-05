@@ -606,6 +606,47 @@ async def orders_create(
     return {"id": order.id, "total_cents": order.total_cents, "currency": order.currency}
 
 
+def _serialize_order(row: MarketplaceOrder, db: Session) -> dict:
+    items = []
+    for item in row.items:
+        listing = db.query(Listing).filter(Listing.id == item.listing_id).first()
+        items.append(
+            {
+                "id": item.id,
+                "listing_id": item.listing_id,
+                "listing_title": listing.title if listing else None,
+                "vendor_id": item.vendor_id,
+                "price_cents": item.price_cents,
+                "status": item.status,
+            }
+        )
+    return {
+        "id": row.id,
+        "status": row.status,
+        "total_cents": row.total_cents,
+        "currency": row.currency,
+        "stripe_payment_intent": row.stripe_payment_intent,
+        "items": items,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.get("/orders/me")
+async def orders_me(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(MarketplaceOrder)
+        .filter(MarketplaceOrder.buyer_id == current_user.id)
+        .order_by(MarketplaceOrder.created_at.desc())
+        .limit(max(1, min(limit, 100)))
+        .all()
+    )
+    return {"items": [_serialize_order(row, db) for row in rows]}
+
+
 @router.get("/orders/{order_id}")
 async def orders_get(
     order_id: str,
@@ -618,18 +659,7 @@ async def orders_get(
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="Order not found")
-    return {
-        "id": row.id,
-        "status": row.status,
-        "total_cents": row.total_cents,
-        "currency": row.currency,
-        "stripe_payment_intent": row.stripe_payment_intent,
-        "items": [
-            {"id": i.id, "listing_id": i.listing_id, "vendor_id": i.vendor_id, "price_cents": i.price_cents, "status": i.status}
-            for i in row.items
-        ],
-        "created_at": row.created_at.isoformat(),
-    }
+    return _serialize_order(row, db)
 
 
 class PaymentIntentRequest(BaseModel):

@@ -61,6 +61,21 @@ interface Preflight {
   compliance_badges: string[];
 }
 
+interface MarketplaceOrder {
+  id: string;
+  status: string;
+  total_cents: number;
+  currency: string;
+  created_at: string;
+  items: Array<{
+    id: string;
+    listing_id: string;
+    listing_title?: string | null;
+    price_cents: number;
+    status: string;
+  }>;
+}
+
 const TYPE_LABEL: Record<string, string> = {
   pipeline: "Pipeline",
   tool: "Tool",
@@ -111,6 +126,11 @@ async function fetchCategories(): Promise<CategoriesResp> {
 async function fetchPreflight(listingId: string): Promise<Preflight> {
   const r = await api.get<Preflight>(`/marketplace/listings/${listingId}/preflight`);
   return r.data;
+}
+
+async function fetchMyOrders(): Promise<MarketplaceOrder[]> {
+  const r = await api.get<{ items: MarketplaceOrder[] }>("/marketplace/orders/me", { params: { limit: 25 } });
+  return r.data.items ?? [];
 }
 
 function normalizeListings(data: unknown): ListingCard[] {
@@ -194,6 +214,11 @@ function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "general";
 }
 
+function apiErrorMessage(error: unknown): string {
+  const e = error as { response?: { data?: { detail?: string } }; message?: string };
+  return e.response?.data?.detail ?? e.message ?? "Request failed";
+}
+
 export function MarketplacePage() {
   const qc = useQueryClient();
   const { slug } = useParams();
@@ -201,9 +226,13 @@ export function MarketplacePage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selected, setSelected] = useState<ListingCard | null>(null);
+  const [showOrders, setShowOrders] = useState(false);
+  const [showProvider, setShowProvider] = useState(false);
+  const [providerName, setProviderName] = useState("");
 
   const featuredQ = useQuery({ queryKey: ["mkt-featured"], queryFn: fetchFeatured });
   const categoriesQ = useQuery({ queryKey: ["mkt-categories"], queryFn: fetchCategories });
+  const ordersQ = useQuery({ queryKey: ["mkt-orders-me"], queryFn: fetchMyOrders, enabled: showOrders });
   const preflightQ = useQuery({
     queryKey: ["mkt-preflight", selected?.id],
     queryFn: () => fetchPreflight(selected!.id),
@@ -220,6 +249,17 @@ export function MarketplacePage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mkt-featured"] });
+    },
+  });
+
+  const providerMut = useMutation({
+    mutationFn: async (displayName: string) => {
+      await api.post("/marketplace/vendors/create", { display_name: displayName.trim() });
+      const r = await api.post<{ onboarding_url?: string }>("/marketplace/vendors/onboard", {});
+      return r.data;
+    },
+    onSuccess: (data) => {
+      if (data.onboarding_url) window.location.href = data.onboarding_url;
     },
   });
 
@@ -335,10 +375,10 @@ export function MarketplacePage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Purchase history route is not wired yet.">
+          <button className="v-btn-ghost h-8 px-3 text-xs" onClick={() => setShowOrders(true)}>
             <Store className="h-3.5 w-3.5" /> My purchases
           </button>
-          <button className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Provider onboarding is handled outside this page for now.">
+          <button className="v-btn-primary h-8 px-3 text-xs" onClick={() => setShowProvider(true)}>
             <Sparkles className="h-3.5 w-3.5" /> Become a provider
           </button>
         </div>
@@ -612,13 +652,23 @@ export function MarketplacePage() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-rule/50 pt-3">
+              {(selected.source_url || selected.use_url) && (
+                <a
+                  className="v-btn-ghost"
+                  href={selected.source_url ?? selected.use_url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View source
+                </a>
+              )}
               {selected.price_cents > 0 ? (
                 <button
                   className="v-btn-primary"
                   disabled={checkoutMut.isPending}
                   onClick={() => checkoutMut.mutate(selected.id)}
                 >
-                  {checkoutMut.isPending ? "Redirecting…" : "Purchase"}
+                  {checkoutMut.isPending ? "Redirecting..." : "Purchase"}
                 </button>
               ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" && (selected.use_url || selected.source_url) ? (
                 <a
@@ -642,7 +692,7 @@ export function MarketplacePage() {
                 >
                   <Download className="h-4 w-4" />
                   {installMut.isPending
-                    ? "Installing…"
+                    ? "Installing..."
                     : installMut.isSuccess
                     ? "Installed"
                     : "One-click install"}
@@ -658,20 +708,145 @@ export function MarketplacePage() {
               </div>
             )}
             {installMut.isError && (
-              <div className="text-[12px] text-crimson">
-                {(installMut.error as { response?: { data?: { detail?: string } } })?.response?.data
-                  ?.detail ?? (installMut.error as Error)?.message}
-              </div>
+              <div className="text-[12px] text-crimson">{apiErrorMessage(installMut.error)}</div>
             )}
             {checkoutMut.isError && (
-              <div className="text-[12px] text-crimson">
-                {(checkoutMut.error as { response?: { data?: { detail?: string } } })?.response
-                  ?.data?.detail ?? (checkoutMut.error as Error)?.message}
-              </div>
+              <div className="text-[12px] text-crimson">{apiErrorMessage(checkoutMut.error)}</div>
             )}
           </div>
         </div>
       )}
+
+      {showOrders && <OrdersModal ordersQ={ordersQ} onClose={() => setShowOrders(false)} />}
+
+      {showProvider && (
+        <ProviderModal
+          displayName={providerName}
+          onDisplayName={setProviderName}
+          pending={providerMut.isPending}
+          error={providerMut.error}
+          onClose={() => setShowProvider(false)}
+          onSubmit={() => providerName.trim() && providerMut.mutate(providerName)}
+        />
+      )}
+    </div>
+  );
+}
+
+function OrdersModal({
+  ordersQ,
+  onClose,
+}: {
+  ordersQ: ReturnType<typeof useQuery<MarketplaceOrder[]>>;
+  onClose: () => void;
+}) {
+  const orders = ordersQ.data ?? [];
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/80 p-4 backdrop-blur-sm md:items-center">
+      <div className="frame w-full max-w-2xl p-5">
+        <header className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Marketplace orders</div>
+            <h3 className="mt-0.5 text-xl font-semibold text-bone">My purchases</h3>
+          </div>
+          <button className="text-muted hover:text-bone" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        {ordersQ.isLoading && <div className="py-8 text-center font-mono text-[12px] text-muted">loading orders...</div>}
+        {ordersQ.isError && <div className="text-[12px] text-crimson">{apiErrorMessage(ordersQ.error)}</div>}
+        {!ordersQ.isLoading && !ordersQ.isError && orders.length === 0 && (
+          <div className="rounded-md border border-dashed border-rule bg-ink-1/50 p-6 text-center text-sm text-muted">
+            No marketplace purchases yet.
+          </div>
+        )}
+        {orders.length > 0 && (
+          <div className="max-h-[460px] overflow-auto">
+            <table className="w-full text-[12px]">
+              <thead className="border-b border-rule text-eyebrow">
+                <tr>
+                  <th className="py-2 text-left">Order</th>
+                  <th className="py-2 text-left">Items</th>
+                  <th className="py-2 text-left">Status</th>
+                  <th className="py-2 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id} className="border-b border-rule/50">
+                    <td className="py-2 font-mono text-bone">{order.id.slice(0, 8)}</td>
+                    <td className="py-2 text-bone-2">
+                      {order.items.map((item) => item.listing_title ?? item.listing_id).join(", ") || "No items"}
+                    </td>
+                    <td className="py-2">
+                      <span className="v-chip">{order.status}</span>
+                    </td>
+                    <td className="py-2 text-right font-mono text-bone">{fmtCents(order.total_cents, order.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProviderModal({
+  displayName,
+  onDisplayName,
+  pending,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  displayName: string;
+  onDisplayName: (value: string) => void;
+  pending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/80 p-4 backdrop-blur-sm md:items-center">
+      <div className="frame w-full max-w-lg p-5">
+        <header className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Vendor onboarding</div>
+            <h3 className="mt-0.5 text-xl font-semibold text-bone">Become a provider</h3>
+            <p className="mt-1 text-sm text-bone-2">
+              Creates a vendor profile and starts Stripe Connect onboarding when your marketplace plan is eligible.
+            </p>
+          </div>
+          <button className="text-muted hover:text-bone" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <label className="block">
+          <div className="v-label">Provider display name</div>
+          <input
+            className="v-input"
+            value={displayName}
+            onChange={(event) => onDisplayName(event.target.value)}
+            placeholder="Veklom Labs"
+            autoFocus
+          />
+        </label>
+        <div className="mt-3 rounded-md border border-rule bg-ink-1/60 p-3 text-[12px] text-muted">
+          Active paid vendor access is required unless the account is a marketplace admin. If access is not active, the
+          backend will return the exact reason and no fake vendor state is created.
+        </div>
+        {Boolean(error) && <div className="mt-3 text-[12px] text-crimson">{apiErrorMessage(error)}</div>}
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="v-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="v-btn-primary" disabled={!displayName.trim() || pending} onClick={onSubmit}>
+            {pending ? "Opening Stripe..." : "Start onboarding"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

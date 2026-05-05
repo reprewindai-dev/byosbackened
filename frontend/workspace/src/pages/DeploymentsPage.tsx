@@ -375,13 +375,7 @@ function EndpointDetail({
 }
 
 function DropInPanel() {
-  return (
-    <div className="frame col-span-12 p-4 lg:col-span-5">
-      <div className="text-eyebrow">Adoption · drop-in</div>
-      <div className="font-display text-[14px] font-semibold text-bone">Veklom is OpenAI-compatible</div>
-      <p className="mt-1 text-[12px] text-muted">Existing OpenAI clients can switch the base URL and keep the same call shape.</p>
-      <pre className="mt-3 max-h-[260px] overflow-auto rounded-md border border-rule bg-ink-1/70 p-3 font-mono text-[11.5px] leading-relaxed text-bone-2">
-{`from openai import OpenAI
+  const snippet = `from openai import OpenAI
 client = OpenAI(
   base_url="https://api.veklom.com/v1",
   api_key=os.environ["VEKLOM_API_KEY"],
@@ -389,10 +383,18 @@ client = OpenAI(
 client.chat.completions.create(
   model="your-deployed-model",
   messages=[{"role": "user", "content": "hi"}],
-)`}
+)`;
+
+  return (
+    <div className="frame col-span-12 p-4 lg:col-span-5">
+      <div className="text-eyebrow">Adoption · drop-in</div>
+      <div className="font-display text-[14px] font-semibold text-bone">Veklom is OpenAI-compatible</div>
+      <p className="mt-1 text-[12px] text-muted">Existing OpenAI clients can switch the base URL and keep the same call shape.</p>
+      <pre className="mt-3 max-h-[260px] overflow-auto rounded-md border border-rule bg-ink-1/70 p-3 font-mono text-[11.5px] leading-relaxed text-bone-2">
+        {snippet}
       </pre>
       <div className="mt-3 flex items-center gap-2">
-        <button className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Clipboard copy is not wired in this page yet.">
+        <button className="v-btn-ghost h-8 px-3 text-xs" onClick={() => navigator.clipboard?.writeText(snippet)}>
           <Copy className="h-3.5 w-3.5" /> Copy
         </button>
         <a href="#/vault" className="v-btn-primary h-8 px-3 text-xs">

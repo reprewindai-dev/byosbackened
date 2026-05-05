@@ -19,7 +19,18 @@ from sqlalchemy.orm import Session
 from core.config import get_settings
 from core.security import create_access_token, decode_access_token, get_password_hash, verify_password
 from db.session import get_db
-from db.models import User, UserRole, UserStatus, UserSession, APIKey, Workspace, TokenWallet, TokenTransaction
+from db.models import (
+    APIKey,
+    InviteStatus,
+    TokenTransaction,
+    TokenWallet,
+    User,
+    UserRole,
+    UserSession,
+    UserStatus,
+    Workspace,
+    WorkspaceInvite,
+)
 from apps.api.deps import get_current_user
 from core.services.trial_onboarding import issue_trial_license, send_trial_welcome
 
@@ -60,6 +71,13 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class AcceptInviteRequest(BaseModel):
+    invite_secret: Optional[str] = None
+    token: Optional[str] = None
+    password: Optional[str] = None
+    full_name: Optional[str] = None
 
 
 class MFASetupResponse(BaseModel):
@@ -291,6 +309,88 @@ async def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
     session.expires_at = datetime.utcnow() + timedelta(seconds=tokens["expires_in"])
     user.last_activity = datetime.utcnow()
     db.commit()
+
+    return TokenResponse(
+        **tokens,
+        user_id=user.id,
+        workspace_id=user.workspace_id,
+        role=user.role.value,
+    )
+
+
+@router.post("/accept-invite", response_model=TokenResponse)
+async def accept_invite(payload: AcceptInviteRequest, request: Request, db: Session = Depends(get_db)):
+    """Redeem a workspace invite link and sign the user into the invited workspace."""
+    invite_secret = (payload.invite_secret or payload.token or "").strip()
+    if not invite_secret:
+        raise HTTPException(status_code=400, detail="Invite link is missing or invalid")
+
+    invite = db.query(WorkspaceInvite).filter(WorkspaceInvite.token == invite_secret).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite link not found or already removed")
+
+    if invite.expires_at and invite.expires_at < datetime.utcnow():
+        invite.status = InviteStatus.EXPIRED
+        db.commit()
+        raise HTTPException(status_code=410, detail="Invite link has expired")
+
+    if invite.status != InviteStatus.PENDING:
+        status_value = invite.status.value if hasattr(invite.status, "value") else invite.status
+        raise HTTPException(status_code=409, detail=f"Invite link is already {status_value}")
+
+    password = payload.password or ""
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not any(c.isupper() for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+
+    try:
+        assigned_role = UserRole(invite.role)
+    except ValueError:
+        assigned_role = UserRole.USER
+
+    user = db.query(User).filter(User.email == invite.email).first()
+    if user:
+        if not verify_password(password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Existing account password is incorrect")
+        user.workspace_id = invite.workspace_id
+        user.role = assigned_role
+        user.status = UserStatus.ACTIVE
+        user.is_active = True
+        if payload.full_name and not user.full_name:
+            user.full_name = payload.full_name
+    else:
+        user = User(
+            email=invite.email,
+            hashed_password=get_password_hash(password),
+            full_name=payload.full_name,
+            workspace_id=invite.workspace_id,
+            role=assigned_role,
+            status=UserStatus.ACTIVE,
+            is_superuser=False,
+        )
+        db.add(user)
+        db.flush()
+
+    invite.status = InviteStatus.ACCEPTED
+    invite.accepted_at = datetime.utcnow()
+    user.last_login = datetime.utcnow()
+    user.last_activity = datetime.utcnow()
+
+    tokens = _create_tokens(user)
+    session = UserSession(
+        user_id=user.id,
+        session_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        expires_at=datetime.utcnow() + timedelta(seconds=tokens["expires_in"]),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(user)
 
     return TokenResponse(
         **tokens,

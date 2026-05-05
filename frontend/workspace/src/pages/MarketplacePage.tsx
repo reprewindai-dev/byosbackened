@@ -172,11 +172,7 @@ function normalizeCategories(data: unknown): CategoriesResp {
     .filter((row) => row.slug);
   return {
     categories,
-    types: [
-      { slug: "connector", count: categories.reduce((sum, row) => sum + row.count, 0) },
-      { slug: "pipeline", count: 0 },
-      { slug: "tool", count: 0 },
-    ],
+    types: [],
   };
 }
 
@@ -260,6 +256,37 @@ export function MarketplacePage() {
     return merged;
   }, [featuredQ.data]);
 
+  const typeFilters = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of allCards) {
+      counts.set(card.listing_type, (counts.get(card.listing_type) ?? 0) + 1);
+    }
+    const fallback = categoriesQ.data?.types ?? [];
+    const source = counts.size
+      ? [...counts.entries()].map(([slug, count]) => ({ slug, count }))
+      : fallback.filter((row) => row.count > 0);
+    const priority = ["pipeline", "tool", "connector", "evidence_pack", "agent", "prompt_pack", "dataset", "edge_template"];
+    return source.sort((a, b) => {
+      const ai = priority.indexOf(a.slug);
+      const bi = priority.indexOf(b.slug);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      return a.slug.localeCompare(b.slug);
+    });
+  }, [allCards, categoriesQ.data?.types]);
+
+  const categoryFilters = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of allCards) {
+      counts.set(card.category ?? "general", (counts.get(card.category ?? "general") ?? 0) + 1);
+    }
+    if (counts.size) {
+      return [...counts.entries()]
+        .map(([slug, count]) => ({ slug, count }))
+        .sort((a, b) => a.slug.localeCompare(b.slug));
+    }
+    return categoriesQ.data?.categories ?? [];
+  }, [allCards, categoriesQ.data?.categories]);
+
   const filteredAll = useMemo(() => {
     return allCards.filter((c) => {
       if (selectedType && c.listing_type !== selectedType) return false;
@@ -330,7 +357,7 @@ export function MarketplacePage() {
         </div>
         <div className="flex flex-wrap gap-1">
           <TypeChip label="All" active={!selectedType} onClick={() => setSelectedType(null)} />
-          {categoriesQ.data?.types.map((t) => (
+          {typeFilters.map((t) => (
             <TypeChip
               key={t.slug}
               label={`${TYPE_LABEL[t.slug] ?? t.slug} · ${t.count}`}
@@ -355,7 +382,7 @@ export function MarketplacePage() {
                 onClick={() => setSelectedCategory(null)}
               />
             </li>
-            {categoriesQ.data?.categories.map((c) => (
+            {categoryFilters.map((c) => (
               <li key={c.slug}>
                 <CategoryButton
                   label={CATEGORY_LABEL[c.slug] ?? c.slug}
@@ -593,7 +620,7 @@ export function MarketplacePage() {
                 >
                   {checkoutMut.isPending ? "Redirecting…" : "Purchase"}
                 </button>
-              ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" ? (
+              ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" && (selected.use_url || selected.source_url) ? (
                 <a
                   className="v-btn-primary"
                   href={selected.use_url ?? selected.source_url ?? "#"}
@@ -603,6 +630,10 @@ export function MarketplacePage() {
                   <Download className="h-4 w-4" />
                   Open product
                 </a>
+              ) : selected.listing_type !== "pipeline" && selected.listing_type !== "agent" ? (
+                <button className="v-btn-ghost cursor-not-allowed opacity-70" disabled title="This listing has no live source URL yet.">
+                  Source unavailable
+                </button>
               ) : (
                 <button
                   className="v-btn-primary"

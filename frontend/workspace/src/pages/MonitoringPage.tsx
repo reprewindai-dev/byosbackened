@@ -44,7 +44,8 @@ interface VerifyResp {
   log_id: string;
   verified: boolean;
   hash_match: boolean;
-  verification_status?: "verified" | "mismatch" | "inconclusive";
+  verification_status?: "verified" | "verified_legacy" | "mismatch" | "inconclusive";
+  verification_scheme?: "current" | "legacy_preflush" | null;
   reason?: string | null;
   log_hash: string | null;
 }
@@ -174,9 +175,9 @@ function PageHeader() {
         <button
           className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70"
           disabled
-          title="Evidence export is activation-only and is not exposed from this page yet."
+          title="Activation required. Free evaluation can inspect runs but cannot export compliance-grade evidence."
         >
-          <Download className="h-3.5 w-3.5" /> Export evidence
+          <Download className="h-3.5 w-3.5" /> Export Evidence Pack
         </button>
       </div>
     </header>
@@ -330,8 +331,8 @@ function AuditRailPanel({
         <span>
           Hash anchor: <span className="font-mono text-bone">{logs[0]?.log_hash?.slice(0, 12) ?? "not available"}</span>
         </span>
-        <button className="inline-flex h-7 cursor-not-allowed items-center gap-1 rounded-md px-2 text-muted opacity-70" disabled>
-          <Download className="h-3.5 w-3.5" /> Export pkg
+        <button className="inline-flex h-7 cursor-not-allowed items-center gap-1 rounded-md px-2 text-muted opacity-70" disabled title="Activation required for signed evidence export.">
+          <Download className="h-3.5 w-3.5" /> Export locked
         </button>
       </div>
     </div>
@@ -507,19 +508,20 @@ function VerifyDrawer({ log, onClose }: { log: AuditLog; onClose: () => void }) 
 
 function VerifyResult({ data }: { data: VerifyResp }) {
   const inconclusive = data.verification_status === "inconclusive";
+  const legacy = data.verification_status === "verified_legacy" || data.verification_scheme === "legacy_preflush";
   const ok = data.verified && !inconclusive;
   return (
     <div
       className={cn(
         "mt-3 flex items-start gap-3 rounded-md border p-3 text-[12px]",
-        inconclusive
+        inconclusive || legacy
           ? "border-brass/40 bg-brass/10 text-brass-2"
           : ok
             ? "border-moss/40 bg-moss/5 text-moss"
             : "border-crimson/40 bg-crimson/5 text-crimson",
       )}
     >
-      {inconclusive ? (
+      {inconclusive || legacy ? (
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
       ) : ok ? (
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -528,9 +530,9 @@ function VerifyResult({ data }: { data: VerifyResp }) {
       )}
       <div>
         <div className="font-semibold">
-          {inconclusive ? "Verification inconclusive for this legacy record" : ok ? "Integrity verified" : "Hash mismatch - record may be tampered"}
+          {legacy ? "Integrity verified with legacy hash scheme" : inconclusive ? "Verification inconclusive for this legacy record" : ok ? "Integrity verified" : "Hash mismatch - record may be tampered"}
         </div>
-        {inconclusive && (
+        {(inconclusive || legacy) && (
           <div className="mt-1 text-[11px] opacity-80">
             This older entry used a previous hash envelope. New entries use the current verifiable scheme.
           </div>

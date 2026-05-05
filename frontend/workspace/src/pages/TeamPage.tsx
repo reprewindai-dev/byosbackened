@@ -100,6 +100,11 @@ const ROLE_STYLE: Record<string, string> = {
   billing: "",
 };
 
+function buildInviteLink(invite: Invite): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://veklom.com";
+  return `${origin}/workspace-app#/accept-invite?invite_secret=${encodeURIComponent(invite.token ?? "")}`;
+}
+
 export function TeamPage() {
   const qc = useQueryClient();
   const [showInvite, setShowInvite] = useState(false);
@@ -354,22 +359,18 @@ export function TeamPage() {
               <div className="space-y-3">
                 <div className="text-sm text-bone-2">
                   Invite created for <span className="font-mono text-bone">{issuedInvite.email}</span>.
-                  Share this acceptance link — it will not be shown again.
+                  Share this invite link. It will not be shown again.
                 </div>
                 <div className="flex items-center gap-2">
                   <input
                     readOnly
                     className="v-input w-full font-mono text-[11px]"
-                    value={`${window.location.origin}/accept-invite?token=${issuedInvite.token ?? ""}`}
+                    value={buildInviteLink(issuedInvite)}
                     onFocus={(e) => e.currentTarget.select()}
                   />
                   <button
                     className="v-btn-ghost"
-                    onClick={() =>
-                      navigator.clipboard?.writeText(
-                        `${window.location.origin}/accept-invite?token=${issuedInvite.token ?? ""}`,
-                      )
-                    }
+                    onClick={() => navigator.clipboard?.writeText(buildInviteLink(issuedInvite))}
                   >
                     <Copy className="h-3.5 w-3.5" /> Copy
                   </button>

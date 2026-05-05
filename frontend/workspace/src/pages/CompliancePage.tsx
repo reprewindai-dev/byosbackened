@@ -39,7 +39,12 @@ async function fetchRegulations(): Promise<Regulation[]> {
 
 async function runCheck(regulation_id: string): Promise<CheckResult> {
   const resp = await api.post<CheckResult>("/compliance/check", { regulation_id });
-  return resp.data;
+  return {
+    ...resp.data,
+    regulation_id: resp.data.regulation_id ?? (resp.data as CheckResult & { regulation?: string }).regulation ?? regulation_id,
+    checks: resp.data.checks ?? [],
+    issues: resp.data.issues ?? [],
+  };
 }
 
 export function CompliancePage() {
@@ -125,7 +130,7 @@ function PageHeader() {
         <button className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Scheduled evidence export is not wired yet.">
           <CalendarClock className="h-3.5 w-3.5" /> Schedule export
         </button>
-        <button className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Auditor-package export is locked until the export backend is live.">
+        <button className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Activation required. Free evaluation cannot export compliance-grade evidence.">
           <Download className="h-3.5 w-3.5" /> Export auditor pkg
         </button>
       </div>
@@ -302,11 +307,17 @@ function EvidencePackagesPanel({ result }: { result: CheckResult | null | undefi
         </Badge>
       </div>
       <div className="mt-3 rounded-md border border-dashed border-rule bg-ink-1/40 px-4 py-5 text-sm text-bone-2">
-        Evidence packages are visible as a capability but locked until the export route is live for activated workspaces.
+        Free evaluation lets you inspect governed runs, but signed artifacts, evidence packs, retention controls, bulk
+        export, and auditor bundles require an activated workspace.
         {result?.summary && <div className="mt-2 font-mono text-[11px] text-muted">Last check summary: {result.summary}</div>}
+        {result?.issues?.length ? (
+          <div className="mt-2 font-mono text-[11px] text-amber">
+            Open issues: {result.issues.join("; ")}
+          </div>
+        ) : null}
       </div>
       <button className="v-btn-primary mt-3 h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled>
-        <FileDown className="h-3.5 w-3.5" /> Download package
+        <FileDown className="h-3.5 w-3.5" /> Export Evidence Pack (Activation Required)
       </button>
     </div>
   );

@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name?: string;
   full_name?: string | null;
-  role: "owner" | "admin" | "developer" | "viewer" | "billing";
+  role: "owner" | "admin" | "analyst" | "user" | "readonly" | "developer" | "viewer" | "billing";
   mfa_enabled: boolean;
   created_at: string;
   avatar_url?: string | null;
@@ -81,6 +81,12 @@ export interface RegisterRequest {
   password: string;
   name?: string;
   workspace_name?: string;
+}
+
+export interface AcceptInviteRequest {
+  invite_secret: string;
+  password: string;
+  full_name?: string;
 }
 
 export interface KpiSummary {

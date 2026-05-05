@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
@@ -20,6 +21,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/overview" replace />} />

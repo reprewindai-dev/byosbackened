@@ -205,6 +205,26 @@ async def create_pipeline(
     return _serialize_pipeline(pipeline, version)
 
 
+@router.get("/runs/recent")
+async def recent_runs_workspace(
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cross-pipeline recent runs for the workspace, used by Pipelines list view."""
+    runs = (
+        db.query(PipelineRun)
+        .filter(PipelineRun.workspace_id == current_user.workspace_id)
+        .order_by(PipelineRun.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    items = []
+    for r in runs:
+        items.append({**_serialize_run(r)})
+    return {"items": items}
+
+
 @router.get("/{pipeline_id}")
 async def get_pipeline(
     pipeline_id: str,
@@ -463,8 +483,7 @@ async def list_runs(
     return {"items": [_serialize_run(r) for r in runs]}
 
 
-@router.get("/runs/recent")
-async def recent_runs_workspace(
+async def _recent_runs_workspace_legacy_order_guard(
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

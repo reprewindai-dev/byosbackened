@@ -21,14 +21,13 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install project and pip-audit
+      - name: Install pip-audit
         run: |
           python -m pip install --upgrade pip
-          pip install -e backend
           pip install pip-audit
 
-      - name: Audit installed backend environment
-        run: pip-audit
+      - name: Audit backend dependency graph
+        run: pip-audit backend --skip-editable
 
   workspace-audit:
     name: Workspace npm audit

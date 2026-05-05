@@ -18,11 +18,16 @@ jobs:
           echo "$HEALTH" | grep -q '"groq_fallback_enabled":true'
 
       - name: Verify authenticated exec model responds
-        if: ${{ secrets.CI_API_KEY != '' }}
+        env:
+          CI_API_KEY: ${{ secrets.CI_API_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${CI_API_KEY:-}" ]; then
+            echo "CI_API_KEY not configured; skipping authenticated /v1/exec probe"
+            exit 0
+          fi
           RESPONSE=$(curl -fsS -X POST https://api.veklom.com/v1/exec \
-            -H "X-API-Key: ${{ secrets.CI_API_KEY }}" \
+            -H "X-API-Key: ${CI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d '{"model":"qwen2.5:0.5b","prompt":"Reply with only: OK","max_tokens":5}' \
             --max-time 30)

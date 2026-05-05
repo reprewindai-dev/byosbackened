@@ -48,7 +48,7 @@ jobs:
           SECRET_KEY: test-secret-key-ci
           STRIPE_SECRET_KEY: sk_test_placeholder_not_real
           LICENSE_ADMIN_TOKEN: test-admin-token
-          ENCRYPTION_KEY: test-encryption-key-32-bytes-long
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
         run: |
           cd backend
           pytest --tb=short -q \

@@ -47,8 +47,8 @@ dependencies = [
     "sentry-sdk[fastapi]>=1.38.0",
     "python-slugify>=8.0.0",
     "pymodbus>=3.6.1,<4.0.0",
-    "pysnmp==4.4.12",
-    "pyasn1<0.5",
+    "pysnmp>=7.1.0,<8.0.0",
+    "pyasn1>=0.6.3,<0.7.0",
 ]
 
 [project.optional-dependencies]

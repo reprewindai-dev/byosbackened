@@ -48,8 +48,9 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /proof     /#proof     302
 /architecture  /#architecture  302
 /security  /#problem   302
-/status          /status.html  200
-/status/         /status.html  200
+/status          /status/index.html  200
+/status/         /status/index.html  200
+/status.html     /status/index.html  301
 
 # Legal short paths
 /legal/terms     /legal/terms.html     301
@@ -60,5 +61,5 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /legal/refunds   /legal/refunds.html   301
 /legal/acceptable-use  /legal/acceptable-use.html  301
 
-# Old workers.dev preview URL → canonical
+# Old workers.dev preview URL -> canonical
 https://veklom.pages.dev/*  https://veklom.com/:splat  301

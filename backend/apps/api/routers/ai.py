@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc
@@ -342,6 +343,15 @@ def _ollama_options(payload: AICompleteRequest, temperature: float) -> dict:
     return options
 
 
+def _openai_messages(payload: AICompleteRequest) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    if payload.system_prompt:
+        messages.append({"role": "system", "content": _safe_log_text(payload.system_prompt, payload)})
+    for msg in _conversation_messages(payload):
+        messages.append({"role": msg.role, "content": _safe_log_text(msg.content, payload)})
+    return messages
+
+
 def _safe_preview(text: str, payload: AICompleteRequest) -> tuple[str, list[dict[str, str]]]:
     detected = detect_pii(text)
     if payload.auto_redact or _protected_session(payload):
@@ -446,6 +456,67 @@ def _call_runtime_model(
             ), "groq", "primary_runtime"
         except GroqFallbackError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    if model_row.provider == "openai":
+        if not settings.openai_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OpenAI is not configured for this workspace runtime.",
+            )
+        openai_payload: dict = {
+            "model": model_row.bedrock_model_id,
+            "messages": _openai_messages(payload),
+            "temperature": temperature,
+            "max_tokens": payload.max_tokens,
+        }
+        if payload.top_p is not None:
+            openai_payload["top_p"] = payload.top_p
+        if payload.frequency_penalty is not None:
+            openai_payload["frequency_penalty"] = payload.frequency_penalty
+        if payload.presence_penalty is not None:
+            openai_payload["presence_penalty"] = payload.presence_penalty
+        if payload.seed is not None:
+            openai_payload["seed"] = payload.seed
+        if payload.response_format == "json":
+            openai_payload["response_format"] = {"type": "json_object"}
+
+        base_url = settings.openai_base_url.rstrip("/")
+        try:
+            with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
+                response = client.post(
+                    f"{base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.openai_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=openai_payload,
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"OpenAI request failed: HTTP {exc.response.status_code}",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"OpenAI request failed: {str(exc)[:240]}",
+            ) from exc
+
+        data = response.json()
+        choice = (data.get("choices") or [{}])[0]
+        message = choice.get("message") or {}
+        usage = data.get("usage") or {}
+        prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
+        completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+        total_tokens = int(usage.get("total_tokens", 0) or (prompt_tokens + completion_tokens))
+        return {
+            "response": (message.get("content") or "").strip(),
+            "model": data.get("model") or model_row.bedrock_model_id,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }, "openai", "primary_runtime"
 
     if model_row.provider == "bedrock":
         if not settings.aws_access_key_id or not settings.aws_secret_access_key:

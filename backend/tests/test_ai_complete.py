@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from apps.api.routers.ai import AICompleteRequest, complete
+from apps.api.routers.ai import AICompleteRequest, _call_runtime_model, complete
 from db.models import AIAuditLog, Subscription, TokenTransaction, TokenWallet
 
 
@@ -91,6 +91,41 @@ def _model_row():
     )
 
 
+class _FakeOpenAIResponse:
+    status_code = 200
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "model": "gpt-4o-mini-2024-07-18",
+            "choices": [{"message": {"content": "openai governed response"}}],
+            "usage": {
+                "prompt_tokens": 11,
+                "completion_tokens": 7,
+                "total_tokens": 18,
+            },
+        }
+
+
+class _FakeOpenAIClient:
+    posted = None
+
+    def __init__(self, timeout=None):
+        self.timeout = timeout
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def post(self, url, headers=None, json=None):
+        self.__class__.posted = {"url": url, "headers": headers, "json": json}
+        return _FakeOpenAIResponse()
+
+
 def test_complete_deducts_wallet_and_logs_call(monkeypatch):
     wallet = SimpleNamespace(
         id="wallet-1",
@@ -132,6 +167,46 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
     assert fake_db.committed is True
     assert any(obj.__class__.__name__ == "TokenTransaction" for obj in fake_db.added)
     assert any(obj.__class__.__name__ == "AIAuditLog" for obj in fake_db.added)
+
+
+def test_call_runtime_model_executes_openai_through_governed_provider(monkeypatch):
+    _FakeOpenAIClient.posted = None
+    monkeypatch.setattr("apps.api.routers.ai.httpx.Client", _FakeOpenAIClient)
+    monkeypatch.setattr(
+        "apps.api.routers.ai.settings",
+        SimpleNamespace(
+            openai_api_key="configured",
+            openai_base_url="https://api.openai.com/v1",
+            llm_timeout_seconds=60,
+        ),
+    )
+    model_row = SimpleNamespace(
+        model_slug="openai-chat",
+        bedrock_model_id="gpt-4o-mini",
+        provider="openai",
+        workspace_id="workspace-1",
+    )
+    payload = AICompleteRequest(
+        model="openai-chat",
+        prompt="Return JSON",
+        system_prompt="Follow policy",
+        max_tokens=64,
+        response_format="json",
+        temperature=0.2,
+    )
+
+    result, provider, routing_reason = _call_runtime_model(model_row, payload)
+
+    assert provider == "openai"
+    assert routing_reason == "primary_runtime"
+    assert result["response"] == "openai governed response"
+    assert result["model"] == "gpt-4o-mini-2024-07-18"
+    assert result["prompt_tokens"] == 11
+    assert result["completion_tokens"] == 7
+    assert _FakeOpenAIClient.posted["url"] == "https://api.openai.com/v1/chat/completions"
+    assert _FakeOpenAIClient.posted["headers"]["Authorization"].startswith("Bearer ")
+    assert _FakeOpenAIClient.posted["json"]["model"] == "gpt-4o-mini"
+    assert _FakeOpenAIClient.posted["json"]["response_format"] == {"type": "json_object"}
 
 
 def test_complete_rejects_when_wallet_is_too_small(monkeypatch):

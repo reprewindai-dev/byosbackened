@@ -138,6 +138,16 @@ def _model_perf_profile(model_slug: str, provider: str) -> dict:
             "input_cost_per_1k": 0.25,
             "output_cost_per_1k": 1.25,
         }
+    if provider == "openai":
+        return {
+            "model_type": "chat",
+            "context_window": 128000,
+            "quantization": "managed",
+            "p50_ms": 650,
+            "p95_ms": 1800,
+            "input_cost_per_1k": 0.15,
+            "output_cost_per_1k": 0.60,
+        }
     return {}
 
 
@@ -163,6 +173,19 @@ def _runtime_model_catalog() -> list[dict]:
                 "display_name": f"{settings.groq_model_smart} (Groq)",
                 "bedrock_model_id": settings.groq_model_smart,
                 "provider": "groq",
+                "connected": True,
+                "input_cost_per_1m_tokens": Decimal("0.00"),
+                "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+            }
+        )
+
+    if settings.openai_api_key:
+        rows.append(
+            {
+                "model_slug": "openai-chat",
+                "display_name": f"{settings.openai_model_chat} (OpenAI)",
+                "bedrock_model_id": settings.openai_model_chat,
+                "provider": "openai",
                 "connected": True,
                 "input_cost_per_1m_tokens": Decimal("0.00"),
                 "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),

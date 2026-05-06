@@ -92,6 +92,7 @@ class Settings(BaseSettings):
 
     # â”€â”€ External AI Providers (optional, for routing diversity) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     openai_api_key: str = ""  # OpenAI API key - used when OpenAI provider selected
+    openai_base_url: str = "https://api.openai.com/v1"
     openai_model_chat: str = "gpt-4o-mini"  # Default chat model
     openai_model_whisper: str = "whisper-1"  # Default STT model
     

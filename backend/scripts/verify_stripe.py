@@ -40,6 +40,7 @@ def main() -> int:
         fail("stripe library missing → pip install stripe")
         return 3
     stripe.api_key = secret_key
+    stripe.api_version = env.get("STRIPE_API_VERSION", "2026-04-22.dahlia")
 
     failures = 0
 

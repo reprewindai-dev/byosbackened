@@ -147,6 +147,7 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
+    stripe_api_version: str = "2026-04-22.dahlia"
 
     # License gate
     license_enforcement_enabled: bool = False

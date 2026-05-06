@@ -251,6 +251,7 @@ async def create_topup_checkout(
         raise HTTPException(status_code=503, detail="Stripe not configured")
     
     stripe.api_key = settings.stripe_secret_key
+    stripe.api_version = settings.stripe_api_version
     
     # Validate pack
     pack = TOKEN_PACKS.get(request.pack_name)

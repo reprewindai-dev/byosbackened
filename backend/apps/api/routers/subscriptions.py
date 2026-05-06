@@ -15,6 +15,12 @@ from db.models import Subscription, PlanTier, SubscriptionStatus, Workspace, Use
 settings = get_settings()
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
+
+def _configure_stripe() -> None:
+    """Apply secret key and pinned API version for deterministic Stripe calls."""
+    stripe.api_key = settings.stripe_secret_key
+    stripe.api_version = settings.stripe_api_version
+
 # ─── Plan catalog ─────────────────────────────────────────────────────────────
 # IMPORTANT: Backend subscription pricing and landing/dashboard displays must
 # stay aligned. Operating reserve funding is handled by the wallet router.
@@ -273,7 +279,7 @@ async def create_checkout(
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
-    stripe.api_key = settings.stripe_secret_key
+    _configure_stripe()
     plan_info = PLANS.get(payload.plan.value)
     if not plan_info:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -347,7 +353,7 @@ async def check_session(
     """Poll Stripe session status after checkout redirect."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
-    stripe.api_key = settings.stripe_secret_key
+    _configure_stripe()
     try:
         session = stripe.checkout.Session.retrieve(session_id)
         return {"status": session.status, "payment_status": session.payment_status}
@@ -364,7 +370,7 @@ async def billing_portal(
     """Create a Stripe Customer Portal session for self-service billing."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
-    stripe.api_key = settings.stripe_secret_key
+    _configure_stripe()
 
     sub = db.query(Subscription).filter(
         Subscription.workspace_id == current_user.workspace_id

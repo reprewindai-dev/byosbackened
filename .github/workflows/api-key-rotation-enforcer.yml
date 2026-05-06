@@ -1,12 +1,21 @@
-name: API Key Rotation Enforcer
+﻿name: Secret Rotation Guardian
 
 on:
   schedule:
     - cron: '0 9 * * 1'
   workflow_dispatch:
+    inputs:
+      force_rotate:
+        description: 'Comma-separated secret names to force into rotation, e.g. CLOUDFLARE_API_TOKEN,STRIPE_SECRET_KEY'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
-  check-stale-keys:
+  rotation-guardian:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,30 +27,33 @@ jobs:
       - name: Install deps
         run: pip install psycopg2-binary
 
-      - name: Check for keys older than 90 days
+      - name: Audit provider secrets and internal API keys
+        id: audit
         env:
+          GH_TOKEN: ${{ github.token }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FORCE_ROTATE_SECRETS: ${{ github.event.inputs.force_rotate }}
         run: |
-          python - <<'EOF'
-          import psycopg2, os, sys
+          python backend/scripts/secret_rotation_audit.py
 
-          conn = psycopg2.connect(os.environ["DATABASE_URL"])
-          cur = conn.cursor()
+      - name: Open rotation issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="[SECURITY] Secret rotation guardian requires action"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file secret-rotation-report.md
+          else
+            gh issue create \
+              --title "$TITLE" \
+              --body-file secret-rotation-report.md
+          fi
 
-          cur.execute("""
-            SELECT workspace_id, key_preview, created_at,
-                   EXTRACT(DAY FROM NOW() - created_at) AS age_days
-            FROM api_keys
-            WHERE is_active = true
-            AND created_at < NOW() - INTERVAL '90 days'
-            ORDER BY age_days DESC
-          """)
-
-          stale = cur.fetchall()
-          if stale:
-              print(f"WARNING: {len(stale)} API keys older than 90 days:")
-              for row in stale:
-                  print(f"  workspace={row[0]} key={row[1]} age={int(row[3])} days")
-          else:
-              print("No API keys older than 90 days")
-          EOF
+      - name: Upload rotation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secret-rotation-report
+          path: secret-rotation-report.md

@@ -5,6 +5,10 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   health-check:
     runs-on: ubuntu-latest
@@ -19,7 +23,8 @@ jobs:
             "/status" \
             "/api/v1/demo/pipeline/health" \
             "/api/v1/edge/demo/summary"; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BACKEND_URL$ROUTE")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+              --retry 3 --retry-delay 10 --retry-all-errors "$BACKEND_URL$ROUTE")
             echo "$ROUTE -> HTTP $STATUS"
             if [ "$STATUS" != "200" ]; then
               echo "Health check FAILED for $ROUTE"
@@ -39,3 +44,12 @@ jobs:
           else
             echo "SLACK_WEBHOOK_URL is not configured; failure notification skipped."
           fi
+
+      - name: Open incident issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "[OPS] Backend health monitor failed" \
+            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: production health endpoint or demo proof endpoint failed canary."

@@ -5,6 +5,10 @@ on:
     - cron: "*/30 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   run-jobs:
     runs-on: ubuntu-latest
@@ -23,4 +27,14 @@ jobs:
             -H "Authorization: Bearer $INTERNAL_API_KEY" \
             -H "Content-Type: application/json" \
             -d '{"trigger":"cron"}' \
+            --retry 3 --retry-delay 10 --retry-all-errors \
             --fail --silent --show-error
+
+      - name: Open incident issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "[OPS] Background job runner cron failed" \
+            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: queued backend jobs may need manual inspection."

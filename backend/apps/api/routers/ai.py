@@ -493,9 +493,16 @@ def _call_runtime_model(
                 )
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 401:
+                detail = "OpenAI authentication failed. Rotate or reconnect the provider key."
+            elif status_code == 429:
+                detail = "OpenAI rate limit or quota exceeded. Check provider billing, quota, or retry later."
+            else:
+                detail = f"OpenAI request failed: HTTP {status_code}"
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"OpenAI request failed: HTTP {exc.response.status_code}",
+                detail=detail,
             ) from exc
         except httpx.HTTPError as exc:
             raise HTTPException(

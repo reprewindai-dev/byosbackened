@@ -12,6 +12,7 @@ class _HealthyOllama:
 
 def _reset_bedrock_probe(monkeypatch):
     monkeypatch.setattr(workspace_gateway, "_bedrock_probe_cache", None)
+    monkeypatch.setattr(workspace_gateway, "_openai_probe_cache", None)
 
 
 def test_runtime_model_catalog_excludes_bedrock_without_credentials(monkeypatch):
@@ -85,6 +86,7 @@ def test_runtime_model_catalog_marks_bedrock_connected_when_probe_succeeds(monke
 def test_runtime_model_catalog_includes_openai_when_key_is_configured(monkeypatch):
     _reset_bedrock_probe(monkeypatch)
     monkeypatch.setattr(workspace_gateway, "OllamaClient", _HealthyOllama)
+    monkeypatch.setattr(workspace_gateway, "_probe_openai_connectivity", lambda: True)
     monkeypatch.setattr(workspace_gateway, "settings", SimpleNamespace(
         llm_model_default="qwen2.5:1.5b",
         groq_api_key="",
@@ -92,6 +94,7 @@ def test_runtime_model_catalog_includes_openai_when_key_is_configured(monkeypatc
         groq_model_fast="llama-3.1-8b-instant",
         groq_model_smart="llama-3.3-70b-versatile",
         openai_api_key="configured",
+        openai_base_url="https://api.openai.com/v1",
         openai_model_chat="gpt-4o-mini",
         aws_access_key_id="",
         aws_secret_access_key="",

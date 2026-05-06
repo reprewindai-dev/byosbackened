@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Iterable, Optional
 
+import httpx
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
@@ -32,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 _BEDROCK_PROBE_TTL_SECONDS = 60
 _bedrock_probe_cache: tuple[float, bool] | None = None
+_OPENAI_PROBE_TTL_SECONDS = 60
+_openai_probe_cache: tuple[float, bool] | None = None
 _OLLAMA_PROBE_TTL_SECONDS = 15
 _ollama_probe_cache: tuple[float, bool] | None = None
 
@@ -42,6 +45,10 @@ def _workspace_token_cost_per_1k_output_tokens() -> Decimal:
 
 def _has_bedrock_credentials() -> bool:
     return bool(settings.aws_access_key_id and settings.aws_secret_access_key)
+
+
+def _has_openai_credentials() -> bool:
+    return bool(settings.openai_api_key)
 
 
 def _probe_bedrock_connectivity() -> bool:
@@ -79,6 +86,34 @@ def _bedrock_connected() -> bool:
 
     connected = _probe_bedrock_connectivity()
     _bedrock_probe_cache = (now, connected)
+    return connected
+
+
+def _probe_openai_connectivity() -> bool:
+    try:
+        with httpx.Client(timeout=2) as client:
+            response = client.get(
+                f"{settings.openai_base_url.rstrip('/')}/models",
+                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+            )
+            return response.status_code == 200
+    except Exception as exc:
+        logger.info("openai_model_catalog_probe_failed", extra={"error": str(exc)})
+        return False
+
+
+def _openai_connected() -> bool:
+    global _openai_probe_cache
+
+    if not _has_openai_credentials():
+        return False
+
+    now = time.monotonic()
+    if _openai_probe_cache and now - _openai_probe_cache[0] < _OPENAI_PROBE_TTL_SECONDS:
+        return _openai_probe_cache[1]
+
+    connected = _probe_openai_connectivity()
+    _openai_probe_cache = (now, connected)
     return connected
 
 
@@ -179,14 +214,14 @@ def _runtime_model_catalog() -> list[dict]:
             }
         )
 
-    if settings.openai_api_key:
+    if _has_openai_credentials():
         rows.append(
             {
                 "model_slug": "openai-chat",
                 "display_name": f"{settings.openai_model_chat} (OpenAI)",
                 "bedrock_model_id": settings.openai_model_chat,
                 "provider": "openai",
-                "connected": True,
+                "connected": _openai_connected(),
                 "input_cost_per_1m_tokens": Decimal("0.00"),
                 "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
             }

@@ -2,6 +2,8 @@
 # https://developers.cloudflare.com/pages/configuration/redirects/
 
 # Force apex (no www). Keeps SEO single-canonical, avoids duplicate-content.
+http://veklom.com/*  https://veklom.com/:splat  301
+http://www.veklom.com/*  https://veklom.com/:splat  301
 https://www.veklom.com/*  https://veklom.com/:splat  301
 
 # Truthful workspace routes. The workspace shell is generated from
@@ -23,8 +25,10 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /marketplace       /workspace-app#/marketplace      302
 /marketplace/      /workspace-app#/marketplace      302
 /marketplace/*     /workspace-app#/marketplace/:splat      302
-/vendors           /vendor/index.html       200
-/vendors/          /vendor/index.html       200
+/vendor           /vendors/       301
+/vendor/          /vendors/       301
+/vendors          /vendors/index.html       200
+/vendors/         /vendors/index.html       200
 
 # Legacy / compiled-shell aliases land on truthful surfaces
 /pipelines         /workspace-app#/pipelines      302
@@ -46,7 +50,7 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 
 # Common typos / alternate paths land on real sections
 /contact   /#contact   302
-/pricing   /#pricing   302
+/pricing.html   /pricing/   301
 /proof     /#proof     302
 /architecture  /#architecture  302
 /security  /#problem   302

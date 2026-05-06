@@ -82,7 +82,7 @@ def _query_stale_database_keys(database_url: str, max_age_days: int) -> list[dic
     import psycopg2  # type: ignore[import-not-found]
 
     query = """
-        SELECT workspace_id, key_preview, created_at,
+        SELECT workspace_id, key_prefix, created_at,
                EXTRACT(DAY FROM NOW() - created_at) AS age_days
         FROM api_keys
         WHERE is_active = true
@@ -155,23 +155,26 @@ def main() -> int:
 
     findings: list[Finding] = []
     github_metadata_available = True
-    try:
-        if args.github_secrets_json:
-            github_secrets = _github_secrets_from_file(Path(args.github_secrets_json))
-        else:
-            github_secrets = _github_secrets_from_cli(args.repo or None)
-    except Exception as exc:  # noqa: BLE001 - report operational failure without leaking env
-        github_metadata_available = False
-        findings.append(
-            Finding(
-                severity="critical",
-                owner="BOUNCER",
-                name="SECRET_ROTATION_GH_TOKEN",
-                message=f"Unable to inspect GitHub secret metadata: {exc.__class__.__name__}.",
-                action="Add a fine-scoped GitHub token as SECRET_ROTATION_GH_TOKEN with repository Actions secrets read permission, then rerun the guardian.",
-            )
-        )
+    if args.skip_provider:
         github_secrets = {}
+    else:
+        try:
+            if args.github_secrets_json:
+                github_secrets = _github_secrets_from_file(Path(args.github_secrets_json))
+            else:
+                github_secrets = _github_secrets_from_cli(args.repo or None)
+        except Exception as exc:  # noqa: BLE001 - report operational failure without leaking env
+            github_metadata_available = False
+            findings.append(
+                Finding(
+                    severity="critical",
+                    owner="BOUNCER",
+                    name="SECRET_ROTATION_GH_TOKEN",
+                    message=f"Unable to inspect GitHub secret metadata: {exc.__class__.__name__}.",
+                    action="Add a fine-scoped GitHub token as SECRET_ROTATION_GH_TOKEN with repository Actions secrets read permission, then rerun the guardian.",
+                )
+            )
+            github_secrets = {}
 
     if not args.skip_provider:
         for secret in policy.get("provider_secrets", []):

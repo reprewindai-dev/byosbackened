@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from apps.api.deps import get_current_workspace_id, require_admin
 from core.cost_intelligence.kill_switch import get_cost_kill_switch
-from core.redis import get_redis
+from core.redis_pool import get_redis
 from db.models import User
 from pydantic import BaseModel, Field
 from typing import Optional

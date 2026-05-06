@@ -12,6 +12,11 @@
 #   xox[baprs]-[A-Za-z0-9-]{10,}              (Slack tokens)
 #   cfat_                                     (Cloudflare API tokens)
 #   gsk_                                      (Groq API keys)
+#   sk-proj-                                  (OpenAI project API keys)
+#   sk-ant-                                   (Anthropic API keys)
+#   hf_                                       (Hugging Face tokens)
+#   re_                                       (Resend API keys)
+#   private key PEM blocks
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
@@ -26,7 +31,12 @@ $patterns = @(
   '\bAIza[0-9A-Za-z_-]{35}\b',
   '\bxox[baprs]-[A-Za-z0-9-]{10,}',
   '\bcfat_[A-Za-z0-9_-]{20,}',
-  '\bgsk_[A-Za-z0-9]{20,}'
+  '\bgsk_[A-Za-z0-9]{20,}',
+  '\bsk-proj-[A-Za-z0-9_-]{20,}',
+  '\bsk-ant-[A-Za-z0-9_-]{20,}',
+  '\bhf_[A-Za-z0-9]{20,}',
+  '\bre_[A-Za-z0-9]{20,}',
+  '-----BEGIN (RSA |EC |OPENSSH |DSA |PRIVATE )?PRIVATE KEY-----'
 )
 
 # Skip known-safe / generated locations

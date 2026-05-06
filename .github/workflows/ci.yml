@@ -43,6 +43,10 @@ jobs:
       - name: Python compile check
         run: python -m compileall -q backend/apps backend/core backend/db backend/edge backend/license
 
+      - name: Repository hygiene gate
+        shell: pwsh
+        run: backend/scripts/check_repo_hygiene.ps1
+
       - name: Run backend contract tests
         env:
           DATABASE_URL: sqlite:///./ci-test.db

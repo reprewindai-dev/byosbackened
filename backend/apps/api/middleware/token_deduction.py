@@ -55,6 +55,10 @@ DEFAULT_ENDPOINT_COSTS: Dict[str, int] = {
     "/api/v1/auth/mfa": 0,
     "/api/v1/auth/api-keys": 0,
     "/api/v1/subscriptions/current": 0,
+
+    # Internal Veklom operator control plane. Access is enforced by
+    # ZeroTrust + automation scope in the router, not by customer metering.
+    "/api/v1/internal/operators": 0,
     
     # Low cost (10 tokens)
     "/api/v1/compliance/regulations": 10,

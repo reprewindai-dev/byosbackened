@@ -15,6 +15,12 @@ def test_buyer_package_excludes_server_only_files(tmp_path, monkeypatch):
     (root / "docker-compose.prod.yml").write_text("services: {}", encoding="utf-8")
     (root / "apps").mkdir()
     (root / "apps" / "main.py").write_text("print('ok')", encoding="utf-8")
+    (root / "apps" / "api").mkdir()
+    (root / "apps" / "api" / "routers").mkdir()
+    (root / "apps" / "api" / "routers" / "internal_operators.py").write_text(
+        "print('veklom internal only')",
+        encoding="utf-8",
+    )
     (root / "license").mkdir()
     (root / "license" / "__init__.py").write_text("", encoding="utf-8")
     (root / "license" / "tier.py").write_text("tier = 'starter'", encoding="utf-8")
@@ -51,6 +57,7 @@ def test_buyer_package_excludes_server_only_files(tmp_path, monkeypatch):
     assert ".env.example" in names
     assert "docker-compose.prod.yml" in names
     assert "apps/main.py" in names
+    assert "apps/api/routers/internal_operators.py" not in names
     assert "edge/router.py" in names
     assert "license/tier.py" in names
     assert "license/validator.py" in names

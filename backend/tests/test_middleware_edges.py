@@ -24,6 +24,7 @@ def test_edge_token_cost_policies_for_protocol_and_webhook():
     assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/modbus"] == 40
     assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/protocol/snmp"] == 40
     assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/protocol/modbus"] == 40
+    assert DEFAULT_ENDPOINT_COSTS["/api/v1/internal/operators"] == 0
 
 
 def test_public_demo_and_pipeline_routes_are_free_and_public():
@@ -81,6 +82,18 @@ def test_edge_protocol_routes_are_not_public():
         "/api/v1/edge/modbus",
         "/api/v1/edge/protocol/snmp",
         "/api/v1/edge/protocol/modbus",
+    }
+
+    assert protected_paths.isdisjoint(ZERO_TRUST_PUBLIC_PATHS)
+    assert protected_paths.isdisjoint(ENTITLEMENT_PUBLIC_ENDPOINTS)
+    assert protected_paths.isdisjoint(TOKEN_PUBLIC_ENDPOINTS)
+
+
+def test_internal_operator_routes_are_not_public():
+    protected_paths = {
+        "/api/v1/internal/operators/overview",
+        "/api/v1/internal/operators/workers",
+        "/api/v1/internal/operators/runs",
     }
 
     assert protected_paths.isdisjoint(ZERO_TRUST_PUBLIC_PATHS)

@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import sys
 from collections import Counter
+from pathlib import Path
 
 from fastapi.testclient import TestClient
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from apps.api.main import app
 
@@ -24,6 +29,7 @@ PROTECTED_ROUTES = (
     "/api/v1/edge/protocol/modbus",
     "/api/v1/jobs/process",
     "/api/v1/marketplace/automation/run",
+    "/api/v1/internal/operators/overview",
 )
 
 
@@ -49,6 +55,7 @@ def main() -> int:
         "/api/v1/edge/protocol/modbus",
         "/api/v1/jobs/process",
         "/api/v1/marketplace/automation/run",
+        "/api/v1/internal/operators/overview",
     }
     missing = sorted(required_paths - set(paths))
     if missing:

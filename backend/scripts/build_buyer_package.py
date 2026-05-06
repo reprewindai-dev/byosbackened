@@ -51,6 +51,7 @@ BUYER_ROOT_FILES = {
 
 # Files that stay on the Veklom-operated license/billing side.
 SERVER_ONLY_EXACT = {
+    "apps/api/routers/internal_operators.py",
     "license/server.py",
     "license/stripe_webhook.py",
     "db/models/license_key.py",

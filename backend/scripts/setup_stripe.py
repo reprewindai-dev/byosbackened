@@ -302,6 +302,11 @@ def configure_customer_portal(stripe, products: list, dry_run: bool):
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main() -> int:
+    fail("setup_stripe.py is retired for the old recurring subscription model.")
+    info("Current model: one-time activation plus USD Operating Reserve.")
+    info("Use backend/PRICING_TRUTH.md and apps/api/routers/subscriptions.py as the source of truth.")
+    return 2
+
     parser = argparse.ArgumentParser(description="Veklom Stripe setup")
     parser.add_argument("--webhook-url", default=DEFAULT_WEBHOOK_URL,
                         help=f"Webhook endpoint URL (default: {DEFAULT_WEBHOOK_URL})")

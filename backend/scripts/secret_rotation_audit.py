@@ -40,6 +40,18 @@ def _load_json(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def _db_only_policy() -> dict[str, Any]:
+    return {
+        "provider_secrets": [],
+        "database_api_keys": {
+            "owner": "BOUNCER",
+            "max_age_days": 90,
+            "critical": True,
+            "rotation_action": "Rotate stale workspace API keys through the Vault/API-key service. No broad owner key should be used by automated workers.",
+        },
+    }
+
+
 def _github_secrets_from_cli(repo: str | None) -> dict[str, datetime]:
     cmd = ["gh", "secret", "list", "--json", "name,updatedAt"]
     if repo:
@@ -134,7 +146,10 @@ def main() -> int:
     args = parser.parse_args()
 
     policy_path = Path(args.policy)
-    policy = _load_json(policy_path)
+    if args.skip_provider and not policy_path.exists():
+        policy = _db_only_policy()
+    else:
+        policy = _load_json(policy_path)
     now = datetime.now(UTC)
     forced = {name.strip() for name in args.force_rotate.split(",") if name.strip()}
 

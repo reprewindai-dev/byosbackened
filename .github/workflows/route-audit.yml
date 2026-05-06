@@ -37,6 +37,6 @@ jobs:
           Commit: $GITHUB_SHA
           Impact: a required backend route contract regressed.
           EOF
-          gh issue create \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "[OPS] Route audit failed" \
             --body-file incident.md

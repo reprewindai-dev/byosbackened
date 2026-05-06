@@ -56,6 +56,6 @@ jobs:
           Commit: $GITHUB_SHA
           Impact: production health endpoint or demo proof endpoint failed canary.
           EOF
-          gh issue create \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "[OPS] Backend health monitor failed" \
             --body-file incident.md

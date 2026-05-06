@@ -42,11 +42,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TITLE="[SECURITY] Secret rotation guardian requires action"
-          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
-            gh issue comment "$EXISTING" --body-file secret-rotation-report.md
+            gh issue comment --repo "$GITHUB_REPOSITORY" "$EXISTING" --body-file secret-rotation-report.md
           else
-            gh issue create \
+            gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$TITLE" \
               --body-file secret-rotation-report.md
           fi

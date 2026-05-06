@@ -68,6 +68,6 @@ jobs:
           Commit: $GITHUB_SHA
           Impact: latest backend main may not be healthy in production, or the deploy verification robot failed.
           EOF
-          gh issue create \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "[OPS] Backend deploy verification failed" \
             --body-file backend-deploy-incident.md

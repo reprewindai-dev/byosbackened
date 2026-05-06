@@ -55,6 +55,6 @@ jobs:
           Commit: $GITHUB_SHA
           Impact: public LLM health or authenticated model probe failed.
           EOF
-          gh issue create \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "[OPS] Model integrity check failed" \
             --body-file incident.md

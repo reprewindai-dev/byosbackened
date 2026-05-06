@@ -42,6 +42,6 @@ jobs:
           Commit: $GITHUB_SHA
           Impact: marketplace automation may not classify/validate queued listings until this is resolved.
           EOF
-          gh issue create \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "[OPS] Marketplace automation cron failed" \
             --body-file incident.md

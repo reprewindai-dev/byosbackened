@@ -849,6 +849,7 @@ function PipelineCanvas({
           <div className="mb-3 rounded-md border border-rule bg-ink-1/70 px-2 py-1.5 font-mono text-[10.5px] text-muted">
             Editing selected node: <span className="text-bone">{selected.label ?? selected.id}</span>
           </div>
+          <NodeGuidance node={selected} />
           <div className="space-y-2">
             <NodeTypeSelect value={selected.type} disabled={!editable} onChange={(type) => updateNode(selected.id, normalizeNodeForType(selected, type))} />
             <TextField label="Label" value={selected.label ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { label: value })} />
@@ -1379,6 +1380,23 @@ function NodeTypeSelect({
   );
 }
 
+function NodeGuidance({ node }: { node: PipelineNode }) {
+  const guide = nodeGuide(node);
+  return (
+    <div className="mb-3 rounded-md border border-brass/25 bg-brass/[0.055] p-2">
+      <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-brass-2">{guide.title}</div>
+      <div className="mt-1 text-[12px] leading-relaxed text-bone-2">{guide.body}</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {guide.chips.map((chip) => (
+          <Badge key={chip} tone="muted">
+            {chip}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TextAreaField({
   label,
   value,
@@ -1404,12 +1422,77 @@ function TextAreaField({
 }
 
 function normalizeNodeForType(node: PipelineNode, type: PipelineNode["type"]): Partial<PipelineNode> {
+  const kind = nodeKind({ ...node, type });
   return {
     type,
-    ...(type === "model" && !node.model ? { model: "qwen2.5:3b" } : {}),
+    ...(type === "model" && !node.model ? { model: kind === "embedding" ? "text-embedding-3-small" : "qwen2.5:3b" } : {}),
     ...(type === "prompt" && !node.prompt ? { prompt: "{{input}}" } : {}),
     ...(type === "tool" && !node.tool ? { tool: node.id } : {}),
     ...(type === "gate" && !node.policy ? { policy: "default" } : {}),
+  };
+}
+
+function nodeKind(node: PipelineNode): string {
+  const kind = node.config?.kind;
+  if (typeof kind === "string") return kind;
+  const text = `${node.label ?? ""} ${node.model ?? ""} ${node.tool ?? ""} ${node.id}`.toLowerCase();
+  if (text.includes("embedding")) return "embedding";
+  if (text.includes("reranker")) return "reranker";
+  if (text.includes("redact")) return "redaction";
+  if (text.includes("audit") || text.includes("signer") || text.includes("manifest")) return "evidence";
+  if (node.type === "gate") return "policy";
+  if (node.type === "condition") return "routing";
+  return node.type;
+}
+
+function nodeGuide(node: PipelineNode): { title: string; body: string; chips: string[] } {
+  const kind = nodeKind(node);
+  if (kind === "embedding") {
+    return {
+      title: "Embedding node",
+      body: "Turns text into searchable vectors. Use it before retrieval or semantic search, not as a chat response step.",
+      chips: ["connect to vector DB", "no chat prompt", "retrieval prep"],
+    };
+  }
+  if (kind === "policy") {
+    return {
+      title: "Policy gate",
+      body: "Checks the request against workspace rules before the next step runs. This is what makes the pipeline governable.",
+      chips: ["blocks bad runs", "audit evidence", "tenant policy"],
+    };
+  }
+  if (kind === "routing") {
+    return {
+      title: "Routing decision",
+      body: "Branches the run based on policy, model confidence, cost, or data type so the right path handles the right work.",
+      chips: ["if / else", "fallback control", "cost control"],
+    };
+  }
+  if (kind === "evidence") {
+    return {
+      title: "Evidence node",
+      body: "Captures signed output or a manifest so procurement, auditors, and incident reviews can verify what happened.",
+      chips: ["signed trail", "export ready", "audit pack"],
+    };
+  }
+  if (node.type === "model") {
+    return {
+      title: "Generation model",
+      body: "Produces the answer or transformation. Put policy, privacy, or retrieval steps before it when the input is sensitive.",
+      chips: ["answer step", "costed run", "latency tracked"],
+    };
+  }
+  if (node.type === "tool") {
+    return {
+      title: "Tool node",
+      body: "Calls a controlled capability such as HTTP, SQL, file reading, redaction, or evidence signing.",
+      chips: ["allowlist", "scoped action", "traceable"],
+    };
+  }
+  return {
+    title: "Input node",
+    body: "Starts the run with the user or system input. Everything downstream should prove how this input was governed.",
+    chips: ["run starts here", "policy context", "workspace scoped"],
   };
 }
 
@@ -1498,11 +1581,12 @@ function addGraphNode(graph: PipelineGraph, type: PipelineNode["type"], name: st
     id,
     type,
     label: name,
-    ...(type === "model" ? { model: "qwen2.5:3b" } : {}),
+    ...(type === "model" ? { model: idBase.includes("embedding") ? "text-embedding-3-small" : idBase.includes("reranker") ? "bge-reranker-large" : "qwen2.5:3b" } : {}),
     ...(type === "prompt" ? { prompt: "{{input}}" } : {}),
     ...(type === "tool" ? { tool: idBase } : {}),
     ...(type === "gate" ? { policy: "default" } : {}),
     config: {
+      kind: idBase.includes("embedding") ? "embedding" : idBase.includes("reranker") ? "reranker" : type,
       ui: {
         x: last ? clamp(last.x + 190, 90, CANVAS_WIDTH - 90) : 140,
         y: last ? clamp(last.y + 40, 70, CANVAS_HEIGHT - 70) : 160,

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
+from types import SimpleNamespace
+
+import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
-from apps.api.routers import internal_operators
+from apps.api.routers import auth, internal_operators
 
 
 def test_internal_operator_routes_are_registered():
@@ -72,3 +77,108 @@ def test_internal_operator_details_size_is_bounded():
         assert getattr(exc, "status_code", None) == 413
     else:
         raise AssertionError("oversized internal operator details should fail closed")
+
+
+def test_customer_api_key_scopes_are_normalized_to_tenant_safe_values():
+    user = SimpleNamespace(is_superuser=False)
+
+    assert auth._normalize_api_key_scopes(["read", "EXEC", "read", "write"], user) == ["READ", "EXEC", "WRITE"]
+
+
+def test_customer_api_key_scopes_block_internal_operator_scopes():
+    user = SimpleNamespace(is_superuser=False)
+
+    with pytest.raises(Exception) as exc_info:
+        auth._normalize_api_key_scopes(["read", "automation"], user)
+
+    assert getattr(exc_info.value, "status_code", None) == 403
+
+
+def test_superuser_can_create_internal_operator_api_key_scopes():
+    user = SimpleNamespace(is_superuser=True)
+
+    assert auth._normalize_api_key_scopes(["automation", "admin"], user) == ["AUTOMATION", "ADMIN"]
+
+
+def test_internal_operator_api_key_owner_must_be_active_superuser():
+    api_key = SimpleNamespace(workspace_id="operator-workspace")
+    customer_owner = SimpleNamespace(
+        workspace_id="operator-workspace",
+        is_superuser=False,
+        is_active=True,
+        status="active",
+    )
+    platform_owner = SimpleNamespace(
+        workspace_id="operator-workspace",
+        is_superuser=True,
+        is_active=True,
+        status="active",
+    )
+    wrong_workspace_owner = SimpleNamespace(
+        workspace_id="customer-workspace",
+        is_superuser=True,
+        is_active=True,
+        status="active",
+    )
+    suspended_owner = SimpleNamespace(
+        workspace_id="operator-workspace",
+        is_superuser=True,
+        is_active=True,
+        status="suspended",
+    )
+
+    assert internal_operators._is_active_superuser_key_owner(customer_owner, api_key) is False
+    assert internal_operators._is_active_superuser_key_owner(platform_owner, api_key) is True
+    assert internal_operators._is_active_superuser_key_owner(wrong_workspace_owner, api_key) is False
+    assert internal_operators._is_active_superuser_key_owner(suspended_owner, api_key) is False
+
+
+def test_customer_owned_admin_scope_key_cannot_open_internal_operator_routes():
+    raw_token = "byos_customer_admin_scope"
+    api_key = SimpleNamespace(
+        key_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+        is_active=True,
+        expires_at=None,
+        scopes=["ADMIN"],
+        workspace_id="customer-workspace",
+        user_id="customer-user",
+    )
+    customer_owner = SimpleNamespace(
+        id="customer-user",
+        workspace_id="customer-workspace",
+        is_superuser=False,
+        is_active=True,
+        status="active",
+    )
+
+    class FakeQuery:
+        def __init__(self, result):
+            self.result = result
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.result
+
+    class FakeDB:
+        def query(self, model):
+            if model is internal_operators.APIKey:
+                return FakeQuery(api_key)
+            if model is internal_operators.User:
+                return FakeQuery(customer_owner)
+            return FakeQuery(None)
+
+    request = SimpleNamespace(state=SimpleNamespace(is_superuser=False))
+
+    with pytest.raises(Exception) as exc_info:
+        asyncio.run(
+            internal_operators.require_internal_operator(
+                request,
+                authorization=f"Bearer {raw_token}",
+                db=FakeDB(),
+            )
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 403
+    assert getattr(exc_info.value, "detail", "") == "Superuser automation key required"

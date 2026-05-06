@@ -12,7 +12,6 @@ from typing import Optional, List
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -40,6 +39,8 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 _API_KEY_PREFIX = "byos_"
 FREE_TRIAL_CREDITS = 50_000
+CUSTOMER_API_KEY_SCOPES = {"READ", "EXEC", "WRITE"}
+INTERNAL_API_KEY_SCOPES = {"ADMIN", "AUTOMATION"}
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
@@ -135,6 +136,42 @@ def _create_tokens(user: User) -> dict:
         "refresh_token": create_access_token(refresh_payload, expires_delta=timedelta(days=30)),
         "expires_in": settings.access_token_expire_minutes * 60,
     }
+
+
+def _normalize_api_key_scopes(scopes: List[str], current_user: User) -> List[str]:
+    """Normalize and constrain API-key scopes before persistence.
+
+    Customer API keys are tenant-scoped execution/read/write credentials. Internal
+    automation scopes are reserved for platform superusers so a workspace owner
+    cannot mint a key that reaches Veklom-only operator surfaces.
+    """
+    normalized = []
+    for scope in scopes or ["read"]:
+        value = str(scope or "").strip().upper()
+        if not value:
+            continue
+        if value not in normalized:
+            normalized.append(value)
+
+    if not normalized:
+        normalized = ["READ"]
+
+    reserved = set(normalized) & INTERNAL_API_KEY_SCOPES
+    if reserved and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Internal automation API-key scopes are reserved for Veklom operators",
+        )
+
+    allowed = CUSTOMER_API_KEY_SCOPES | (INTERNAL_API_KEY_SCOPES if current_user.is_superuser else set())
+    unsupported = set(normalized) - allowed
+    if unsupported:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported API-key scope(s): {', '.join(sorted(unsupported))}",
+        )
+
+    return normalized
 
 
 # ─── Auth Routes ─────────────────────────────────────────────────────────────
@@ -293,7 +330,7 @@ async def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
 
     session = db.query(UserSession).filter(
         UserSession.refresh_token == payload.refresh_token,
-        UserSession.is_active == True,
+        UserSession.is_active.is_(True),
     ).first()
     if not session:
         raise HTTPException(status_code=401, detail="Session not found or revoked")
@@ -405,7 +442,7 @@ async def logout(current_user: User = Depends(get_current_user), db: Session = D
     """Invalidate all active sessions for current user."""
     db.query(UserSession).filter(
         UserSession.user_id == current_user.id,
-        UserSession.is_active == True,
+        UserSession.is_active.is_(True),
     ).update({"is_active": False})
     db.commit()
 
@@ -496,6 +533,7 @@ async def create_api_key(
     db: Session = Depends(get_db),
 ):
     """Create a new workspace-scoped API key."""
+    scopes = _normalize_api_key_scopes(payload.scopes, current_user)
     raw_key = _API_KEY_PREFIX + secrets.token_urlsafe(40)
     prefix = raw_key[:12]
     key_hash = _hash_api_key(raw_key)
@@ -510,7 +548,7 @@ async def create_api_key(
         name=payload.name,
         key_hash=key_hash,
         key_prefix=prefix,
-        scopes=payload.scopes,
+        scopes=scopes,
         rate_limit_per_minute=str(payload.rate_limit_per_minute),
         allowed_ips=payload.allowed_ips or [],
         expires_at=expires_at,
@@ -540,7 +578,7 @@ async def list_api_keys(
     """List all API keys for the current workspace."""
     keys = db.query(APIKey).filter(
         APIKey.workspace_id == current_user.workspace_id,
-        APIKey.is_active == True,
+        APIKey.is_active.is_(True),
     ).all()
     return [
         APIKeyResponse(

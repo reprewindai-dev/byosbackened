@@ -18,7 +18,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from core.config import get_settings
-from db.models import APIKey, SecurityAuditLog
+from db.models import APIKey, SecurityAuditLog, User, UserStatus
 from db.session import get_db
 
 
@@ -181,6 +181,19 @@ def _safe_details_json(details: dict[str, Any]) -> str:
     return encoded
 
 
+def _is_active_superuser_key_owner(owner: User | None, api_key: APIKey) -> bool:
+    """Return whether an API key is owned by an active platform superuser."""
+    if owner is None:
+        return False
+    status_value = getattr(owner.status, "value", owner.status)
+    return (
+        bool(owner.is_superuser)
+        and bool(owner.is_active)
+        and status_value == UserStatus.ACTIVE.value
+        and owner.workspace_id == api_key.workspace_id
+    )
+
+
 async def require_internal_operator(
     request: Request,
     authorization: str | None = Header(None),
@@ -211,6 +224,9 @@ async def require_internal_operator(
     scopes = set(api_key.scopes or [])
     if scopes.isdisjoint({"AUTOMATION", "ADMIN"}):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Automation scope required")
+    owner = db.query(User).filter(User.id == api_key.user_id).first()
+    if not _is_active_superuser_key_owner(owner, api_key):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superuser automation key required")
     return OperatorPrincipal(
         workspace_id=api_key.workspace_id,
         user_id=api_key.user_id,

@@ -17,14 +17,19 @@ jobs:
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
           JOB_PROCESSOR_API_KEY: ${{ secrets.JOB_PROCESSOR_API_KEY }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${JOB_PROCESSOR_API_KEY:-}" ]; then
-            echo "JOB_PROCESSOR_API_KEY is not configured; background job processor cannot run."
+          WORKER_KEY="${JOB_PROCESSOR_API_KEY:-${INTERNAL_API_KEY:-}}"
+          if [ -z "$WORKER_KEY" ]; then
+            echo "JOB_PROCESSOR_API_KEY and INTERNAL_API_KEY are not configured; background job processor cannot run."
             exit 1
           fi
+          if [ -z "${JOB_PROCESSOR_API_KEY:-}" ]; then
+            echo "JOB_PROCESSOR_API_KEY missing; using INTERNAL_API_KEY break-glass fallback until scoped key is minted."
+          fi
           curl -X POST "$BACKEND_URL/api/v1/jobs/process" \
-            -H "Authorization: Bearer $JOB_PROCESSOR_API_KEY" \
+            -H "Authorization: Bearer $WORKER_KEY" \
             -H "Content-Type: application/json" \
             -d '{"trigger":"cron"}' \
             --retry 3 --retry-delay 10 --retry-all-errors \

@@ -1,11 +1,11 @@
 """Per-workspace and per-IP rate limiting middleware using Redis sliding window."""
-import time
 import logging
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from core.config import get_settings
 from core.redis_pool import get_redis
+from core.security.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -68,7 +68,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if path in _SKIP_PATHS:
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = get_client_ip(request)
         is_auth_path = path.startswith("/api/v1/auth/")
 
         # IP-level limit (tighter for auth)

@@ -7,12 +7,14 @@ Additional security middleware for request tracking and hardening.
 import uuid
 import time
 import logging
-from typing import Dict, Set
+from typing import Dict
 from datetime import datetime, timedelta
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from collections import defaultdict
+
+from core.security.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -131,15 +133,7 @@ class RequestSecurityMiddleware(BaseHTTPMiddleware):
     
     def _get_client_ip(self, request: Request) -> str:
         """Get client IP from request."""
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip.strip()
-        
-        return request.client.host if request.client else "unknown"
+        return get_client_ip(request)
     
     def _is_sensitive_endpoint(self, path: str) -> bool:
         """Check if endpoint is sensitive (auth-related)."""

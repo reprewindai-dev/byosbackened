@@ -13,6 +13,7 @@ class _HealthyOllama:
 def _reset_bedrock_probe(monkeypatch):
     monkeypatch.setattr(workspace_gateway, "_bedrock_probe_cache", None)
     monkeypatch.setattr(workspace_gateway, "_openai_probe_cache", None)
+    monkeypatch.setattr(workspace_gateway, "_gemini_probe_cache", None)
 
 
 def test_runtime_model_catalog_excludes_bedrock_without_credentials(monkeypatch):
@@ -25,7 +26,11 @@ def test_runtime_model_catalog_excludes_bedrock_without_credentials(monkeypatch)
         groq_model_fast="llama-3.1-8b-instant",
         groq_model_smart="llama-3.3-70b-versatile",
         openai_api_key="",
+        openai_base_url="https://api.openai.com/v1",
         openai_model_chat="gpt-4o-mini",
+        gemini_api_key="",
+        gemini_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        gemini_model_chat="gemini-2.5-pro",
         aws_access_key_id="",
         aws_secret_access_key="",
         aws_default_region="us-east-1",
@@ -47,7 +52,11 @@ def test_runtime_model_catalog_marks_bedrock_disconnected_when_probe_fails(monke
         groq_model_fast="llama-3.1-8b-instant",
         groq_model_smart="llama-3.3-70b-versatile",
         openai_api_key="",
+        openai_base_url="https://api.openai.com/v1",
         openai_model_chat="gpt-4o-mini",
+        gemini_api_key="",
+        gemini_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        gemini_model_chat="gemini-2.5-pro",
         aws_access_key_id="bad-key",
         aws_secret_access_key="bad-secret",
         aws_default_region="us-east-1",
@@ -71,7 +80,11 @@ def test_runtime_model_catalog_marks_bedrock_connected_when_probe_succeeds(monke
         groq_model_fast="llama-3.1-8b-instant",
         groq_model_smart="llama-3.3-70b-versatile",
         openai_api_key="",
+        openai_base_url="https://api.openai.com/v1",
         openai_model_chat="gpt-4o-mini",
+        gemini_api_key="",
+        gemini_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        gemini_model_chat="gemini-2.5-pro",
         aws_access_key_id="valid-key",
         aws_secret_access_key="valid-secret",
         aws_default_region="us-east-1",
@@ -96,6 +109,9 @@ def test_runtime_model_catalog_includes_openai_when_key_is_configured(monkeypatc
         openai_api_key="configured",
         openai_base_url="https://api.openai.com/v1",
         openai_model_chat="gpt-4o-mini",
+        gemini_api_key="",
+        gemini_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        gemini_model_chat="gemini-2.5-pro",
         aws_access_key_id="",
         aws_secret_access_key="",
         aws_default_region="us-east-1",
@@ -107,3 +123,32 @@ def test_runtime_model_catalog_includes_openai_when_key_is_configured(monkeypatc
     assert openai["provider"] == "openai"
     assert openai["connected"] is True
     assert openai["bedrock_model_id"] == "gpt-4o-mini"
+
+
+def test_runtime_model_catalog_includes_gemini_when_key_is_configured(monkeypatch):
+    _reset_bedrock_probe(monkeypatch)
+    monkeypatch.setattr(workspace_gateway, "OllamaClient", _HealthyOllama)
+    monkeypatch.setattr(workspace_gateway, "_probe_gemini_connectivity", lambda: True)
+    monkeypatch.setattr(workspace_gateway, "settings", SimpleNamespace(
+        llm_model_default="qwen2.5:1.5b",
+        groq_api_key="",
+        llm_fallback="off",
+        groq_model_fast="llama-3.1-8b-instant",
+        groq_model_smart="llama-3.3-70b-versatile",
+        openai_api_key="",
+        openai_base_url="https://api.openai.com/v1",
+        openai_model_chat="gpt-4o-mini",
+        gemini_api_key="configured",
+        gemini_base_url="http://localhost:1106/modelfarm/gemini",
+        gemini_model_chat="gemini-2.5-pro",
+        aws_access_key_id="",
+        aws_secret_access_key="",
+        aws_default_region="us-east-1",
+    ))
+
+    rows = workspace_gateway._runtime_model_catalog()
+    gemini = next(row for row in rows if row["model_slug"] == "gemini-chat")
+
+    assert gemini["provider"] == "gemini"
+    assert gemini["connected"] is True
+    assert gemini["bedrock_model_id"] == "gemini-2.5-pro"

@@ -209,6 +209,41 @@ def test_call_runtime_model_executes_openai_through_governed_provider(monkeypatc
     assert _FakeOpenAIClient.posted["json"]["response_format"] == {"type": "json_object"}
 
 
+def test_call_runtime_model_executes_gemini_through_modelfarm_provider(monkeypatch):
+    _FakeOpenAIClient.posted = None
+    monkeypatch.setattr("apps.api.routers.ai.httpx.Client", _FakeOpenAIClient)
+    monkeypatch.setattr(
+        "apps.api.routers.ai.settings",
+        SimpleNamespace(
+            gemini_api_key="configured",
+            gemini_base_url="http://localhost:1106/modelfarm/gemini",
+            llm_timeout_seconds=60,
+        ),
+    )
+    model_row = SimpleNamespace(
+        model_slug="gemini-chat",
+        bedrock_model_id="gemini-2.5-pro",
+        provider="gemini",
+        workspace_id="workspace-1",
+    )
+    payload = AICompleteRequest(
+        model="gemini-chat",
+        prompt="Return a governed answer",
+        system_prompt="Follow policy",
+        max_tokens=64,
+        temperature=0.2,
+    )
+
+    result, provider, routing_reason = _call_runtime_model(model_row, payload)
+
+    assert provider == "gemini"
+    assert routing_reason == "primary_runtime"
+    assert result["response"] == "openai governed response"
+    assert _FakeOpenAIClient.posted["url"] == "http://localhost:1106/modelfarm/gemini/chat/completions"
+    assert _FakeOpenAIClient.posted["headers"]["Authorization"].startswith("Bearer ")
+    assert _FakeOpenAIClient.posted["json"]["model"] == "gemini-2.5-pro"
+
+
 def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
     wallet = SimpleNamespace(
         id="wallet-1",

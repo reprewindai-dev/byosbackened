@@ -29,6 +29,11 @@ def _normalize_ollama_base_url(value: str) -> str:
     return raw
 
 
+def _normalize_provider_base_url(value: str) -> str:
+    """Normalize OpenAI-compatible provider/gateway base URLs."""
+    return (value or "").strip().rstrip("/")
+
+
 class Settings(BaseSettings):
     """Application settings from environment variables."""
 
@@ -95,6 +100,14 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model_chat: str = "gpt-4o-mini"  # Default chat model
     openai_model_whisper: str = "whisper-1"  # Default STT model
+    ai_integrations_openai_base_url: str = ""
+    ai_integrations_openai_api_key: str = ""
+    ai_integrations_gemini_base_url: str = ""
+    ai_integrations_gemini_api_key: str = ""
+
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_model_chat: str = "gemini-2.5-pro"
     
     huggingface_api_key: str = ""  # HuggingFace API key - free tier available
     huggingface_model_chat: str = "mistralai/Mistral-7B-Instruct-v0.1"
@@ -194,6 +207,16 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _resolve_ollama_url(self) -> "Settings":
         self.llm_base_url = _normalize_ollama_base_url(self.llm_base_url)
+        if self.ai_integrations_openai_base_url:
+            self.openai_base_url = self.ai_integrations_openai_base_url
+        if self.ai_integrations_openai_api_key and not self.openai_api_key:
+            self.openai_api_key = self.ai_integrations_openai_api_key
+        if self.ai_integrations_gemini_base_url:
+            self.gemini_base_url = self.ai_integrations_gemini_base_url
+        if self.ai_integrations_gemini_api_key and not self.gemini_api_key:
+            self.gemini_api_key = self.ai_integrations_gemini_api_key
+        self.openai_base_url = _normalize_provider_base_url(self.openai_base_url)
+        self.gemini_base_url = _normalize_provider_base_url(self.gemini_base_url)
         return self
 
 

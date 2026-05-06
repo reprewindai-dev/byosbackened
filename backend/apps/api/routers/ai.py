@@ -378,6 +378,14 @@ def _governance_controls(payload: AICompleteRequest) -> dict:
     }
 
 
+def _openai_compatible_provider_config(provider: str) -> tuple[str, str, str]:
+    if provider == "openai":
+        return settings.openai_api_key, settings.openai_base_url.rstrip("/"), "OpenAI"
+    if provider == "gemini":
+        return settings.gemini_api_key, settings.gemini_base_url.rstrip("/"), "Gemini"
+    raise ValueError(f"Unsupported OpenAI-compatible provider: {provider}")
+
+
 def _call_runtime_model(
     model_row,
     payload: AICompleteRequest,
@@ -457,11 +465,12 @@ def _call_runtime_model(
         except GroqFallbackError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
-    if model_row.provider == "openai":
-        if not settings.openai_api_key:
+    if model_row.provider in {"openai", "gemini"}:
+        provider_key, base_url, provider_label = _openai_compatible_provider_config(model_row.provider)
+        if not provider_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="OpenAI is not configured for this workspace runtime.",
+                detail=f"{provider_label} is not configured for this workspace runtime.",
             )
         openai_payload: dict = {
             "model": model_row.bedrock_model_id,
@@ -480,13 +489,12 @@ def _call_runtime_model(
         if payload.response_format == "json":
             openai_payload["response_format"] = {"type": "json_object"}
 
-        base_url = settings.openai_base_url.rstrip("/")
         try:
             with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
                 response = client.post(
                     f"{base_url}/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {settings.openai_api_key}",
+                        "Authorization": f"Bearer {provider_key}",
                         "Content-Type": "application/json",
                     },
                     json=openai_payload,
@@ -494,12 +502,12 @@ def _call_runtime_model(
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
-            if status_code == 401:
-                detail = "OpenAI authentication failed. Rotate or reconnect the provider key."
+            if status_code in {401, 403}:
+                detail = f"{provider_label} authentication failed. Rotate or reconnect the provider key."
             elif status_code == 429:
-                detail = "OpenAI rate limit or quota exceeded. Check provider billing, quota, or retry later."
+                detail = f"{provider_label} rate limit or quota exceeded. Check provider billing, quota, or retry later."
             else:
-                detail = f"OpenAI request failed: HTTP {status_code}"
+                detail = f"{provider_label} request failed: HTTP {status_code}"
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=detail,
@@ -507,7 +515,7 @@ def _call_runtime_model(
         except httpx.HTTPError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"OpenAI request failed: {str(exc)[:240]}",
+                detail=f"{provider_label} request failed: {str(exc)[:240]}",
             ) from exc
 
         data = response.json()
@@ -523,7 +531,7 @@ def _call_runtime_model(
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
-        }, "openai", "primary_runtime"
+        }, model_row.provider, "primary_runtime"
 
     if model_row.provider == "bedrock":
         if not settings.aws_access_key_id or not settings.aws_secret_access_key:

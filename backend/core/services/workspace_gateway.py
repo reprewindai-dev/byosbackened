@@ -35,6 +35,8 @@ _BEDROCK_PROBE_TTL_SECONDS = 60
 _bedrock_probe_cache: tuple[float, bool] | None = None
 _OPENAI_PROBE_TTL_SECONDS = 60
 _openai_probe_cache: tuple[float, bool] | None = None
+_GEMINI_PROBE_TTL_SECONDS = 60
+_gemini_probe_cache: tuple[float, bool] | None = None
 _OLLAMA_PROBE_TTL_SECONDS = 15
 _ollama_probe_cache: tuple[float, bool] | None = None
 
@@ -49,6 +51,10 @@ def _has_bedrock_credentials() -> bool:
 
 def _has_openai_credentials() -> bool:
     return bool(settings.openai_api_key)
+
+
+def _has_gemini_credentials() -> bool:
+    return bool(settings.gemini_api_key and settings.gemini_base_url)
 
 
 def _probe_bedrock_connectivity() -> bool:
@@ -102,6 +108,19 @@ def _probe_openai_connectivity() -> bool:
         return False
 
 
+def _probe_gemini_connectivity() -> bool:
+    try:
+        with httpx.Client(timeout=2) as client:
+            response = client.get(
+                f"{settings.gemini_base_url.rstrip('/')}/models",
+                headers={"Authorization": f"Bearer {settings.gemini_api_key}"},
+            )
+            return response.status_code == 200
+    except Exception as exc:
+        logger.info("gemini_model_catalog_probe_failed", extra={"error": str(exc)})
+        return False
+
+
 def _openai_connected() -> bool:
     global _openai_probe_cache
 
@@ -114,6 +133,21 @@ def _openai_connected() -> bool:
 
     connected = _probe_openai_connectivity()
     _openai_probe_cache = (now, connected)
+    return connected
+
+
+def _gemini_connected() -> bool:
+    global _gemini_probe_cache
+
+    if not _has_gemini_credentials():
+        return False
+
+    now = time.monotonic()
+    if _gemini_probe_cache and now - _gemini_probe_cache[0] < _GEMINI_PROBE_TTL_SECONDS:
+        return _gemini_probe_cache[1]
+
+    connected = _probe_gemini_connectivity()
+    _gemini_probe_cache = (now, connected)
     return connected
 
 
@@ -183,6 +217,16 @@ def _model_perf_profile(model_slug: str, provider: str) -> dict:
             "input_cost_per_1k": 0.15,
             "output_cost_per_1k": 0.60,
         }
+    if provider == "gemini":
+        return {
+            "model_type": "chat",
+            "context_window": 1000000,
+            "quantization": "managed",
+            "p50_ms": 750,
+            "p95_ms": 2200,
+            "input_cost_per_1k": 1.25,
+            "output_cost_per_1k": 10.00,
+        }
     return {}
 
 
@@ -222,6 +266,19 @@ def _runtime_model_catalog() -> list[dict]:
                 "bedrock_model_id": settings.openai_model_chat,
                 "provider": "openai",
                 "connected": _openai_connected(),
+                "input_cost_per_1m_tokens": Decimal("0.00"),
+                "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
+            }
+        )
+
+    if _has_gemini_credentials():
+        rows.append(
+            {
+                "model_slug": "gemini-chat",
+                "display_name": f"{settings.gemini_model_chat} (Gemini)",
+                "bedrock_model_id": settings.gemini_model_chat,
+                "provider": "gemini",
+                "connected": _gemini_connected(),
                 "input_cost_per_1m_tokens": Decimal("0.00"),
                 "output_cost_per_1m_tokens": _workspace_token_cost_per_1k_output_tokens() * Decimal(1000),
             }

@@ -634,6 +634,7 @@ function PipelineCanvas({
   onChange: (graph: PipelineGraph) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const previousNodeIds = useRef<string[]>(graph.nodes.map((node) => node.id));
   const [selectedNodeId, setSelectedNodeId] = useState(graph.nodes[0]?.id ?? "");
   const [dragging, setDragging] = useState<string | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
@@ -642,10 +643,18 @@ function PipelineCanvas({
   const selected = graph.nodes.find((node) => node.id === selectedNodeId) ?? graph.nodes[0] ?? null;
 
   useEffect(() => {
-    if (!selectedNodeId || !graph.nodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId(graph.nodes[0]?.id ?? "");
+    const currentIds = graph.nodes.map((node) => node.id);
+    const addedId = currentIds.find((id) => !previousNodeIds.current.includes(id));
+    previousNodeIds.current = currentIds;
+    if (addedId) {
+      setSelectedNodeId(addedId);
+      onInspectorCollapsedChange(false);
+      return;
     }
-  }, [graph.nodes, selectedNodeId]);
+    if (!selectedNodeId || !currentIds.includes(selectedNodeId)) {
+      setSelectedNodeId(currentIds[0] ?? "");
+    }
+  }, [graph.nodes, onInspectorCollapsedChange, selectedNodeId]);
 
   function pointFromEvent(event: PointerEvent<HTMLDivElement>) {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -673,6 +682,7 @@ function PipelineCanvas({
   }
 
   function removeNode(id: string) {
+    if (id !== selectedNodeId) return;
     const nextNodes = graph.nodes.filter((node) => node.id !== id);
     onChange({
       nodes: nextNodes,
@@ -825,7 +835,7 @@ function PipelineCanvas({
                 className="v-btn-ghost h-7 w-7 p-0 text-crimson"
                 disabled={!editable || graph.nodes.length <= 1}
                 onClick={() => removeNode(selected.id)}
-                title="Delete node."
+                title={`Delete selected node: ${selected.label ?? selected.id}.`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -836,6 +846,9 @@ function PipelineCanvas({
               Connect mode active
             </div>
           )}
+          <div className="mb-3 rounded-md border border-rule bg-ink-1/70 px-2 py-1.5 font-mono text-[10.5px] text-muted">
+            Editing selected node: <span className="text-bone">{selected.label ?? selected.id}</span>
+          </div>
           <div className="space-y-2">
             <NodeTypeSelect value={selected.type} disabled={!editable} onChange={(type) => updateNode(selected.id, normalizeNodeForType(selected, type))} />
             <TextField label="Label" value={selected.label ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { label: value })} />

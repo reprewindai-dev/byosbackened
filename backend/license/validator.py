@@ -59,7 +59,7 @@ def _parse_dt(value: Any) -> Optional[datetime]:
 def _normalize_verify_url(url: str) -> str:
     url = (url or "").strip().rstrip("/")
     if not url:
-        return "https://license.veklom.com/verify"
+        return ""
     if url.endswith("/verify"):
         return url
     return f"{url}/verify"
@@ -162,7 +162,7 @@ def get_cached_license_result() -> Optional[LicenseValidationResult]:
 async def verify_license_once() -> LicenseValidationResult:
     settings = get_settings()
     verify_urls = [
-        _normalize_verify_url(settings.license_verify_url),
+        url for url in [_normalize_verify_url(settings.license_verify_url)] if url
     ]
     backup_url = _normalize_verify_url(settings.license_verify_backup_url)
     if backup_url and backup_url not in verify_urls:
@@ -189,6 +189,18 @@ async def verify_license_once() -> LicenseValidationResult:
             reason="license_key_missing",
             checked_at=now,
             machine_fingerprint=machine_fingerprint,
+        )
+        cache_license_result(result)
+        return result
+
+    if not verify_urls:
+        result = LicenseValidationResult(
+            valid=False,
+            status="misconfigured",
+            reason="license_verify_url_missing",
+            checked_at=now,
+            machine_fingerprint=machine_fingerprint,
+            license_key_prefix=license_key[:8],
         )
         cache_license_result(result)
         return result

@@ -47,7 +47,7 @@ def test_buyer_package_excludes_server_only_files(tmp_path, monkeypatch):
     out_dir = tmp_path / "out"
     zip_path = build_buyer_package.build_zip("pro", "1.2.3", out_dir)
 
-    assert zip_path.name == "veklom-backend-pro-1.2.3.zip"
+    assert zip_path.name == "byos-ai-backend-pro-1.2.3.zip"
     assert zip_path.exists()
 
     with zipfile.ZipFile(zip_path) as bundle:
@@ -72,6 +72,30 @@ def test_buyer_package_excludes_server_only_files(tmp_path, monkeypatch):
     assert "package_manifest.json" in names
     assert "package_manifest.sig" in names
     assert "license_public_key.pem" in names
+
+
+def test_buyer_package_sanitizes_operator_branding(tmp_path, monkeypatch):
+    root = tmp_path / "backend"
+    root.mkdir()
+    (root / "README.md").write_text(
+        "Veklom connects to https://license.veklom.com and stores veklom-backend packages in .veklom.",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(build_buyer_package, "ROOT", root)
+
+    zip_path = build_buyer_package.build_zip("starter", "1.2.3", tmp_path / "out")
+    with zipfile.ZipFile(zip_path) as bundle:
+        readme = bundle.read("README.md").decode("utf-8")
+
+    assert "Veklom" not in readme
+    assert "license.veklom.com" not in readme
+    assert "veklom-backend" not in readme
+    assert ".veklom" not in readme
+    assert "BYOS AI Backend" in readme
+    assert "https://license.example.com" in readme
+    assert "byos-ai-backend" in readme
+    assert ".backend" in readme
 
 
 def test_buyer_package_refuses_secret_material(tmp_path, monkeypatch):

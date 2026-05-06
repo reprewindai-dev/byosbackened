@@ -1,4 +1,4 @@
-"""Build a clean customer-facing Veklom backend release archive.
+"""Build a clean customer-facing backend release archive.
 
 The source repository contains operator-only deployment state, marketing pages,
 local databases, logs, stress artifacts, and secret environment files. This
@@ -22,7 +22,41 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_NAME = "veklom-backend"
+PACKAGE_NAME = "byos-ai-backend"
+
+BUYER_TEXT_REPLACEMENTS = {
+    "https://license.veklom.com": "https://license.example.com",
+    "https://license2.veklom.com": "https://license-backup.example.com",
+    "https://api.veklom.com": "https://api.example.com",
+    "https://veklom.com": "https://example.com",
+    "api.veklom.com": "api.example.com",
+    "license.veklom.com": "license.example.com",
+    "license2.veklom.com": "license-backup.example.com",
+    "veklom.com": "example.com",
+    "veklom.dev": "example.dev",
+    "app.veklom.dev": "app.example.dev",
+    "veklom-db-backups": "backend-db-backups",
+    "veklom/demo": "demo",
+    "veklom:": "backend:",
+    "veklom_api_key": "backend_api_key",
+    "veklom-operational": "backend-operational",
+    "veklom-backend": PACKAGE_NAME,
+    "postgresql://veklom:": "postgresql://app:",
+    "/.veklom/": "/.backend/",
+    ".veklom": ".backend",
+    "Veklom API Documentation": "API Documentation",
+    "Veklom Operating Reserve": "Operating Reserve",
+    "Veklom Marketplace": "Marketplace",
+    "Veklom Compliance": "Compliance",
+    "Veklom status": "Status",
+    "Veklom AI Support Agent": "AI Support Agent",
+    "Veklom AI operations platform": "AI operations platform",
+    "Veklom": "BYOS AI Backend",
+    "VEKLOM_INSTALL_UUID_PATH": "BACKEND_INSTALL_UUID_PATH",
+    "VEKLOM_INSTALL_UUID": "BACKEND_INSTALL_UUID",
+    "VEKLOM_LICENSE_SIGNING_PRIVATE_KEY": "BACKEND_LICENSE_SIGNING_PRIVATE_KEY",
+    "veklom": "backend",
+}
 
 # Customer-facing backend runtime surface. Everything else stays out of the zip.
 BUYER_DIRS = {
@@ -183,7 +217,15 @@ def _is_text_file(path: Path) -> bool:
         ".js",
         ".svg",
         ".example",
+        ".sh",
     } or path.name.startswith(".env")
+
+
+def _buyer_text(content: str) -> str:
+    """Strip Veklom/operator branding from customer-facing text files."""
+    for needle, replacement in BUYER_TEXT_REPLACEMENTS.items():
+        content = content.replace(needle, replacement)
+    return content
 
 
 def scan_file_for_secret_material(path: Path) -> list[str]:
@@ -308,7 +350,11 @@ def build_zip(tier: str, version: str, output_dir: Path) -> Path:
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for file_path in files:
             rel = file_path.relative_to(ROOT)
-            bundle.write(file_path, rel.as_posix())
+            if _is_text_file(file_path):
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                bundle.writestr(rel.as_posix(), _buyer_text(content))
+            else:
+                bundle.write(file_path, rel.as_posix())
         bundle.writestr("package_manifest.json", json.dumps(manifest, indent=2, sort_keys=True))
         bundle.writestr("package_manifest.sig", signature)
         bundle.writestr("license_public_key.pem", public_key)

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "byos-ai"
     s3_region: str = "us-east-1"
     s3_use_ssl: bool = False
-    s3_backup_bucket: str = "veklom-db-backups"
+    s3_backup_bucket: str = "backend-db-backups"
 
     # AWS
     aws_access_key_id: str = ""
@@ -117,8 +117,8 @@ class Settings(BaseSettings):
     serpapi_key: str = ""
     resend_api_key: str = ""
     resend_webhook_secret: str = ""
-    resend_from_vendor: str = "Veklom Marketplace <noreply@veklom.com>"
-    resend_from_compliance: str = "Veklom Compliance <compliance@veklom.com>"
+    resend_from_vendor: str = "Marketplace <noreply@example.com>"
+    resend_from_compliance: str = "Compliance <compliance@example.com>"
     resend_vendor_audience_id: str = ""
     resend_regulated_audience_id: str = ""
 
@@ -128,13 +128,6 @@ class Settings(BaseSettings):
 
     # CORS â€” tighten in production via CORS_ORIGINS env var
     cors_origins: list[str] = [
-        "https://veklom.com",
-        "https://www.veklom.com",
-        "https://veklom.dev",
-        "https://www.veklom.dev",
-        "https://app.veklom.dev",
-        "https://api.veklom.dev",
-        "https://api.veklom.com",
         "http://localhost:3000",
         "http://localhost:3458",
         "http://localhost:3459",
@@ -151,8 +144,8 @@ class Settings(BaseSettings):
 
     # License gate
     license_enforcement_enabled: bool = False
-    license_verify_url: str = "https://license.veklom.com/verify"
-    license_verify_backup_url: str = "https://license2.veklom.com/verify"
+    license_verify_url: str = ""
+    license_verify_backup_url: str = ""
     license_key: str = ""
     license_admin_token: str = ""
     license_cache_grace_hours: int = 48
@@ -161,11 +154,11 @@ class Settings(BaseSettings):
     license_cache_path: str = ""
     license_public_key: str = ""
     license_public_key_path: str = "license_public_key.pem"
-    license_heartbeat_url: str = "https://license.veklom.com/heartbeat"
-    license_heartbeat_backup_url: str = "https://license2.veklom.com/heartbeat"
-    license_issue_url: str = "https://license.veklom.com/issue"
-    license_issue_backup_url: str = "https://license2.veklom.com/issue"
-    package_name: str = "veklom-backend"
+    license_heartbeat_url: str = ""
+    license_heartbeat_backup_url: str = ""
+    license_issue_url: str = ""
+    license_issue_backup_url: str = ""
+    package_name: str = "byos-ai-backend"
     package_version: str = "0.1.0"
     package_manifest_enforcement_enabled: bool = False
     buyer_download_base_url: str = ""
@@ -174,8 +167,8 @@ class Settings(BaseSettings):
     # GitHub OAuth
     github_client_id: str = ""
     github_client_secret: str = ""
-    github_redirect_uri: str = "https://veklom.com/auth/github/callback"
-    marketplace_admin_emails: list[str] = ["veklomdev@hotmail.com"]
+    github_redirect_uri: str = "http://localhost:3000/auth/github/callback"
+    marketplace_admin_emails: list[str] = []
 
     # MFA / Auth security
     max_failed_login_attempts: int = 10

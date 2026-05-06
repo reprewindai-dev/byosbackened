@@ -4,7 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from core.cost_intelligence import BudgetTracker
 from core.cost_intelligence.kill_switch import get_cost_kill_switch
-from core.redis import get_redis
+from core.redis_pool import get_redis
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
 from core.config import get_settings

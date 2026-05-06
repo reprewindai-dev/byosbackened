@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from core.config import get_settings
 from core.security import create_access_token, decode_access_token, get_password_hash, verify_password
 from db.session import get_db
-from db.models import User, UserRole, UserStatus, UserSession, APIKey, Workspace, TokenWallet, TokenTransaction
+from db.models import User, UserRole, UserStatus, UserSession, APIKey, Workspace, TokenWallet
 from apps.api.deps import get_current_user
 from core.services.trial_onboarding import issue_trial_license, send_trial_welcome
 
@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 _API_KEY_PREFIX = "byos_"
-FREE_TRIAL_CREDITS = 50_000
+FREE_EVALUATION_RESERVE_UNITS = 0
+# Deprecated compatibility alias. Free Evaluation is run-limited, not prepaid reserve-funded.
+FREE_TRIAL_CREDITS = FREE_EVALUATION_RESERVE_UNITS
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
@@ -159,23 +161,15 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     wallet = TokenWallet(
         workspace_id=workspace.id,
-        balance=FREE_TRIAL_CREDITS,
-        monthly_credits_included=FREE_TRIAL_CREDITS,
+        balance=FREE_EVALUATION_RESERVE_UNITS,
+        monthly_credits_included=0,
         monthly_credits_used=0,
         total_credits_purchased=0,
         total_credits_used=0,
     )
     db.add(wallet)
     db.flush()
-    db.add(TokenTransaction(
-        wallet_id=wallet.id,
-        workspace_id=workspace.id,
-        transaction_type="monthly_allotment",
-        amount=FREE_TRIAL_CREDITS,
-        balance_before=0,
-        balance_after=FREE_TRIAL_CREDITS,
-        description="Free workspace trial credits",
-    ))
+    license_payload = None
     try:
         license_payload = await issue_trial_license(
             db=db,
@@ -184,23 +178,24 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             user_name=payload.full_name or payload.workspace_name,
             requested_tier=payload.trial_tier,
         )
-        db.commit()
-        db.refresh(user)
-        db.refresh(workspace)
-    except Exception:
-        db.rollback()
-        raise
+    except Exception as exc:
+        logger.warning("Trial license issuance deferred for workspace %s: %s", workspace.id, exc)
+
+    db.commit()
+    db.refresh(user)
+    db.refresh(workspace)
 
     tokens = _create_tokens(user)
-    try:
-        await send_trial_welcome(
-            workspace=workspace,
-            user_email=payload.email,
-            user_name=payload.full_name or payload.workspace_name,
-            license_payload=license_payload,
-        )
-    except Exception as exc:
-        logger.warning("Trial welcome email failed for workspace %s: %s", workspace.id, exc)
+    if license_payload:
+        try:
+            await send_trial_welcome(
+                workspace=workspace,
+                user_email=payload.email,
+                user_name=payload.full_name or payload.workspace_name,
+                license_payload=license_payload,
+            )
+        except Exception as exc:
+            logger.warning("Trial welcome email failed for workspace %s: %s", workspace.id, exc)
     return TokenResponse(
         **tokens,
         user_id=user.id,
@@ -623,23 +618,13 @@ async def github_callback(
         db.add(user)
         wallet = TokenWallet(
             workspace_id=workspace.id,
-            balance=FREE_TRIAL_CREDITS,
-            monthly_credits_included=FREE_TRIAL_CREDITS,
+            balance=FREE_EVALUATION_RESERVE_UNITS,
+            monthly_credits_included=0,
             monthly_credits_used=0,
             total_credits_purchased=0,
             total_credits_used=0,
         )
         db.add(wallet)
-        db.flush()
-        db.add(TokenTransaction(
-            wallet_id=wallet.id,
-            workspace_id=workspace.id,
-            transaction_type="monthly_allotment",
-            amount=FREE_TRIAL_CREDITS,
-            balance_before=0,
-            balance_after=FREE_TRIAL_CREDITS,
-            description="Free GitHub workspace trial credits",
-        ))
         db.commit()
         db.refresh(user)
     else:

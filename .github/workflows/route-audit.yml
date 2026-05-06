@@ -29,8 +29,14 @@ jobs:
       - name: Open incident issue on failure
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          cat > incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: a required backend route contract regressed.
+          EOF
           gh issue create \
             --title "[OPS] Route audit failed" \
-            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: a required backend route contract regressed."
+            --body-file incident.md

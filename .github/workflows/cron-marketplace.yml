@@ -34,8 +34,14 @@ jobs:
       - name: Open incident issue on failure
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          cat > incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: marketplace automation may not classify/validate queued listings until this is resolved.
+          EOF
           gh issue create \
             --title "[OPS] Marketplace automation cron failed" \
-            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: marketplace automation may not classify/validate queued listings until this is resolved."
+            --body-file incident.md

@@ -48,8 +48,14 @@ jobs:
       - name: Open incident issue on failure
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          cat > incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: production health endpoint or demo proof endpoint failed canary.
+          EOF
           gh issue create \
             --title "[OPS] Backend health monitor failed" \
-            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: production health endpoint or demo proof endpoint failed canary."
+            --body-file incident.md

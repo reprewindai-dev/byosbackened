@@ -47,8 +47,14 @@ jobs:
       - name: Open incident issue on failure
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          cat > incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: public LLM health or authenticated model probe failed.
+          EOF
           gh issue create \
             --title "[OPS] Model integrity check failed" \
-            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: public LLM health or authenticated model probe failed."
+            --body-file incident.md

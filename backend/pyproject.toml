@@ -49,6 +49,7 @@ dependencies = [
     "pymodbus>=3.6.1,<4.0.0",
     "pysnmp>=7.1.0,<8.0.0",
     "pyasn1>=0.6.3,<0.7.0",
+    "apscheduler==3.10.4",
 ]
 
 [project.optional-dependencies]
@@ -67,7 +68,9 @@ include = [
     "core*",
     "db*",
     "edge*",
+    "herald*",
     "license*",
+    "onboarding*",
 ]
 
 [tool.black]

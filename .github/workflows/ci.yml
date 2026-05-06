@@ -29,19 +29,22 @@ jobs:
             backend/apps/api \
             backend/core/security \
             backend/edge \
+            backend/herald \
             backend/license \
+            backend/onboarding \
             backend/tests/test_edge_demo_contract.py \
             backend/tests/test_edge_demo_routes.py \
             backend/tests/test_middleware_edges.py \
             backend/tests/test_edge_gateway.py \
             backend/tests/test_demo_pipeline_quota.py \
+            backend/tests/test_herald_onboarding.py \
             backend/tests/test_route_security_audit.py \
             backend/tests/test_buyer_package.py \
             backend/tests/test_license_health.py \
             backend/tests/test_license_protection.py
 
       - name: Python compile check
-        run: python -m compileall -q backend/apps backend/core backend/db backend/edge backend/license
+        run: python -m compileall -q backend/apps backend/core backend/db backend/edge backend/herald backend/license backend/onboarding
 
       - name: Repository hygiene gate
         shell: pwsh
@@ -62,6 +65,7 @@ jobs:
             tests/test_middleware_edges.py \
             tests/test_edge_gateway.py \
             tests/test_demo_pipeline_quota.py \
+            tests/test_herald_onboarding.py \
             tests/test_route_security_audit.py \
             tests/test_buyer_package.py \
             tests/test_license_health.py \

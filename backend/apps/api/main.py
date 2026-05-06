@@ -80,6 +80,7 @@ from edge.routers.control import router as edge_control_router
 from edge.routers.modbus import router as edge_modbus_router
 from edge.routers.snmp import router as edge_snmp_router
 from license.middleware import LicenseGateMiddleware, bootstrap_license_check
+from herald.scheduler import start_herald_scheduler, stop_herald_scheduler
 import logging
 
 logger = logging.getLogger(__name__)
@@ -127,9 +128,16 @@ async def startup_validation():
         # Safety net: ensure core tables exist even if migrations were missed.
         Base.metadata.create_all(bind=engine)
         logger.info("Database schema presence check completed")
+        start_herald_scheduler()
     except ValueError as e:
         logger.critical(f"PRODUCTION CONFIGURATION INVALID: {e}")
         raise
+
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    """Stop background schedulers cleanly."""
+    stop_herald_scheduler()
 
 
 # Middleware stack (outermost = first to run)

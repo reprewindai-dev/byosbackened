@@ -17,6 +17,7 @@ except ImportError:  # optional in local/test environments
 
 from core.config import get_settings
 from core.redis_pool import get_redis
+from herald.resend_sequences import suppress_email
 
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,17 @@ async def resend_webhook(request: Request) -> dict[str, Any]:
 
     event_type = str(event.get("type") or "unknown")
     data = event.get("data") or {}
+    contact_data = data.get("contact") if isinstance(data.get("contact"), dict) else {}
+    email = (
+        data.get("email")
+        or data.get("to")
+        or data.get("recipient")
+        or contact_data.get("email")
+    )
+    if isinstance(email, list):
+        email = email[0] if email else ""
+    if event_type in {"contact.unsubscribed", "email.bounced", "email.complained"}:
+        suppress_email(str(email or ""), event_type)
     logger.info(
         "resend_webhook_received",
         extra={
@@ -81,6 +93,7 @@ async def resend_webhook(request: Request) -> dict[str, Any]:
             "subject": data.get("subject"),
             "from": data.get("from"),
             "to": data.get("to"),
+            "suppressed_email": email if event_type in {"contact.unsubscribed", "email.bounced", "email.complained"} else None,
         },
     )
 

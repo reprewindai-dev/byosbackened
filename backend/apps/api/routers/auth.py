@@ -32,13 +32,14 @@ from db.models import (
 )
 from apps.api.deps import get_current_user
 from core.services.trial_onboarding import issue_trial_license, send_trial_welcome
+from onboarding.trial import post_signup_onboarding
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 _API_KEY_PREFIX = "byos_"
-FREE_TRIAL_CREDITS = 50_000
+FREE_TRIAL_CREDITS = 0  # Free evaluation limits are entitlement-controlled, not a token grant.
 CUSTOMER_API_KEY_SCOPES = {"READ", "EXEC", "WRITE"}
 INTERNAL_API_KEY_SCOPES = {"ADMIN", "AUTOMATION"}
 
@@ -52,6 +53,7 @@ class RegisterRequest(BaseModel):
     workspace_name: str
     invite_code: Optional[str] = None
     trial_tier: Optional[str] = None
+    signup_type: str = "general"
 
 
 class LoginRequest(BaseModel):
@@ -68,6 +70,9 @@ class TokenResponse(BaseModel):
     user_id: str
     workspace_id: str
     role: str
+    trial_api_key: Optional[str] = None
+    wallet_balance: Optional[int] = None
+    signup_type: Optional[str] = None
 
 
 class RefreshRequest(BaseModel):
@@ -222,15 +227,17 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(wallet)
     db.flush()
-    db.add(TokenTransaction(
-        wallet_id=wallet.id,
-        workspace_id=workspace.id,
-        transaction_type="monthly_allotment",
-        amount=FREE_TRIAL_CREDITS,
-        balance_before=0,
-        balance_after=FREE_TRIAL_CREDITS,
-            description="Free Evaluation governed-run allowance",
-    ))
+    db.add(
+        TokenTransaction(
+            wallet_id=wallet.id,
+            workspace_id=workspace.id,
+            transaction_type="monthly_allotment",
+            amount=FREE_TRIAL_CREDITS,
+            balance_before=0,
+            balance_after=FREE_TRIAL_CREDITS,
+            description="Free Evaluation wallet initialized; governed-run limits are entitlement-controlled",
+        )
+    )
     try:
         license_payload = await issue_trial_license(
             db=db,
@@ -242,6 +249,15 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
         db.refresh(workspace)
+        onboarding = await post_signup_onboarding(
+            user_id=str(user.id),
+            email=user.email,
+            first_name=user.full_name or user.email.split("@")[0],
+            workspace_id=str(workspace.id),
+            signup_type=payload.signup_type,
+            db=db,
+        )
+        db.commit()
     except Exception:
         db.rollback()
         raise
@@ -261,6 +277,9 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         workspace_id=user.workspace_id,
         role=user.role.value,
+        trial_api_key=onboarding.get("api_key"),
+        wallet_balance=onboarding.get("wallet_balance"),
+        signup_type=onboarding.get("signup_type"),
     )
 
 

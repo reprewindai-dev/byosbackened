@@ -117,6 +117,10 @@ class Settings(BaseSettings):
     serpapi_key: str = ""
     resend_api_key: str = ""
     resend_webhook_secret: str = ""
+    resend_from_vendor: str = "Veklom Marketplace <noreply@veklom.com>"
+    resend_from_compliance: str = "Veklom Compliance <compliance@veklom.com>"
+    resend_vendor_audience_id: str = ""
+    resend_regulated_audience_id: str = ""
 
     # Worker
     celery_broker_url: str = "redis://redis:6379/0"

@@ -5,6 +5,8 @@ import {
   AlertCircle,
   Box,
   BrainCircuit,
+  ChevronLeft,
+  ChevronRight,
   Code2,
   Database,
   FileJson,
@@ -235,6 +237,8 @@ export function PipelinesPage() {
   const [nodeSearch, setNodeSearch] = useState("");
   const [actionError, setActionError] = useState<unknown>(null);
   const [draftGraph, setDraftGraph] = useState<PipelineGraph | null>(null);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
@@ -375,6 +379,9 @@ export function PipelinesPage() {
             deploying={deploying || deployMut.isPending}
             saving={saveVersionMut.isPending}
             dirty={isDirty}
+            expanded={paletteCollapsed}
+            inspectorCollapsed={inspectorCollapsed}
+            onInspectorCollapsedChange={setInspectorCollapsed}
             onGraphChange={setDraftGraph}
             onSave={() =>
               selectedPipeline &&
@@ -395,6 +402,8 @@ export function PipelinesPage() {
             search={nodeSearch}
             onSearch={setNodeSearch}
             disabled={pipelineRoutesUnavailable || !graph}
+            collapsed={paletteCollapsed}
+            onCollapsedChange={setPaletteCollapsed}
             onAdd={(type, name) => setDraftGraph((current) => addGraphNode(current ?? STARTER_GRAPH, type, name))}
           />
         </div>
@@ -509,6 +518,9 @@ function BuilderPanel({
   deploying,
   saving,
   dirty,
+  expanded,
+  inspectorCollapsed,
+  onInspectorCollapsedChange,
   onGraphChange,
   onSave,
   onExecute,
@@ -522,6 +534,9 @@ function BuilderPanel({
   deploying: boolean;
   saving: boolean;
   dirty: boolean;
+  expanded: boolean;
+  inspectorCollapsed: boolean;
+  onInspectorCollapsedChange: (collapsed: boolean) => void;
   onGraphChange: (graph: PipelineGraph) => void;
   onSave: () => void;
   onExecute: () => void;
@@ -531,7 +546,7 @@ function BuilderPanel({
   const edgeCount = graph?.edges.length ?? 0;
 
   return (
-    <div className="frame col-span-12 overflow-hidden lg:col-span-8">
+    <div className={cn("frame col-span-12 overflow-hidden transition-[grid-column] duration-300", expanded ? "lg:col-span-11" : "lg:col-span-8")}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule/80 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <Workflow className="h-4 w-4 shrink-0 text-brass-2" />
@@ -575,7 +590,13 @@ function BuilderPanel({
           </div>
         )}
         {graph ? (
-          <PipelineCanvas graph={graph} editable={!routeUnavailable} onChange={onGraphChange} />
+          <PipelineCanvas
+            graph={graph}
+            editable={!routeUnavailable}
+            inspectorCollapsed={inspectorCollapsed}
+            onInspectorCollapsedChange={onInspectorCollapsedChange}
+            onChange={onGraphChange}
+          />
         ) : (
           <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-bone-2">
             Select a pipeline to render its persisted graph.
@@ -600,10 +621,14 @@ const CANVAS_HEIGHT = 460;
 function PipelineCanvas({
   graph,
   editable,
+  inspectorCollapsed,
+  onInspectorCollapsedChange,
   onChange,
 }: {
   graph: PipelineGraph;
   editable: boolean;
+  inspectorCollapsed: boolean;
+  onInspectorCollapsedChange: (collapsed: boolean) => void;
   onChange: (graph: PipelineGraph) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -743,7 +768,32 @@ function PipelineCanvas({
         </button>
       ))}
 
-      {selected && (
+      {selected && inspectorCollapsed && (
+        <div className="absolute right-3 top-3 flex w-12 flex-col items-center gap-2 rounded-lg border border-rule bg-ink-2/95 p-2 shadow-xl">
+          <button
+            type="button"
+            className="v-btn-ghost h-8 w-8 p-0"
+            onClick={() => onInspectorCollapsedChange(false)}
+            title="Expand node inspector."
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className={cn("v-btn-ghost h-8 w-8 p-0", connectFrom === selected.id && "border-brass/60 text-brass-2")}
+            disabled={!editable}
+            onClick={() => setConnectFrom(connectFrom === selected.id ? null : selected.id)}
+            title="Connect selected node."
+          >
+            <Link2 className="h-4 w-4" />
+          </button>
+          <div className="grid h-8 w-8 place-items-center rounded-md border border-rule bg-ink-3 text-brass-2">
+            {nodeIcon(selected.type)}
+          </div>
+        </div>
+      )}
+
+      {selected && !inspectorCollapsed && (
         <div className="absolute right-3 top-3 w-[280px] rounded-lg border border-rule bg-ink-2/95 p-3 shadow-xl">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -751,6 +801,14 @@ function PipelineCanvas({
               <div className="truncate font-display text-sm font-semibold text-bone">{selected.label ?? selected.id}</div>
             </div>
             <div className="flex gap-1">
+              <button
+                type="button"
+                className="v-btn-ghost h-7 w-7 p-0"
+                onClick={() => onInspectorCollapsedChange(true)}
+                title="Collapse node inspector."
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
               <button
                 type="button"
                 className={cn("v-btn-ghost h-7 w-7 p-0", connectFrom === selected.id && "border-brass/60 text-brass-2")}
@@ -771,6 +829,11 @@ function PipelineCanvas({
               </button>
             </div>
           </div>
+          {connectFrom === selected.id && (
+            <div className="mb-3 rounded-md border border-brass/40 bg-brass/10 px-2 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-brass-2">
+              Connect mode active
+            </div>
+          )}
           <div className="space-y-2">
             <NodeTypeSelect value={selected.type} disabled={!editable} onChange={(type) => updateNode(selected.id, normalizeNodeForType(selected, type))} />
             <TextField label="Label" value={selected.label ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { label: value })} />
@@ -815,22 +878,55 @@ function layoutNodes(nodes: PipelineNode[]): Array<PipelineNode & { x: number; y
 function NodePalette({
   search,
   disabled,
+  collapsed,
   onSearch,
+  onCollapsedChange,
   onAdd,
 }: {
   search: string;
   disabled: boolean;
+  collapsed: boolean;
   onSearch: (value: string) => void;
+  onCollapsedChange: (collapsed: boolean) => void;
   onAdd: (type: PipelineNode["type"], name: string) => void;
 }) {
   const groups = paletteGroups();
   const q = search.trim().toLowerCase();
 
+  if (collapsed) {
+    return (
+      <aside className="frame col-span-12 flex min-h-[560px] flex-col items-center gap-3 overflow-hidden p-2 transition-[grid-column] duration-300 lg:col-span-1">
+        <button
+          type="button"
+          className="v-btn-ghost h-8 w-8 p-0"
+          onClick={() => onCollapsedChange(false)}
+          title="Expand node palette."
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="grid h-9 w-9 place-items-center rounded-md border border-rule bg-ink-2 text-brass-2">
+          <Search className="h-4 w-4" />
+        </div>
+        <div className="writing-mode-vertical font-mono text-[10px] uppercase tracking-[0.18em] text-muted [writing-mode:vertical-rl]">
+          Nodes
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="frame col-span-12 overflow-hidden lg:col-span-4">
-      <div className="border-b border-rule/80 px-4 py-2.5">
-        <label className="flex items-center gap-2 rounded-md border border-rule bg-ink-1/70 px-2.5 py-1.5">
-          <Search className="h-3.5 w-3.5 text-muted" />
+    <aside className="frame col-span-12 overflow-hidden transition-[grid-column] duration-300 lg:col-span-4">
+      <div className="flex items-center gap-2 border-b border-rule/80 px-4 py-2.5">
+        <button
+          type="button"
+          className="v-btn-ghost h-8 w-8 shrink-0 p-0"
+          onClick={() => onCollapsedChange(true)}
+          title="Collapse node palette."
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-rule bg-ink-1/70 px-2.5 py-1.5">
+          <Search className="h-3.5 w-3.5 shrink-0 text-muted" />
           <input
             className="w-full bg-transparent text-[12px] text-bone outline-none placeholder:text-muted"
             placeholder="Search nodes..."

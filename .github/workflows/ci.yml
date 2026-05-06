@@ -35,6 +35,7 @@ jobs:
             backend/tests/test_middleware_edges.py \
             backend/tests/test_edge_gateway.py \
             backend/tests/test_demo_pipeline_quota.py \
+            backend/tests/test_route_security_audit.py \
             backend/tests/test_buyer_package.py \
             backend/tests/test_license_health.py \
             backend/tests/test_license_protection.py
@@ -57,9 +58,19 @@ jobs:
             tests/test_middleware_edges.py \
             tests/test_edge_gateway.py \
             tests/test_demo_pipeline_quota.py \
+            tests/test_route_security_audit.py \
             tests/test_buyer_package.py \
             tests/test_license_health.py \
             tests/test_license_protection.py
+
+      - name: Route security audit
+        env:
+          DATABASE_URL: sqlite:///./ci-test.db
+          SECRET_KEY: test-secret-key-ci
+          STRIPE_SECRET_KEY: sk_test_placeholder_not_real
+          LICENSE_ADMIN_TOKEN: test-admin-token
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+        run: python backend/scripts/audit_route_security.py
 
   workspace:
     name: Workspace gate

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -11,15 +11,18 @@ import {
   GitBranch,
   Globe2,
   Layers3,
+  Link2,
   LockKeyhole,
   Play,
   Plus,
   Route,
+  Save,
   Search,
   ShieldCheck,
   Sparkles,
   Split,
   TerminalSquare,
+  Trash2,
   Webhook,
   Workflow,
   X,
@@ -90,6 +93,12 @@ interface CreatePipelinePayload {
   description?: string;
   graph: PipelineGraph;
   policy_refs?: string[];
+}
+
+interface SavePipelineVersionPayload {
+  graph: PipelineGraph;
+  policy_refs?: string[];
+  notes?: string;
 }
 
 interface PipelineTemplate {
@@ -225,6 +234,7 @@ export function PipelinesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nodeSearch, setNodeSearch] = useState("");
   const [actionError, setActionError] = useState<unknown>(null);
+  const [draftGraph, setDraftGraph] = useState<PipelineGraph | null>(null);
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
@@ -296,7 +306,31 @@ export function PipelinesPage() {
     onSettled: () => setDeploying(false),
   });
 
-  const graph = detail.data?.graph ?? (!selectedPipeline ? STARTER_GRAPH : undefined);
+  const saveVersionMut = useMutation({
+    mutationFn: async ({ pipelineId, payload }: { pipelineId: string; payload: SavePipelineVersionPayload }) => {
+      const r = await api.post(`/pipelines/${encodeURIComponent(pipelineId)}/versions`, payload);
+      return r.data;
+    },
+    onSuccess: () => {
+      setActionError(null);
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
+      qc.invalidateQueries({ queryKey: ["pipeline-detail", selectedPipeline?.id] });
+    },
+    onError: (error) => setActionError(error),
+  });
+
+  useEffect(() => {
+    if (!selectedPipeline) {
+      setDraftGraph(normalizeGraph(STARTER_GRAPH));
+      return;
+    }
+    if (detail.data?.graph) {
+      setDraftGraph(normalizeGraph(detail.data.graph));
+    }
+  }, [detail.data?.current_version, detail.data?.graph, selectedPipeline?.id]);
+
+  const graph = draftGraph ?? detail.data?.graph ?? (!selectedPipeline ? STARTER_GRAPH : undefined);
+  const isDirty = Boolean(selectedPipeline && detail.data?.graph && draftGraph && graphFingerprint(draftGraph) !== graphFingerprint(normalizeGraph(detail.data.graph)));
   const visibleRuns = runs.data ?? [];
   const runCountByPipeline = useMemo(() => {
     const counts = new Map<string, number>();
@@ -339,10 +373,30 @@ export function PipelinesPage() {
             routeUnavailable={pipelineRoutesUnavailable}
             executing={creating === selectedPipeline?.id || executeMut.isPending}
             deploying={deploying || deployMut.isPending}
+            saving={saveVersionMut.isPending}
+            dirty={isDirty}
+            onGraphChange={setDraftGraph}
+            onSave={() =>
+              selectedPipeline &&
+              graph &&
+              saveVersionMut.mutate({
+                pipelineId: selectedPipeline.id,
+                payload: {
+                  graph,
+                  policy_refs: collectPolicyRefs(graph),
+                  notes: "Saved from visual railway builder",
+                },
+              })
+            }
             onExecute={() => selectedPipeline && executeMut.mutate(selectedPipeline.id)}
             onDeploy={() => selectedPipeline && deployMut.mutate({ pipeline: selectedPipeline, graph })}
           />
-          <NodePalette search={nodeSearch} onSearch={setNodeSearch} />
+          <NodePalette
+            search={nodeSearch}
+            onSearch={setNodeSearch}
+            disabled={pipelineRoutesUnavailable || !graph}
+            onAdd={(type, name) => setDraftGraph((current) => addGraphNode(current ?? STARTER_GRAPH, type, name))}
+          />
         </div>
 
         <PipelinesTable
@@ -453,6 +507,10 @@ function BuilderPanel({
   routeUnavailable,
   executing,
   deploying,
+  saving,
+  dirty,
+  onGraphChange,
+  onSave,
   onExecute,
   onDeploy,
 }: {
@@ -462,6 +520,10 @@ function BuilderPanel({
   routeUnavailable: boolean;
   executing: boolean;
   deploying: boolean;
+  saving: boolean;
+  dirty: boolean;
+  onGraphChange: (graph: PipelineGraph) => void;
+  onSave: () => void;
   onExecute: () => void;
   onDeploy: () => void;
 }) {
@@ -481,6 +543,14 @@ function BuilderPanel({
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            className="v-btn-ghost h-7 px-2 text-xs"
+            disabled={!selected || routeUnavailable || !dirty || saving}
+            onClick={onSave}
+            title="Save this canvas as the next immutable pipeline version."
+          >
+            <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save version"}
+          </button>
           <button
             className="v-btn-ghost h-7 px-2 text-xs"
             disabled={!selected || routeUnavailable || executing}
@@ -505,7 +575,7 @@ function BuilderPanel({
           </div>
         )}
         {graph ? (
-          <PipelineCanvas graph={graph} />
+          <PipelineCanvas graph={graph} editable={!routeUnavailable} onChange={onGraphChange} />
         ) : (
           <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-bone-2">
             Select a pipeline to render its persisted graph.
@@ -524,53 +594,207 @@ function BuilderPanel({
   );
 }
 
-function PipelineCanvas({ graph }: { graph: PipelineGraph }) {
+const CANVAS_WIDTH = 1100;
+const CANVAS_HEIGHT = 460;
+
+function PipelineCanvas({
+  graph,
+  editable,
+  onChange,
+}: {
+  graph: PipelineGraph;
+  editable: boolean;
+  onChange: (graph: PipelineGraph) => void;
+}) {
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(graph.nodes[0]?.id ?? "");
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const layout = layoutNodes(graph.nodes);
   const byId = new Map(layout.map((node) => [node.id, node]));
+  const selected = graph.nodes.find((node) => node.id === selectedNodeId) ?? graph.nodes[0] ?? null;
+
+  useEffect(() => {
+    if (!selectedNodeId || !graph.nodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(graph.nodes[0]?.id ?? "");
+    }
+  }, [graph.nodes, selectedNodeId]);
+
+  function pointFromEvent(event: PointerEvent<HTMLDivElement>) {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: clamp(((event.clientX - rect.left) / rect.width) * CANVAS_WIDTH, 60, CANVAS_WIDTH - 90),
+      y: clamp(((event.clientY - rect.top) / rect.height) * CANVAS_HEIGHT, 48, CANVAS_HEIGHT - 58),
+    };
+  }
+
+  function updateNode(id: string, patch: Partial<PipelineNode>) {
+    onChange({
+      ...graph,
+      nodes: graph.nodes.map((node) => (node.id === id ? { ...node, ...patch } : node)),
+    });
+  }
+
+  function moveNode(id: string, x: number, y: number) {
+    onChange({
+      ...graph,
+      nodes: graph.nodes.map((node) =>
+        node.id === id ? { ...node, config: { ...(node.config ?? {}), ui: { x: Math.round(x), y: Math.round(y) } } } : node,
+      ),
+    });
+  }
+
+  function removeNode(id: string) {
+    const nextNodes = graph.nodes.filter((node) => node.id !== id);
+    onChange({
+      nodes: nextNodes,
+      edges: graph.edges.filter((edge) => (edge.from ?? edge.from_) !== id && edge.to !== id),
+    });
+    setSelectedNodeId(nextNodes[0]?.id ?? "");
+    if (connectFrom === id) setConnectFrom(null);
+  }
+
+  function handleNodeClick(id: string) {
+    if (connectFrom && connectFrom !== id) {
+      const exists = graph.edges.some((edge) => (edge.from ?? edge.from_) === connectFrom && edge.to === id);
+      if (!exists) onChange({ ...graph, edges: [...graph.edges, { from: connectFrom, to: id }] });
+      setConnectFrom(null);
+    }
+    setSelectedNodeId(id);
+  }
 
   return (
-    <svg viewBox="0 0 1100 460" className="absolute inset-0 h-full w-full">
-      <defs>
-        <marker id="pipeline-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,0 L10,5 L0,10 z" fill="rgba(200,203,214,0.55)" />
-        </marker>
-      </defs>
-      {graph.edges.map((edge, index) => {
-        const from = byId.get(edge.from ?? edge.from_ ?? "");
-        const to = byId.get(edge.to);
-        if (!from || !to) return null;
-        const mid = (from.x + to.x) / 2;
-        return (
-          <path
-            key={`${edge.from ?? edge.from_}-${edge.to}-${index}`}
-            d={`M${from.x + 70},${from.y} C${mid},${from.y} ${mid},${to.y} ${to.x},${to.y}`}
-            fill="none"
-            stroke="rgba(200,203,214,0.42)"
-            strokeWidth="1.4"
-            strokeDasharray="4 3"
-            markerEnd="url(#pipeline-arrow)"
-          />
-        );
-      })}
+    <div
+      ref={canvasRef}
+      className="absolute inset-0"
+      onPointerMove={(event) => {
+        if (!dragging || !editable) return;
+        const point = pointFromEvent(event);
+        moveNode(dragging, point.x, point.y);
+      }}
+      onPointerUp={() => setDragging(null)}
+      onPointerCancel={() => setDragging(null)}
+    >
+      <svg viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`} className="absolute inset-0 h-full w-full">
+        <defs>
+          <marker id="pipeline-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="rgba(200,203,214,0.55)" />
+          </marker>
+        </defs>
+        {graph.edges.map((edge, index) => {
+          const from = byId.get(edge.from ?? edge.from_ ?? "");
+          const to = byId.get(edge.to);
+          if (!from || !to) return null;
+          const mid = (from.x + to.x) / 2;
+          return (
+            <g key={`${edge.from ?? edge.from_}-${edge.to}-${index}`}>
+              <path
+                d={`M${from.x + 70},${from.y} C${mid},${from.y} ${mid},${to.y} ${to.x - 74},${to.y}`}
+                fill="none"
+                stroke="rgba(200,203,214,0.42)"
+                strokeWidth="1.4"
+                strokeDasharray="4 3"
+                markerEnd="url(#pipeline-arrow)"
+              />
+              {editable && selectedNodeId === (edge.from ?? edge.from_) && (
+                <foreignObject x={mid - 16} y={(from.y + to.y) / 2 - 14} width="32" height="28">
+                  <button
+                    type="button"
+                    className="grid h-7 w-8 place-items-center rounded border border-crimson/40 bg-ink-2 text-crimson"
+                    onClick={() => onChange({ ...graph, edges: graph.edges.filter((_, edgeIndex) => edgeIndex !== index) })}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </foreignObject>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
       {layout.map((node) => (
-        <foreignObject key={node.id} x={node.x} y={node.y - 18} width="150" height="58">
-          <div
-            className={cn(
-              "flex h-full items-center gap-2 rounded-md border bg-ink-2/95 px-2.5 shadow-md",
-              nodeToneClass(node.type),
-            )}
-          >
-            <div className={cn("grid h-6 w-6 place-items-center rounded-md", nodeIconToneClass(node.type))}>
-              {nodeIcon(node.type)}
+        <button
+          key={node.id}
+          type="button"
+          className={cn(
+            "absolute flex h-14 w-[154px] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-md border bg-ink-2/95 px-2.5 text-left shadow-md transition",
+            nodeToneClass(node.type),
+            selectedNodeId === node.id && "ring-1 ring-brass/80",
+            connectFrom && connectFrom !== node.id && "hover:border-brass hover:bg-brass/10",
+            editable && "cursor-grab active:cursor-grabbing",
+          )}
+          style={{ left: `${(node.x / CANVAS_WIDTH) * 100}%`, top: `${(node.y / CANVAS_HEIGHT) * 100}%` }}
+          onClick={() => handleNodeClick(node.id)}
+          onPointerDown={(event) => {
+            if (!editable) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setDragging(node.id);
+            handleNodeClick(node.id);
+          }}
+        >
+          <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md", nodeIconToneClass(node.type))}>
+            {nodeIcon(node.type)}
+          </div>
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-[11.5px] text-bone">{node.label ?? node.model ?? node.tool ?? node.id}</span>
+            <span className="truncate font-mono text-[9px] text-muted">{node.id}</span>
+          </div>
+        </button>
+      ))}
+
+      {selected && (
+        <div className="absolute right-3 top-3 w-[280px] rounded-lg border border-rule bg-ink-2/95 p-3 shadow-xl">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-eyebrow">{selected.type}</div>
+              <div className="truncate font-display text-sm font-semibold text-bone">{selected.label ?? selected.id}</div>
             </div>
-            <div className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-[11.5px] text-bone">{node.label ?? node.model ?? node.tool ?? node.id}</span>
-              <span className="truncate font-mono text-[9px] text-muted">{node.id}</span>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className={cn("v-btn-ghost h-7 w-7 p-0", connectFrom === selected.id && "border-brass/60 text-brass-2")}
+                disabled={!editable}
+                onClick={() => setConnectFrom(connectFrom === selected.id ? null : selected.id)}
+                title="Connect this node to another node."
+              >
+                <Link2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="v-btn-ghost h-7 w-7 p-0 text-crimson"
+                disabled={!editable || graph.nodes.length <= 1}
+                onClick={() => removeNode(selected.id)}
+                title="Delete node."
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
-        </foreignObject>
-      ))}
-    </svg>
+          <div className="space-y-2">
+            <NodeTypeSelect value={selected.type} disabled={!editable} onChange={(type) => updateNode(selected.id, normalizeNodeForType(selected, type))} />
+            <TextField label="Label" value={selected.label ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { label: value })} />
+            {selected.type === "model" && (
+              <TextField label="Model" value={selected.model ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { model: value })} />
+            )}
+            {selected.type === "prompt" && (
+              <TextAreaField
+                label="Prompt"
+                value={selected.prompt ?? ""}
+                disabled={!editable}
+                onChange={(value) => updateNode(selected.id, { prompt: value })}
+              />
+            )}
+            {selected.type === "tool" && (
+              <TextField label="Tool" value={selected.tool ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { tool: value })} />
+            )}
+            {selected.type === "gate" && (
+              <TextField label="Policy" value={selected.policy ?? ""} disabled={!editable} onChange={(value) => updateNode(selected.id, { policy: value })} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -578,6 +802,8 @@ function layoutNodes(nodes: PipelineNode[]): Array<PipelineNode & { x: number; y
   if (nodes.length === 0) return [];
   const columns = Math.min(5, Math.max(1, nodes.length));
   return nodes.map((node, index) => {
+    const saved = readNodePosition(node);
+    if (saved) return { ...node, ...saved };
     const col = columns === 1 ? 0 : index % columns;
     const row = Math.floor(index / columns);
     const x = 60 + col * (980 / Math.max(1, columns - 1));
@@ -586,7 +812,17 @@ function layoutNodes(nodes: PipelineNode[]): Array<PipelineNode & { x: number; y
   });
 }
 
-function NodePalette({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
+function NodePalette({
+  search,
+  disabled,
+  onSearch,
+  onAdd,
+}: {
+  search: string;
+  disabled: boolean;
+  onSearch: (value: string) => void;
+  onAdd: (type: PipelineNode["type"], name: string) => void;
+}) {
   const groups = paletteGroups();
   const q = search.trim().toLowerCase();
 
@@ -614,9 +850,9 @@ function NodePalette({ search, onSearch }: { search: string; onSearch: (value: s
                 {items.map((item) => (
                   <button
                     key={item.name}
-                    className="hover-elevate flex cursor-not-allowed items-center gap-2 rounded-md border border-rule bg-ink-1/45 px-2 py-1.5 text-[11.5px] text-bone-2"
-                    disabled
-                    title="The visual composer is read-only until node persistence is wired."
+                    className="hover-elevate flex items-center gap-2 rounded-md border border-rule bg-ink-1/45 px-2 py-1.5 text-[11.5px] text-bone-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={disabled}
+                    onClick={() => onAdd(item.type, item.name)}
                   >
                     <span className="grid h-5 w-5 place-items-center rounded bg-ink-3 text-muted">{item.icon}</span>
                     <span className="line-clamp-1">{item.name}</span>
@@ -830,8 +1066,7 @@ function CreatePipelineModal({
             />
           </label>
           <div className="font-mono text-[10px] text-muted">
-            Starter graph: input to policy gate to LLM. Add nodes later through{" "}
-            <span className="text-bone">POST /pipelines/{"{id}"}/versions</span>.
+            Starter graph: input to policy gate to LLM. Save canvas edits as immutable pipeline versions.
           </div>
           {Boolean(error) && (
             <div className="text-[12px] text-crimson">{actionUnavailableMessage(error, "Pipeline creation")}</div>
@@ -906,49 +1141,217 @@ function TemplateModal({
   );
 }
 
-function paletteGroups(): Array<{ name: string; items: Array<{ name: string; icon: ReactNode }> }> {
+function TextField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="v-label">{label}</div>
+      <input className="v-input h-8 text-[12px]" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function NodeTypeSelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (value: PipelineNode["type"]) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="v-label">Type</div>
+      <select
+        className="v-input h-8 text-[12px]"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as PipelineNode["type"])}
+      >
+        <option value="prompt">Prompt</option>
+        <option value="gate">Policy gate</option>
+        <option value="model">Model</option>
+        <option value="tool">Tool</option>
+        <option value="condition">Condition</option>
+      </select>
+    </label>
+  );
+}
+
+function TextAreaField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="v-label">{label}</div>
+      <textarea
+        className="v-input min-h-20 text-[12px]"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function normalizeNodeForType(node: PipelineNode, type: PipelineNode["type"]): Partial<PipelineNode> {
+  return {
+    type,
+    ...(type === "model" && !node.model ? { model: "qwen2.5:3b" } : {}),
+    ...(type === "prompt" && !node.prompt ? { prompt: "{{input}}" } : {}),
+    ...(type === "tool" && !node.tool ? { tool: node.id } : {}),
+    ...(type === "gate" && !node.policy ? { policy: "default" } : {}),
+  };
+}
+
+function normalizeGraph(graph: PipelineGraph): PipelineGraph {
+  const nodes = graph.nodes.map((node, index) => {
+    const existing = readNodePosition(node);
+    const fallback = layoutNodes(graph.nodes)[index] ?? { x: 120 + index * 180, y: 150 };
+    return {
+      ...node,
+      config: {
+        ...(node.config ?? {}),
+        ui: existing ?? { x: Math.round(fallback.x), y: Math.round(fallback.y) },
+      },
+    };
+  });
+  return {
+    nodes,
+    edges: graph.edges.map((edge) => ({ from: edge.from ?? edge.from_, to: edge.to })).filter((edge) => edge.from && edge.to),
+  };
+}
+
+function addGraphNode(graph: PipelineGraph, type: PipelineNode["type"], name: string): PipelineGraph {
+  const base = normalizeGraph(graph);
+  const idBase = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || type;
+  let id = idBase;
+  let suffix = 2;
+  while (base.nodes.some((node) => node.id === id)) {
+    id = `${idBase}-${suffix}`;
+    suffix += 1;
+  }
+  const last = layoutNodes(base.nodes).at(-1);
+  const node: PipelineNode = {
+    id,
+    type,
+    label: name,
+    ...(type === "model" ? { model: "qwen2.5:3b" } : {}),
+    ...(type === "prompt" ? { prompt: "{{input}}" } : {}),
+    ...(type === "tool" ? { tool: idBase } : {}),
+    ...(type === "gate" ? { policy: "default" } : {}),
+    config: {
+      ui: {
+        x: last ? clamp(last.x + 190, 90, CANVAS_WIDTH - 90) : 140,
+        y: last ? clamp(last.y + 40, 70, CANVAS_HEIGHT - 70) : 160,
+      },
+    },
+  };
+  return { ...base, nodes: [...base.nodes, node] };
+}
+
+function collectPolicyRefs(graph: PipelineGraph): string[] {
+  const refs = graph.nodes
+    .filter((node) => node.type === "gate" && node.policy)
+    .map((node) => String(node.policy))
+    .filter(Boolean);
+  return refs.length ? Array.from(new Set(refs)) : ["default"];
+}
+
+function graphFingerprint(graph: PipelineGraph): string {
+  return JSON.stringify({
+    nodes: graph.nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      label: node.label ?? "",
+      model: node.model ?? "",
+      prompt: node.prompt ?? "",
+      tool: node.tool ?? "",
+      policy: node.policy ?? "",
+      config: node.config ?? {},
+    })),
+    edges: graph.edges.map((edge) => ({ from: edge.from ?? edge.from_, to: edge.to })),
+  });
+}
+
+function readNodePosition(node: PipelineNode): { x: number; y: number } | null {
+  const ui = node.config?.ui;
+  if (!ui || typeof ui !== "object") return null;
+  const x = (ui as { x?: unknown }).x;
+  const y = (ui as { y?: unknown }).y;
+  if (typeof x !== "number" || typeof y !== "number") return null;
+  return { x: clamp(x, 60, CANVAS_WIDTH - 90), y: clamp(y, 48, CANVAS_HEIGHT - 58) };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function paletteGroups(): Array<{ name: string; items: Array<{ name: string; type: PipelineNode["type"]; icon: ReactNode }> }> {
   return [
+    {
+      name: "Input",
+      items: [{ type: "prompt", icon: <FileJson className="h-3.5 w-3.5" />, name: "Prompt input" }],
+    },
     {
       name: "Models",
       items: [
-        { icon: <BrainCircuit className="h-3.5 w-3.5" />, name: "LLM (deployed)" },
-        { icon: <Database className="h-3.5 w-3.5" />, name: "Embedding" },
-        { icon: <Route className="h-3.5 w-3.5" />, name: "Reranker" },
+        { type: "model", icon: <BrainCircuit className="h-3.5 w-3.5" />, name: "LLM (deployed)" },
+        { type: "model", icon: <Database className="h-3.5 w-3.5" />, name: "Embedding" },
+        { type: "model", icon: <Route className="h-3.5 w-3.5" />, name: "Reranker" },
       ],
     },
     {
       name: "Retrieval",
       items: [
-        { icon: <Database className="h-3.5 w-3.5" />, name: "pgvector" },
-        { icon: <Database className="h-3.5 w-3.5" />, name: "Qdrant" },
-        { icon: <Database className="h-3.5 w-3.5" />, name: "Weaviate" },
-        { icon: <FileJson className="h-3.5 w-3.5" />, name: "Document loader" },
+        { type: "tool", icon: <Database className="h-3.5 w-3.5" />, name: "pgvector" },
+        { type: "tool", icon: <Database className="h-3.5 w-3.5" />, name: "Qdrant" },
+        { type: "tool", icon: <Database className="h-3.5 w-3.5" />, name: "Weaviate" },
+        { type: "tool", icon: <FileJson className="h-3.5 w-3.5" />, name: "Document loader" },
       ],
     },
     {
       name: "Tools",
       items: [
-        { icon: <Globe2 className="h-3.5 w-3.5" />, name: "HTTP" },
-        { icon: <Database className="h-3.5 w-3.5" />, name: "SQL" },
-        { icon: <TerminalSquare className="h-3.5 w-3.5" />, name: "Python" },
-        { icon: <Code2 className="h-3.5 w-3.5" />, name: "File reader" },
+        { type: "tool", icon: <Globe2 className="h-3.5 w-3.5" />, name: "HTTP" },
+        { type: "tool", icon: <Database className="h-3.5 w-3.5" />, name: "SQL" },
+        { type: "tool", icon: <TerminalSquare className="h-3.5 w-3.5" />, name: "Python" },
+        { type: "tool", icon: <Code2 className="h-3.5 w-3.5" />, name: "File reader" },
       ],
     },
     {
       name: "Routing",
       items: [
-        { icon: <ShieldCheck className="h-3.5 w-3.5" />, name: "Policy gate" },
-        { icon: <Split className="h-3.5 w-3.5" />, name: "Semantic router" },
-        { icon: <GitBranch className="h-3.5 w-3.5" />, name: "If / else" },
+        { type: "gate", icon: <ShieldCheck className="h-3.5 w-3.5" />, name: "Policy gate" },
+        { type: "condition", icon: <Split className="h-3.5 w-3.5" />, name: "Semantic router" },
+        { type: "condition", icon: <GitBranch className="h-3.5 w-3.5" />, name: "If / else" },
       ],
     },
     {
       name: "Output",
       items: [
-        { icon: <FileJson className="h-3.5 w-3.5" />, name: "JSON formatter" },
-        { icon: <Box className="h-3.5 w-3.5" />, name: "Markdown render" },
-        { icon: <Webhook className="h-3.5 w-3.5" />, name: "Webhook" },
-        { icon: <LockKeyhole className="h-3.5 w-3.5" />, name: "Audit signer" },
+        { type: "tool", icon: <FileJson className="h-3.5 w-3.5" />, name: "JSON formatter" },
+        { type: "tool", icon: <Box className="h-3.5 w-3.5" />, name: "Markdown render" },
+        { type: "tool", icon: <Webhook className="h-3.5 w-3.5" />, name: "Webhook" },
+        { type: "tool", icon: <LockKeyhole className="h-3.5 w-3.5" />, name: "Audit signer" },
       ],
     },
   ];

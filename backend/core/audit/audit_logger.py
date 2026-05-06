@@ -94,9 +94,9 @@ class AuditLogger:
         db.refresh(audit_log)
         
         # Update last log hash for chaining
-        self.last_log_hash = log_hash
+        self.last_log_hash = audit_log.log_hash
         
-        logger.info(f"Audit log created: {audit_log.id}, hash={log_hash[:16]}...")
+        logger.info("Audit log created: %s, hash=%s...", audit_log.id, audit_log.log_hash[:16])
         
         return audit_log
 

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  Activity,
   AlertCircle,
   Bell,
   CheckCircle2,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, dateFromApiTimestamp, fmtNumber, formatApiDateTime, relativeTime } from "@/lib/cn";
+import type { OverviewPayload } from "@/types/api";
 
 interface AuditLog {
   id: string;
@@ -62,6 +64,11 @@ async function fetchLogs(params: { operation_type?: string; limit: number; offse
   return resp.data;
 }
 
+async function fetchOverview() {
+  const resp = await api.get<OverviewPayload>("/monitoring/overview");
+  return resp.data;
+}
+
 async function verifyLog(id: string) {
   const resp = await api.get<VerifyResp>(`/audit/verify/${encodeURIComponent(id)}`);
   return resp.data;
@@ -79,16 +86,21 @@ export function MonitoringPage() {
     queryFn: () => fetchLogs({ limit: 50, offset: 0, operation_type: opType === "all" ? undefined : opType }),
     refetchInterval: 20_000,
   });
+  const overview = useQuery({
+    queryKey: ["monitoring-overview"],
+    queryFn: fetchOverview,
+    refetchInterval: 20_000,
+  });
 
   const logs = query.data?.logs ?? [];
   const filteredLogs = useMemo(() => filterLogs(logs, logSearch), [logs, logSearch]);
-  const stats = useMemo(() => summarize(logs), [logs]);
-  const throughput = useMemo(() => buildBuckets(logs), [logs]);
-  const latencySamples = useMemo(() => logs.map(latencyFor).filter((v): v is number => v !== undefined), [logs]);
+  const stats = useMemo(() => summarize(logs, overview.data), [logs, overview.data]);
+  const throughput = useMemo(() => buildBuckets(logs, overview.data), [logs, overview.data]);
+  const latencySamples = useMemo(() => latencySeries(logs, overview.data), [logs, overview.data]);
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
-      <PageHeader />
+      <PageHeader fetching={query.isFetching || overview.isFetching} updatedAt={query.dataUpdatedAt || overview.dataUpdatedAt} />
 
       <section>
         <KpiStrip stats={stats} />
@@ -146,7 +158,8 @@ export function MonitoringPage() {
   );
 }
 
-function PageHeader() {
+function PageHeader({ fetching, updatedAt }: { fetching: boolean; updatedAt: number }) {
+  const updated = updatedAt ? new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "pending";
   return (
     <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -161,7 +174,9 @@ function PageHeader() {
           <Badge tone="ok" dot>
             live · <span className="font-mono">/api/v1/audit/logs</span>
           </Badge>
-          <Badge tone="muted">auto-refresh 20s</Badge>
+          <Badge tone={fetching ? "primary" : "muted"} icon={fetching ? <Activity className="h-3 w-3 animate-spin" /> : undefined}>
+            refresh 20s - {updated}
+          </Badge>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -194,7 +209,8 @@ function KpiStrip({ stats }: { stats: ReturnType<typeof summarize> }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {cards.map((card) => (
-        <div key={card.label} className="frame p-3">
+        <div key={card.label} className="frame relative overflow-hidden p-3">
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 animate-[pulse_2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-brass/10 to-transparent" />
           <div className="flex items-center justify-between text-eyebrow">
             {card.label}
             <span className="font-mono text-[10.5px] text-moss">{card.delta}</span>
@@ -210,6 +226,7 @@ function KpiStrip({ stats }: { stats: ReturnType<typeof summarize> }) {
 }
 
 function ThroughputPanel({ buckets }: { buckets: Bucket[] }) {
+  const total = buckets.reduce((sum, bucket) => sum + bucket.total, 0);
   return (
     <div className="frame col-span-12 p-4 lg:col-span-7">
       <div className="flex items-center justify-between">
@@ -217,7 +234,7 @@ function ThroughputPanel({ buckets }: { buckets: Bucket[] }) {
           <div className="text-eyebrow">Throughput</div>
           <div className="font-display text-[14px] text-bone">Primary vs approved fallback - audit events</div>
         </div>
-        <Badge tone="ok">healthy</Badge>
+        <Badge tone={total ? "ok" : "muted"}>{total ? "streaming" : "waiting"}</Badge>
       </div>
       <div className="mt-2">
         <AreaChart buckets={buckets} />
@@ -227,6 +244,9 @@ function ThroughputPanel({ buckets }: { buckets: Bucket[] }) {
 }
 
 function LatencyPanel({ samples }: { samples: number[] }) {
+  const p50 = percentile(samples, 0.5);
+  const p95 = percentile(samples, 0.95);
+  const p99 = percentile(samples, 0.99);
   return (
     <div className="frame col-span-12 p-4 lg:col-span-5">
       <div className="flex items-center justify-between">
@@ -237,10 +257,22 @@ function LatencyPanel({ samples }: { samples: number[] }) {
       </div>
       <div className="mt-2">
         {samples.length ? (
-          <BarChart data={samples.slice(-18)} />
+          <>
+            <div className="mb-2 grid grid-cols-3 gap-2">
+              <MetricPill label="P50" value={`${p50}ms`} />
+              <MetricPill label="P95" value={`${p95}ms`} />
+              <MetricPill label="P99" value={`${p99}ms`} />
+            </div>
+            <BarChart data={samples.slice(-24)} />
+          </>
         ) : (
-          <div className="grid h-[210px] place-items-center rounded-md border border-dashed border-rule bg-ink-1/50 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-            No latency samples returned by audit logs yet
+          <div className="grid h-[250px] place-items-center rounded-md border border-dashed border-rule bg-ink-1/50 px-6 text-center">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-brass-2">Telemetry gap</div>
+              <div className="mt-2 text-sm text-bone-2">
+                Audit rows are present, but no runtime latency samples are attached to this window.
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -543,23 +575,25 @@ function VerifyResult({ data }: { data: VerifyResp }) {
   );
 }
 
-function summarize(logs: AuditLog[]) {
-  const totalCost = logs.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0);
+function summarize(logs: AuditLog[], overview?: OverviewPayload) {
+  const totalCost = overview ? overview.kpi.spend_today_cents / 100 : logs.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0);
   const piiCount = logs.filter((log) => log.pii_detected).length;
   const providers = new Set(logs.map((log) => log.provider).filter(Boolean)).size;
   const errorCount = logs.filter((log) => isErrorLog(log)).length;
   const minutes = activeWindowMinutes(logs);
-  const buckets = buildBuckets(logs);
+  const buckets = buildBuckets(logs, overview);
+  const requestSeries = overview?.kpi.requests_series?.length ? overview.kpi.requests_series : buckets.map((bucket) => bucket.total);
+  const costSeries = overview?.kpi.spend_series?.length ? overview.kpi.spend_series.map((cents) => cents / 100) : bucketCost(logs);
   return {
-    total: logs.length,
-    requestsPerMinute: logs.length / minutes,
+    total: overview?.kpi.audit_entries ?? logs.length,
+    requestsPerMinute: overview?.kpi.requests_per_minute ?? logs.length / minutes,
     totalCost,
     piiCount,
     providers,
     errorCount,
     errorRate: logs.length ? (errorCount / logs.length) * 100 : 0,
-    activitySeries: buckets.map((bucket) => bucket.total),
-    costSeries: bucketCost(logs),
+    activitySeries: requestSeries,
+    costSeries,
     errorSeries: bucketFlag(logs, isErrorLog),
     piiSeries: bucketFlag(logs, (log) => log.pii_detected),
   };
@@ -571,7 +605,20 @@ function activeWindowMinutes(logs: AuditLog[]): number {
   return Math.max(1, (Math.max(...times) - Math.min(...times)) / 60000);
 }
 
-function buildBuckets(logs: AuditLog[]): Bucket[] {
+function buildBuckets(logs: AuditLog[], overview?: OverviewPayload): Bucket[] {
+  const routingSeries = overview?.routing.series;
+  const requests = overview?.kpi.requests_series;
+  if (routingSeries?.length) {
+    return routingSeries.map((row, index) => {
+      const total = requests?.[index] ?? 0;
+      return {
+        label: row.t,
+        primary: Math.round((total * row.primary) / 100),
+        burst: Math.round((total * row.burst) / 100),
+        total,
+      };
+    });
+  }
   const buckets = Array.from({ length: 24 }, (_, index) => ({ label: `${index}`, primary: 0, burst: 0, total: 0 }));
   if (!logs.length) return buckets;
   const sorted = [...logs].sort((a, b) => {
@@ -603,6 +650,21 @@ function bucketCost(logs: AuditLog[]): number[] {
     buckets[Math.min(19, Math.floor((index / Math.max(1, logs.length)) * 20))] += parseFloat(log.cost || "0") || 0;
   });
   return buckets;
+}
+
+function latencySeries(logs: AuditLog[], overview?: OverviewPayload): number[] {
+  const auditSamples = logs.map(latencyFor).filter((v): v is number => v !== undefined);
+  const runSamples = (overview?.recent_runs ?? []).map((run) => run.latency_ms).filter((value) => Number.isFinite(value) && value > 0);
+  if (auditSamples.length || runSamples.length) return [...runSamples, ...auditSamples].slice(-48);
+  const p50 = overview?.kpi.p50_latency_ms ?? 0;
+  return p50 > 0 ? [p50] : [];
+}
+
+function percentile(values: number[], pct: number): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * pct) - 1));
+  return Math.round(sorted[index]);
 }
 
 function filterLogs(logs: AuditLog[], query: string): AuditLog[] {
@@ -672,9 +734,23 @@ function AreaChart({ buckets }: { buckets: Bucket[] }) {
       })
       .join(" ");
   return (
-    <svg viewBox="0 0 800 220" className="h-[210px] w-full" preserveAspectRatio="none">
+    <svg viewBox="0 0 800 220" className="h-[210px] w-full overflow-visible rounded-md border border-rule bg-ink-1/50" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="throughput-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="rgba(229,177,110,0.22)" />
+          <stop offset="100%" stopColor="rgba(229,177,110,0)" />
+        </linearGradient>
+      </defs>
+      {Array.from({ length: 8 }, (_, index) => (
+        <line key={index} x1={(index / 7) * 800} x2={(index / 7) * 800} y1="0" y2="220" stroke="rgba(255,255,255,0.045)" />
+      ))}
+      <path d={`${line("primary")} L800 220 L0 220 Z`} fill="url(#throughput-fill)" opacity="0.9" />
       <path d={line("burst")} fill="none" stroke="rgba(110,168,254,0.9)" strokeWidth="2" />
       <path d={line("primary")} fill="none" stroke="rgba(229,177,110,0.95)" strokeWidth="2.4" />
+      <line x1="0" x2="0" y1="0" y2="220" stroke="rgba(229,177,110,0.45)" strokeWidth="2">
+        <animate attributeName="x1" values="0;800" dur="3.4s" repeatCount="indefinite" />
+        <animate attributeName="x2" values="0;800" dur="3.4s" repeatCount="indefinite" />
+      </line>
     </svg>
   );
 }
@@ -682,12 +758,25 @@ function AreaChart({ buckets }: { buckets: Bucket[] }) {
 function BarChart({ data }: { data: number[] }) {
   const max = Math.max(1, ...data);
   return (
-    <div className="flex h-[210px] items-end gap-1 rounded-md border border-rule bg-ink-1/50 p-3">
+    <div className="relative flex h-[210px] items-end gap-1 overflow-hidden rounded-md border border-rule bg-ink-1/50 p-3">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-10 animate-[pulse_1.7s_ease-in-out_infinite] bg-brass/10 blur-xl" />
       {data.map((value, index) => (
         <div key={index} className="flex flex-1 items-end">
-          <div className="w-full rounded-t bg-brass/80" style={{ height: `${Math.max(3, (value / max) * 100)}%` }} />
+          <div
+            className="w-full rounded-t bg-gradient-to-t from-brass/55 to-brass shadow-[0_0_18px_rgba(229,177,110,0.28)] transition-all duration-500"
+            style={{ height: `${Math.max(3, (value / max) * 100)}%` }}
+          />
         </div>
       ))}
+    </div>
+  );
+}
+
+function MetricPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-rule bg-ink-1/60 px-2 py-1">
+      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted">{label}</div>
+      <div className="font-display text-sm text-bone">{value}</div>
     </div>
   );
 }

@@ -104,11 +104,13 @@ async def verify_audit_log(
     
     scheme = verification_scheme(log)
     verified = scheme is not None
-    verification_status = "verified" if verified else "mismatch"
+    verification_status = "verified" if verified else "inconclusive"
     reason = None
     if scheme == "legacy_preflush":
         verification_status = "verified_legacy"
         reason = "verified_against_legacy_preflush_hash_scheme"
+    elif not verified:
+        reason = "stored_hash_does_not_match_current_or_legacy_scheme"
 
     return {
         "log_id": log_id,

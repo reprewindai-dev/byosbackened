@@ -81,9 +81,9 @@ interface PipelineRun {
   pipeline_id: string;
   version: number;
   status: "pending" | "running" | "succeeded" | "failed" | "blocked_policy";
-  total_cost_usd: number | null;
+  total_cost_usd: number | string | null;
   total_latency_ms: number | null;
-  step_trace: Array<{ node_id: string; type: string; status: string; latency_ms: number; cost_usd: number }>;
+  step_trace: Array<{ node_id: string; type: string; status: string; latency_ms: number; cost_usd: number | string; model?: string | null; tool?: string | null }>;
   outputs: Record<string, unknown> | null;
   error_message?: string | null;
   finished_at?: string | null;
@@ -239,6 +239,7 @@ export function PipelinesPage() {
   const [draftGraph, setDraftGraph] = useState<PipelineGraph | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
@@ -280,6 +281,10 @@ export function PipelinesPage() {
     onSettled: () => {
       setCreating(null);
       qc.invalidateQueries({ queryKey: ["pipelines-runs"] });
+    },
+    onSuccess: (run) => {
+      setActionError(null);
+      setSelectedRunId(run.id);
     },
     onError: (error) => setActionError(error),
   });
@@ -421,7 +426,7 @@ export function PipelinesPage() {
           onExecute={(id) => executeMut.mutate(id)}
         />
 
-        <RecentRunsPanel runs={visibleRuns} loading={runs.isLoading} />
+        <RecentRunsPanel runs={visibleRuns} loading={runs.isLoading} selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} />
       </section>
 
       {showNew && (
@@ -1101,17 +1106,27 @@ function PipelinesTable({
   );
 }
 
-function RecentRunsPanel({ runs, loading }: { runs: PipelineRun[]; loading: boolean }) {
+function RecentRunsPanel({
+  runs,
+  loading,
+  selectedRunId,
+  onSelectRun,
+}: {
+  runs: PipelineRun[];
+  loading: boolean;
+  selectedRunId: string | null;
+  onSelectRun: (id: string | null) => void;
+}) {
   return (
     <section className="frame mt-4 overflow-hidden">
       <header className="flex items-center justify-between border-b border-rule/80 px-5 py-3">
         <div>
-          <div className="text-eyebrow">Recent runs</div>
-          <h3 className="font-display mt-0.5 text-sm font-semibold text-bone">Cross-pipeline execution feed</h3>
+          <div className="text-eyebrow">Pipeline run ledger</div>
+          <h3 className="font-display mt-0.5 text-sm font-semibold text-bone">Builder tests and deployment traces</h3>
         </div>
-        <a href="#/monitoring" className="v-btn-ghost h-8 px-3 text-xs">
-          <Activity className="h-4 w-4" /> Full audit trail
-        </a>
+        <Badge tone="info" dot>
+          audit on deployed runs
+        </Badge>
       </header>
       <ul className="divide-y divide-rule/50">
         {loading && <li className="px-5 py-8 text-center font-mono text-[12px] text-muted">loading...</li>}
@@ -1120,29 +1135,125 @@ function RecentRunsPanel({ runs, loading }: { runs: PipelineRun[]; loading: bool
             No runs yet. Execute a pipeline above to populate this feed.
           </li>
         )}
-        {runs.map((run) => (
-          <li key={run.id} className="flex items-start gap-3 px-5 py-3 font-mono text-[12px]">
-            <div className={cn("mt-0.5 flex h-7 w-7 items-center justify-center rounded-md", runTone(run.status))}>
-              <Sparkles className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={run.status === "succeeded" ? "ok" : run.status === "failed" ? "warn" : "primary"}>{run.status}</Badge>
-                <span className="text-bone-2">v{run.version}</span>
-                <span className="text-muted">·</span>
-                <span className="text-bone-2">{run.step_trace?.length ?? 0} steps</span>
-                {run.total_latency_ms != null && <span className="text-muted">{run.total_latency_ms}ms</span>}
-              </div>
-              {run.error_message && <div className="mt-1 truncate text-crimson">{run.error_message}</div>}
-            </div>
-            <div className="shrink-0 text-right text-muted">
-              <div>{relativeTime(run.created_at)}</div>
-              {run.total_cost_usd != null && <div className="mt-0.5 text-bone">${run.total_cost_usd.toFixed(4)}</div>}
-            </div>
-          </li>
-        ))}
+        {runs.map((run) => {
+          const selected = selectedRunId === run.id;
+          const steps = run.step_trace ?? [];
+          return (
+            <li key={run.id} className="font-mono text-[12px]">
+              <button
+                type="button"
+                className={cn("flex w-full items-start gap-3 px-5 py-3 text-left transition hover:bg-white/[0.025]", selected && "bg-white/[0.035]")}
+                onClick={() => onSelectRun(selected ? null : run.id)}
+              >
+                <div className={cn("mt-0.5 flex h-7 w-7 items-center justify-center rounded-md", runTone(run.status))}>
+                  <Sparkles className="h-3.5 w-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={run.status === "succeeded" ? "ok" : run.status === "failed" ? "warn" : "primary"}>{run.status}</Badge>
+                    <span className="text-bone-2">v{run.version}</span>
+                    <span className="text-muted">/</span>
+                    <span className="text-bone-2">{steps.length} steps</span>
+                    <span className="text-muted">{formatMs(runTraceLatency(run))} trace</span>
+                    <span className="text-muted">${formatUsd(runCost(run))} est.</span>
+                  </div>
+                  <RunMiniRail steps={steps} />
+                  {run.error_message && <div className="mt-1 truncate text-crimson">{run.error_message}</div>}
+                </div>
+                <div className="shrink-0 text-right text-muted">
+                  <div>{relativeTime(run.created_at)}</div>
+                  <div className="mt-1 flex justify-end">
+                    <ChevronRight className={cn("h-4 w-4 transition", selected && "rotate-90 text-bone")} />
+                  </div>
+                </div>
+              </button>
+              {selected && <RunTraceDetail run={run} />}
+            </li>
+          );
+        })}
       </ul>
     </section>
+  );
+}
+
+function RunMiniRail({ steps }: { steps: PipelineRun["step_trace"] }) {
+  if (!steps.length) return null;
+  const visibleSteps = steps.slice(0, 8);
+  return (
+    <div className="mt-2 flex items-center gap-1.5 overflow-hidden">
+      {visibleSteps.map((step, index) => (
+        <div key={`${step.node_id}-${index}`} className="flex items-center gap-1.5">
+          <span className={cn("flex h-5 w-5 items-center justify-center rounded-md border", nodeIconToneClass(step.type), nodeToneClass(step.type))}>
+            {nodeIcon(step.type)}
+          </span>
+          {index < visibleSteps.length - 1 && <span className="h-px w-5 bg-rule" />}
+        </div>
+      ))}
+      {steps.length > visibleSteps.length && <span className="text-muted">+{steps.length - visibleSteps.length}</span>}
+    </div>
+  );
+}
+
+function RunTraceDetail({ run }: { run: PipelineRun }) {
+  const steps = run.step_trace ?? [];
+  const outputSummary = typeof run.outputs?.summary === "string" ? run.outputs.summary : `${steps.length} step trace`;
+  return (
+    <div className="border-t border-rule/50 bg-ink/30 px-5 py-4">
+      <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+        <div className="rounded-lg border border-rule/70 bg-ink-2/70 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-eyebrow">Executed path</div>
+              <div className="mt-1 text-sm font-semibold text-bone">{outputSummary}</div>
+            </div>
+            <Badge tone="primary">builder test</Badge>
+          </div>
+          <div className="space-y-2">
+            {steps.map((step, index) => (
+              <div key={`${step.node_id}-${index}`} className="grid grid-cols-[28px_1fr_auto] items-center gap-3 rounded-md border border-rule/60 bg-black/10 px-3 py-2">
+                <span className={cn("flex h-7 w-7 items-center justify-center rounded-md border", nodeIconToneClass(step.type), nodeToneClass(step.type))}>
+                  {nodeIcon(step.type)}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-bone">{step.node_id}</span>
+                    <Badge tone={step.status === "succeeded" ? "ok" : step.status === "failed" ? "warn" : "muted"}>{step.status}</Badge>
+                    {(step.model || step.tool) && <span className="truncate text-muted">{step.model ?? step.tool}</span>}
+                  </div>
+                  <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-muted">{step.type}</div>
+                </div>
+                <div className="text-right text-muted">
+                  <div>{formatMs(Number(step.latency_ms ?? 0))}</div>
+                  <div className="mt-0.5 text-bone">${formatUsd(Number(step.cost_usd ?? 0))}</div>
+                </div>
+              </div>
+            ))}
+            {steps.length === 0 && <div className="rounded-md border border-rule/60 px-3 py-4 text-center text-muted">No step trace returned.</div>}
+          </div>
+        </div>
+        <div className="rounded-lg border border-rule/70 bg-ink-2/70 p-3">
+          <div className="text-eyebrow">Run math</div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <RunMetric label="steps" value={String(steps.length)} />
+            <RunMetric label="trace" value={formatMs(runTraceLatency(run))} />
+            <RunMetric label="estimate" value={`$${formatUsd(runCost(run))}`} />
+            <RunMetric label="version" value={`v${run.version}`} />
+          </div>
+          <div className="mt-3 rounded-md border border-electric/20 bg-electric/5 px-3 py-2 text-[11px] leading-5 text-bone-2">
+            Builder tests prove graph order. Deployed endpoint runs write monitoring audit evidence.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RunMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-rule/60 bg-black/10 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-bone">{value}</div>
+    </div>
   );
 }
 
@@ -1754,6 +1865,28 @@ function runTone(status: PipelineRun["status"]): string {
   if (status === "failed") return "bg-crimson/10 text-crimson";
   if (status === "blocked_policy") return "bg-brass/10 text-brass-2";
   return "bg-electric/10 text-electric";
+}
+
+function runTraceLatency(run: PipelineRun): number {
+  const stepLatency = (run.step_trace ?? []).reduce((sum, step) => sum + Number(step.latency_ms ?? 0), 0);
+  return stepLatency || Number(run.total_latency_ms ?? 0);
+}
+
+function runCost(run: PipelineRun): number {
+  const total = Number(run.total_cost_usd ?? 0);
+  if (Number.isFinite(total) && total > 0) return total;
+  return (run.step_trace ?? []).reduce((sum, step) => sum + Number(step.cost_usd ?? 0), 0);
+}
+
+function formatMs(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0ms";
+  if (value < 1000) return `${Math.round(value)}ms`;
+  return `${(value / 1000).toFixed(1)}s`;
+}
+
+function formatUsd(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0.0000";
+  return value >= 1 ? value.toFixed(2) : value.toFixed(4);
 }
 
 function Badge({

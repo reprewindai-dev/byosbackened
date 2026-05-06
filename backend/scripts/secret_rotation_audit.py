@@ -130,6 +130,7 @@ def main() -> int:
         help="Comma-separated secret names to flag for immediate rotation.",
     )
     parser.add_argument("--skip-db", action="store_true")
+    parser.add_argument("--skip-provider", action="store_true")
     args = parser.parse_args()
 
     policy_path = Path(args.policy)
@@ -157,51 +158,52 @@ def main() -> int:
         )
         github_secrets = {}
 
-    for secret in policy.get("provider_secrets", []):
-        if not github_metadata_available:
-            continue
-        name = secret["name"]
-        owner = secret.get("owner", "BOUNCER")
-        max_age_days = int(secret.get("max_age_days") or policy.get("max_default_age_days", 90))
-        critical = bool(secret.get("critical", False))
-        action = secret.get("rotation_action", "Rotate this secret and update all secret stores.")
-        updated_at = github_secrets.get(name)
+    if not args.skip_provider:
+        for secret in policy.get("provider_secrets", []):
+            if not github_metadata_available:
+                continue
+            name = secret["name"]
+            owner = secret.get("owner", "BOUNCER")
+            max_age_days = int(secret.get("max_age_days") or policy.get("max_default_age_days", 90))
+            critical = bool(secret.get("critical", False))
+            action = secret.get("rotation_action", "Rotate this secret and update all secret stores.")
+            updated_at = github_secrets.get(name)
 
-        if updated_at is None:
-            severity = "critical" if critical else "warning"
-            findings.append(
-                Finding(
-                    severity=severity,
-                    owner=owner,
-                    name=name,
-                    message="Secret metadata was not found in GitHub Actions.",
-                    action=action,
+            if updated_at is None:
+                severity = "critical" if critical else "warning"
+                findings.append(
+                    Finding(
+                        severity=severity,
+                        owner=owner,
+                        name=name,
+                        message="Secret metadata was not found in GitHub Actions.",
+                        action=action,
+                    )
                 )
-            )
-            continue
+                continue
 
-        age_days = (now - updated_at).days
-        if name in forced:
-            findings.append(
-                Finding(
-                    severity="critical",
-                    owner=owner,
-                    name=name,
-                    message=f"Forced rotation requested. Current metadata age is {age_days} day(s).",
-                    action=action,
+            age_days = (now - updated_at).days
+            if name in forced:
+                findings.append(
+                    Finding(
+                        severity="critical",
+                        owner=owner,
+                        name=name,
+                        message=f"Forced rotation requested. Current metadata age is {age_days} day(s).",
+                        action=action,
+                    )
                 )
-            )
-        elif age_days > max_age_days:
-            severity = "critical" if critical else "warning"
-            findings.append(
-                Finding(
-                    severity=severity,
-                    owner=owner,
-                    name=name,
-                    message=f"Secret metadata age is {age_days} days; policy limit is {max_age_days} days.",
-                    action=action,
+            elif age_days > max_age_days:
+                severity = "critical" if critical else "warning"
+                findings.append(
+                    Finding(
+                        severity=severity,
+                        owner=owner,
+                        name=name,
+                        message=f"Secret metadata age is {age_days} days; policy limit is {max_age_days} days.",
+                        action=action,
+                    )
                 )
-            )
 
     db_policy = policy.get("database_api_keys", {})
     if not args.skip_db and db_policy:

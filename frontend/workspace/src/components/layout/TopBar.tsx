@@ -6,6 +6,7 @@ import {
   BookOpen,
   CheckCircle2,
   Command,
+  CreditCard,
   Key,
   LogOut,
   Search,
@@ -15,12 +16,13 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { logout } from "@/lib/auth";
-import { fmtCents } from "@/lib/cn";
+import { cn, fmtCents } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
 import type { OverviewPayload } from "@/types/api";
 
 interface WalletBalance {
   balance: number;
+  reserve_balance_usd?: string;
   monthly_credits_included: number;
   monthly_credits_used: number;
 }
@@ -85,6 +87,8 @@ export function TopBar() {
   const regionLabel = user?.region?.trim() || "tenant-scoped";
   const planLabel = (user?.plan ?? user?.role ?? "live").replace(/_/g, " ");
   const burnCents = overview.data?.spend?.burn_rate_per_min_cents;
+  const reserveUsd = Number(wallet.data?.reserve_balance_usd ?? 0);
+  const reserveState = wallet.isError ? "unknown" : reserveUsd <= 0 ? "empty" : reserveUsd < 25 ? "low" : "funded";
   const budgetPct = useMemo(() => {
     const included = wallet.data?.monthly_credits_included ?? 0;
     if (included > 0) return Math.round(((wallet.data?.monthly_credits_used ?? 0) / included) * 100);
@@ -169,11 +173,32 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.1em]">
-        <span className="v-chip">
+        <button
+          type="button"
+          className={cn(
+            "v-chip transition hover:border-brass/50 hover:text-bone",
+            reserveState === "empty" && "v-chip-warn",
+            reserveState === "low" && "v-chip-brass",
+            reserveState === "funded" && "v-chip-ok",
+          )}
+          onClick={() => navigate("/billing")}
+          title="Operating reserve"
+        >
+          Reserve <span className="text-bone">{wallet.data ? `$${reserveUsd.toFixed(2)}` : "--"}</span>
+        </button>
+        <button
+          type="button"
+          className="v-chip v-chip-brass transition hover:border-brass hover:text-bone"
+          onClick={() => navigate("/billing")}
+          title="Fund operating reserve"
+        >
+          <CreditCard className="h-3.5 w-3.5" /> Fund
+        </button>
+        <span className="v-chip hidden xl:inline-flex">
           Burn <span className="text-bone">{burnCents != null ? fmtCents(burnCents) : "--"}</span>/min
         </span>
-        <span className="v-chip">
-          <span className="text-amber">{budgetPct != null ? `${budgetPct}%` : "--"}</span> budget
+        <span className="v-chip hidden 2xl:inline-flex">
+          <span className="text-amber">{budgetPct != null ? `${budgetPct}%` : "--"}</span> policy
         </span>
         <span className={degraded ? "v-chip v-chip-warn" : "v-chip v-chip-ok"}>
           {degraded ? "degraded" : "healthy"}

@@ -32,6 +32,7 @@ import {
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
 import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
+import { useAuthStore } from "@/store/auth-store";
 
 interface PipelineNode {
   id: string;
@@ -227,6 +228,7 @@ const PIPELINE_TEMPLATES: PipelineTemplate[] = [
 
 export function PipelinesPage() {
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const [showNew, setShowNew] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [newName, setNewName] = useState("");
@@ -426,7 +428,13 @@ export function PipelinesPage() {
           onExecute={(id) => executeMut.mutate(id)}
         />
 
-        <RecentRunsPanel runs={visibleRuns} loading={runs.isLoading} selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} />
+        <RecentRunsPanel
+          runs={visibleRuns}
+          loading={runs.isLoading}
+          selectedRunId={selectedRunId}
+          pricingTier={user?.plan}
+          onSelectRun={setSelectedRunId}
+        />
       </section>
 
       {showNew && (
@@ -1110,11 +1118,13 @@ function RecentRunsPanel({
   runs,
   loading,
   selectedRunId,
+  pricingTier,
   onSelectRun,
 }: {
   runs: PipelineRun[];
   loading: boolean;
   selectedRunId: string | null;
+  pricingTier?: string;
   onSelectRun: (id: string | null) => void;
 }) {
   return (
@@ -1138,6 +1148,7 @@ function RecentRunsPanel({
         {runs.map((run) => {
           const selected = selectedRunId === run.id;
           const steps = run.step_trace ?? [];
+          const eventPrice = governedRunPrice(pricingTier);
           return (
             <li key={run.id} className="font-mono text-[12px]">
               <button
@@ -1155,7 +1166,7 @@ function RecentRunsPanel({
                     <span className="text-muted">/</span>
                     <span className="text-bone-2">{steps.length} steps</span>
                     <span className="text-muted">{formatMs(runTraceLatency(run))} trace</span>
-                    <span className="text-muted">${formatUsd(runCost(run))} est.</span>
+                    <span className="text-brass-2">{eventPrice.label}</span>
                   </div>
                   <RunMiniRail steps={steps} />
                   {run.error_message && <div className="mt-1 truncate text-crimson">{run.error_message}</div>}
@@ -1167,7 +1178,7 @@ function RecentRunsPanel({
                   </div>
                 </div>
               </button>
-              {selected && <RunTraceDetail run={run} />}
+              {selected && <RunTraceDetail run={run} pricingTier={pricingTier} />}
             </li>
           );
         })}
@@ -1194,9 +1205,11 @@ function RunMiniRail({ steps }: { steps: PipelineRun["step_trace"] }) {
   );
 }
 
-function RunTraceDetail({ run }: { run: PipelineRun }) {
+function RunTraceDetail({ run, pricingTier }: { run: PipelineRun; pricingTier?: string }) {
   const steps = run.step_trace ?? [];
   const outputSummary = typeof run.outputs?.summary === "string" ? run.outputs.summary : `${steps.length} step trace`;
+  const eventPrice = governedRunPrice(pricingTier);
+  const providerEstimate = runCost(run);
   return (
     <div className="border-t border-rule/50 bg-ink/30 px-5 py-4">
       <div className="grid gap-3 md:grid-cols-[1fr_220px]">
@@ -1236,11 +1249,12 @@ function RunTraceDetail({ run }: { run: PipelineRun }) {
           <div className="mt-3 grid grid-cols-2 gap-2">
             <RunMetric label="steps" value={String(steps.length)} />
             <RunMetric label="trace" value={formatMs(runTraceLatency(run))} />
-            <RunMetric label="estimate" value={`$${formatUsd(runCost(run))}`} />
+            <RunMetric label="run price" value={eventPrice.value} />
             <RunMetric label="version" value={`v${run.version}`} />
           </div>
           <div className="mt-3 rounded-md border border-electric/20 bg-electric/5 px-3 py-2 text-[11px] leading-5 text-bone-2">
-            Builder tests prove graph order. Deployed endpoint runs write monitoring audit evidence.
+            Reserve impact is Veklom event pricing. Provider/token cost basis stays internal.
+            {providerEstimate > 0 ? ` Internal estimate: $${formatUsd(providerEstimate)}.` : ""}
           </div>
         </div>
       </div>
@@ -1876,6 +1890,14 @@ function runCost(run: PipelineRun): number {
   const total = Number(run.total_cost_usd ?? 0);
   if (Number.isFinite(total) && total > 0) return total;
   return (run.step_trace ?? []).reduce((sum, step) => sum + Number(step.cost_usd ?? 0), 0);
+}
+
+function governedRunPrice(pricingTier?: string): { label: string; value: string } {
+  const tier = (pricingTier ?? "founding").toLowerCase();
+  if (tier.includes("standard")) return { label: "Governed run $0.40", value: "$0.40" };
+  if (tier.includes("regulated") || tier.includes("enterprise")) return { label: "Governed run private", value: "private" };
+  if (tier.includes("free")) return { label: "Evaluation run included", value: "included" };
+  return { label: "Governed run $0.25", value: "$0.25" };
 }
 
 function formatMs(value: number): string {

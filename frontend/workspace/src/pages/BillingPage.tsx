@@ -16,6 +16,7 @@ import { cn, fmtCents, fmtNumber, formatApiDate, relativeTime } from "@/lib/cn";
 
 interface WalletBalance {
   workspace_id: string;
+  reserve_balance_usd?: string;
   balance: number;
   monthly_credits_included: number;
   monthly_credits_used: number;
@@ -48,6 +49,7 @@ interface TxnList {
 interface TopupOption {
   pack_name: string;
   price_cents: number;
+  reserve_usd?: string;
   credits: number;
   bonus_percent: number;
 }
@@ -90,6 +92,17 @@ async function createTopup(pack: string) {
     cancel_url: `${origin}/workspace-app#/billing?topup=cancel`,
   });
   return resp.data;
+}
+
+function fmtReserveUsd(balance: WalletBalance): string {
+  const amount = Number(balance.reserve_balance_usd ?? balance.balance / 1000);
+  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtReserveUnitsAsUsd(units: number): string {
+  const sign = units < 0 ? "-" : "";
+  const amount = Math.abs(units) / 1000;
+  return `${sign}$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function BillingPage() {
@@ -162,12 +175,12 @@ export function BillingPage() {
               {balance.isLoading ? (
                 <span className="inline-block h-9 w-40 animate-pulse rounded bg-rule" />
               ) : balance.data ? (
-                fmtNumber(balance.data.balance)
+                fmtReserveUsd(balance.data)
               ) : (
                 "-"
               )}
             </div>
-            <span className="font-mono text-[12px] uppercase tracking-widest text-muted">reserve units</span>
+            <span className="font-mono text-[12px] uppercase tracking-widest text-muted">available</span>
           </div>
 
           <div className="mt-5">
@@ -197,12 +210,12 @@ export function BillingPage() {
             <Stat
               icon={<ArrowUpRight className="h-3 w-3 text-moss" />}
               label="Reserve funded"
-              value={balance.data ? fmtNumber(balance.data.total_credits_purchased) : "-"}
+              value={balance.data ? fmtReserveUnitsAsUsd(balance.data.total_credits_purchased) : "-"}
             />
             <Stat
               icon={<TrendingUp className="h-3 w-3 text-electric" />}
               label="Reserve consumed"
-              value={balance.data ? fmtNumber(balance.data.total_credits_used) : "-"}
+              value={balance.data ? fmtReserveUnitsAsUsd(balance.data.total_credits_used) : "-"}
             />
           </div>
         </div>
@@ -293,8 +306,8 @@ export function BillingPage() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {(packs.data?.options ?? []).map((p) => {
-            const effectiveCredits = p.credits;
-            const pricePerK = (p.price_cents / 100 / (effectiveCredits / 1000)).toFixed(2);
+            const reserveUsd = Number(p.reserve_usd ?? p.credits / 1000);
+            const runCount = Math.floor(reserveUsd / 0.25);
             const active = selectedPack === p.pack_name;
             return (
               <div
@@ -322,10 +335,10 @@ export function BillingPage() {
                 </div>
                 <div>
                   <div className="font-mono text-[14px] font-semibold text-bone">
-                    {fmtNumber(effectiveCredits)} reserve units
+                    ${reserveUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} operating reserve
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-muted">
-                    approx ${pricePerK} / 1k reserve units
+                    up to {fmtNumber(runCount)} Founding governed runs
                   </div>
                 </div>
                 <button
@@ -420,9 +433,9 @@ export function BillingPage() {
                     )}
                   >
                     {credit ? "+" : ""}
-                    {fmtNumber(t.amount)}
+                    {fmtReserveUnitsAsUsd(t.amount)}
                   </td>
-                  <td className="px-5 py-2.5 text-right text-bone">{fmtNumber(t.balance_after)}</td>
+                  <td className="px-5 py-2.5 text-right text-bone">{fmtReserveUnitsAsUsd(t.balance_after)}</td>
                 </tr>
               );
             })}

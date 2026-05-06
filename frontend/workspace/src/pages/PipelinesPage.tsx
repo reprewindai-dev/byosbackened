@@ -544,6 +544,7 @@ function BuilderPanel({
 }) {
   const nodeCount = graph?.nodes.length ?? selected?.latest_version?.node_count ?? 0;
   const edgeCount = graph?.edges.length ?? 0;
+  const proof = graph ? analyzePipelineProof(graph) : null;
 
   return (
     <div className={cn("frame col-span-12 overflow-hidden transition-[grid-column] duration-300", expanded ? "lg:col-span-11" : "lg:col-span-8")}>
@@ -603,6 +604,7 @@ function BuilderPanel({
           </div>
         )}
       </div>
+      {proof && <PreflightProofPanel proof={proof} />}
       <div className="flex items-center justify-between border-t border-rule/80 px-4 py-2 text-[11px] text-muted">
         <span>
           <Badge tone="primary">POLICY ENGINE INLINE</Badge>
@@ -1237,6 +1239,86 @@ function TemplateModal({
   );
 }
 
+function PreflightProofPanel({ proof }: { proof: PipelineProof }) {
+  return (
+    <div className="border-t border-rule/80 bg-ink-1/45 px-4 py-3">
+      <div className="grid gap-2 md:grid-cols-5">
+        <ProofCard
+          icon={<ShieldCheck className="h-4 w-4" />}
+          label="Readiness"
+          value={`${proof.score}%`}
+          detail={proof.status}
+          tone={proof.score >= 80 ? "ok" : proof.score >= 60 ? "warn" : "muted"}
+        />
+        <ProofCard
+          icon={<LockKeyhole className="h-4 w-4" />}
+          label="Policy gates"
+          value={String(proof.gateCount)}
+          detail={proof.policyRefs.join(", ") || "missing"}
+          tone={proof.gateCount ? "ok" : "warn"}
+        />
+        <ProofCard
+          icon={<FileJson className="h-4 w-4" />}
+          label="Evidence"
+          value={proof.auditReady ? "ready" : "gap"}
+          detail={proof.auditReady ? "signed trail" : "add signer"}
+          tone={proof.auditReady ? "ok" : "warn"}
+        />
+        <ProofCard
+          icon={<Route className="h-4 w-4" />}
+          label="Run contract"
+          value={proof.contract}
+          detail={proof.routing}
+          tone="primary"
+        />
+        <ProofCard
+          icon={<ShieldCheck className="h-4 w-4" />}
+          label="Privacy"
+          value={proof.privacyReady ? "covered" : "open"}
+          detail={proof.privacyReady ? "PII/PHI path" : "add redaction"}
+          tone={proof.privacyReady ? "ok" : "muted"}
+        />
+      </div>
+      {proof.issues.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {proof.issues.map((issue) => (
+            <Badge key={issue} tone="warn">
+              {issue}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProofCard({
+  icon,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone: "muted" | "primary" | "ok" | "warn";
+}) {
+  return (
+    <div className="rounded-md border border-rule bg-ink-2/65 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className={cn("grid h-7 w-7 place-items-center rounded-md", proofToneClass(tone))}>{icon}</div>
+        <div className="min-w-0 flex-1 text-right">
+          <div className="text-eyebrow">{label}</div>
+          <div className="truncate font-display text-[15px] font-semibold text-bone">{value}</div>
+        </div>
+      </div>
+      <div className="mt-1 truncate font-mono text-[10.5px] text-muted">{detail}</div>
+    </div>
+  );
+}
+
 function TextField({
   label,
   value,
@@ -1315,6 +1397,59 @@ function normalizeNodeForType(node: PipelineNode, type: PipelineNode["type"]): P
     ...(type === "prompt" && !node.prompt ? { prompt: "{{input}}" } : {}),
     ...(type === "tool" && !node.tool ? { tool: node.id } : {}),
     ...(type === "gate" && !node.policy ? { policy: "default" } : {}),
+  };
+}
+
+interface PipelineProof {
+  score: number;
+  status: string;
+  gateCount: number;
+  auditReady: boolean;
+  privacyReady: boolean;
+  contract: string;
+  routing: string;
+  policyRefs: string[];
+  issues: string[];
+}
+
+function analyzePipelineProof(graph: PipelineGraph): PipelineProof {
+  const nodes = graph.nodes;
+  const text = nodes
+    .map((node) => [node.type, node.label, node.model, node.prompt, node.tool, node.policy].filter(Boolean).join(" "))
+    .join(" ")
+    .toLowerCase();
+  const gateNodes = nodes.filter((node) => node.type === "gate");
+  const modelNodes = nodes.filter((node) => node.type === "model");
+  const promptNodes = nodes.filter((node) => node.type === "prompt");
+  const conditionNodes = nodes.filter((node) => node.type === "condition");
+  const auditReady = /audit|signer|signed|manifest|evidence/.test(text);
+  const privacyReady = /pii|phi|hipaa|redact|privacy/.test(text);
+  const policyRefs = collectPolicyRefs(graph);
+  const issues: string[] = [];
+  if (!promptNodes.length) issues.push("missing input");
+  if (!modelNodes.length) issues.push("missing model");
+  if (!gateNodes.length) issues.push("no policy gate");
+  if (!auditReady) issues.push("no evidence signer");
+
+  let score = 25;
+  if (promptNodes.length) score += 15;
+  if (modelNodes.length) score += 15;
+  if (gateNodes.length) score += 22;
+  if (auditReady) score += 13;
+  if (privacyReady) score += 5;
+  if (conditionNodes.length) score += 5;
+  score = Math.min(100, score);
+
+  return {
+    score,
+    status: score >= 85 ? "enterprise-ready" : score >= 65 ? "controlled draft" : "needs hardening",
+    gateCount: gateNodes.length,
+    auditReady,
+    privacyReady,
+    contract: modelNodes.length > 1 ? "compare run" : "governed run",
+    routing: conditionNodes.length ? "branch controlled" : modelNodes.length > 1 ? "multi-model" : "direct",
+    policyRefs,
+    issues,
   };
 }
 
@@ -1472,6 +1607,13 @@ function nodeIconToneClass(type: string): string {
   if (type === "gate" || type === "model") return "bg-brass/15 text-brass-2";
   if (type === "condition") return "bg-electric/15 text-electric";
   if (type === "tool") return "bg-moss/15 text-moss";
+  return "bg-ink-3 text-muted";
+}
+
+function proofToneClass(tone: "muted" | "primary" | "ok" | "warn"): string {
+  if (tone === "primary") return "bg-brass/15 text-brass-2";
+  if (tone === "ok") return "bg-moss/15 text-moss";
+  if (tone === "warn") return "bg-amber/15 text-amber";
   return "bg-ink-3 text-muted";
 }
 

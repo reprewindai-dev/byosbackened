@@ -40,16 +40,21 @@ jobs:
           BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
         run: |
           set -euo pipefail
+          BASE_URL="${BACKEND_URL%/}"
           for ROUTE in \
             "/health" \
             "/api/v1/edge/demo/summary" \
             "/api/v1/edge/demo/infrastructure?scenario=network&live=false"; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-              --retry 3 --retry-delay 10 --retry-all-errors "$BACKEND_URL$ROUTE")
+            BODY_FILE="$(mktemp)"
+            STATUS=$(curl -L -sS --output "$BODY_FILE" --write-out "%{http_code}" --max-time 20 \
+              --retry 3 --retry-delay 10 --retry-all-errors "$BASE_URL$ROUTE")
             echo "$ROUTE -> HTTP $STATUS"
             if [ "$STATUS" != "200" ]; then
+              echo "Response body:"
+              cat "$BODY_FILE"
               exit 1
             fi
+            rm -f "$BODY_FILE"
           done
 
       - name: Open incident issue on failure
@@ -57,6 +62,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cat > backend-deploy-incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: latest backend main may not be healthy in production, or the deploy verification robot failed.
+          EOF
           gh issue create \
             --title "[OPS] Backend deploy verification failed" \
-            --body "Workflow: $GITHUB_WORKFLOW`nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`nCommit: $GITHUB_SHA`nImpact: latest backend main may not be healthy in production."
+            --body-file backend-deploy-incident.md

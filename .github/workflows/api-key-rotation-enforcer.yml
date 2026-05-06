@@ -30,7 +30,7 @@ jobs:
       - name: Audit provider secrets and internal API keys
         id: audit
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SECRET_ROTATION_GH_TOKEN || github.token }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FORCE_ROTATE_SECRETS: ${{ github.event.inputs.force_rotate }}
         run: |

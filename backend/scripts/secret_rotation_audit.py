@@ -138,24 +138,28 @@ def main() -> int:
     forced = {name.strip() for name in args.force_rotate.split(",") if name.strip()}
 
     findings: list[Finding] = []
+    github_metadata_available = True
     try:
         if args.github_secrets_json:
             github_secrets = _github_secrets_from_file(Path(args.github_secrets_json))
         else:
             github_secrets = _github_secrets_from_cli(args.repo or None)
     except Exception as exc:  # noqa: BLE001 - report operational failure without leaking env
+        github_metadata_available = False
         findings.append(
             Finding(
                 severity="critical",
                 owner="BOUNCER",
-                name="GITHUB_ACTIONS_SECRETS",
-                message=f"Unable to inspect GitHub secret metadata: {exc.__class__.__name__}",
-                action="Verify GITHUB_TOKEN permissions and rerun the rotation guardian.",
+                name="SECRET_ROTATION_GH_TOKEN",
+                message=f"Unable to inspect GitHub secret metadata: {exc.__class__.__name__}.",
+                action="Add a fine-scoped GitHub token as SECRET_ROTATION_GH_TOKEN with repository Actions secrets read permission, then rerun the guardian.",
             )
         )
         github_secrets = {}
 
     for secret in policy.get("provider_secrets", []):
+        if not github_metadata_available:
+            continue
         name = secret["name"]
         owner = secret.get("owner", "BOUNCER")
         max_age_days = int(secret.get("max_age_days") or policy.get("max_default_age_days", 90))

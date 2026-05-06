@@ -19,8 +19,14 @@ router = APIRouter(prefix="/wallet", tags=["wallet"])
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
+RESERVE_UNITS_PER_USD = 1000
+
+
 class WalletBalanceResponse(BaseModel):
     workspace_id: str
+    reserve_balance_units: int
+    reserve_balance_usd: str
+    # Deprecated compatibility fields. The public product language is Operating Reserve, not credits.
     balance: int
     monthly_credits_included: int
     monthly_credits_used: int
@@ -53,6 +59,8 @@ class TransactionListResponse(BaseModel):
 class TopupOption(BaseModel):
     pack_name: str
     price_cents: int
+    reserve_units: int
+    reserve_usd: str
     credits: int
     bonus_percent: int
 
@@ -74,23 +82,23 @@ class CreateCheckoutResponse(BaseModel):
 
 # ─── Operating Reserve Definitions ────────────────────────────────────────────
 
-TOKEN_PACKS = {
+RESERVE_PACKS = {
     "founding": {
         "name": "Founding Reserve",
         "price_cents": 15_000,  # $150 minimum reserve
-        "credits": 150_000,
+        "reserve_units": 150_000,
         "bonus_percent": 0,
     },
     "standard": {
         "name": "Standard Reserve",
         "price_cents": 30_000,  # $300 minimum reserve
-        "credits": 300_000,
+        "reserve_units": 300_000,
         "bonus_percent": 0,
     },
     "regulated": {
         "name": "Regulated Reserve",
         "price_cents": 250_000,  # $2,500 minimum reserve
-        "credits": 2_500_000,
+        "reserve_units": 2_500_000,
         "bonus_percent": 0,
     },
 }
@@ -168,6 +176,8 @@ async def get_balance(
     
     return WalletBalanceResponse(
         workspace_id=wallet.workspace_id,
+        reserve_balance_units=wallet.balance,
+        reserve_balance_usd=f"{wallet.balance / RESERVE_UNITS_PER_USD:.2f}",
         balance=wallet.balance,
         monthly_credits_included=wallet.monthly_credits_included or 0,
         monthly_credits_used=wallet.monthly_credits_used or 0,
@@ -230,10 +240,12 @@ async def get_topup_options():
             TopupOption(
                 pack_name=pack_id,
                 price_cents=pack["price_cents"],
-                credits=pack["credits"],
+                reserve_units=pack["reserve_units"],
+                reserve_usd=f"{pack['reserve_units'] / RESERVE_UNITS_PER_USD:.2f}",
+                credits=pack["reserve_units"],
                 bonus_percent=pack["bonus_percent"],
             )
-            for pack_id, pack in TOKEN_PACKS.items()
+            for pack_id, pack in RESERVE_PACKS.items()
         ]
     )
 
@@ -254,7 +266,7 @@ async def create_topup_checkout(
     stripe.api_version = settings.stripe_api_version
     
     # Validate pack
-    pack = TOKEN_PACKS.get(request.pack_name)
+    pack = RESERVE_PACKS.get(request.pack_name)
     if not pack:
         raise HTTPException(status_code=400, detail="Invalid reserve pack")
     
@@ -270,7 +282,7 @@ async def create_topup_checkout(
                 "currency": "usd",
                 "product_data": {
                     "name": f"Veklom Operating Reserve - {pack['name']}",
-                    "description": f"{pack['credits']:,} reserve units for governed execution",
+                    "description": f"${pack['reserve_units'] / RESERVE_UNITS_PER_USD:,.2f} operating reserve for governed execution",
                 },
                 "unit_amount": pack["price_cents"],
             },
@@ -282,7 +294,8 @@ async def create_topup_checkout(
         metadata={
             "workspace_id": workspace_id,
             "pack_name": request.pack_name,
-            "credits": str(pack["credits"]),
+            "reserve_units": str(pack["reserve_units"]),
+            "credits": str(pack["reserve_units"]),
             "type": "operating_reserve",
         },
     )
@@ -299,7 +312,7 @@ async def get_usage_stats(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
 ):
-    """Get usage statistics for the wallet."""
+    """Get operating reserve usage statistics."""
     from datetime import timedelta
     from sqlalchemy import func
     
@@ -307,7 +320,7 @@ async def get_usage_stats(
     
     # Get usage stats
     usage_stats = db.query(
-        func.sum(TokenTransaction.amount).label("total_credits"),
+        func.sum(TokenTransaction.amount).label("total_reserve_units"),
         func.count(TokenTransaction.id).label("transaction_count"),
     ).filter(
         TokenTransaction.workspace_id == workspace_id,
@@ -318,7 +331,7 @@ async def get_usage_stats(
     # Get top endpoints
     top_endpoints = db.query(
         TokenTransaction.endpoint_path,
-        func.sum(-TokenTransaction.amount).label("credits_used"),
+        func.sum(-TokenTransaction.amount).label("reserve_units_used"),
         func.count(TokenTransaction.id).label("call_count"),
     ).filter(
         TokenTransaction.workspace_id == workspace_id,
@@ -327,17 +340,21 @@ async def get_usage_stats(
     ).group_by(
         TokenTransaction.endpoint_path
     ).order_by(
-        desc("credits_used")
+        desc("reserve_units_used")
     ).limit(10).all()
     
     return {
         "period_days": days,
-        "total_credits_used": abs(int(usage_stats.total_credits or 0)),
+        "total_reserve_units_used": abs(int(usage_stats.total_reserve_units or 0)),
+        "total_reserve_usd_used": f"{abs(int(usage_stats.total_reserve_units or 0)) / RESERVE_UNITS_PER_USD:.2f}",
+        "total_credits_used": abs(int(usage_stats.total_reserve_units or 0)),
         "transaction_count": int(usage_stats.transaction_count or 0),
         "top_endpoints": [
             {
                 "endpoint": ep.endpoint_path,
-                "credits_used": int(ep.credits_used or 0),
+                "reserve_units_used": int(ep.reserve_units_used or 0),
+                "reserve_usd_used": f"{int(ep.reserve_units_used or 0) / RESERVE_UNITS_PER_USD:.2f}",
+                "credits_used": int(ep.reserve_units_used or 0),
                 "call_count": int(ep.call_count or 0),
             }
             for ep in top_endpoints

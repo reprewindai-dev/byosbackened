@@ -74,51 +74,34 @@ byosbackened/
 
 ### Public Pricing
 
-| Tier | DB Enum | Monthly | Yearly | Display Name |
-|------|---------|---------|--------|--------------|
-| Team | `starter` | $12,000 | $120,000 | Team |
-| Business | `pro` | $35,000 | $350,000 | Business |
-| Sovereign | `sovereign` | $2,500 | $25,000 | Sovereign |
-| Enterprise | `enterprise` | Custom | Custom | Enterprise |
+No subscriptions. No tokens. Reserve balances are USD-denominated and never expire.
 
-**Yearly = 10× monthly** (2 months free)
+| Tier | DB Enum | Activation | Minimum Reserve | Display Name |
+|------|---------|------------|-----------------|--------------|
+| Free Evaluation | n/a | $0 | $0 | Evaluate |
+| Founding | `starter` | $395 one-time | $150 | Founding Activation |
+| Standard | `pro` | $795 one-time | $300 | Standard |
+| Regulated | `sovereign` | From $2,500 | $2,500 | Regulated |
+| Enterprise | `enterprise` | Private terms | Private terms | Enterprise |
+
+Free Evaluation is limited by run counts: 15 governed Playground runs, 3 compare runs, 20 policy tests, 2 watermarked exports, BYOK provider testing, and marketplace browsing.
 
 ### Files to Keep in Sync
 
 | Location | File Path | Must Show |
 |----------|-----------|-----------|
-| Backend PLANS dict | `backend/apps/api/routers/subscriptions.py:23-147` | `1_200_000` / `3_500_000` / `250_000` cents |
+| Backend PLANS dict | `backend/apps/api/routers/subscriptions.py:23-147` | Activation cents and minimum reserve cents |
 | Human reference | `backend/PRICING_TRUTH.md` | All tiers with explanations |
 | Public page | `landing/pricing.html` | Cards, JSON-LD, FAQ |
 | Structured data | `veklom_landing_reference.html` | JSON-LD SoftwareApplication |
-| Stripe Dashboard | Manual setup | Same monthly/yearly prices |
+| Stripe Dashboard | Manual setup | One-time activation Checkout plus Operating Reserve funding |
 
 ### Current PLANS Dict Reference (subscriptions.py)
 
 ```python
-"starter": {
-    "name": "Team",
-    "price_monthly_cents": 1_200_000,   # $12,000
-    "price_yearly_cents": 12_000_000,   # $120,000
-    "monthly_credits_included": 10_000_000,
-},
-"pro": {
-    "name": "Business",
-    "price_monthly_cents": 3_500_000,   # $35,000
-    "price_yearly_cents": 35_000_000,   # $350,000
-    "monthly_credits_included": 100_000_000,
-},
-"sovereign": {
-    "name": "Sovereign",
-    "price_monthly_cents": 250_000,     # $2,500
-    "price_yearly_cents": 2_500_000,    # $25,000
-    "monthly_credits_included": 500_000_000,
-},
-"enterprise": {
-    "name": "Enterprise",
-    "price_monthly_cents": None,        # Custom
-    "self_serve_checkout": False,
-}
+"starter": {"name": "Founding Activation", "activation_cents": 39_500, "minimum_reserve_cents": 15_000}
+"pro": {"name": "Standard Activation", "activation_cents": 79_500, "minimum_reserve_cents": 30_000}
+"sovereign": {"name": "Regulated Activation", "activation_cents": 250_000, "minimum_reserve_cents": 250_000, "self_serve_checkout": False}
 ```
 
 ---
@@ -282,7 +265,7 @@ curl -X POST https://license.veklom.com/verify \
 | License gates | ✅ | Token wallet middleware |
 | Ollama proxy | ✅ | `POST /v1/exec` |
 | Marketplace | ✅ | `GET /api/v1/listings` |
-| Trial wallet (50K credits) | ✅ | Auto-issued on signup |
+| Free Evaluation run limits | ✅ | 15 governed Playground runs, 3 compare runs, 20 policy tests, 2 watermarked exports |
 | Admin bypass for plan gates | ✅ | `entitlement_check.py` |
 
 ---

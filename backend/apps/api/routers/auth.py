@@ -71,6 +71,9 @@ class TokenResponse(BaseModel):
     workspace_id: str
     role: str
     trial_api_key: Optional[str] = None
+    reserve_balance_units: Optional[int] = None
+    reserve_balance_usd: Optional[str] = None
+    # Deprecated compatibility field. New product language is Operating Reserve.
     wallet_balance: Optional[int] = None
     signup_type: Optional[str] = None
 
@@ -231,11 +234,11 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         TokenTransaction(
             wallet_id=wallet.id,
             workspace_id=workspace.id,
-            transaction_type="monthly_allotment",
+            transaction_type="evaluation_initialized",
             amount=FREE_TRIAL_CREDITS,
             balance_before=0,
             balance_after=FREE_TRIAL_CREDITS,
-            description="Free Evaluation wallet initialized; governed-run limits are entitlement-controlled",
+            description="Free Evaluation initialized; governed-run limits are entitlement-controlled",
         )
     )
     try:
@@ -279,6 +282,8 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         role=user.role.value,
         trial_api_key=onboarding.get("api_key"),
         wallet_balance=onboarding.get("wallet_balance"),
+        reserve_balance_units=onboarding.get("wallet_balance"),
+        reserve_balance_usd="0.00",
         signup_type=onboarding.get("signup_type"),
     )
 
@@ -795,7 +800,7 @@ async def github_callback(
             amount=FREE_TRIAL_CREDITS,
             balance_before=0,
             balance_after=FREE_TRIAL_CREDITS,
-            description="Free GitHub workspace governed-run allowance",
+            description="Free GitHub workspace initialized; governed-run limits are entitlement-controlled",
         ))
         db.commit()
         db.refresh(user)

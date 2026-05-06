@@ -1,4 +1,4 @@
-"""Workspace AI playground and wallet-backed completion endpoint."""
+"""Workspace AI playground and Operating Reserve-backed completion endpoint."""
 from __future__ import annotations
 
 import hashlib
@@ -133,11 +133,14 @@ class AICompleteResponse(BaseModel):
     audit_log_id: str
     audit_hash: str
     prompt_tokens: int
+    reserve_units_debited: int
     tokens_deducted: int
     output_tokens: int
     total_tokens: int
     latency_ms: int
     cost_usd: str
+    reserve_balance_units: int
+    reserve_balance_usd: str
     wallet_balance: int
     reserve_debited: int
     billing_event_type: str
@@ -601,7 +604,7 @@ async def complete(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Run a wallet-backed completion through the configured production LLM stack."""
+    """Run a governed completion through the configured production LLM stack."""
     try:
         model_row = get_model_setting(db, current_user.workspace_id, payload.model)
     except ValueError as exc:
@@ -648,7 +651,6 @@ async def complete(
         prompt_tokens = int(llm_result.get("prompt_tokens") or 0)
         output_tokens = int(llm_result.get("completion_tokens") or 0)
         total_tokens = int(llm_result.get("total_tokens") or (prompt_tokens + output_tokens))
-        tokens_deducted = reserve_units_debited
         cost_usd = _reserve_units_to_usd(reserve_units_debited)
         latency_ms = int((datetime.utcnow() - started_at).total_seconds() * 1000)
 
@@ -783,8 +785,10 @@ async def complete(
                 "prompt_tokens": prompt_tokens,
                 "output_tokens": output_tokens,
                 "total_tokens": total_tokens,
-                "tokens_deducted": tokens_deducted,
+                "reserve_units_debited": reserve_units_debited,
                 "reserve_debited": reserve_units_debited,
+                "reserve_balance_units": wallet.balance,
+                "reserve_balance_usd": str(_reserve_units_to_usd(wallet.balance)),
                 "wallet_balance": wallet.balance,
                 "billing_event_type": billing_event_type,
                 "pricing_tier": pricing_tier,
@@ -813,11 +817,11 @@ async def complete(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="AI completion failed") from exc
 
     logger.info(
-        "AI completion logged user_id=%s workspace_id=%s model=%s tokens_deducted=%s timestamp=%s",
+        "AI completion logged user_id=%s workspace_id=%s model=%s reserve_units_debited=%s timestamp=%s",
         current_user.id,
         current_user.workspace_id,
         executed_model,
-        tokens_deducted,
+        reserve_units_debited,
         started_at.isoformat(),
     )
 
@@ -834,11 +838,14 @@ async def complete(
         audit_log_id=str(audit_entry.id),
         audit_hash=audit_entry.log_hash,
         prompt_tokens=prompt_tokens,
-        tokens_deducted=tokens_deducted,
+        reserve_units_debited=reserve_units_debited,
+        tokens_deducted=reserve_units_debited,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
         latency_ms=latency_ms,
         cost_usd=str(cost_usd),
+        reserve_balance_units=wallet.balance,
+        reserve_balance_usd=str(_reserve_units_to_usd(wallet.balance)),
         wallet_balance=wallet.balance,
         reserve_debited=reserve_units_debited,
         billing_event_type=billing_event_type,

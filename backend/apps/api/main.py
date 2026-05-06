@@ -6,14 +6,11 @@ import os
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from core.config import get_settings
 from core.auth import get_current_workspace
 from db.session import SessionLocal
-from db.models import TokenWallet, TokenTransaction
-from datetime import datetime
-import uuid
 from core.logging import setup_logging
 from core.security.zero_trust import ZeroTrustMiddleware
 from apps.api.middleware.metrics import MetricsMiddleware
@@ -22,7 +19,6 @@ from apps.api.middleware.edge_routing import EdgeRoutingMiddleware
 from apps.api.middleware.budget_check import BudgetCheckMiddleware
 from apps.api.middleware.rate_limit import RateLimitMiddleware
 from apps.api.middleware.entitlement_check import EntitlementCheckMiddleware
-from apps.api.middleware.token_deduction import TokenDeductionMiddleware
 from apps.api.middleware.locker_security_integration import LockerSecurityMiddleware
 from apps.api.middleware.request_security import RequestSecurityMiddleware
 from apps.api.middleware.performance import PerformanceMiddleware, GzipMiddleware
@@ -151,7 +147,6 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(ZeroTrustMiddleware)
 app.add_middleware(LicenseGateMiddleware)
 app.add_middleware(EntitlementCheckMiddleware)
-app.add_middleware(TokenDeductionMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(IntelligentRoutingMiddleware)
 app.add_middleware(EdgeRoutingMiddleware)
@@ -274,89 +269,17 @@ async def legacy_stripe_webhook(request: Request):
         db.close()
 
 
-def deduct_tokens_for_docs(workspace_id: str, endpoint: str):
-    """Deduct 100 tokens for docs access."""
-    db = SessionLocal()
-    try:
-        wallet = db.query(TokenWallet).filter(
-            TokenWallet.workspace_id == workspace_id
-        ).with_for_update().first()
-        
-        if not wallet:
-            wallet = TokenWallet(workspace_id=workspace_id, balance=0)
-            db.add(wallet)
-            db.flush()
-        
-        if wallet.balance < 100:
-            return False, wallet.balance
-        
-        # Record transaction
-        transaction = TokenTransaction(
-            wallet_id=wallet.id,
-            workspace_id=workspace_id,
-            transaction_type="usage",
-            amount=-100,
-            balance_before=wallet.balance,
-            balance_after=wallet.balance - 100,
-            endpoint_path=endpoint,
-            endpoint_method="GET",
-            request_id=str(uuid.uuid4()),
-            description=f"API documentation access: {endpoint}"
-        )
-        db.add(transaction)
-        
-        wallet.balance -= 100
-        wallet.updated_at = datetime.utcnow()
-        db.commit()
-        
-        return True, wallet.balance
-    finally:
-        db.close()
-
-
-# Protected documentation routes - require auth + tokens (100 tokens per view)
+# Protected documentation routes - require auth, but docs viewing is not a billable event.
 @app.get(f"{settings.api_prefix}/docs", include_in_schema=False)
 async def protected_docs(request: Request, workspace_id: str = Depends(get_current_workspace)):
-    """Swagger UI - requires authentication and 100 tokens per view."""
-    success, balance = deduct_tokens_for_docs(workspace_id, "/api/v1/docs")
-    if not success:
-        return JSONResponse(
-            status_code=402,
-            content={
-                "detail": "Insufficient tokens. Docs access requires 100 tokens.",
-                "required": 100,
-                "balance": balance,
-                "purchase_url": "/api/v1/wallet/topup"
-            },
-            headers={"X-Tokens-Required": "100", "X-Tokens-Balance": str(balance)}
-        )
-    
-    response = FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
-    response.headers["X-Tokens-Cost"] = "100"
-    response.headers["X-Tokens-Remaining"] = str(balance)
-    return response
+    """Swagger UI - authenticated operator documentation."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
 
 
 @app.get(f"{settings.api_prefix}/redoc", include_in_schema=False)
 async def protected_redoc(request: Request, workspace_id: str = Depends(get_current_workspace)):
-    """ReDoc UI - requires authentication and 100 tokens per view."""
-    success, balance = deduct_tokens_for_docs(workspace_id, "/api/v1/redoc")
-    if not success:
-        return JSONResponse(
-            status_code=402,
-            content={
-                "detail": "Insufficient tokens. Docs access requires 100 tokens.",
-                "required": 100,
-                "balance": balance,
-                "purchase_url": "/api/v1/wallet/topup"
-            },
-            headers={"X-Tokens-Required": "100", "X-Tokens-Balance": str(balance)}
-        )
-    
-    response = FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))
-    response.headers["X-Tokens-Cost"] = "100"
-    response.headers["X-Tokens-Remaining"] = str(balance)
-    return response
+    """ReDoc UI - authenticated operator documentation."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))
 
 
 @app.get(f"{settings.api_prefix}/openapi.json", include_in_schema=False)

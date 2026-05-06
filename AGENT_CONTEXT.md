@@ -20,7 +20,7 @@ Read this entire file before doing anything else. No exceptions.
 - **Live URL:** https://veklom.com (acquisition page), https://api.veklom.com (API)
 - **Marketplace:** https://veklom.com/api/v1/listings â€” public, returns catalog
 - **Signup:** https://veklom.com/signup/
-- **Status:** Live. API returns 200. llm_ok: true. Trial wallets get 50,000 credits on registration.
+- **Status:** Live. API returns 200. llm_ok: true. Free Evaluation gets run-count limits, not credits or tokens.
 
 ### 2. CO2 Router / ECOBE Engine (separate repo)
 - **What it is:** Carbon-aware routing engine
@@ -68,10 +68,10 @@ Read this entire file before doing anything else. No exceptions.
 - `GET /health` â†’ 200
 - `GET /status` â†’ llm_ok: true
 - `GET /api/v1/listings` â†’ public marketplace catalog
-- Signup at veklom.com/signup/ â†’ workspace created, 50k trial credits issued
+- Signup at veklom.com/signup/ â†’ workspace created with Free Evaluation limits and $0.00 reserve balance
 - API key creation via dashboard/API
 - `POST /v1/exec` with X-API-Key â†’ verified against live Ollama (qwen2.5:0.5b)
-- `POST /api/v1/ai/complete` -> Bedrock proxy with JWT auth, wallet checks, token deduction, and audit logging
+- `POST /api/v1/ai/complete` -> governed AI execution with JWT auth, Free Evaluation limits, Operating Reserve debit, and audit logging
 - Workspace dashboard tabs -> overview, AI playground, observability, API keys, models, and cost/budget
 - Public `/status` page -> live uptime surface for API, Auth, Marketplace, and AI Proxy
 - Hetzner backup automation -> S3 backup script, daily cron, and 7-day retention cleanup

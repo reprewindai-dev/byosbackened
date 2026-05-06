@@ -718,6 +718,13 @@ function PipelineCanvas({
           <marker id="pipeline-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M0,0 L10,5 L0,10 z" fill="rgba(200,203,214,0.55)" />
           </marker>
+          <filter id="pipeline-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
         {graph.edges.map((edge, index) => {
           const from = byId.get(edge.from ?? edge.from_ ?? "");
@@ -734,6 +741,9 @@ function PipelineCanvas({
                 strokeDasharray="4 3"
                 markerEnd="url(#pipeline-arrow)"
               />
+              <circle r="3.2" fill="rgba(229,177,110,0.92)" filter="url(#pipeline-glow)">
+                <animateMotion dur="2.4s" repeatCount="indefinite" path={`M${from.x + 70},${from.y} C${mid},${from.y} ${mid},${to.y} ${to.x - 74},${to.y}`} />
+              </circle>
               {editable && selectedNodeId === (edge.from ?? edge.from_) && (
                 <foreignObject x={mid - 16} y={(from.y + to.y) / 2 - 14} width="32" height="28">
                   <button
@@ -775,8 +785,10 @@ function PipelineCanvas({
           </div>
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-[11.5px] text-bone">{node.label ?? node.model ?? node.tool ?? node.id}</span>
-            <span className="truncate font-mono text-[9px] text-muted">{node.id}</span>
+            <span className="truncate font-mono text-[9px] text-muted">{nodeRoleLabel(node)}</span>
           </div>
+          <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border border-rule bg-ink-3" />
+          <span className={cn("absolute -right-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border", nodePortClass(node))} />
         </button>
       ))}
 
@@ -1643,7 +1655,7 @@ function paletteGroups(): Array<{ name: string; items: Array<{ name: string; typ
       name: "Models",
       items: [
         { type: "model", icon: <BrainCircuit className="h-3.5 w-3.5" />, name: "LLM (deployed)" },
-        { type: "model", icon: <Database className="h-3.5 w-3.5" />, name: "Embedding" },
+        { type: "model", icon: <Database className="h-3.5 w-3.5" />, name: "Embedding vectorizer" },
         { type: "model", icon: <Route className="h-3.5 w-3.5" />, name: "Reranker" },
       ],
     },
@@ -1705,6 +1717,29 @@ function nodeIconToneClass(type: string): string {
   if (type === "condition") return "bg-electric/15 text-electric";
   if (type === "tool") return "bg-moss/15 text-moss";
   return "bg-ink-3 text-muted";
+}
+
+function nodeRoleLabel(node: PipelineNode): string {
+  const kind = nodeKind(node);
+  if (kind === "embedding") return "vectorizer";
+  if (kind === "reranker") return "ranker";
+  if (kind === "redaction") return "redaction";
+  if (kind === "evidence") return "evidence";
+  if (kind === "policy") return "policy";
+  if (kind === "routing") return "router";
+  if (node.type === "model") return "generator";
+  if (node.type === "tool") return "tool";
+  return "input";
+}
+
+function nodePortClass(node: PipelineNode): string {
+  const kind = nodeKind(node);
+  if (kind === "embedding") return "border-electric/60 bg-electric";
+  if (kind === "policy") return "border-brass/70 bg-brass";
+  if (kind === "evidence") return "border-moss/70 bg-moss";
+  if (node.type === "model") return "border-brass/70 bg-brass";
+  if (node.type === "tool") return "border-moss/70 bg-moss";
+  return "border-rule bg-bone-2";
 }
 
 function proofToneClass(tone: "muted" | "primary" | "ok" | "warn"): string {

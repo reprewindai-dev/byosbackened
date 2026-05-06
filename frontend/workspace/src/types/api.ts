@@ -41,6 +41,7 @@ export interface PlatformPulseSuperuser {
 export interface PlatformPulse {
   users: { total: number; delta_pct_30d: number; added_30d: number };
   active_listings: { total: number; added_7d: number };
+  tool_installs: { total: number; active_tools: number };
   orders_30d: { count: number; delta_pct_vs_prior: number };
   paid_tier_users: { total: number; upgrades_30d: number };
   tier_distribution: Record<string, number>;

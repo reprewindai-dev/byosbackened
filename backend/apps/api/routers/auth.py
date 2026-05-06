@@ -41,7 +41,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 _API_KEY_PREFIX = "byos_"
 FREE_TRIAL_CREDITS = 0  # Free evaluation limits are entitlement-controlled, not a token grant.
 CUSTOMER_API_KEY_SCOPES = {"READ", "EXEC", "WRITE"}
-INTERNAL_API_KEY_SCOPES = {"ADMIN", "AUTOMATION"}
+INTERNAL_API_KEY_SCOPES = {"ADMIN", "AUTOMATION", "MARKETPLACE_AUTOMATION", "JOB_PROCESSOR"}
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────

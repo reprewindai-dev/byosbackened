@@ -38,6 +38,7 @@ jobs:
             backend/tests/test_edge_gateway.py \
             backend/tests/test_demo_pipeline_quota.py \
             backend/tests/test_herald_onboarding.py \
+            backend/tests/test_internal_operators.py \
             backend/tests/test_route_security_audit.py \
             backend/tests/test_buyer_package.py \
             backend/tests/test_license_health.py \
@@ -66,6 +67,7 @@ jobs:
             tests/test_edge_gateway.py \
             tests/test_demo_pipeline_quota.py \
             tests/test_herald_onboarding.py \
+            tests/test_internal_operators.py \
             tests/test_route_security_audit.py \
             tests/test_buyer_package.py \
             tests/test_license_health.py \

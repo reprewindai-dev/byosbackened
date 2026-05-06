@@ -1,22 +1,24 @@
 """Job router."""
+import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from db.session import get_db
-from apps.api.deps import get_current_workspace_id
+from apps.api.deps import APIKeyPrincipal, require_api_key_scope, get_current_workspace_id
 from apps.api.schemas.job import JobResponse
-from db.models import Job, JobStatus
+from db.models import Job, JobStatus, SecurityAuditLog
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/process")
 async def process_jobs(
-    workspace_id: str = Depends(get_current_workspace_id),
+    principal: APIKeyPrincipal = Depends(require_api_key_scope("JOB_PROCESSOR")),
     db: Session = Depends(get_db),
 ):
     """Run a safe background queue maintenance pass for one workspace."""
+    workspace_id = principal.workspace_id
     now = datetime.utcnow()
     stale_cutoff = now - timedelta(hours=2)
     pending_count = (
@@ -39,8 +41,25 @@ async def process_jobs(
         job.error_message = "Marked failed by scheduled queue maintenance after timeout."
         job.completed_at = now
         job.updated_at = now
-    if stale_jobs:
-        db.commit()
+    db.add(
+        SecurityAuditLog(
+            workspace_id=workspace_id,
+            user_id=principal.user_id,
+            event_type="job_processor_cron",
+            event_category="automation",
+            success=True,
+            details=json.dumps(
+                {
+                    "api_key_id": principal.api_key_id,
+                    "pending_jobs": pending_count,
+                    "stale_running_jobs_closed": len(stale_jobs),
+                },
+                sort_keys=True,
+            ),
+            created_at=now,
+        )
+    )
+    db.commit()
     return {
         "status": "ok",
         "workspace_id": workspace_id,

@@ -147,6 +147,21 @@ async def platform_pulse(
         active_listings = (
             db.query(func.count(Listing.id)).filter(Listing.status == "active").scalar() or 0
         )
+        tool_installs_total = (
+            db.query(func.coalesce(func.sum(Listing.install_count), 0))
+            .filter(Listing.status == "active")
+            .scalar()
+            or 0
+        )
+        active_tools = (
+            db.query(func.count(Listing.id))
+            .filter(
+                Listing.status == "active",
+                Listing.listing_type.in_(("tool", "pipeline", "agent", "connector", "edge_template")),
+            )
+            .scalar()
+            or 0
+        )
         listings_added_7d = (
             db.query(func.count(Listing.id))
             .filter(Listing.status == "active", Listing.created_at >= window_7)
@@ -155,6 +170,8 @@ async def platform_pulse(
         )
     else:
         active_listings = 0
+        tool_installs_total = 0
+        active_tools = 0
         listings_added_7d = 0
 
     # ── Orders ───────────────────────────────────────────────────────────────
@@ -221,6 +238,10 @@ async def platform_pulse(
         "active_listings": {
             "total": int(active_listings),
             "added_7d": int(listings_added_7d),
+        },
+        "tool_installs": {
+            "total": int(tool_installs_total),
+            "active_tools": int(active_tools),
         },
         "orders_30d": {
             "count": int(orders_30d),

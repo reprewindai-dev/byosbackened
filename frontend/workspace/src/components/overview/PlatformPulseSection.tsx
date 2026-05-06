@@ -211,7 +211,7 @@ export function PlatformPulseSection() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <PulseCard
           label="Total users"
           value={data ? fmtNumber(data.users.total) : isLoading ? "…" : "—"}
@@ -225,6 +225,13 @@ export function PlatformPulseSection() {
           delta={data ? `+${fmtNumber(data.active_listings.added_7d)} (7d)` : undefined}
           positive
           icon={Tag}
+        />
+        <PulseCard
+          label="Tool installs"
+          value={data ? fmtNumber(data.tool_installs.total) : isLoading ? "…" : "—"}
+          delta={data ? `${fmtNumber(data.tool_installs.active_tools)} active tools` : undefined}
+          positive
+          icon={Activity}
         />
         <PulseCard
           label="Orders (30d)"

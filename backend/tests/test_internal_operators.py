@@ -100,6 +100,24 @@ def test_superuser_can_create_internal_operator_api_key_scopes():
     assert auth._normalize_api_key_scopes(["automation", "admin"], user) == ["AUTOMATION", "ADMIN"]
 
 
+def test_superuser_can_create_purpose_specific_worker_api_key_scopes():
+    user = SimpleNamespace(is_superuser=True)
+
+    assert auth._normalize_api_key_scopes(["marketplace_automation", "job_processor"], user) == [
+        "MARKETPLACE_AUTOMATION",
+        "JOB_PROCESSOR",
+    ]
+
+
+def test_customer_cannot_create_purpose_specific_worker_api_key_scopes():
+    user = SimpleNamespace(is_superuser=False)
+
+    with pytest.raises(Exception) as exc_info:
+        auth._normalize_api_key_scopes(["marketplace_automation"], user)
+
+    assert getattr(exc_info.value, "status_code", None) == 403
+
+
 def test_internal_operator_api_key_owner_must_be_active_superuser():
     api_key = SimpleNamespace(workspace_id="operator-workspace")
     customer_owner = SimpleNamespace(

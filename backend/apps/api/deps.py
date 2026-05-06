@@ -2,6 +2,8 @@
 import hashlib
 import hmac
 import secrets
+from dataclasses import dataclass
+from datetime import datetime
 from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from db.session import get_db
@@ -12,6 +14,68 @@ from typing import Optional
 def _secure_compare(val1: str, val2: str) -> bool:
     """Timing-safe string comparison to prevent timing attacks."""
     return hmac.compare_digest(val1.encode(), val2.encode())
+
+
+@dataclass(frozen=True)
+class APIKeyPrincipal:
+    workspace_id: str
+    user_id: str
+    api_key_id: str
+    scopes: set[str]
+
+
+async def require_api_key_principal(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> APIKeyPrincipal:
+    """Require a live workspace API key and return its scoped principal.
+
+    This dependency intentionally rejects JWT bearer tokens. It is for timers,
+    workers, and machine agents, where drift control depends on issuing a
+    purpose-specific key instead of reusing an owner session.
+    """
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header missing")
+    try:
+        scheme, token = authorization.split()
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header") from exc
+    if scheme.lower() != "bearer" or not token.startswith("byos_"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Automation API key required")
+
+    from db.models import APIKey, User
+
+    key_hash = hashlib.sha256(token.encode()).hexdigest()
+    api_key = db.query(APIKey).filter(APIKey.key_hash == key_hash, APIKey.is_active.is_(True)).first()
+    if not api_key:
+        _secure_compare("dummy_hash_for_timing", hashlib.sha256(b"dummy").hexdigest())
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+    if api_key.expires_at and datetime.utcnow() > api_key.expires_at:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired")
+
+    owner = db.query(User).filter(User.id == api_key.user_id, User.is_active.is_(True)).first()
+    if not owner:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key owner inactive")
+
+    api_key.last_used_at = datetime.utcnow()
+    db.commit()
+    return APIKeyPrincipal(
+        workspace_id=api_key.workspace_id,
+        user_id=api_key.user_id,
+        api_key_id=api_key.id,
+        scopes={str(scope).upper() for scope in (api_key.scopes or [])},
+    )
+
+
+def require_api_key_scope(scope: str):
+    required = scope.upper()
+
+    async def _dependency(principal: APIKeyPrincipal = Depends(require_api_key_principal)) -> APIKeyPrincipal:
+        if required not in principal.scopes and "ADMIN" not in principal.scopes:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"{required} scope required")
+        return principal
+
+    return _dependency
 
 
 async def get_current_workspace_id(

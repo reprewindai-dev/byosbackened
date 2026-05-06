@@ -29,13 +29,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from apps.api.deps import get_current_user, get_current_workspace_id
+from apps.api.deps import APIKeyPrincipal, get_current_user, get_current_workspace_id, require_api_key_scope
 from core.cost_intelligence import CostCalculator
 from db.models import (
     Listing,
     Pipeline,
     PipelineStatus,
     PipelineVersion,
+    SecurityAuditLog,
     User,
     Vendor,
 )
@@ -291,10 +292,11 @@ def _llm_classify(title: str, description: str, payload: Optional[dict]) -> Opti
 @router.post("/automation/run", response_model=AutomationRunResponse)
 async def run_marketplace_automation(
     payload: AutomationRunRequest,
-    workspace_id: str = Depends(get_current_workspace_id),
+    principal: APIKeyPrincipal = Depends(require_api_key_scope("MARKETPLACE_AUTOMATION")),
     db: Session = Depends(get_db),
 ):
     """Run scheduled marketplace classification and trust-bookkeeping."""
+    workspace_id = principal.workspace_id
     now = datetime.utcnow()
     listings = (
         db.query(Listing)
@@ -342,8 +344,29 @@ async def run_marketplace_automation(
             pending_review += 1
         listing.updated_at = now
 
-    if listings:
-        db.commit()
+    db.add(
+        SecurityAuditLog(
+            workspace_id=workspace_id,
+            user_id=principal.user_id,
+            event_type="marketplace_automation_cron",
+            event_category="automation",
+            success=True,
+            details=json.dumps(
+                {
+                    "api_key_id": principal.api_key_id,
+                    "trigger": payload.trigger,
+                    "source": payload.source,
+                    "scanned": len(listings),
+                    "classified": classified,
+                    "validation_marked": validation_marked,
+                    "pending_review": pending_review,
+                },
+                sort_keys=True,
+            ),
+            created_at=now,
+        )
+    )
+    db.commit()
     return AutomationRunResponse(
         status="ok",
         workspace_id=workspace_id,

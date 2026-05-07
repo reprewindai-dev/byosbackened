@@ -216,6 +216,7 @@ const DEFAULT_TOP_P = 0.95;
 const DEFAULT_TOP_K = 40;
 const DEFAULT_SEED = 42;
 const REQUEST_TIMEOUT_MS = 30_000;
+const PREFLIGHT_TIMEOUT_MS = 25_000;
 const MAX_CONVERSATION_TURNS = 20; // safety cap — keeps context window sane
 const PLAYGROUND_STORAGE_KEY = "veklom.workspace.playground.v3";
 const SESSION_TAGS: SessionTag[] = ["Standard", "PHI", "PII", "HIPAA", "PCI", "SOC2"];
@@ -967,7 +968,7 @@ export function PlaygroundPage() {
         provider: selectedModel?.provider ?? "local",
         input_text: prompt.slice(0, 4000),
         model: selectedModel?.runtime_model_id ?? selectedModelSlug,
-      });
+      }, { timeout: PREFLIGHT_TIMEOUT_MS });
       const cost = costResp.data as {
         predicted_cost: string;
         confidence_lower: string;
@@ -989,14 +990,20 @@ export function PlaygroundPage() {
         input_text: prompt.slice(0, 2000),
       };
       try {
-        const qResp = await api.post("/autonomous/quality/predict", null, { params });
+        const qResp = await api.post("/autonomous/quality/predict", null, {
+          params,
+          timeout: PREFLIGHT_TIMEOUT_MS,
+        });
         const q = qResp.data as { predicted_quality?: number };
         if (q?.predicted_quality != null) next.predicted_quality = q.predicted_quality;
       } catch {
         /* ML may still be warming for a fresh workspace. */
       }
       try {
-        const rResp = await api.post("/autonomous/quality/failure-risk", null, { params });
+        const rResp = await api.post("/autonomous/quality/failure-risk", null, {
+          params,
+          timeout: PREFLIGHT_TIMEOUT_MS,
+        });
         const r = rResp.data as { failure_risk?: number; risk?: number };
         const risk = r?.failure_risk ?? r?.risk;
         if (risk != null) next.failure_risk = risk;
@@ -1006,7 +1013,11 @@ export function PlaygroundPage() {
 
       setPreflight(next);
     } catch (err) {
-      setPreflight({ loading: false, error: responseDetail(err) });
+      const msg = responseDetail(err);
+      const friendly = /timeout|network|ERR_NETWORK|ECONN/i.test(msg)
+        ? "Pre-flight timed out reaching predictors. Run still works; retry pre-flight in a moment."
+        : msg;
+      setPreflight({ loading: false, error: friendly });
     }
   }, [prompt, selectedModel, selectedModelSlug]);
 
@@ -1108,8 +1119,9 @@ export function PlaygroundPage() {
     ? `${Math.round(selectedModel.context_window / 1000)}K`
     : "128K";
   const quantLabel = selectedModel?.quantization ?? "FP16";
-  const p50Label = selectedModel?.p50_ms ? `${selectedModel.p50_ms} ms` : stats.latency_ms ? `${stats.latency_ms} ms` : "142 ms";
-  const p95Label = selectedModel?.p95_ms ? `${selectedModel.p95_ms} ms` : "380 ms";
+  // Show live observed latency when available; fall back to model profile only as a secondary estimate.
+  const p50Label = stats.latency_ms ? `${stats.latency_ms} ms` : selectedModel?.p50_ms ? `~${selectedModel.p50_ms} ms` : "-";
+  const p95Label = selectedModel?.p95_ms ? `~${selectedModel.p95_ms} ms` : "-";
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">

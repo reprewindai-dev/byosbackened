@@ -6,6 +6,7 @@ import time
 import logging
 import httpx
 from typing import Optional
+from functools import lru_cache
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,16 @@ settings = get_settings()
 
 class GroqFallbackError(Exception):
     """Raised when Groq fallback also fails."""
+
+
+@lru_cache(maxsize=8)
+def _shared_groq_client(timeout_seconds: Optional[float] = None) -> httpx.Client:
+    timeout = timeout_seconds or settings.groq_timeout_seconds
+    return httpx.Client(
+        timeout=timeout,
+        http2=True,
+        limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+    )
 
 
 def call_groq(
@@ -51,16 +62,16 @@ def call_groq(
 
     start = time.monotonic()
     try:
-        with httpx.Client(timeout=timeout_seconds or settings.groq_timeout_seconds) as client:
-            resp = client.post(
-                f"{settings.groq_base_url}/chat/completions",
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {settings.groq_api_key}",
-                    "Content-Type": "application/json",
-                },
-            )
-            resp.raise_for_status()
+        client = _shared_groq_client(timeout_seconds)
+        resp = client.post(
+            f"{settings.groq_base_url}/chat/completions",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {settings.groq_api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        resp.raise_for_status()
     except httpx.ConnectError as e:
         raise GroqFallbackError(f"Cannot reach Groq API: {e}") from e
     except httpx.TimeoutException as e:

@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
+from functools import lru_cache
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -389,6 +390,19 @@ def _openai_compatible_provider_config(provider: str) -> tuple[str, str, str]:
     raise ValueError(f"Unsupported OpenAI-compatible provider: {provider}")
 
 
+@lru_cache(maxsize=16)
+def _shared_http_client(timeout_seconds: float) -> httpx.Client:
+    try:
+        return httpx.Client(
+            timeout=timeout_seconds,
+            http2=True,
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+        )
+    except TypeError:
+        # Test doubles may not implement advanced constructor kwargs.
+        return httpx.Client(timeout=timeout_seconds)
+
+
 def _call_runtime_model(
     model_row,
     payload: AICompleteRequest,
@@ -490,16 +504,16 @@ def _call_runtime_model(
             openai_payload["response_format"] = {"type": "json_object"}
 
         try:
-            with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
-                response = client.post(
-                    f"{base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {provider_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=openai_payload,
-                )
-                response.raise_for_status()
+            client = _shared_http_client(float(settings.llm_timeout_seconds))
+            response = client.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {provider_key}",
+                    "Content-Type": "application/json",
+                },
+                json=openai_payload,
+            )
+            response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
             if status_code in {401, 403}:

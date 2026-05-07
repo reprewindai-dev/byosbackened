@@ -19,7 +19,7 @@ from apps.api.deps import get_current_user
 from core.config import get_settings
 from core.llm.circuit_breaker import is_open, record_failure, record_success
 from core.llm.groq_fallback import GroqFallbackError, call_groq
-from core.llm.ollama_client import OllamaClient, OllamaError
+from core.llm.ollama_client import OllamaError, _shared_ollama_client
 from core.privacy.pii_detection import detect_and_mask_pii, detect_pii
 from core.services.workspace_gateway import (
     get_model_setting,
@@ -401,12 +401,8 @@ def _call_runtime_model(
             detail="On-prem lock is enabled for this request. Select an Ollama/Hetzner runtime.",
         )
     if model_row.provider == "ollama":
-        timeout_seconds = (
-            settings.llm_on_prem_timeout_seconds
-            if _effective_on_prem_lock(payload)
-            else settings.llm_latency_budget_seconds
-        )
-        client = OllamaClient(model=model_row.bedrock_model_id, timeout=timeout_seconds)
+        timeout_seconds = settings.llm_on_prem_timeout_seconds
+        client = _shared_ollama_client(model=model_row.bedrock_model_id, timeout=timeout_seconds)
         circuit_scope = _circuit_scope(model_row)
         use_groq = is_open(circuit_scope)
         routing_reason = "circuit_open" if use_groq else "primary_runtime"
@@ -420,11 +416,12 @@ def _call_runtime_model(
                 record_success(circuit_scope)
                 return result, "ollama", "primary_runtime"
             except OllamaError as exc:
-                record_failure(circuit_scope)
                 reason_text = str(exc).lower()
+                record_failure(circuit_scope)
+                timed_out = "timed out" in reason_text or "timeout" in reason_text
                 routing_reason = (
                     "ollama_latency_budget_exceeded"
-                    if "timed out" in reason_text or "timeout" in reason_text
+                    if timed_out
                     else "ollama_unavailable"
                 )
                 use_groq = True

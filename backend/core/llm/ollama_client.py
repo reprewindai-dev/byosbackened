@@ -7,6 +7,7 @@ All calls blocked if Ollama is unreachable — no silent degradation.
 import time
 import logging
 from typing import Optional
+from functools import lru_cache
 
 from ollama import Client as _OllamaSDK, ResponseError as _ResponseError
 
@@ -63,6 +64,7 @@ class OllamaClient:
                 prompt=prompt,
                 stream=stream,
                 options=options or {},
+                keep_alive=getattr(settings, "llm_keep_alive", "30m"),
             )
         except _ResponseError as e:
             raise OllamaError(f"Ollama API error ({e.status_code}): {e.error}") from e
@@ -115,5 +117,14 @@ class OllamaClient:
 
 
 def get_ollama_client() -> OllamaClient:
-    """FastAPI dependency — returns a fresh OllamaClient per request."""
-    return OllamaClient()
+    """FastAPI dependency — returns a shared OllamaClient for connection reuse."""
+    return _shared_ollama_client()
+
+
+@lru_cache(maxsize=16)
+def _shared_ollama_client(
+    base_url: Optional[str] = None,
+    model: Optional[str] = None,
+    timeout: Optional[float] = None,
+) -> OllamaClient:
+    return OllamaClient(base_url=base_url, model=model, timeout=timeout)

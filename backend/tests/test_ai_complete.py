@@ -244,6 +244,62 @@ def test_call_runtime_model_executes_gemini_through_modelfarm_provider(monkeypat
     assert _FakeOpenAIClient.posted["json"]["model"] == "gemini-2.5-pro"
 
 
+def test_call_runtime_model_falls_back_after_ollama_timeout(monkeypatch):
+    class _ColdStartOllama:
+        attempts = []
+
+        def __init__(self, model=None, timeout=None, **kwargs):
+            self.model = model
+            self.timeout = timeout
+
+        def generate(self, prompt, model=None, options=None):
+            self.__class__.attempts.append(self.timeout)
+            raise ai_module.OllamaError("Ollama request failed: timed out")
+
+    import apps.api.routers.ai as ai_module
+
+    monkeypatch.setattr(ai_module, "_shared_ollama_client", lambda **kwargs: _ColdStartOllama(**kwargs))
+    monkeypatch.setattr(ai_module, "is_open", lambda scope: False)
+    monkeypatch.setattr(ai_module, "record_success", lambda scope: None)
+    monkeypatch.setattr(ai_module, "record_failure", lambda scope: "closed")
+    monkeypatch.setattr(
+        ai_module,
+        "call_groq",
+        lambda **kwargs: {
+            "response": "groq fallback",
+            "model": "llama-3.1-8b-instant",
+            "prompt_tokens": 2,
+            "completion_tokens": 3,
+            "total_tokens": 5,
+        },
+    )
+    monkeypatch.setattr(
+        ai_module,
+        "settings",
+        SimpleNamespace(
+            llm_timeout_seconds=60,
+            llm_on_prem_timeout_seconds=20,
+            llm_fallback="groq",
+            groq_api_key="test-key",
+            groq_timeout_seconds=10,
+        ),
+    )
+    model_row = SimpleNamespace(
+        model_slug="ollama-default",
+        bedrock_model_id="qwen2.5:3b",
+        provider="ollama",
+        workspace_id="workspace-1",
+    )
+    payload = AICompleteRequest(model="ollama-default", prompt="reply with healthy", max_tokens=16)
+
+    result, provider, routing_reason = _call_runtime_model(model_row, payload)
+
+    assert provider == "groq"
+    assert routing_reason == "ollama_latency_budget_exceeded"
+    assert result["response"] == "groq fallback"
+    assert _ColdStartOllama.attempts == [20]
+
+
 def test_complete_rejects_when_wallet_is_too_small(monkeypatch):
     wallet = SimpleNamespace(
         id="wallet-1",

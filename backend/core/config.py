@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 60
     llm_latency_budget_seconds: float = 2.5
     llm_on_prem_timeout_seconds: float = 20.0
+    llm_keep_alive: str = "30m"
     llm_max_tokens: int = 2048
 
     # â”€â”€ Groq fallback (self-healing circuit breaker) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

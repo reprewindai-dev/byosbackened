@@ -118,7 +118,9 @@ export function TopBar() {
         severity: "info",
       });
     }
-    return merged.slice(0, 8);
+    return merged
+      .sort((left, right) => new Date(right.ts).getTime() - new Date(left.ts).getTime())
+      .slice(0, 8);
   }, [alerts, policyEvents]);
   const notifCount = notifications.length;
 

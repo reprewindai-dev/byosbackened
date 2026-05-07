@@ -161,6 +161,20 @@ interface ConversationTurn {
   ts: number;
 }
 
+interface CompareRunResult {
+  modelSlug: string;
+  modelName: string;
+  provider: string;
+  status: "idle" | "running" | "done" | "error";
+  responseText?: string;
+  error?: string;
+  latencyMs?: number;
+  outputTokens?: number;
+  costUsd?: string;
+  requestId?: string;
+  auditHash?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -335,6 +349,9 @@ export function PlaygroundPage() {
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [responseText, setResponseText] = useState("");
+  const [secondaryModelSlug, setSecondaryModelSlug] = useState("");
+  const [comparePrompt, setComparePrompt] = useState("");
+  const [compareResults, setCompareResults] = useState<Record<string, CompareRunResult>>({});
 
   // -------------------------------------------------------------------------
   // Multi-turn conversation history (added 2026-05-04 — see note at top)
@@ -346,6 +363,8 @@ export function PlaygroundPage() {
     setConversation([]);
     setResponseText("");
     setEvents([]);
+    setComparePrompt("");
+    setCompareResults({});
   }, []);
 
   const appendTurn = useCallback((turn: Omit<ConversationTurn, "id" | "ts">) => {
@@ -443,6 +462,18 @@ export function PlaygroundPage() {
   }, [effectiveLockToOnPrem, preferredModel, runnableModels, selectedModelSlug]);
 
   useEffect(() => {
+    const current = runnableModels.find((model) => model.slug === secondaryModelSlug);
+    const fallback = runnableModels.find((model) => model.slug !== selectedModelSlug);
+    if (!fallback) {
+      if (secondaryModelSlug) setSecondaryModelSlug("");
+      return;
+    }
+    if (!current || current.slug === selectedModelSlug || (effectiveLockToOnPrem && current.provider !== "ollama")) {
+      setSecondaryModelSlug(fallback.slug);
+    }
+  }, [effectiveLockToOnPrem, runnableModels, secondaryModelSlug, selectedModelSlug]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(
       PLAYGROUND_STORAGE_KEY,
@@ -494,6 +525,11 @@ export function PlaygroundPage() {
     () => runnableModels.find((model) => model.slug === selectedModelSlug) ?? preferredModel ?? runnableModels[0],
     [preferredModel, runnableModels, selectedModelSlug],
   );
+  const secondaryCompareModel = useMemo(
+    () => runnableModels.find((model) => model.slug === secondaryModelSlug && model.slug !== selectedModel?.slug)
+      ?? runnableModels.find((model) => model.slug !== selectedModel?.slug),
+    [runnableModels, secondaryModelSlug, selectedModel?.slug],
+  );
 
   const appendEvent = useCallback((event: string, data: Record<string, unknown> = {}) => {
     setEvents((prev) => [
@@ -536,93 +572,68 @@ export function PlaygroundPage() {
     setRunning(false);
   }, []);
 
-  const run = useCallback(async () => {
-    if (running || !selectedModel || !prompt.trim()) return;
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const startedAt = performance.now();
-
-    // Add user turn to conversation thread BEFORE the request fires
-    const userContent = prompt.trim();
-    appendTurn({ role: "user", content: userContent });
-
-    setEvents([]);
-    setResponseText("");
-    setStats({});
-    setError(null);
-    setSavedPipelineSlug(null);
-    setRunning(true);
-
-    appendEvent("workspace_request", {
-      endpoint: "/api/v1/ai/complete",
-      model: selectedModel.slug,
-      max_tokens: maxTokens,
-      temperature,
-      top_p: topP,
-      top_k: topK,
-      response_format: responseFormat,
-      session_tag: sessionTag,
-      lock_to_on_prem: effectiveLockToOnPrem,
-    });
-    appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace" });
-    appendEvent("wallet_check", { status: "reserve requested", model: selectedModel.slug });
-    appendEvent("provider_selected", {
-      provider: selectedModel.provider,
-      model: selectedModel.slug,
-      runtime_model_id: selectedModel.runtime_model_id,
-    });
-
-    // Build messages array for multi-turn context. Backend honours this if
-    // it supports conversational /ai/complete; otherwise falls back to prompt.
-    const messages = conversation
+  const buildConversationMessages = useCallback((userContent: string) => (
+    conversation
       .slice(-MAX_CONVERSATION_TURNS)
-      .map((t) => ({ role: t.role, content: t.content }))
-      .concat([{ role: "user" as const, content: userContent }]);
+      .map((turn) => ({ role: turn.role, content: turn.content }))
+      .concat([{ role: "user" as const, content: userContent }])
+  ), [conversation]);
 
-    const governanceSystemPrompt = [
+  const buildGovernanceSystemPrompt = useCallback(() => (
+    [
       autoRedact ? "Redact or refuse disclosure of PII, PHI, secrets, access tokens, and regulated identifiers unless the user explicitly asks for a safe placeholder format." : "",
       `Session tag: ${sessionTag}. Apply Veklom policy controls before provider execution.`,
       protectedSession ? "PHI/HIPAA session: keep execution on Hetzner/on-prem runtime only, auto-redact PHI/PII, and keep signed audit export pinned on." : "",
       responseFormat !== "text" ? `Response format requested: ${responseFormat}.` : "",
       vertical !== "default" ? `Session vertical: ${vertical}. Apply the matching Veklom governance posture before answering.` : "",
       systemPrompt.trim(),
-    ].filter(Boolean).join("\n\n");
+    ].filter(Boolean).join("\n\n")
+  ), [autoRedact, protectedSession, responseFormat, sessionTag, systemPrompt, vertical]);
 
-    try {
-      const resp = await api.post<AICompleteResponse>(
-        "/ai/complete",
-        {
-          model: selectedModel.slug,
-          prompt: userContent.slice(0, 8000),
-          messages,
-          system_prompt: governanceSystemPrompt || undefined,
-          temperature,
-          top_p: topP,
-          top_k: topK,
-          frequency_penalty: frequencyPenalty,
-          presence_penalty: presencePenalty,
-          stream: streamEnabled,
-          response_format: responseFormat,
-          seed,
-          session_tag: sessionTag,
-          lock_to_on_prem: effectiveLockToOnPrem,
-          auto_redact: autoRedact,
-          sign_audit_on_export: auditExportPinned,
-          billing_event_type: "governed_run",
-          max_tokens: maxTokens,
-        },
-        { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS },
-      );
-      const elapsedMs = Math.round(performance.now() - startedAt);
-      const payload = resp.data;
-      const provider = payload.provider ?? selectedModel.provider;
-      const requestedProvider = payload.requested_provider ?? selectedModel.provider;
-      const fallbackTriggered = payload.fallback_triggered ?? provider !== selectedModel.provider;
-      const latency = payload.latency_ms ?? elapsedMs;
-
-      setResponseText(payload.response_text);
-      setStats({
+  const executeCompletion = useCallback(async (
+    model: WorkspaceModel,
+    userContent: string,
+    billingEventType: "governed_run" | "compare_run",
+    signal: AbortSignal,
+  ) => {
+    const startedAt = performance.now();
+    const resp = await api.post<AICompleteResponse>(
+      "/ai/complete",
+      {
+        model: model.slug,
+        prompt: userContent.slice(0, 8000),
+        messages: buildConversationMessages(userContent),
+        system_prompt: buildGovernanceSystemPrompt() || undefined,
+        temperature,
+        top_p: topP,
+        top_k: topK,
+        frequency_penalty: frequencyPenalty,
+        presence_penalty: presencePenalty,
+        stream: streamEnabled,
+        response_format: responseFormat,
+        seed,
+        session_tag: sessionTag,
+        lock_to_on_prem: effectiveLockToOnPrem,
+        auto_redact: autoRedact,
+        sign_audit_on_export: auditExportPinned,
+        billing_event_type: billingEventType,
+        max_tokens: maxTokens,
+      },
+      { signal, timeout: REQUEST_TIMEOUT_MS },
+    );
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    const payload = resp.data;
+    const provider = payload.provider ?? model.provider;
+    const requestedProvider = payload.requested_provider ?? model.provider;
+    const fallbackTriggered = payload.fallback_triggered ?? provider !== model.provider;
+    const latency = payload.latency_ms ?? elapsedMs;
+    return {
+      payload,
+      provider,
+      requestedProvider,
+      fallbackTriggered,
+      latency,
+      stats: {
         provider,
         model: payload.model,
         runtime_model_id: payload.bedrock_model_id,
@@ -635,17 +646,228 @@ export function PlaygroundPage() {
         tokens_deducted: payload.reserve_debited ?? payload.tokens_deducted,
         wallet_balance: payload.wallet_balance,
         reserve_debited: payload.reserve_debited ?? payload.tokens_deducted,
-        billing_event_type: payload.billing_event_type ?? "governed_run",
+        billing_event_type: payload.billing_event_type ?? billingEventType,
         pricing_tier: payload.pricing_tier,
         free_evaluation_remaining: payload.free_evaluation_remaining,
         cost_usd: payload.cost_usd,
         requested_provider: requestedProvider,
-        requested_model: payload.requested_model ?? selectedModel.slug,
+        requested_model: payload.requested_model ?? model.slug,
         fallback_triggered: fallbackTriggered,
         routing_reason: payload.routing_reason ?? (fallbackTriggered ? "circuit_breaker_failover" : "primary_runtime"),
+      },
+    };
+  }, [
+    auditExportPinned,
+    autoRedact,
+    buildConversationMessages,
+    buildGovernanceSystemPrompt,
+    effectiveLockToOnPrem,
+    frequencyPenalty,
+    maxTokens,
+    presencePenalty,
+    responseFormat,
+    seed,
+    sessionTag,
+    streamEnabled,
+    temperature,
+    topK,
+    topP,
+  ]);
+
+  const run = useCallback(async () => {
+    if (running || !selectedModel || !prompt.trim()) return;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const userContent = prompt.trim();
+    setEvents([]);
+    setResponseText("");
+    setStats({});
+    setError(null);
+    setSavedPipelineSlug(null);
+    setRunning(true);
+
+    try {
+      if (compareOpen) {
+        const compareModels = [selectedModel, secondaryCompareModel].filter(
+          (model, index, items): model is WorkspaceModel => Boolean(model) && items.findIndex((item) => item?.slug === model?.slug) === index,
+        );
+        if (compareModels.length < 2) {
+          throw new Error("Compare mode requires two connected models.");
+        }
+
+        setComparePrompt(userContent);
+        setCompareResults(
+          Object.fromEntries(
+            compareModels.map((model) => [
+              model.slug,
+              {
+                modelSlug: model.slug,
+                modelName: model.name,
+                provider: model.provider,
+                status: "running" as const,
+              },
+            ]),
+          ),
+        );
+
+        appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace", compare: true });
+        for (const model of compareModels) {
+          appendEvent("workspace_request", {
+            endpoint: "/api/v1/ai/complete",
+            model: model.slug,
+            max_tokens: maxTokens,
+            temperature,
+            top_p: topP,
+            top_k: topK,
+            response_format: responseFormat,
+            session_tag: sessionTag,
+            lock_to_on_prem: effectiveLockToOnPrem,
+            billing_event_type: "compare_run",
+          });
+          appendEvent("wallet_check", { status: "reserve requested", model: model.slug, billing_event_type: "compare_run" });
+          appendEvent("provider_selected", {
+            provider: model.provider,
+            model: model.slug,
+            runtime_model_id: model.runtime_model_id,
+          });
+        }
+
+        const settled = await Promise.allSettled(
+          compareModels.map(async (model) => {
+            try {
+              return { model, result: await executeCompletion(model, userContent, "compare_run", controller.signal) };
+            } catch (error) {
+              throw { model, error };
+            }
+          }),
+        );
+
+        let primaryResultText = "";
+        let primaryStats: typeof stats | null = null;
+        let firstSuccessfulStats: typeof stats | null = null;
+
+        for (const outcome of settled) {
+          if (outcome.status === "fulfilled") {
+            const { model, result } = outcome.value;
+            const { payload, provider, requestedProvider, fallbackTriggered, latency } = result;
+            setCompareResults((prev) => ({
+              ...prev,
+              [model.slug]: {
+                modelSlug: model.slug,
+                modelName: model.name,
+                provider,
+                status: "done",
+                responseText: payload.response_text,
+                latencyMs: latency,
+                outputTokens: payload.output_tokens,
+                costUsd: payload.cost_usd,
+                requestId: payload.request_id,
+                auditHash: payload.audit_hash,
+              },
+            }));
+
+            if (!firstSuccessfulStats) firstSuccessfulStats = result.stats;
+            if (model.slug === selectedModel.slug) {
+              primaryResultText = payload.response_text;
+              primaryStats = result.stats;
+            }
+
+            if (fallbackTriggered) {
+              appendEvent("circuit_breaker_triggered", {
+                intended_provider: requestedProvider,
+                intended_model: payload.requested_model ?? model.slug,
+                actual_provider: provider,
+                actual_model: payload.model,
+                reason: payload.routing_reason ?? "circuit_breaker_failover",
+              });
+            }
+
+            appendEvent("response_complete", {
+              provider,
+              model: payload.model,
+              output_tokens: payload.output_tokens,
+              latency_ms: latency,
+            });
+            appendEvent("audit_written", {
+              audit_log_id: payload.audit_log_id,
+              audit_hash: payload.audit_hash,
+            });
+            appendEvent("cost_recorded", {
+              reserve_debit: payload.reserve_debited ?? payload.tokens_deducted,
+              billing_event_type: payload.billing_event_type ?? "compare_run",
+              pricing_tier: payload.pricing_tier,
+              free_evaluation_remaining: payload.free_evaluation_remaining,
+              wallet_balance: payload.wallet_balance,
+              cost_usd: payload.cost_usd,
+            });
+            appendEvent("done", {
+              request_id: payload.request_id,
+              total_latency_ms: latency,
+              model: model.slug,
+            });
+          } else {
+            const err = outcome.reason as { model?: WorkspaceModel; error?: unknown };
+            const model = err?.model;
+            const rawError = err?.error ?? err;
+            const aborted = (rawError as { code?: string })?.code === "ERR_CANCELED";
+            const message = aborted ? "Request cancelled before completion." : responseDetail(rawError);
+            if (model) {
+              setCompareResults((prev) => ({
+                ...prev,
+                [model.slug]: {
+                  modelSlug: model.slug,
+                  modelName: model.name,
+                  provider: model.provider,
+                  status: "error",
+                  error: message,
+                },
+              }));
+            }
+            appendEvent("error", {
+              endpoint: "/api/v1/ai/complete",
+              model: model?.slug,
+              message,
+            });
+          }
+        }
+
+        setResponseText(primaryResultText);
+        setStats(primaryStats ?? firstSuccessfulStats ?? {});
+        if ((primaryStats ?? firstSuccessfulStats) == null) {
+          setError("Compare run failed for both models.");
+        } else {
+          setPrompt("");
+        }
+        return;
+      }
+
+      appendTurn({ role: "user", content: userContent });
+      appendEvent("workspace_request", {
+        endpoint: "/api/v1/ai/complete",
+        model: selectedModel.slug,
+        max_tokens: maxTokens,
+        temperature,
+        top_p: topP,
+        top_k: topK,
+        response_format: responseFormat,
+        session_tag: sessionTag,
+        lock_to_on_prem: effectiveLockToOnPrem,
+      });
+      appendEvent("auth_check", { status: "bearer token attached", tenant_scope: "current workspace" });
+      appendEvent("wallet_check", { status: "reserve requested", model: selectedModel.slug });
+      appendEvent("provider_selected", {
+        provider: selectedModel.provider,
+        model: selectedModel.slug,
+        runtime_model_id: selectedModel.runtime_model_id,
       });
 
-      // Append assistant turn to conversation thread
+      const result = await executeCompletion(selectedModel, userContent, "governed_run", controller.signal);
+      const { payload, provider, requestedProvider, fallbackTriggered, latency } = result;
+
+      setResponseText(payload.response_text);
+      setStats(result.stats);
+
       appendTurn({
         role: "assistant",
         content: payload.response_text,
@@ -655,8 +877,6 @@ export function PlaygroundPage() {
         tokens: payload.output_tokens,
         latency_ms: latency,
       });
-
-      // Clear the prompt input so the user can type the next message naturally
       setPrompt("");
 
       if (fallbackTriggered) {
@@ -693,7 +913,11 @@ export function PlaygroundPage() {
       });
     } catch (err) {
       const aborted = (err as { code?: string })?.code === "ERR_CANCELED";
-      const message = aborted ? "Request cancelled before completion." : responseDetail(err);
+      const message = aborted
+        ? "Request cancelled before completion."
+        : err instanceof Error
+          ? err.message
+          : responseDetail(err);
       setError(message);
       appendEvent("error", {
         endpoint: "/api/v1/ai/complete",
@@ -707,25 +931,23 @@ export function PlaygroundPage() {
     appendEvent,
     appendTurn,
     auditExportPinned,
-    autoRedact,
-    conversation,
+    maxTokens,
+    prompt,
+    running,
+    compareOpen,
+    secondaryCompareModel,
+    executeCompletion,
+    appendTurn,
     effectiveLockToOnPrem,
     frequencyPenalty,
     maxTokens,
     presencePenalty,
-    prompt,
-    protectedSession,
     responseFormat,
-    running,
-    seed,
     selectedModel,
     sessionTag,
-    streamEnabled,
-    systemPrompt,
     temperature,
     topK,
     topP,
-    vertical,
   ]);
 
   useEffect(() => {
@@ -789,7 +1011,8 @@ export function PlaygroundPage() {
   }, [prompt, selectedModel, selectedModelSlug]);
 
   const saveAsPipeline = useCallback(async () => {
-    if (!prompt.trim() || savingPipeline) return;
+    const pipelinePrompt = (comparePrompt || prompt).trim();
+    if (!pipelinePrompt || savingPipeline) return;
     setSavingPipeline(true);
     try {
       const name = `Playground - ${vertical} - ${new Date().toLocaleDateString()}`;
@@ -798,7 +1021,7 @@ export function PlaygroundPage() {
         description: `Saved from Playground (${vertical}). Original prompt preserved as input node.`,
         graph: {
           nodes: [
-            { id: "input", type: "prompt", label: "User input", prompt },
+            { id: "input", type: "prompt", label: "User input", prompt: pipelinePrompt },
             { id: "policy", type: "gate", label: "Policy gate", policy: "default" },
             { id: "llm", type: "model", label: "LLM step", model: stats.model || selectedModelSlug },
           ],
@@ -814,11 +1037,19 @@ export function PlaygroundPage() {
     } finally {
       setSavingPipeline(false);
     }
-  }, [prompt, savingPipeline, selectedModelSlug, stats.model, vertical]);
+  }, [comparePrompt, prompt, savingPipeline, selectedModelSlug, stats.model, vertical]);
 
   const eventCount = events.length;
   const tokenCount = stats.completion_tokens ?? 0;
-  const canRun = Boolean(prompt.trim() && selectedModel && !models.isLoading && !models.isError);
+  const canRun = Boolean(
+    prompt.trim()
+    && selectedModel
+    && !models.isLoading
+    && !models.isError
+    && (!compareOpen || secondaryCompareModel),
+  );
+  const hasCompareOutput = Object.values(compareResults).some((result) => result.status === "done" && Boolean(result.responseText));
+  const hasRunOutput = Boolean(responseText || hasCompareOutput);
 
   const exportAudit = () => {
     const blob = new Blob(
@@ -831,6 +1062,8 @@ export function PlaygroundPage() {
             prompt,
             conversation,       // now includes full multi-turn thread
             response: responseText,
+            compare_prompt: comparePrompt,
+            compare_results: compareResults,
             stats,
             events,
             audit_export_pinned: auditExportPinned,
@@ -858,7 +1091,7 @@ export function PlaygroundPage() {
     const href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    a.download = `veklom-audit-${stats.request_id ?? Date.now()}.json`;
+    a.download = `veklom-audit-${stats.request_id ?? "compare"}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(href);
   };
@@ -910,7 +1143,7 @@ export function PlaygroundPage() {
           <button type="button" className="v-btn-primary h-8 px-3 text-xs" onClick={exportAudit} disabled={!events.length || running}>
             <Download className="h-3.5 w-3.5" /> Audit export
           </button>
-          <button type="button" className="v-btn-ghost h-8 px-3 text-xs" onClick={saveAsPipeline} disabled={!responseText || running || savingPipeline}>
+          <button type="button" className="v-btn-ghost h-8 px-3 text-xs" onClick={saveAsPipeline} disabled={!hasRunOutput || running || savingPipeline}>
             <Save className="h-3.5 w-3.5" /> {savingPipeline ? "Saving" : "Save prompt"}
           </button>
           <button type="button" className="v-btn-ghost h-8 px-3 text-xs" disabled title="Branching requires a saved pipeline run">
@@ -936,7 +1169,7 @@ export function PlaygroundPage() {
                   <span className="h-1.5 w-1.5 rounded-full bg-brass-2" />
                   <span className="truncate">Last audit export</span>
                 </span>
-                <span className="font-mono text-[10px] text-muted">{stats.request_id ? "ready" : "none"}</span>
+                <span className="font-mono text-[10px] text-muted">{hasRunOutput ? "ready" : "none"}</span>
               </button>
             </div>
           </div>
@@ -1011,8 +1244,22 @@ export function PlaygroundPage() {
 
           {compareOpen ? (
             <div className="grid min-h-[420px] grid-cols-1 gap-3 px-4 py-4 lg:grid-cols-2">
-              <ComparePane model={selectedModel?.name ?? "Selected model"} prompt={prompt} status={responseText ? "last run ready" : "run first"} />
-              <ComparePane model={runnableModels.find((model) => model.slug !== selectedModel?.slug)?.name ?? "Second model"} prompt={prompt} status={runnableModels.length > 1 ? "select and run" : "connect another model"} />
+              <ComparePane
+                model={selectedModel?.name ?? "Selected model"}
+                prompt={comparePrompt || prompt}
+                result={selectedModel ? compareResults[selectedModel.slug] : undefined}
+                status={selectedModel ? compareResults[selectedModel.slug]?.status ?? "idle" : "idle"}
+              />
+              <ComparePane
+                model={secondaryCompareModel?.name ?? "Second model"}
+                prompt={comparePrompt || prompt}
+                result={secondaryCompareModel ? compareResults[secondaryCompareModel.slug] : undefined}
+                status={
+                  !secondaryCompareModel
+                    ? "error"
+                    : compareResults[secondaryCompareModel.slug]?.status ?? (runnableModels.length > 1 ? "idle" : "error")
+                }
+              />
             </div>
           ) : (
             <div ref={threadRef} className="max-h-[58vh] min-h-[420px] space-y-4 overflow-y-auto px-5 py-5">
@@ -1108,7 +1355,7 @@ export function PlaygroundPage() {
               <div className="mt-2 grid gap-2 rounded-lg border border-rule bg-ink/70 p-2 sm:grid-cols-2">
                 <ToolAction name="compliance.fetch" detail="Live evidence and framework checks" enabled />
                 <ToolAction name="vault.read" detail="Workspace key inventory" enabled />
-                <ToolAction name="pipeline.save" detail="Save this thread into Pipelines" enabled={Boolean(responseText)} />
+                <ToolAction name="pipeline.save" detail="Save this thread into Pipelines" enabled={hasRunOutput} />
                 <ToolAction name="http.get" detail="Pipeline-only external fetch" />
               </div>
             )}
@@ -1118,7 +1365,7 @@ export function PlaygroundPage() {
                 <button className="v-btn-ghost text-xs" onClick={runPreflight} disabled={!prompt.trim() || preflight.loading} type="button">
                   <TrendingDown className="h-4 w-4" /> {preflight.loading ? "Predicting..." : "Pre-flight"}
                 </button>
-                <button className="v-btn-ghost text-xs" onClick={saveAsPipeline} disabled={!responseText || running || savingPipeline} type="button">
+                <button className="v-btn-ghost text-xs" onClick={saveAsPipeline} disabled={!hasRunOutput || running || savingPipeline} type="button">
                   <Save className="h-4 w-4" /> {savingPipeline ? "Saving..." : savedPipelineSlug ? "Saved" : "Save as Pipeline"}
                 </button>
                 {conversation.length > 0 && (
@@ -1633,7 +1880,7 @@ export function PlaygroundPage() {
                 <button
                   className="v-btn-ghost"
                   onClick={saveAsPipeline}
-                  disabled={!responseText || running || savingPipeline}
+                  disabled={!hasRunOutput || running || savingPipeline}
                   title="Save this run as a governed pipeline"
                 >
                   <Save className="h-4 w-4" />
@@ -1919,7 +2166,26 @@ function ModeButton({
   );
 }
 
-function ComparePane({ model, prompt, status }: { model: string; prompt: string; status: string }) {
+function ComparePane({
+  model,
+  prompt,
+  status,
+  result,
+}: {
+  model: string;
+  prompt: string;
+  status: CompareRunResult["status"];
+  result?: CompareRunResult;
+}) {
+  const statusLabel = status === "running"
+    ? "running governed compare"
+    : status === "done"
+      ? "live result ready"
+      : status === "error"
+        ? result?.error ?? "compare unavailable"
+        : prompt
+          ? "ready to compare"
+          : "send a prompt to compare";
   return (
     <div className="flex h-[460px] flex-col rounded-xl border border-rule bg-ink/40">
       <div className="border-b border-rule px-3 py-2">
@@ -1927,13 +2193,39 @@ function ComparePane({ model, prompt, status }: { model: string; prompt: string;
           <span className="truncate text-[12.5px] text-bone">{model}</span>
           <span className="chip border-rule bg-ink/40 text-muted">compare</span>
         </div>
-        <div className="mt-1 text-[10.5px] text-muted">{status}</div>
+        <div className="mt-1 text-[10.5px] text-muted">{statusLabel}</div>
       </div>
       <div className="flex-1 overflow-auto px-3 py-3 text-[12.5px] leading-relaxed">
         <p className="text-muted">{prompt ? `Prompt: ${prompt}` : "Send a prompt to compare across connected models."}</p>
-        <div className="mt-3 rounded-md border border-rule bg-ink-2/70 p-3 text-muted">
-          Compare is displayed here in the reference layout. Execution will stay honest: only live `/ai/complete` results are shown after a real run.
-        </div>
+        {status === "running" && (
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-rule bg-ink-2/70 p-3 text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Waiting on live `/ai/complete` output.
+          </div>
+        )}
+        {status === "error" && (
+          <div className="mt-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-crimson">
+            {result?.error ?? "Compare execution failed for this model."}
+          </div>
+        )}
+        {status === "done" && result?.responseText && (
+          <>
+            <div className="mt-3 whitespace-pre-wrap rounded-md border border-rule bg-ink-2/70 p-3 text-bone">
+              {result.responseText}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10.5px]">
+              <span className="chip border-brass/40 bg-brass/10 text-brass-2">{result.provider}</span>
+              {result.latencyMs != null && <span className="chip border-rule bg-ink/40 text-muted">{result.latencyMs} ms</span>}
+              {result.outputTokens != null && <span className="chip border-rule bg-ink/40 text-muted">{result.outputTokens} out</span>}
+              {result.costUsd && <span className="chip border-rule bg-ink/40 text-muted">{result.costUsd}</span>}
+            </div>
+          </>
+        )}
+        {status === "idle" && (
+          <div className="mt-3 rounded-md border border-rule bg-ink-2/70 p-3 text-muted">
+            Compare will execute honest, model-specific governed runs for both panes.
+          </div>
+        )}
       </div>
     </div>
   );

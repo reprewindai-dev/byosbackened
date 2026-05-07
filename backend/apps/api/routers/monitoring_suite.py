@@ -1,6 +1,7 @@
 """Monitoring Suite: system health, metrics, real-time dashboard, alerts."""
 import time
 import os
+import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
@@ -10,6 +11,7 @@ from sqlalchemy import func, desc
 from sqlalchemy.orm import Session, load_only
 
 from apps.api.deps import get_current_user, require_admin
+from core.redis_pool import get_redis
 from db.session import get_db
 from db.models import (
     AIAuditLog,
@@ -28,6 +30,7 @@ router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 _START_TIME = time.time()
 _OVERVIEW_CACHE_TTL_SECONDS = 6
+_OVERVIEW_WARM_CACHE_TTL_SECONDS = 30
 _overview_cache: dict[str, tuple[float, dict]] = {}
 
 
@@ -342,6 +345,15 @@ async def workspace_overview(
     cached = _overview_cache.get(cache_key)
     if cached and time.time() - cached[0] < _OVERVIEW_CACHE_TTL_SECONDS:
         return cached[1]
+    redis_key = f"warm:{cache_key}"
+    try:
+        cached_raw = get_redis().get(redis_key)
+        if cached_raw:
+            payload = json.loads(cached_raw)
+            _overview_cache[cache_key] = (time.time(), payload)
+            return payload
+    except Exception:
+        pass
 
     now = datetime.utcnow()
     last_hour = now - timedelta(hours=1)
@@ -711,4 +723,8 @@ async def workspace_overview(
         "fleet": fleet,
     }
     _overview_cache[cache_key] = (time.time(), payload)
+    try:
+        get_redis().setex(redis_key, _OVERVIEW_WARM_CACHE_TTL_SECONDS, json.dumps(payload))
+    except Exception:
+        pass
     return payload

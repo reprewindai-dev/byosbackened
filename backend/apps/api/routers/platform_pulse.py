@@ -12,6 +12,8 @@ personal data ever leaks through this endpoint.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import json
+import time
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header
@@ -19,6 +21,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.security import decode_access_token
+from core.redis_pool import get_redis
 from db.models import (
     Subscription,
     SubscriptionStatus,
@@ -41,6 +44,9 @@ except ImportError:  # pragma: no cover
 from db.session import get_db
 
 router = APIRouter(prefix="/platform", tags=["platform"])
+_PULSE_HOT_CACHE_TTL_SECONDS = 6
+_PULSE_WARM_CACHE_TTL_SECONDS = 30
+_pulse_cache: dict[str, tuple[float, dict]] = {}
 
 
 # ─── Optional auth dep (returns None for anonymous / invalid tokens) ──────────
@@ -124,6 +130,19 @@ async def platform_pulse(
     populated when the caller is a platform superuser.
     """
     is_super = bool(current_user and current_user.is_superuser)
+    cache_key = "platform_pulse:super" if is_super else "platform_pulse:public"
+    cached = _pulse_cache.get(cache_key)
+    if cached and time.time() - cached[0] < _PULSE_HOT_CACHE_TTL_SECONDS:
+        return cached[1]
+    redis_key = f"warm:{cache_key}"
+    try:
+        cached_raw = get_redis().get(redis_key)
+        if cached_raw:
+            payload = json.loads(cached_raw)
+            _pulse_cache[cache_key] = (time.time(), payload)
+            return payload
+    except Exception:
+        pass
 
     now = datetime.utcnow()
     window_30 = now - timedelta(days=30)
@@ -460,4 +479,9 @@ async def platform_pulse(
             "marketplace_gross_30d_cents": int(order_revenue_30d),
         }
 
+    _pulse_cache[cache_key] = (time.time(), payload)
+    try:
+        get_redis().setex(redis_key, _PULSE_WARM_CACHE_TTL_SECONDS, json.dumps(payload))
+    except Exception:
+        pass
     return payload

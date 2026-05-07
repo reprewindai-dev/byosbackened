@@ -23,7 +23,7 @@ from core.llm.groq_fallback import GroqFallbackError, call_groq
 from core.llm.ollama_client import OllamaError, _shared_ollama_client
 from core.privacy.pii_detection import detect_and_mask_pii, detect_pii
 from core.services.workspace_gateway import (
-    get_model_setting,
+    get_model_setting_fast,
     record_request_log,
 )
 from db.models import AIAuditLog, Subscription, SubscriptionStatus, TokenTransaction, TokenWallet, User
@@ -617,7 +617,7 @@ async def complete(
 ):
     """Run a governed completion through the configured production LLM stack."""
     try:
-        model_row = get_model_setting(db, current_user.workspace_id, payload.model)
+        model_row = get_model_setting_fast(db, current_user.workspace_id, payload.model)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if not model_row.enabled:

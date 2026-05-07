@@ -39,6 +39,8 @@ _GEMINI_PROBE_TTL_SECONDS = 60
 _gemini_probe_cache: tuple[float, bool] | None = None
 _OLLAMA_PROBE_TTL_SECONDS = 15
 _ollama_probe_cache: tuple[float, bool] | None = None
+_MODEL_SETTING_CACHE_TTL_SECONDS = 10
+_model_setting_cache: dict[str, tuple[float, "ResolvedModelSetting"]] = {}
 
 
 def _workspace_token_cost_per_1k_output_tokens() -> Decimal:
@@ -335,6 +337,17 @@ class NormalizedLog:
     api_key_id: str | None = None
 
 
+@dataclass(frozen=True)
+class ResolvedModelSetting:
+    workspace_id: str
+    model_slug: str
+    display_name: str | None
+    bedrock_model_id: str
+    provider: str
+    enabled: bool
+    connected: bool
+
+
 def month_start(now: Optional[datetime] = None) -> datetime:
     now = now or datetime.utcnow()
     return datetime(now.year, now.month, 1)
@@ -403,12 +416,38 @@ def get_model_setting(db: Session, workspace_id: str, model_slug: str) -> Worksp
     return row
 
 
+def get_model_setting_fast(db: Session, workspace_id: str, model_slug: str) -> ResolvedModelSetting:
+    """Resolve a workspace model with a short-lived hot cache.
+
+    This avoids re-seeding/re-probing model catalog data on every governed run.
+    """
+    cache_key = f"{workspace_id}:{model_slug}"
+    now = time.monotonic()
+    cached = _model_setting_cache.get(cache_key)
+    if cached and now - cached[0] < _MODEL_SETTING_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    row = get_model_setting(db, workspace_id, model_slug)
+    resolved = ResolvedModelSetting(
+        workspace_id=row.workspace_id,
+        model_slug=row.model_slug,
+        display_name=row.display_name,
+        bedrock_model_id=row.bedrock_model_id,
+        provider=row.provider,
+        enabled=bool(row.enabled),
+        connected=bool(row.connected),
+    )
+    _model_setting_cache[cache_key] = (now, resolved)
+    return resolved
+
+
 def set_model_enabled(db: Session, workspace_id: str, model_slug: str, enabled: bool) -> WorkspaceModelSetting:
     row = get_model_setting(db, workspace_id, model_slug)
     row.enabled = enabled
     row.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(row)
+    _model_setting_cache.pop(f"{workspace_id}:{model_slug}", None)
     return row
 
 

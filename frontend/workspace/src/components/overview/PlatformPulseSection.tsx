@@ -77,7 +77,7 @@ function TierDistribution({ distribution }: { distribution: Record<string, numbe
   if (total === 0) {
     return (
       <div className="rounded-lg border border-rule bg-ink-2/40 p-4 font-mono text-[11px] text-muted">
-        No subscriptions yet — register the first tenant to see the tier distribution.
+        No subscriptions yet - register the first tenant to see the tier distribution.
       </div>
     );
   }
@@ -133,6 +133,7 @@ function ActivityIcon({ kind }: { kind: PlatformPulseActivity["kind"] }) {
 function ActivityRow({ event, isSuperuser }: { event: PlatformPulseActivity; isSuperuser: boolean }) {
   let label = "";
   let detail = "";
+
   switch (event.kind) {
     case "listing_new":
       label = `New listing: ${event.title ?? event.actor}`;
@@ -163,6 +164,7 @@ function ActivityRow({ event, isSuperuser }: { event: PlatformPulseActivity; isS
       label = String(event.kind);
       detail = `@${event.actor}`;
   }
+
   return (
     <li className="flex items-start gap-2 border-b border-rule/40 px-3 py-2 last:border-0">
       <span className="mt-0.5">
@@ -187,7 +189,7 @@ export function PlatformPulseSection() {
   });
 
   if (isError) {
-    // Soft-fail: don't break the Overview page if /platform/pulse 404s in a
+    // Soft-fail: don't break the Marketplace page if /platform/pulse 404s in a
     // partial deployment. Render nothing so the rest of the page is intact.
     return null;
   }
@@ -197,11 +199,11 @@ export function PlatformPulseSection() {
       <header className="flex items-end justify-between gap-4">
         <div>
           <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-            Platform · Marketplace pulse
+            Marketplace · Transparency pulse
           </div>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight">Live transparency</h2>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Marketplace transparency</h2>
           <p className="mt-1 max-w-2xl text-sm text-bone-2">
-            Public marketplace health — visible to vendors and tenants alike. Internal financials
+            Public marketplace health - visible to vendors and tenants alike. Internal financials
             and security signals stay scoped to platform operators.
           </p>
         </div>
@@ -214,35 +216,35 @@ export function PlatformPulseSection() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <PulseCard
           label="Total users"
-          value={data ? fmtNumber(data.users.total) : isLoading ? "…" : "—"}
+          value={data ? fmtNumber(data.users.total) : isLoading ? "..." : "-"}
           delta={data ? `${data.users.delta_pct_30d >= 0 ? "+" : ""}${data.users.delta_pct_30d}% (30d)` : undefined}
           positive={!!data && data.users.delta_pct_30d >= 0}
           icon={Users}
         />
         <PulseCard
           label="Active listings"
-          value={data ? fmtNumber(data.active_listings.total) : isLoading ? "…" : "—"}
+          value={data ? fmtNumber(data.active_listings.total) : isLoading ? "..." : "-"}
           delta={data ? `+${fmtNumber(data.active_listings.added_7d)} (7d)` : undefined}
           positive
           icon={Tag}
         />
         <PulseCard
           label="Tool installs"
-          value={data ? fmtNumber(data.tool_installs.total) : isLoading ? "…" : "—"}
+          value={data ? fmtNumber(data.tool_installs.total) : isLoading ? "..." : "-"}
           delta={data ? `${fmtNumber(data.tool_installs.active_tools)} active tools` : undefined}
           positive
           icon={Activity}
         />
         <PulseCard
           label="Orders (30d)"
-          value={data ? fmtNumber(data.orders_30d.count) : isLoading ? "…" : "—"}
+          value={data ? fmtNumber(data.orders_30d.count) : isLoading ? "..." : "-"}
           delta={data ? `${data.orders_30d.delta_pct_vs_prior >= 0 ? "+" : ""}${data.orders_30d.delta_pct_vs_prior}% vs prior` : undefined}
           positive={!!data && data.orders_30d.delta_pct_vs_prior >= 0}
           icon={ShoppingCart}
         />
         <PulseCard
           label="Paid tiers"
-          value={data ? fmtNumber(data.paid_tier_users.total) : isLoading ? "…" : "—"}
+          value={data ? fmtNumber(data.paid_tier_users.total) : isLoading ? "..." : "-"}
           delta={data ? `+${fmtNumber(data.paid_tier_users.upgrades_30d)} upgrades` : undefined}
           positive
           icon={Crown}
@@ -276,7 +278,7 @@ export function PlatformPulseSection() {
           <ul className="max-h-72 overflow-y-auto">
             {(data?.activity ?? []).length === 0 && (
               <li className="px-3 py-6 text-center font-mono text-[11px] text-muted">
-                {isLoading ? "Loading activity…" : "No recent platform activity."}
+                {isLoading ? "Loading activity..." : "No recent platform activity."}
               </li>
             )}
             {(data?.activity ?? []).map((event, idx) => (

@@ -168,8 +168,13 @@ def _call_with_circuit_breaker(
 
     if not use_groq:
         try:
+            fast_timeout_seconds = float(settings.llm_latency_budget_seconds)
+            recovery_timeout_seconds = max(
+                float(settings.llm_timeout_seconds),
+                float(settings.llm_on_prem_timeout_seconds),
+            )
             fast_ollama = (
-                OllamaClient(base_url=ollama.base_url, model=model, timeout=settings.llm_latency_budget_seconds)
+                OllamaClient(base_url=ollama.base_url, model=model, timeout=fast_timeout_seconds)
                 if isinstance(getattr(ollama, "base_url", None), str)
                 else ollama
             )
@@ -177,9 +182,24 @@ def _call_with_circuit_breaker(
             record_success(scope)
             return result, "ollama", "primary_runtime"
         except OllamaError as exc:
+            text = str(exc).lower()
+            timed_out = "timed out" in text or "timeout" in text
+            if timed_out and recovery_timeout_seconds > fast_timeout_seconds:
+                try:
+                    recovered = OllamaClient(
+                        base_url=getattr(ollama, "base_url", None),
+                        model=model,
+                        timeout=recovery_timeout_seconds,
+                    ).generate(prompt=prompt, model=model, options=options or None)
+                    record_success(scope)
+                    return recovered, "ollama", "ollama_cold_start_recovered"
+                except OllamaError as recovery_exc:
+                    exc = recovery_exc
+                    text = str(exc).lower()
+                    timed_out = "timed out" in text or "timeout" in text
+
             new_state = record_failure(scope)
             logger.warning("[CB] Ollama failed (%s), state now %s", exc, new_state)
-            text = str(exc).lower()
             routing_reason = "ollama_latency_budget_exceeded" if "timed out" in text or "timeout" in text else "ollama_unavailable"
             use_groq = True
 

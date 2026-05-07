@@ -15,6 +15,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { PlatformPulseSection } from "@/components/overview/PlatformPulseSection";
 import { api } from "@/lib/api";
 import { fmtCents, cn } from "@/lib/cn";
 
@@ -380,6 +381,8 @@ export function MarketplacePage() {
           </button>
         </div>
       </header>
+
+      <PlatformPulseSection />
 
       {/* Search + type chips */}
       <div className="frame flex flex-wrap items-center gap-3 p-3">

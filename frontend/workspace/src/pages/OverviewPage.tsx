@@ -22,7 +22,6 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { PlatformPulseSection } from "@/components/overview/PlatformPulseSection";
 import { Sparkline } from "@/components/overview/Sparkline";
 import { api } from "@/lib/api";
 import {
@@ -232,10 +231,6 @@ export function OverviewPage() {
           <AlertsPanel alerts={data?.alerts ?? []} isLoading={isLoading} />
           <AuditTrailPanel entries={data?.audit_trail ?? []} isLoading={isLoading} />
           <FleetPanel fleet={data?.fleet ?? []} isLoading={isLoading} />
-        </div>
-
-        <div className="mt-4">
-          <PlatformPulseSection />
         </div>
       </section>
     </div>

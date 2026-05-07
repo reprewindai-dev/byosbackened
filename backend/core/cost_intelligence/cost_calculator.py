@@ -70,6 +70,7 @@ class CostCalculator:
         model: Optional[str] = None,
         workspace_id: Optional[str] = None,
         use_ml: bool = True,
+        include_alternatives: bool = True,
     ) -> CostPrediction:
         """
         Predict cost with precision.
@@ -145,19 +146,24 @@ class CostCalculator:
 
         # Find alternative providers
         alternatives = []
-        for alt_provider in ["huggingface", "openai", "local"]:
-            if alt_provider == provider:
-                continue
-            alt_cost = self.predict_cost(
-                operation_type, alt_provider, input_tokens=input_tokens,
-                estimated_output_tokens=estimated_output_tokens, model=model
-            ).predicted_cost
-            savings = ((predicted_cost - alt_cost) / predicted_cost * 100) if predicted_cost > 0 else 0
-            alternatives.append({
-                "provider": alt_provider,
-                "cost": str(alt_cost),
-                "savings_percent": float(savings),
-            })
+        if include_alternatives:
+            for alt_provider in ["huggingface", "openai", "local"]:
+                if alt_provider == provider:
+                    continue
+                alt_cost = self.predict_cost(
+                    operation_type,
+                    alt_provider,
+                    input_tokens=input_tokens,
+                    estimated_output_tokens=estimated_output_tokens,
+                    model=model,
+                    include_alternatives=False,
+                ).predicted_cost
+                savings = ((predicted_cost - alt_cost) / predicted_cost * 100) if predicted_cost > 0 else 0
+                alternatives.append({
+                    "provider": alt_provider,
+                    "cost": str(alt_cost),
+                    "savings_percent": float(savings),
+                })
 
         return CostPrediction(
             predicted_cost=predicted_cost.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP),

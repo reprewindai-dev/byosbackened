@@ -404,10 +404,31 @@ async def workspace_overview(
     prev_hour_logs = [l for l in recent_logs if prev_hour <= l.created_at < last_hour]
 
     # KPIs.
-    current_run_count = len(last_hour_requests) if telemetry_logs else len(last_hour_logs)
-    previous_run_count = len(prev_hour_requests) if telemetry_logs else len(prev_hour_logs)
-    rpm = round(current_run_count / 60, 2)
-    prev_rpm = round(previous_run_count / 60, 2)
+    # Prefer true 1h telemetry, but if that window is empty fall back to a 24h
+    # view so Overview does not look dead when runs happened outside the last hour.
+    window_minutes = 60
+    if telemetry_logs:
+        kpi_current_rows = last_hour_requests
+        kpi_previous_rows = prev_hour_requests
+    else:
+        kpi_current_rows = last_hour_logs
+        kpi_previous_rows = prev_hour_logs
+
+    if not kpi_current_rows:
+        window_minutes = 24 * 60
+        kpi_window_start = now - timedelta(minutes=window_minutes)
+        prev_window_start = kpi_window_start - timedelta(minutes=window_minutes)
+        if telemetry_logs:
+            kpi_current_rows = [l for l in telemetry_logs if l.created_at >= kpi_window_start]
+            kpi_previous_rows = [l for l in telemetry_logs if prev_window_start <= l.created_at < kpi_window_start]
+        else:
+            kpi_current_rows = [l for l in recent_logs if l.created_at >= kpi_window_start]
+            kpi_previous_rows = [l for l in recent_logs if prev_window_start <= l.created_at < kpi_window_start]
+
+    current_run_count = len(kpi_current_rows)
+    previous_run_count = len(kpi_previous_rows)
+    rpm = round(current_run_count / max(1, window_minutes), 2)
+    prev_rpm = round(previous_run_count / max(1, window_minutes), 2)
     rpm_delta = ((rpm - prev_rpm) / prev_rpm * 100) if prev_rpm > 0 else 0.0
 
     def _median_int(values: list[int]) -> int:
@@ -416,8 +437,8 @@ async def workspace_overview(
             return 0
         return int(clean[len(clean) // 2])
 
-    p50 = _median_int([int(l.latency_ms or 0) for l in last_hour_requests])
-    prev_p50 = _median_int([int(l.latency_ms or 0) for l in prev_hour_requests])
+    p50 = _median_int([int(getattr(l, "latency_ms", 0) or 0) for l in kpi_current_rows])
+    prev_p50 = _median_int([int(getattr(l, "latency_ms", 0) or 0) for l in kpi_previous_rows])
 
     def _toks(l):
         return (l.tokens_input or 0) + (l.tokens_output or 0)
@@ -425,18 +446,14 @@ async def workspace_overview(
     def _units_from_request(l: WorkspaceRequestLog) -> int:
         return int((l.tokens_in or 0) + (l.tokens_out or 0))
 
-    total_units_hr = (
-        sum(_units_from_request(l) for l in last_hour_requests)
-        if telemetry_logs
-        else sum(_toks(l) for l in last_hour_logs)
-    )
-    prev_units_hr = (
-        sum(_units_from_request(l) for l in prev_hour_requests)
-        if telemetry_logs
-        else sum(_toks(l) for l in prev_hour_logs)
-    )
-    tps = round(total_units_hr / 3600, 2)
-    tps_delta = ((total_units_hr - prev_units_hr) / prev_units_hr * 100) if prev_units_hr > 0 else 0.0
+    if telemetry_logs:
+        total_units_window = sum(_units_from_request(l) for l in kpi_current_rows)
+        prev_units_window = sum(_units_from_request(l) for l in kpi_previous_rows)
+    else:
+        total_units_window = sum(_toks(l) for l in kpi_current_rows)
+        prev_units_window = sum(_toks(l) for l in kpi_previous_rows)
+    tps = round(total_units_window / max(1, window_minutes * 60), 2)
+    tps_delta = ((total_units_window - prev_units_window) / prev_units_window * 100) if prev_units_window > 0 else 0.0
 
     spend_source = telemetry_logs if telemetry_logs else recent_logs
     spend_today_cents = int(

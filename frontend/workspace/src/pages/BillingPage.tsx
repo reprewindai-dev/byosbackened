@@ -73,6 +73,11 @@ interface PlansResponse {
   plans: PlanDefinition[];
 }
 
+interface CurrentSubscription {
+  plan: string;
+  status: string;
+}
+
 const FREE_EVALUATION_RUNS = 15;
 
 const EVENT_PRICES = [
@@ -94,6 +99,10 @@ async function fetchTopupOptions() {
 
 async function fetchPlans() {
   return (await api.get<PlansResponse>("/subscriptions/plans")).data;
+}
+
+async function fetchCurrentSubscription() {
+  return (await api.get<CurrentSubscription>("/subscriptions/current")).data;
 }
 
 async function createTopup(pack: string) {
@@ -122,6 +131,7 @@ export function BillingPage() {
   const txns = useQuery({ queryKey: ["wallet-txns"], queryFn: fetchTransactions });
   const packs = useQuery({ queryKey: ["wallet-topup-options"], queryFn: fetchTopupOptions });
   const plans = useQuery({ queryKey: ["subscription-plans"], queryFn: fetchPlans, staleTime: 5 * 60_000 });
+  const subscription = useQuery({ queryKey: ["subscription-current"], queryFn: fetchCurrentSubscription, staleTime: 60_000 });
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
 
   const topup = useMutation({
@@ -138,9 +148,10 @@ export function BillingPage() {
   const evaluationLimitReached = !txns.isLoading && evaluationRunsUsed >= FREE_EVALUATION_RUNS;
   const pricingRows = useMemo(() => buildPricingRows(plans.data?.plans ?? []), [plans.data?.plans]);
   const firstReservePack = packs.data?.options[0]?.pack_name ?? null;
+  const reserveTopupAllowed = subscription.data?.status === "active" && subscription.data?.plan !== "free";
 
   const startReserveCheckout = () => {
-    if (!firstReservePack || topup.isPending) return;
+    if (!firstReservePack || !reserveTopupAllowed || topup.isPending) return;
     setSelectedPack(firstReservePack);
     topup.mutate(firstReservePack);
   };
@@ -241,7 +252,8 @@ export function BillingPage() {
                         className="v-btn-primary"
                         type="button"
                         onClick={startReserveCheckout}
-                        disabled={!firstReservePack || topup.isPending}
+                        disabled={!firstReservePack || !reserveTopupAllowed || topup.isPending}
+                        title={reserveTopupAllowed ? "Add operating reserve" : "Activation is required before reserve can be funded"}
                       >
                         {topup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                         Add reserve
@@ -277,10 +289,11 @@ export function BillingPage() {
           <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Quick actions</div>
           <button
             className="v-btn-primary w-full"
-            onClick={() => setSelectedPack(packs.data?.options[0]?.pack_name ?? "founding")}
-            disabled={packs.isLoading}
+            onClick={startReserveCheckout}
+            disabled={packs.isLoading || !reserveTopupAllowed || topup.isPending}
+            title={reserveTopupAllowed ? "Add operating reserve" : "Activation is required before reserve can be funded"}
           >
-            <Sparkles className="h-4 w-4" /> Add reserve
+            {topup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Add reserve
           </button>
           <button
             className="v-btn-ghost mt-2 w-full cursor-not-allowed justify-center opacity-70"
@@ -299,6 +312,7 @@ export function BillingPage() {
       <ProofStrip
         items={[
           { label: "pricing source", value: plans.data ? "/api/v1/subscriptions/plans" : plans.isError ? "unavailable" : "loading" },
+          { label: "activation source", value: subscription.data ? "/api/v1/subscriptions/current" : subscription.isError ? "unavailable" : "loading" },
           { label: "reserve source", value: balance.data ? "/api/v1/wallet/balance" : balance.isError ? "unavailable" : "loading" },
           { label: "ledger source", value: txns.data ? "/api/v1/wallet/transactions" : txns.isError ? "unavailable" : "loading" },
           { label: "checkout source", value: packs.data ? "/api/v1/wallet/topup/options" : packs.isError ? "unavailable" : "loading" },

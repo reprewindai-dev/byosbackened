@@ -204,7 +204,7 @@ def _active_subscription(db: Session, workspace_id: str) -> Optional[Subscriptio
     return (
         db.query(Subscription)
         .filter(Subscription.workspace_id == workspace_id)
-        .filter(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]))
+        .filter(Subscription.status == SubscriptionStatus.ACTIVE)
         .first()
     )
 

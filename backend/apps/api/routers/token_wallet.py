@@ -10,7 +10,7 @@ from sqlalchemy import desc
 from apps.api.deps import get_current_user, get_current_workspace_id
 from core.config import get_settings
 from db.session import get_db
-from db.models import TokenWallet, TokenTransaction, User
+from db.models import Subscription, SubscriptionStatus, TokenWallet, TokenTransaction, User
 from core.redis_pool import get_redis
 
 settings = get_settings()
@@ -271,6 +271,15 @@ async def create_topup_checkout(
         raise HTTPException(status_code=400, detail="Invalid reserve pack")
     
     workspace_id = current_user.workspace_id
+    active_subscription = db.query(Subscription).filter(
+        Subscription.workspace_id == workspace_id,
+        Subscription.status == SubscriptionStatus.ACTIVE,
+    ).first()
+    if not active_subscription:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Activate the workspace before adding operating reserve.",
+        )
     
     success_separator = "&" if "?" in request.success_url else "?"
 

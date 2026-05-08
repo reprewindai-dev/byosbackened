@@ -28,6 +28,11 @@ def _configure_stripe() -> None:
 
 RESERVE_UNITS_PER_USD = 1000
 
+
+def _reserve_units_from_cents(cents: int | str | None) -> int:
+    """Convert paid reserve cents into integer reserve units."""
+    return int(cents or 0) * RESERVE_UNITS_PER_USD // 100
+
 PLANS = {
     "starter": {
         "name": "Founding Activation",
@@ -295,8 +300,10 @@ async def create_checkout(
     if not plan_info.get("self_serve_checkout"):
         raise HTTPException(status_code=400, detail="Regulated and Enterprise plans require sales-assisted activation")
 
-    amount = plan_info.get("activation_cents")
-    if not amount:
+    activation_cents = int(plan_info.get("activation_cents") or 0)
+    minimum_reserve_cents = int(plan_info.get("minimum_reserve_cents") or 0)
+    amount = activation_cents + minimum_reserve_cents
+    if activation_cents <= 0:
         raise HTTPException(status_code=400, detail="Plan is not available for self-serve activation")
 
     sub = db.query(Subscription).filter(
@@ -347,7 +354,9 @@ async def create_checkout(
             "plan": payload.plan.value,
             "billing_cycle": "activation",
             "type": "workspace_activation",
-            "minimum_reserve_cents": str(plan_info.get("minimum_reserve_cents") or 0),
+            "activation_cents": str(activation_cents),
+            "minimum_reserve_cents": str(minimum_reserve_cents),
+            "reserve_units": str(_reserve_units_from_cents(minimum_reserve_cents)),
         },
     )
     return CheckoutResponse(checkout_url=session.url, session_id=session.id)
@@ -556,8 +565,29 @@ def _apply_paid_checkout_session(db: Session, session) -> bool:
                 "activation_payment_intent_id": session.get("payment_intent"),
                 "activated_at": datetime.utcnow().isoformat(),
                 "minimum_reserve_cents": metadata.get("minimum_reserve_cents", "0"),
+                "activation_cents": metadata.get("activation_cents", str(plan_info.get("activation_cents") or 0)),
+                "reserve_units": metadata.get("reserve_units", "0"),
             }
-        db.commit()
+
+        reserve_units = int(metadata.get("reserve_units") or _reserve_units_from_cents(metadata.get("minimum_reserve_cents")))
+        if reserve_units > 0:
+            existing = db.query(TokenTransaction).filter(
+                TokenTransaction.stripe_checkout_session_id == session_id,
+                TokenTransaction.transaction_type == "purchase",
+            ).first()
+            if not existing:
+                _credit_token_wallet(
+                    db,
+                    workspace_id,
+                    reserve_units,
+                    stripe_checkout_session_id=session_id,
+                    stripe_payment_intent_id=session.get("payment_intent"),
+                    description="Minimum operating reserve from activation",
+                )
+            else:
+                db.commit()
+        else:
+            db.commit()
         return True
 
     return False

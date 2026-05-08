@@ -260,6 +260,211 @@
     color: #f0b3ac;
   }
 
+  .command-bridge {
+    position: relative;
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: minmax(360px, 0.42fr) minmax(0, 0.58fr);
+    min-height: 240px;
+    border: 1px solid rgba(186, 198, 205, 0.16);
+    background:
+      linear-gradient(90deg, rgba(11, 16, 21, 0.96), rgba(5, 8, 11, 0.9)),
+      rgba(5, 8, 11, 0.86);
+    overflow: hidden;
+    box-shadow: 0 34px 100px -70px rgba(0, 0, 0, 0.96);
+    animation: command-enter 460ms ease-out 80ms both;
+  }
+
+  .command-bridge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(146, 214, 208, 0.14) 46%, transparent 58%),
+      radial-gradient(circle at 20% 0%, rgba(218, 167, 94, 0.16), transparent 36%);
+    opacity: 0.72;
+    transform: translateX(-35%);
+    animation: command-sweep 8s ease-in-out infinite;
+  }
+
+  .bridge-prime {
+    position: relative;
+    z-index: 1;
+    padding: 24px;
+    border-right: 1px solid rgba(186, 198, 205, 0.12);
+  }
+
+  .bridge-prime > span,
+  .surface-node > span {
+    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: rgba(156, 201, 210, 0.78);
+  }
+
+  .bridge-prime h2 {
+    margin-top: 14px;
+    max-width: 520px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(28px, 3.6vw, 56px);
+    line-height: 0.95;
+    color: #f4f1e9;
+  }
+
+  .bridge-prime p {
+    margin-top: 14px;
+    max-width: 520px;
+    color: rgba(216, 221, 222, 0.62);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .bridge-pulse {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .bridge-pulse i {
+    grid-row: span 2;
+    height: 36px;
+    border: 1px solid rgba(128, 214, 189, 0.42);
+    background: rgba(128, 214, 189, 0.14);
+    box-shadow: 0 0 38px rgba(128, 214, 189, 0.2);
+    animation: command-pulse 2.8s ease-in-out infinite;
+  }
+
+  .bridge-pulse b {
+    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: #80d6bd;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .bridge-pulse small {
+    color: rgba(216, 221, 222, 0.54);
+    font-size: 12px;
+  }
+
+  .bridge-actions {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: rgba(186, 198, 205, 0.1);
+    gap: 1px;
+  }
+
+  .bridge-action {
+    position: relative;
+    min-height: 120px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto 1fr;
+    gap: 8px 10px;
+    padding: 18px;
+    color: rgba(238, 241, 244, 0.86);
+    text-decoration: none;
+    background: rgba(7, 11, 15, 0.84);
+    transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+  }
+
+  .bridge-action:hover {
+    background: rgba(12, 19, 24, 0.96);
+    color: #f4f1e9;
+    transform: translateY(-1px);
+  }
+
+  .bridge-action svg {
+    color: #92d6d0;
+  }
+
+  .bridge-action span {
+    font-weight: 650;
+    color: #f4f1e9;
+  }
+
+  .bridge-action b {
+    justify-self: end;
+    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: #d6a45f;
+  }
+
+  .bridge-action small {
+    grid-column: 2 / 4;
+    max-width: 320px;
+    color: rgba(216, 221, 222, 0.55);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .bridge-arrow {
+    position: absolute;
+    right: 16px;
+    bottom: 14px;
+    opacity: 0.5;
+  }
+
+  .surface-map {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 1px;
+    border: 1px solid rgba(186, 198, 205, 0.14);
+    background: rgba(186, 198, 205, 0.1);
+  }
+
+  .surface-node {
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    color: rgba(238, 241, 244, 0.8);
+    text-decoration: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+      rgba(7, 11, 15, 0.86);
+    border-top: 2px solid rgba(186, 198, 205, 0.16);
+    transition: background 180ms ease, border-color 180ms ease;
+  }
+
+  .surface-node:hover {
+    background: rgba(11, 17, 22, 0.96);
+    border-top-color: rgba(146, 214, 208, 0.58);
+  }
+
+  .surface-node.stable { border-top-color: rgba(128, 214, 189, 0.5); }
+  .surface-node.watch { border-top-color: rgba(214, 164, 95, 0.6); }
+  .surface-node.critical { border-top-color: rgba(227, 111, 101, 0.65); }
+
+  .surface-node b {
+    color: #f4f1e9;
+    font-size: 15px;
+    line-height: 1.1;
+  }
+
+  .surface-node strong {
+    margin-top: auto;
+    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #92d6d0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .surface-node small {
+    color: rgba(216, 221, 222, 0.52);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
   .scope-rail {
     margin-top: 14px;
     display: grid;
@@ -267,57 +472,6 @@
     gap: 1px;
     background: rgba(185, 197, 200, 0.12);
     border: 1px solid rgba(185, 197, 200, 0.12);
-  }
-
-  .command-ops-dock {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    border: 1px solid rgba(186, 198, 205, 0.14);
-    border-left: 3px solid rgba(146, 214, 208, 0.42);
-    background:
-      linear-gradient(90deg, rgba(146, 214, 208, 0.08), rgba(255, 255, 255, 0.018)),
-      rgba(5, 8, 11, 0.78);
-    padding: 9px 12px;
-  }
-
-  .command-ops-dock > span {
-    white-space: nowrap;
-    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: rgba(198, 207, 211, 0.62);
-  }
-
-  .command-ops-dock div {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 6px;
-  }
-
-  .command-ops-dock a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid rgba(185, 197, 200, 0.14);
-    padding: 5px 8px;
-    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: rgba(228, 232, 231, 0.72);
-    text-decoration: none;
-    transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
-  }
-
-  .command-ops-dock a:hover {
-    border-color: rgba(146, 214, 208, 0.48);
-    background: rgba(146, 214, 208, 0.08);
-    color: #eaf6f5;
   }
 
   .scope-group {
@@ -878,8 +1032,19 @@
     to { transform: rotate(405deg); }
   }
 
+  @keyframes command-sweep {
+    0%, 100% { transform: translateX(-42%); opacity: 0.34; }
+    45% { transform: translateX(18%); opacity: 0.72; }
+  }
+
+  @keyframes command-pulse {
+    0%, 100% { transform: scaleY(0.78); opacity: 0.55; }
+    50% { transform: scaleY(1); opacity: 1; }
+  }
+
   @media (max-width: 1180px) {
     .command-header,
+    .command-bridge,
     .scope-rail,
     .command-section-title,
     .archives-spine {
@@ -907,17 +1072,18 @@
     }
 
     .command-status-strip,
+    .bridge-actions,
     .archive-line {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .command-ops-dock {
-      align-items: flex-start;
-      flex-direction: column;
+    .bridge-prime {
+      border-right: 0;
+      border-bottom: 1px solid rgba(186, 198, 205, 0.12);
     }
 
-    .command-ops-dock div {
-      justify-content: flex-start;
+    .surface-map {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .trace-row {
@@ -942,9 +1108,11 @@
     }
 
     .command-status-strip,
+    .bridge-actions,
     .resource-grid,
     .state-matrix,
     .alignment-map,
+    .surface-map,
     .archive-line {
       grid-template-columns: 1fr;
     }

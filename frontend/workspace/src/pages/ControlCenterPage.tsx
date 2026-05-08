@@ -255,7 +255,7 @@ export function ControlCenterPage() {
     <div className="mx-auto w-full max-w-[1440px]">
       <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
-          <div className="text-eyebrow">Control Center</div>
+          <div className="text-eyebrow">Operations Spine</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-bone md:text-4xl">
             One operating surface for every governed run.
           </h1>

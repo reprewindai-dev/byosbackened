@@ -30,8 +30,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Workspace",
     items: [
-      { to: "/control-center", label: "Control Center", icon: Command, badge: "NEW" },
-      { to: "/overview", label: "Overview", icon: LayoutDashboard },
+      { to: "/overview", label: "Command Center", icon: Command, badge: "LIVE" },
+      { to: "/control-center", label: "Operations Spine", icon: LayoutDashboard },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],

@@ -15,13 +15,17 @@ import {
   Hash,
   Landmark,
   Layers3,
+  LineChart,
   Network,
   OctagonAlert,
   RadioTower,
   Scale,
   ShieldCheck,
+  ShoppingBag,
   Split,
+  TerminalSquare,
   Vote,
+  WalletCards,
   Workflow,
 } from "lucide-react";
 import { Sparkline } from "@/components/overview/Sparkline";
@@ -235,7 +239,7 @@ export function OverviewPage() {
         state={state}
         isLoading={overview.isLoading}
       />
-      <CommandOpsDock />
+      <CommandBridge data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} />
 
       {overview.isError && (
         <div className="command-alert">
@@ -244,7 +248,7 @@ export function OverviewPage() {
         </div>
       )}
 
-      <ScopeRail isSuperuser={Boolean(user?.is_superuser)} />
+      <SurfaceMap data={data} pulse={pulseData} state={state} isSuperuser={Boolean(user?.is_superuser)} />
 
       <section className="sv-chamber">
         <SectionTitle
@@ -269,32 +273,6 @@ export function OverviewPage() {
   );
 }
 
-function CommandOpsDock() {
-  const routes = [
-    { label: "Control", to: "#/control-center" },
-    { label: "Playground", to: "#/playground" },
-    { label: "Marketplace", to: "#/marketplace" },
-    { label: "Monitoring", to: "#/monitoring" },
-    { label: "Billing", to: "#/billing" },
-    { label: "Vault", to: "#/vault" },
-    { label: "Settings", to: "#/settings" },
-  ];
-
-  return (
-    <nav className="command-ops-dock" aria-label="Return to workspace operations">
-      <span>App ingress</span>
-      <div>
-        {routes.map((route) => (
-          <a key={route.to} href={route.to}>
-            {route.label}
-            <ArrowRight className="h-3 w-3" />
-          </a>
-        ))}
-      </div>
-    </nav>
-  );
-}
-
 function CommandHeader({
   userScope,
   workspace,
@@ -310,7 +288,7 @@ function CommandHeader({
     <header className="command-header">
       <div>
         <div className="command-kicker">Veklom sovereign command center</div>
-        <h1>Hello, Silicon Valley / Hello, Sunnyvale</h1>
+        <h1>Institutional command overview</h1>
         <p>{userScope} - {workspace}</p>
       </div>
       <div className="command-status-strip">
@@ -323,29 +301,154 @@ function CommandHeader({
   );
 }
 
-function ScopeRail({ isSuperuser }: { isSuperuser: boolean }) {
-  const superuser = ["Silicon Valley", "Global UACP", "Global Agents", "Archives", "Tenants", "Risk", "Marketplace", "Billing", "Backend Deployments"];
-  const tenant = ["Sunnyvale", "My Runs", "My Agents", "My Evidence", "My Routes", "My Usage", "My Tasks", "My Marketplace"];
-  const enterprise = ["Own deployment", "Command shell", "Policies", "Agents", "Archives"];
+function CommandBridge({
+  data,
+  pulse,
+  state,
+  isLoading,
+}: {
+  data?: OverviewPayload;
+  pulse: PlatformPulse | null;
+  state: InstitutionalState | null;
+  isLoading: boolean;
+}) {
+  const primarySignal = isLoading
+    ? "Synchronizing live spine"
+    : state?.posture ?? "Awaiting live signal";
+  const actions = [
+    {
+      label: "Run governed decision",
+      detail: "Execute through policy, route, reserve, and audit.",
+      to: "#/playground",
+      icon: TerminalSquare,
+      value: `${fmtNumber(data?.recent_runs.length ?? 0)} traces`,
+    },
+    {
+      label: "Inspect live pressure",
+      detail: "Open telemetry, latency, routing, alerts, and proof.",
+      to: "#/monitoring",
+      icon: LineChart,
+      value: data ? `${data.kpi.p50_latency_ms}ms p50` : "no signal",
+    },
+    {
+      label: "Build marketplace asset",
+      detail: "Move from public pain to governed Veklom-native tools.",
+      to: "#/marketplace",
+      icon: ShoppingBag,
+      value: pulse ? `${pulse.active_listings.total} listings` : "catalog",
+    },
+    {
+      label: "Tune reserve posture",
+      detail: "Review spend, burn rate, billing, and operating reserve.",
+      to: "#/billing",
+      icon: WalletCards,
+      value: data ? fmtCents(data.spend.spend_cents) : "$0.00",
+    },
+  ];
+
   return (
-    <nav className="scope-rail" aria-label="Command center scope">
-      <ScopeGroup title={isSuperuser ? "Veklom Superuser" : "Superuser scope"} items={superuser} active={isSuperuser ? "Silicon Valley" : undefined} locked={!isSuperuser} />
-      <ScopeGroup title="Tenant User" items={tenant} active="Sunnyvale" />
-      <ScopeGroup title="Enterprise Deployment" items={enterprise} active={undefined} />
-    </nav>
+    <section className="command-bridge" aria-label="Live command bridge">
+      <div className="bridge-prime">
+        <span>Live command bridge</span>
+        <h2>{primarySignal}</h2>
+        <p>
+          This overview is the control surface: institutional telemetry, execution lanes, evidence lineage, and the
+          operating actions that move the system.
+        </p>
+        <div className="bridge-pulse">
+          <i />
+          <b>{state ? `${state.systemCoherence}% coherence` : "coherence pending"}</b>
+          <small>{data ? `${fmtNumber(data.kpi.audit_entries)} audit entries / ${fmtNumber(data.kpi.active_models)} active models` : "waiting for backend telemetry"}</small>
+        </div>
+      </div>
+      <div className="bridge-actions">
+        {actions.map((action) => (
+          <a key={action.to} href={action.to} className="bridge-action">
+            <action.icon className="h-4 w-4" />
+            <span>{action.label}</span>
+            <b>{action.value}</b>
+            <small>{action.detail}</small>
+            <ArrowRight className="bridge-arrow h-3.5 w-3.5" />
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 
-function ScopeGroup({ title, items, active, locked }: { title: string; items: string[]; active?: string; locked?: boolean }) {
+function SurfaceMap({
+  data,
+  pulse,
+  state,
+  isSuperuser,
+}: {
+  data?: OverviewPayload;
+  pulse: PlatformPulse | null;
+  state: InstitutionalState | null;
+  isSuperuser: boolean;
+}) {
+  const surfaces = [
+    {
+      title: "Deterministic Engine",
+      label: "Public narrative",
+      value: state ? `${state.convergencePressure}% pressure` : "story layer",
+      detail: "Intent, doctrine, and the reason governed autonomy matters.",
+      tone: "neutral",
+      to: "#/control-center",
+    },
+    {
+      title: "Silicon Valley",
+      label: isSuperuser ? "Strategic governance" : "Scoped governance",
+      value: state ? `${state.systemCoherence}% coherence` : "syncing",
+      detail: "UACP posture, policy stability, escalation pressure, and route authority.",
+      tone: state?.tone ?? "neutral",
+      to: "#/overview",
+    },
+    {
+      title: "Sunnyvale",
+      label: "Execution floor",
+      value: `${fmtNumber(data?.recent_runs.length ?? 0)} runs`,
+      detail: "Agents, queues, workflows, tools, blocked jobs, and intervention paths.",
+      tone: data?.recent_runs.length ? "stable" : "neutral",
+      to: "#/playground",
+    },
+    {
+      title: "Archives",
+      label: "Memory spine",
+      value: `${fmtNumber(data?.audit_trail.length ?? data?.kpi.audit_entries ?? 0)} records`,
+      detail: "Replayable judgment, evidence ledger, provenance, and institutional continuity.",
+      tone: data?.audit_trail.length ? "stable" : "watch",
+      to: "#/compliance",
+    },
+    {
+      title: "Marketplace",
+      label: "Asset factory",
+      value: pulse ? `${pulse.active_listings.total} live` : "Builder lane",
+      detail: "Sovereign Builder Agents convert public pain into governed sellable tools.",
+      tone: "neutral",
+      to: "#/marketplace",
+    },
+    {
+      title: "Control room",
+      label: "Tuning",
+      value: data ? `${data.routing.primary_util_pct}% primary` : "no signal",
+      detail: "Models, billing, settings, routes, and operational spine controls.",
+      tone: "stable",
+      to: "#/settings",
+    },
+  ];
+
   return (
-    <div className={cn("scope-group", locked && "opacity-55")}>
-      <span>{title}</span>
-      <div>
-        {items.map((item) => (
-          <b key={item} className={cn(item === active && "active")}>{item}</b>
-        ))}
-      </div>
-    </div>
+    <section className="surface-map" aria-label="Institutional product surface map">
+      {surfaces.map((surface) => (
+        <a key={surface.title} href={surface.to} className={cn("surface-node", surface.tone)}>
+          <span>{surface.label}</span>
+          <b>{surface.title}</b>
+          <strong>{surface.value}</strong>
+          <small>{surface.detail}</small>
+        </a>
+      ))}
+    </section>
   );
 }
 

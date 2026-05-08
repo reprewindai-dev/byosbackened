@@ -25,7 +25,7 @@ export function AppRoutes() {
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/control-center" replace />} />
+        <Route index element={<Navigate to="/overview" replace />} />
         <Route path="/dashboard" element={<ControlCenterPage />} />
         <Route path="/control-center" element={<ControlCenterPage />} />
         <Route path="/overview" element={<OverviewPage />} />
@@ -43,7 +43,7 @@ export function AppRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/control-center" replace />} />
+      <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>
   );
 }

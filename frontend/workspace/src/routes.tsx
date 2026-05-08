@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -16,6 +17,12 @@ import { CompliancePage } from "./pages/CompliancePage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { PipelinesPage } from "./pages/PipelinesPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
+import { useAuthStore } from "@/store/auth-store";
+
+function SuperuserOnly({ children }: { children: ReactNode }) {
+  const user = useAuthStore((s) => s.user);
+  return user?.is_superuser ? <>{children}</> : <Navigate to="/overview" replace />;
+}
 
 export function AppRoutes() {
   return (
@@ -26,8 +33,8 @@ export function AppRoutes() {
 
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/overview" replace />} />
-        <Route path="/dashboard" element={<ControlCenterPage />} />
-        <Route path="/control-center" element={<ControlCenterPage />} />
+        <Route path="/dashboard" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
+        <Route path="/control-center" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />

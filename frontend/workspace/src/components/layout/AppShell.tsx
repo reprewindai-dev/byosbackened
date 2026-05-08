@@ -8,7 +8,7 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const status = useAuthStore((s) => s.status);
   const location = useLocation();
-  const isCommandCenter = location.pathname === "/overview";
+  const isOverviewCenter = location.pathname === "/overview";
 
   if (status === "idle") {
     return (
@@ -22,7 +22,7 @@ export function AppShell() {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  if (isCommandCenter) {
+  if (isOverviewCenter) {
     return (
       <main className="command-center-stage">
         <Outlet />

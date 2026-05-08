@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useAuthStore } from "@/store/auth-store";
 
 interface NavItem {
   to: string;
@@ -26,12 +27,11 @@ interface NavItem {
   badge?: string;
 }
 
-const SECTIONS: { title: string; items: NavItem[] }[] = [
+const CUSTOMER_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Workspace",
     items: [
-      { to: "/overview", label: "Command Center", icon: Command, badge: "LIVE" },
-      { to: "/control-center", label: "Operations Spine", icon: LayoutDashboard },
+      { to: "/overview", label: "Overview Center", icon: Command, badge: "LIVE" },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],
@@ -63,6 +63,21 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
 ];
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const isSuperuser = Boolean(useAuthStore((s) => s.user?.is_superuser));
+  const sections = isSuperuser
+    ? CUSTOMER_SECTIONS.map((section) =>
+        section.title === "Workspace"
+          ? {
+              ...section,
+              items: [
+                { to: "/control-center", label: "Command Center", icon: LayoutDashboard, badge: "OWNER" },
+                ...section.items,
+              ],
+            }
+          : section,
+      )
+    : CUSTOMER_SECTIONS;
+
   return (
     <aside
       className={cn(
@@ -92,7 +107,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.title} className="px-2">
             {!collapsed && <div className="v-sidebar-section">{section.title}</div>}
             {section.items.map(({ to, label, icon: Icon, badge }) => (

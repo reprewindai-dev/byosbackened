@@ -16,6 +16,7 @@ def test_internal_operator_routes_are_registered():
     paths = {route.path for route in app.routes if isinstance(route, APIRoute)}
 
     assert "/api/v1/internal/operators/overview" in paths
+    assert "/api/v1/internal/operators/registry" in paths
     assert "/api/v1/internal/operators/workers" in paths
     assert "/api/v1/internal/operators/runs" in paths
     assert "/api/v1/internal/operators/digest" in paths
@@ -69,15 +70,62 @@ def test_worker_registry_is_internal_only():
         "builder-scout",
         "builder-forge",
         "builder-arbiter",
+        "sentinel",
+        "mirror",
+        "polish",
+        "glide",
+        "pulse",
+        "sheriff",
+        "welcome",
     }
 
     assert expected.issubset(internal_operators.WORKER_REGISTRY)
+    assert set(internal_operators.MINIMUM_LIVE_SET) == {
+        "gauge",
+        "ledger",
+        "sentinel",
+        "mirror",
+        "pulse",
+        "sheriff",
+        "polish",
+    }
     for worker_id, worker in internal_operators.WORKER_REGISTRY.items():
         payload = internal_operators._worker_payload(worker_id, worker)
         assert payload["customer_visible"] is False
         assert payload["ships_to_buyer_package"] is False
         assert payload["mission"]
         assert payload["hard_kpis"]
+        assert payload["primary_pillar"]
+        assert payload["committees"]
+        assert payload["trigger"]
+        assert payload["inputs"]
+        assert payload["outputs"]
+        assert payload["success_metric"]
+        assert payload["escalation"]
+        assert payload["rollout_stage"] in {"ready", "staged", "minimum_live"}
+
+
+def test_worker_committees_are_resolved():
+    assert set(internal_operators._worker_committees("sheriff")) == {
+        "governance-evidence",
+        "experience-assurance",
+    }
+    assert set(internal_operators._worker_committees("welcome")) == {
+        "growth-intelligence",
+        "experience-assurance",
+    }
+
+
+def test_committee_payload_contains_readiness_summary():
+    payload = internal_operators._committee_payload(
+        "experience-assurance",
+        internal_operators.COMMITTEE_REGISTRY["experience-assurance"],
+    )
+
+    assert payload["name"] == "Experience Assurance Committee"
+    assert "sentinel" in payload["worker_ids"]
+    assert "mirror" in payload["worker_ids"]
+    assert payload["ready_workers"] >= 1
 
 
 def test_internal_operator_details_redact_secret_like_fields():

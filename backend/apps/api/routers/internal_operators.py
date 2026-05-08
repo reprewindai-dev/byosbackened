@@ -142,10 +142,277 @@ WORKER_REGISTRY: dict[str, dict[str, Any]] = {
         "required_config": [],
         "hard_kpis": ["blocked_unsafe_builds", "provenance_completeness", "release_gate_pass_rate", "audit_replay_success"],
     },
+    "sentinel": {
+        "name": "SENTINEL",
+        "mission": "Run end-to-end uptime, route, API, and critical production flow verification across app surfaces.",
+        "owned_surfaces": ["route map", "API health checks", "auth flows", "critical user journeys"],
+        "required_config": ["BACKEND_URL"],
+        "hard_kpis": ["core_route_pass_rate", "auth_flow_success", "broken_flow_detection_time", "silent_breakage_count"],
+    },
+    "mirror": {
+        "name": "MIRROR",
+        "mission": "Validate that frontend-visible data matches backend truth and catch fake, stale, null, or mismatched display state.",
+        "owned_surfaces": ["command center widgets", "overview telemetry", "workspace dashboard", "API response truth sets"],
+        "required_config": ["DATABASE_URL"],
+        "hard_kpis": ["truth_match_rate", "stale_widget_count", "display_confidence", "null_misrepresentation_count"],
+    },
+    "polish": {
+        "name": "POLISH",
+        "mission": "Enforce premium visual quality, command-surface hierarchy, empty-state quality, and non-cheap interaction standards.",
+        "owned_surfaces": ["command center", "overview", "first-run surfaces", "premium product screens"],
+        "required_config": [],
+        "hard_kpis": ["premium_surface_score", "layout_defect_count", "cheap_pattern_count", "usability_confidence"],
+    },
+    "glide": {
+        "name": "GLIDE",
+        "mission": "Verify navigation, transitions, CTAs, controls, forms, and command-surface movement feel seamless and consistent.",
+        "owned_surfaces": ["navigation map", "route transitions", "CTA paths", "interactive controls"],
+        "required_config": ["BACKEND_URL"],
+        "hard_kpis": ["dead_route_count", "click_friction", "control_success_rate", "transition_defect_count"],
+    },
+    "pulse": {
+        "name": "PULSE",
+        "mission": "Ensure live telemetry is actually live, fresh, evidenced, and not decorative.",
+        "owned_surfaces": ["live widgets", "telemetry timestamps", "health feeds", "realtime counters"],
+        "required_config": ["DATABASE_URL"],
+        "hard_kpis": ["freshness_score", "stale_feed_count", "telemetry_truth_rate", "decorative_panel_count"],
+    },
+    "sheriff": {
+        "name": "SHERIFF",
+        "mission": "Detect regressions after deploys, config changes, permission changes, and workflow updates.",
+        "owned_surfaces": ["build outputs", "smoke tests", "permission diffs", "deployment workflows"],
+        "required_config": ["BACKEND_URL"],
+        "hard_kpis": ["escaped_regressions", "post_deploy_confidence", "rollback_detection_time", "workflow_drift_count"],
+    },
+    "welcome": {
+        "name": "WELCOME",
+        "mission": "Protect first-run, landing-to-app, signup, onboarding, and empty-state experience for new users.",
+        "owned_surfaces": ["landing-to-app path", "signup flow", "new workspace state", "onboarding copy"],
+        "required_config": [],
+        "hard_kpis": ["time_to_value", "first_run_confusion_count", "onboarding_completion", "first_impression_score"],
+    },
+}
+
+
+COMMITTEE_REGISTRY: dict[str, dict[str, Any]] = {
+    "marketplace-operations": {
+        "name": "Marketplace Operations Committee",
+        "workers": ["herald", "harvest", "bouncer", "gauge", "arbiter"],
+        "authority": "Operate marketplace supply, demand, trust, and health loops.",
+    },
+    "governance-evidence": {
+        "name": "Governance & Evidence Committee",
+        "workers": ["ledger", "oracle", "builder-arbiter", "sheriff"],
+        "authority": "Own policy posture, evidence integrity, release gates, and production safety.",
+    },
+    "growth-intelligence": {
+        "name": "Growth & Intelligence Committee",
+        "workers": ["signal", "scout", "mint", "welcome"],
+        "authority": "Convert market signal, pricing, positioning, and onboarding into revenue leverage.",
+    },
+    "builder-systems": {
+        "name": "Builder Systems Committee",
+        "workers": ["builder-scout", "builder-forge", "builder-arbiter"],
+        "authority": "Convert clean public pain signals into original Veklom-native tool assets.",
+    },
+    "experience-assurance": {
+        "name": "Experience Assurance Committee",
+        "workers": ["sentinel", "mirror", "polish", "glide", "pulse", "sheriff", "welcome"],
+        "authority": "Keep the product live, truthful, premium, navigable, and regression-resistant.",
+    },
+}
+
+
+MINIMUM_LIVE_SET = ["gauge", "ledger", "sentinel", "mirror", "pulse", "sheriff", "polish"]
+
+
+WORKER_OPERATING_SPEC: dict[str, dict[str, Any]] = {
+    "herald": {
+        "primary_pillar": "Growth / Sales",
+        "trigger": "New lead, vendor event, messaging failure, or campaign launch.",
+        "inputs": ["contact records", "delivery events", "suppression status", "lifecycle state"],
+        "outputs": ["outbound messages", "funnel updates", "suppression actions", "delivery reports"],
+        "success_metric": "Delivery rate, reply rate, and low suppression drift.",
+        "escalation": "Escalate to Growth lead if deliverability drops or suppression spikes.",
+        "rollout_stage": "ready",
+    },
+    "harvest": {
+        "primary_pillar": "Sales / Operations",
+        "trigger": "New sourcing cycle, low supply depth, or new category push.",
+        "inputs": ["vendor records", "category targets", "qualification rules", "external signals"],
+        "outputs": ["qualified account lists", "sourcing recommendations", "pipeline updates"],
+        "success_metric": "Qualified vendors added, acceptance rate, and fill rate.",
+        "escalation": "Escalate to scout and arbiter if category quality is weak.",
+        "rollout_stage": "ready",
+    },
+    "bouncer": {
+        "primary_pillar": "Compliance / Risk",
+        "trigger": "New vendor intake, risky action, abuse signal, or trust anomaly.",
+        "inputs": ["vendor submissions", "trust signals", "abuse heuristics", "policy rules"],
+        "outputs": ["block decisions", "allow decisions", "trust flags", "review queues"],
+        "success_metric": "Low fraud leakage and low false-allow rate.",
+        "escalation": "Escalate to oracle and arbiter on high-risk or regulated cases.",
+        "rollout_stage": "ready",
+    },
+    "gauge": {
+        "primary_pillar": "Operations / Finance",
+        "trigger": "Scheduled telemetry check, metric threshold breach, or deploy completion.",
+        "inputs": ["telemetry", "wallet data", "route status", "usage data", "conversion events"],
+        "outputs": ["health summaries", "anomaly reports", "KPI snapshots"],
+        "success_metric": "Healthy routes, accurate dashboards, and fast anomaly detection.",
+        "escalation": "Escalate to sentinel and ledger if telemetry mismatches evidence.",
+        "rollout_stage": "minimum_live",
+    },
+    "ledger": {
+        "primary_pillar": "Finance / Compliance",
+        "trigger": "Compliance review, customer request, audit export, or incident follow-up.",
+        "inputs": ["events", "runs", "logs", "privacy actions", "approvals", "trace data"],
+        "outputs": ["audit packs", "proof bundles", "explainability reports"],
+        "success_metric": "Complete evidence trail, export accuracy, and fast retrieval.",
+        "escalation": "Escalate to oracle if evidence is incomplete or policy-sensitive.",
+        "rollout_stage": "minimum_live",
+    },
+    "signal": {
+        "primary_pillar": "Growth / Knowledge",
+        "trigger": "New release, launch, adoption dip, or ecosystem monitoring cycle.",
+        "inputs": ["product updates", "community channels", "feedback", "engagement signals"],
+        "outputs": ["distribution plans", "community summaries", "ecosystem insights"],
+        "success_metric": "Engagement lift, signal coverage, and feedback quality.",
+        "escalation": "Escalate to scout if competitor movement changes positioning.",
+        "rollout_stage": "ready",
+    },
+    "oracle": {
+        "primary_pillar": "Governance / Compliance",
+        "trigger": "New policy question, risky vendor/tool, or regulated customer path.",
+        "inputs": ["policies", "laws", "procurement needs", "privacy requirements", "trust status"],
+        "outputs": ["policy rulings", "procurement guidance", "compliance decisions"],
+        "success_metric": "Low policy drift, fast risk decisions, and clear rulings.",
+        "escalation": "Escalate to founder governance on legal ambiguity or high-risk actions.",
+        "rollout_stage": "ready",
+    },
+    "mint": {
+        "primary_pillar": "Finance / Growth",
+        "trigger": "Pricing review, wallet anomaly, packaging change, or monetization experiment.",
+        "inputs": ["revenue data", "wallet balances", "packaging configs", "usage data"],
+        "outputs": ["pricing updates", "monetization models", "wallet policy actions"],
+        "success_metric": "Margin quality, conversion lift, and reduced wallet drift.",
+        "escalation": "Escalate to gauge and founder if monetization hurts trust or usage.",
+        "rollout_stage": "ready",
+    },
+    "scout": {
+        "primary_pillar": "Knowledge / Growth",
+        "trigger": "Scheduled market watch, launch detection, or partnership signal.",
+        "inputs": ["public competitor signals", "partner data", "category trends", "market events"],
+        "outputs": ["threat briefs", "opportunity maps", "movement alerts"],
+        "success_metric": "Fast threat detection and useful opportunity identification.",
+        "escalation": "Escalate to signal, harvest, and builder-scout on actionable gaps.",
+        "rollout_stage": "ready",
+    },
+    "arbiter": {
+        "primary_pillar": "Operations / Compliance",
+        "trigger": "Vendor dispute, trust downgrade, review event, or install anomaly.",
+        "inputs": ["vendor history", "dispute records", "install events", "trust signals"],
+        "outputs": ["trust decisions", "dispute outcomes", "integrity rulings"],
+        "success_metric": "Low dispute backlog, trust accuracy, and review integrity.",
+        "escalation": "Escalate to bouncer and oracle if abuse or regulation is involved.",
+        "rollout_stage": "ready",
+    },
+    "builder-scout": {
+        "primary_pillar": "Knowledge / Engineering",
+        "trigger": "Builder discovery cycle, missing integration, or broken public tool signal.",
+        "inputs": ["public issues", "docs", "changelogs", "registries", "support threads"],
+        "outputs": ["opportunity dossiers", "pain clusters", "source lineage records"],
+        "success_metric": "High-quality legal opportunities identified.",
+        "escalation": "Escalate to builder-arbiter before spec approval.",
+        "rollout_stage": "staged",
+    },
+    "builder-forge": {
+        "primary_pillar": "Engineering / Product",
+        "trigger": "Approved builder spec, release sprint, or integration opportunity.",
+        "inputs": ["approved specs", "contracts", "tests", "policy constraints"],
+        "outputs": ["original tool packages", "docs", "tests", "build artifacts"],
+        "success_metric": "Build quality, test pass rate, and time to usable asset.",
+        "escalation": "Escalate to builder-arbiter if provenance or quality gates fail.",
+        "rollout_stage": "staged",
+    },
+    "builder-arbiter": {
+        "primary_pillar": "Governance / Compliance",
+        "trigger": "New builder output, release request, or provenance review.",
+        "inputs": ["source lineage", "licenses", "tests", "docs", "quality reports"],
+        "outputs": ["release approval", "release denial", "compliance gate result", "quality ruling"],
+        "success_metric": "Zero illegal copying, strong release hygiene, and trusted outputs.",
+        "escalation": "Escalate to founder governance on ambiguous legal or reputational risk.",
+        "rollout_stage": "staged",
+    },
+    "sentinel": {
+        "primary_pillar": "Operations / Engineering",
+        "trigger": "Deploy complete, cron interval, incident report, or health anomaly.",
+        "inputs": ["route map", "API endpoints", "auth flows", "critical user journeys"],
+        "outputs": ["synthetic check results", "incident alerts", "broken-flow reports"],
+        "success_metric": "Core routes pass, auth works, and no silent breakage.",
+        "escalation": "Escalate to sheriff and gauge when a production path breaks.",
+        "rollout_stage": "minimum_live",
+    },
+    "mirror": {
+        "primary_pillar": "Product / Operations",
+        "trigger": "Dashboard render, page load audit, telemetry refresh, or incident report.",
+        "inputs": ["UI payloads", "API responses", "DB-backed truth sets", "timestamps"],
+        "outputs": ["truth mismatch reports", "stale-data alerts", "display confidence score"],
+        "success_metric": "No fake, stale, or null misrepresentation on key surfaces.",
+        "escalation": "Escalate to ledger and pulse if displayed data cannot be evidenced.",
+        "rollout_stage": "minimum_live",
+    },
+    "polish": {
+        "primary_pillar": "Product",
+        "trigger": "UI change merged, design review cycle, or user complaint.",
+        "inputs": ["screens", "layouts", "spacing", "typography", "empty states", "hierarchy"],
+        "outputs": ["UX quality reviews", "polish issues", "premium-surface recommendations"],
+        "success_metric": "Reduced cheap/template feel and higher usability confidence.",
+        "escalation": "Escalate to product owner if command surfaces degrade trust.",
+        "rollout_stage": "minimum_live",
+    },
+    "glide": {
+        "primary_pillar": "Product / Engineering",
+        "trigger": "Route update, component release, UX complaint, or weekly audit.",
+        "inputs": ["click paths", "nav map", "transition logic", "interactive elements"],
+        "outputs": ["broken-nav reports", "interaction QA", "friction maps"],
+        "success_metric": "Low click friction, no dead routes, and smooth control transitions.",
+        "escalation": "Escalate to sentinel if broken navigation affects critical journeys.",
+        "rollout_stage": "ready",
+    },
+    "pulse": {
+        "primary_pillar": "Operations / Engineering",
+        "trigger": "Real-time refresh cycle, dashboard check, or telemetry incident.",
+        "inputs": ["WebSocket streams", "polling outputs", "timestamps", "counters", "health feeds"],
+        "outputs": ["live-status verification", "stale-widget alerts", "freshness scores"],
+        "success_metric": "Accurate live widgets, fresh timestamps, and no fake real-time panels.",
+        "escalation": "Escalate to gauge and mirror if telemetry and UI disagree.",
+        "rollout_stage": "minimum_live",
+    },
+    "sheriff": {
+        "primary_pillar": "Engineering / Governance",
+        "trigger": "Post-merge, post-deploy, permission change, or workflow patch.",
+        "inputs": ["build outputs", "smoke tests", "permission diffs", "route checks", "logs"],
+        "outputs": ["regression reports", "rollback recommendations", "defect queues"],
+        "success_metric": "Low escaped regressions and fast post-deploy confidence.",
+        "escalation": "Escalate to founder or release owner if production safety is at risk.",
+        "rollout_stage": "minimum_live",
+    },
+    "welcome": {
+        "primary_pillar": "Product / Growth",
+        "trigger": "New signup flow, landing-to-app path audit, or onboarding update.",
+        "inputs": ["landing pages", "signup flow", "empty-state copy", "initial workspace state"],
+        "outputs": ["onboarding issues", "first-run improvement list", "friction summaries"],
+        "success_metric": "Faster time-to-value, lower confusion, and stronger first impression.",
+        "escalation": "Escalate to polish and glide if onboarding makes the app feel broken or cheap.",
+        "rollout_stage": "ready",
+    },
 }
 
 
 def _config_present(key: str) -> bool:
+    if key == "BACKEND_URL":
+        return bool(os.getenv(key) or "https://api.veklom.com")
     if key == "RESEND_API_KEY":
         return bool(settings.resend_api_key or os.getenv(key))
     if key == "RESEND_WEBHOOK_SECRET":
@@ -157,7 +424,16 @@ def _config_present(key: str) -> bool:
     return bool(os.getenv(key))
 
 
+def _worker_committees(worker_id: str) -> list[str]:
+    return [
+        committee_id
+        for committee_id, committee in COMMITTEE_REGISTRY.items()
+        if worker_id in committee["workers"]
+    ]
+
+
 def _worker_payload(worker_id: str, worker: dict[str, Any]) -> dict[str, Any]:
+    spec = WORKER_OPERATING_SPEC.get(worker_id, {})
     readiness = {
         key: _config_present(key)
         for key in worker.get("required_config", [])
@@ -167,6 +443,15 @@ def _worker_payload(worker_id: str, worker: dict[str, Any]) -> dict[str, Any]:
         "id": worker_id,
         "name": worker["name"],
         "mission": worker["mission"],
+        "primary_pillar": spec.get("primary_pillar", "Operations"),
+        "committees": _worker_committees(worker_id),
+        "trigger": spec.get("trigger", "Manual operator run or scheduled health cycle."),
+        "inputs": spec.get("inputs", []),
+        "outputs": spec.get("outputs", []),
+        "success_metric": spec.get("success_metric", "Useful output with evidence and no policy violation."),
+        "escalation": spec.get("escalation", "Escalate to founder governance if risk or uncertainty is material."),
+        "rollout_stage": spec.get("rollout_stage", "ready"),
+        "minimum_live": worker_id in MINIMUM_LIVE_SET,
         "owned_surfaces": worker["owned_surfaces"],
         "hard_kpis": worker["hard_kpis"],
         "readiness": readiness,
@@ -174,6 +459,23 @@ def _worker_payload(worker_id: str, worker: dict[str, Any]) -> dict[str, Any]:
         "customer_visible": False,
         "ships_to_buyer_package": False,
         "status": "ready" if not missing else "needs_config",
+    }
+
+
+def _committee_payload(committee_id: str, committee: dict[str, Any]) -> dict[str, Any]:
+    workers = [
+        _worker_payload(worker_id, WORKER_REGISTRY[worker_id])
+        for worker_id in committee["workers"]
+        if worker_id in WORKER_REGISTRY
+    ]
+    return {
+        "id": committee_id,
+        "name": committee["name"],
+        "authority": committee["authority"],
+        "workers": workers,
+        "worker_ids": [worker["id"] for worker in workers],
+        "ready_workers": sum(1 for worker in workers if worker["status"] == "ready"),
+        "needs_config": [worker["id"] for worker in workers if worker["status"] != "ready"],
     }
 
 
@@ -280,6 +582,9 @@ def _write_run_log(
             {
                 "worker_id": worker_id,
                 "worker_name": WORKER_REGISTRY.get(worker_id, {}).get("name", worker_id.upper()),
+                "committees": _worker_committees(worker_id),
+                "primary_pillar": WORKER_OPERATING_SPEC.get(worker_id, {}).get("primary_pillar"),
+                "rollout_stage": WORKER_OPERATING_SPEC.get(worker_id, {}).get("rollout_stage"),
                 "status": status_value,
                 "summary": summary,
                 "source": source,
@@ -304,6 +609,7 @@ async def operator_overview(
     db: Session = Depends(get_db),
 ):
     workers = [_worker_payload(worker_id, worker) for worker_id, worker in WORKER_REGISTRY.items()]
+    minimum_live_workers = [worker for worker in workers if worker["minimum_live"]]
     recent_failures = (
         db.query(SecurityAuditLog)
         .filter(SecurityAuditLog.event_category == "internal_ops", SecurityAuditLog.success.is_(False))
@@ -318,6 +624,9 @@ async def operator_overview(
         "ships_to_buyer_package": False,
         "worker_count": len(workers),
         "ready_workers": sum(1 for worker in workers if worker["status"] == "ready"),
+        "committee_count": len(COMMITTEE_REGISTRY),
+        "minimum_live_count": len(minimum_live_workers),
+        "minimum_live_ready": sum(1 for worker in minimum_live_workers if worker["status"] == "ready"),
         "needs_config": [worker["id"] for worker in workers if worker["status"] != "ready"],
         "recent_failure_count": len(recent_failures),
         "generated_at": datetime.utcnow().isoformat() + "Z",
@@ -351,6 +660,33 @@ async def list_workers(_: OperatorPrincipal = Depends(require_internal_operator)
     return {
         "workers": [_worker_payload(worker_id, worker) for worker_id, worker in WORKER_REGISTRY.items()],
         "visibility": "veklom_internal_only",
+    }
+
+
+@router.get("/registry")
+async def worker_registry(_: OperatorPrincipal = Depends(require_internal_operator)):
+    workers = [_worker_payload(worker_id, worker) for worker_id, worker in WORKER_REGISTRY.items()]
+    return {
+        "version": "uacp_v3",
+        "visibility": "veklom_internal_only",
+        "customer_visible": False,
+        "ships_to_buyer_package": False,
+        "workers": workers,
+        "committees": [
+            _committee_payload(committee_id, committee)
+            for committee_id, committee in COMMITTEE_REGISTRY.items()
+        ],
+        "minimum_live_set": [
+            _worker_payload(worker_id, WORKER_REGISTRY[worker_id])
+            for worker_id in MINIMUM_LIVE_SET
+            if worker_id in WORKER_REGISTRY
+        ],
+        "promotion_logic": {
+            "promote": "Consistently hits success metrics, produces useful outputs, and reduces founder intervention.",
+            "demote": "Causes false positives, misses obvious failures, creates noise, or operates outside policy boundaries.",
+            "archive_requirement": "Every promotion or demotion is written to Archives with timestamp, evidence, reason, and approving authority.",
+        },
+        "generated_at": datetime.utcnow().isoformat() + "Z",
     }
 
 

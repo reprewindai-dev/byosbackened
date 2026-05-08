@@ -79,7 +79,7 @@ Read this entire file before doing anything else. No exceptions.
 - License system: issue, activate, verify, deactivate, health endpoint
 - Stripe webhook: payment fail = instant key deactivation
 - Buyer package builder: `python backend/scripts/build_buyer_package.py --tier [starter|pro|sovereign] --version 1.0.0`
-- Internal Builder Agents: `builder-scout`, `builder-forge`, and `builder-arbiter` registered in `/api/v1/internal/operators/workers` for clean-room marketplace tool research/build/release gating. Operating model: `docs/BUILDER_AGENTS.md`. Upstash Box/QStash readiness: `docs/UPSTASH_OPERATORS.md`.
+- Internal UACP V3 workers: the protected registry is available at `/api/v1/internal/operators/registry` and includes operating workers, Builder Agents, and Experience Assurance workers (`sentinel`, `mirror`, `polish`, `glide`, `pulse`, `sheriff`, `welcome`). Machine-readable export: `python backend/scripts/export_worker_registry.py`. Operating model: `docs/UACP_V3_WORKER_REGISTRY.md`, `docs/BUILDER_AGENTS.md`, and `docs/UPSTASH_OPERATORS.md`.
 
 ### What's NOT Done Yet âš ï¸
 - The newest Coolify build artifact for commit `9493aceb` is still restart-looping beside the live routed API container; keep the routed `veklom-api` service as the source of truth until Coolify is reconciled
@@ -105,6 +105,7 @@ Read this entire file before doing anything else. No exceptions.
 | `backend/scripts/bootstrap_prod.sh` | Run once to verify/wire Postgres+Redis into Coolify |
 | `backend/scripts/build_buyer_package.py` | Builds buyer zip (excludes server-side files) |
 | `docs/INSTITUTIONAL_COMPUTE_GOVERNANCE.md` | Canonical doctrine and vocabulary for UACP, Sunnyvale, Silicon Valley, Archives, and Builder Agents |
+| `docs/UACP_V3_WORKER_REGISTRY.md` | Runtime worker registry contract, committees, minimum live set, and JSON export command |
 | `docs/BUILDER_AGENTS.md` | Clean-room Builder Agent operating model and Upstash Box experiment contract |
 | `docs/UPSTASH_OPERATORS.md` | QStash schedules, Upstash operator guardrails, optional Builder Agent heartbeat |
 | `backend/license/server.py` | License server (needs separate deploy to license.veklom.com) |

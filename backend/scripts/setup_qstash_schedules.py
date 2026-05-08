@@ -29,6 +29,7 @@ class ScheduleSpec:
     body: dict[str, Any]
     timeout: str = "30s"
     retries: int = 5
+    enabled_env: str | None = None
 
 
 SCHEDULES = [
@@ -53,6 +54,24 @@ SCHEDULES = [
         worker_key_env="MARKETPLACE_AUTOMATION_API_KEY",
         body={"trigger": "qstash", "source": "qstash", "worker": "marketplace_automation_monday"},
     ),
+    ScheduleSpec(
+        schedule_id="veklom-builder-agent-box-heartbeat-6h",
+        destination_path="/api/v1/internal/operators/workers/builder-scout/heartbeat",
+        cron="22 */6 * * *",
+        worker_key_env="INTERNAL_OPERATOR_TOKEN",
+        body={
+            "status": "ok",
+            "summary": "builder agent Upstash Box experiment heartbeat",
+            "source": "qstash-builder-agent-experiment",
+            "details": {
+                "experiment": "upstash_box_builder_agents",
+                "mode": "read_only_research_intake",
+                "customer_visible": False,
+                "ships_to_buyer_package": False,
+            },
+        },
+        enabled_env="ENABLE_BUILDER_AGENT_QSTASH",
+    ),
 ]
 
 
@@ -65,6 +84,12 @@ def _required_env(name: str) -> str:
 
 def _backend_url() -> str:
     return os.getenv("BACKEND_URL", "https://api.veklom.com").strip().rstrip("/")
+
+
+def _is_enabled(spec: ScheduleSpec) -> bool:
+    if spec.enabled_env is None:
+        return True
+    return os.getenv(spec.enabled_env, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _create_or_update_schedule(client: httpx.Client, token: str, spec: ScheduleSpec) -> dict[str, Any]:
@@ -120,17 +145,20 @@ def main() -> int:
                     "destination": f"{_backend_url()}{spec.destination_path}",
                     "cron": spec.cron,
                     "worker_key_env": spec.worker_key_env,
+                    "enabled": _is_enabled(spec),
+                    "enabled_env": spec.enabled_env,
                 }
                 for spec in SCHEDULES
             ],
         }, indent=2))
         return 0
 
+    enabled_schedules = [spec for spec in SCHEDULES if _is_enabled(spec)]
     with httpx.Client(timeout=20.0) as client:
-        results = [_create_or_update_schedule(client, token, spec) for spec in SCHEDULES]
+        results = [_create_or_update_schedule(client, token, spec) for spec in enabled_schedules]
         existing = _list_schedules(client, token)
 
-    managed_ids = {spec.schedule_id for spec in SCHEDULES}
+    managed_ids = {spec.schedule_id for spec in enabled_schedules}
     managed_existing = [
         {
             "scheduleId": row.get("scheduleId"),

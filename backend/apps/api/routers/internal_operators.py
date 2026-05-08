@@ -121,6 +121,27 @@ WORKER_REGISTRY: dict[str, dict[str, Any]] = {
         "required_config": [],
         "hard_kpis": ["review_quality", "dispute_resolution_time", "trusted_listing_rate"],
     },
+    "builder-scout": {
+        "name": "BUILDER SCOUT",
+        "mission": "Find public tool pain signals from compliant sources and convert them into clean-room marketplace opportunities.",
+        "owned_surfaces": ["public issue metadata", "package registries", "developer forums", "docs/changelog watchlists"],
+        "required_config": [],
+        "hard_kpis": ["qualified_pain_signals", "clean_room_opportunities", "license_clearance_rate", "duplicate_rejection_rate"],
+    },
+    "builder-forge": {
+        "name": "BUILDER FORGE",
+        "mission": "Turn approved opportunities into original Veklom-native MCP, SDK, CLI, CI/CD, and agent tool packages.",
+        "owned_surfaces": ["marketplace build specs", "tool package workspaces", "integration test harnesses"],
+        "required_config": [],
+        "hard_kpis": ["tools_built", "test_pass_rate", "time_to_package", "install_success_rate"],
+    },
+    "builder-arbiter": {
+        "name": "BUILDER ARBITER",
+        "mission": "Enforce provenance, license safety, no-copy rules, marketplace quality gates, and release readiness.",
+        "owned_surfaces": ["source lineage records", "license review", "release gates", "marketplace approval queue"],
+        "required_config": [],
+        "hard_kpis": ["blocked_unsafe_builds", "provenance_completeness", "release_gate_pass_rate", "audit_replay_success"],
+    },
 }
 
 

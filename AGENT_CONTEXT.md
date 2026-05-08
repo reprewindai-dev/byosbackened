@@ -79,6 +79,7 @@ Read this entire file before doing anything else. No exceptions.
 - License system: issue, activate, verify, deactivate, health endpoint
 - Stripe webhook: payment fail = instant key deactivation
 - Buyer package builder: `python backend/scripts/build_buyer_package.py --tier [starter|pro|sovereign] --version 1.0.0`
+- Internal Builder Agents: `builder-scout`, `builder-forge`, and `builder-arbiter` registered in `/api/v1/internal/operators/workers` for clean-room marketplace tool research/build/release gating. Operating model: `docs/BUILDER_AGENTS.md`. Upstash Box/QStash readiness: `docs/UPSTASH_OPERATORS.md`.
 
 ### What's NOT Done Yet âš ï¸
 - The newest Coolify build artifact for commit `9493aceb` is still restart-looping beside the live routed API container; keep the routed `veklom-api` service as the source of truth until Coolify is reconciled
@@ -103,6 +104,8 @@ Read this entire file before doing anything else. No exceptions.
 | `backend/HONEST_AUDIT_REPORT.md` | Real benchmark numbers, bug history |
 | `backend/scripts/bootstrap_prod.sh` | Run once to verify/wire Postgres+Redis into Coolify |
 | `backend/scripts/build_buyer_package.py` | Builds buyer zip (excludes server-side files) |
+| `docs/BUILDER_AGENTS.md` | Clean-room Builder Agent operating model and Upstash Box experiment contract |
+| `docs/UPSTASH_OPERATORS.md` | QStash schedules, Upstash operator guardrails, optional Builder Agent heartbeat |
 | `backend/license/server.py` | License server (needs separate deploy to license.veklom.com) |
 | `backend/apps/api/middleware/entitlement_check.py` | Admin bypass for plan gates |
 | `backend/core/config.py` | Reads DATABASE_URL, REDIS_URL, all env vars |

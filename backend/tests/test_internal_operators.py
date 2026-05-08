@@ -43,6 +43,9 @@ def test_worker_registry_is_internal_only():
         "mint",
         "scout",
         "arbiter",
+        "builder-scout",
+        "builder-forge",
+        "builder-arbiter",
     }
 
     assert expected.issubset(internal_operators.WORKER_REGISTRY)

@@ -18,6 +18,8 @@ def test_internal_operator_routes_are_registered():
     assert "/api/v1/internal/operators/overview" in paths
     assert "/api/v1/internal/operators/workers" in paths
     assert "/api/v1/internal/operators/runs" in paths
+    assert "/api/v1/internal/operators/digest" in paths
+    assert "/api/v1/internal/operators/watch" in paths
     assert "/api/v1/internal/operators/workers/{worker_id}/heartbeat" in paths
 
 

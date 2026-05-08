@@ -18,6 +18,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from core.config import get_settings
+from core.operations.operator_watch import evaluate_operator_watch
 from db.models import APIKey, SecurityAuditLog, User, UserStatus
 from db.session import get_db
 
@@ -300,6 +301,28 @@ async def operator_overview(
         "recent_failure_count": len(recent_failures),
         "generated_at": datetime.utcnow().isoformat() + "Z",
     }
+
+
+@router.get("/digest")
+async def operator_digest(
+    principal: OperatorPrincipal = Depends(require_internal_operator),
+    db: Session = Depends(get_db),
+):
+    """Backend-owned operator digest.
+
+    This is the non-Slack source for what the owner needs to know before the
+    system becomes critical. It evaluates live telemetry without mutating state.
+    """
+    return evaluate_operator_watch(db, workspace_id=principal.workspace_id, persist=False)
+
+
+@router.post("/watch")
+async def operator_watch(
+    principal: OperatorPrincipal = Depends(require_internal_operator),
+    db: Session = Depends(get_db),
+):
+    """Run the operator watch loop and persist actionable alerts."""
+    return evaluate_operator_watch(db, workspace_id=principal.workspace_id, persist=True)
 
 
 @router.get("/workers")

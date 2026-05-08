@@ -1,9 +1,9 @@
 """SLO-based alerting - monitor service level objectives."""
-from typing import Dict, Optional, List
+from typing import Any, Dict, Optional, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
-from db.models import AIAuditLog, Anomaly
+from db.models import AIAuditLog, Anomaly, WorkspaceRequestLog
 from core.autonomous.anomaly.detector import get_anomaly_detector
 from core.autonomous.anomaly.remediator import get_auto_remediator
 from core.incident.alerting import send_alert
@@ -108,10 +108,10 @@ class SLOAlerts:
         # Get last hour of operations
         cutoff = datetime.utcnow() - timedelta(hours=1)
         
-        operations = db.query(AIAuditLog).filter(
-            AIAuditLog.workspace_id == workspace_id,
-            AIAuditLog.created_at >= cutoff,
-            AIAuditLog.latency_ms.isnot(None),
+        operations = db.query(WorkspaceRequestLog).filter(
+            WorkspaceRequestLog.workspace_id == workspace_id,
+            WorkspaceRequestLog.created_at >= cutoff,
+            WorkspaceRequestLog.latency_ms.isnot(None),
         ).all()
         
         if len(operations) < 10:
@@ -184,16 +184,16 @@ class SLOAlerts:
         # Get last hour of operations
         cutoff = datetime.utcnow() - timedelta(hours=1)
         
-        total_operations = db.query(AIAuditLog).filter(
-            AIAuditLog.workspace_id == workspace_id,
-            AIAuditLog.created_at >= cutoff,
+        total_operations = db.query(WorkspaceRequestLog).filter(
+            WorkspaceRequestLog.workspace_id == workspace_id,
+            WorkspaceRequestLog.created_at >= cutoff,
         ).count()
         
         # Count errors (operations with high latency or failures)
-        error_operations = db.query(AIAuditLog).filter(
-            AIAuditLog.workspace_id == workspace_id,
-            AIAuditLog.created_at >= cutoff,
-            AIAuditLog.latency_ms > 10000,  # > 10s is considered error
+        error_operations = db.query(WorkspaceRequestLog).filter(
+            WorkspaceRequestLog.workspace_id == workspace_id,
+            WorkspaceRequestLog.created_at >= cutoff,
+            WorkspaceRequestLog.status.notin_(["success", "ok", "completed", "200"]),
         ).count()
         
         if total_operations == 0:

@@ -334,7 +334,7 @@ async def operator_digest(
     This is the non-Slack source for what the owner needs to know before the
     system becomes critical. It evaluates live telemetry without mutating state.
     """
-    return evaluate_operator_watch(db, workspace_id=principal.workspace_id, persist=False)
+    return evaluate_operator_watch(db, workspace_id=None, persist=False)
 
 
 @router.post("/watch")
@@ -343,7 +343,7 @@ async def operator_watch(
     db: Session = Depends(get_db),
 ):
     """Run the operator watch loop and persist actionable alerts."""
-    return evaluate_operator_watch(db, workspace_id=principal.workspace_id, persist=True)
+    return evaluate_operator_watch(db, workspace_id=None, persist=True)
 
 
 @router.get("/workers")

@@ -31,6 +31,29 @@ def test_internal_operator_overview_requires_auth():
     assert response.status_code == 401
 
 
+def test_operator_watch_uses_global_scope(monkeypatch):
+    calls = []
+
+    def fake_evaluate_operator_watch(db, *, workspace_id=None, persist=True):
+        calls.append({"workspace_id": workspace_id, "persist": persist})
+        return {"status": "healthy", "workspace_id": workspace_id}
+
+    monkeypatch.setattr(internal_operators, "evaluate_operator_watch", fake_evaluate_operator_watch)
+    principal = internal_operators.OperatorPrincipal(
+        workspace_id="operator-workspace",
+        user_id="operator-user",
+        principal_type="automation_key",
+    )
+
+    asyncio.run(internal_operators.operator_digest(principal=principal, db=object()))
+    asyncio.run(internal_operators.operator_watch(principal=principal, db=object()))
+
+    assert calls == [
+        {"workspace_id": None, "persist": False},
+        {"workspace_id": None, "persist": True},
+    ]
+
+
 def test_worker_registry_is_internal_only():
     expected = {
         "herald",

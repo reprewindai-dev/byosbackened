@@ -114,6 +114,14 @@ Read this entire file before doing anything else. No exceptions.
 
 ---
 
+## Approved External References
+
+| Resource | Use |
+|----------|-----|
+| https://devhints.io/ | Developer cheatsheets for CLIs, languages, frameworks, package managers, shell commands, Git, Docker, and other implementation references. Use as a quick syntax/reference aid, not as an authority over official docs for security, deployment, billing, or API behavior. |
+
+---
+
 ## Agent Rules
 
 1. **Always read this file first** on every new session.

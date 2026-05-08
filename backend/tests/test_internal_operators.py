@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from apps.api.main import app
 from apps.api.routers import auth, internal_operators
+from license.middleware import _is_license_exempt_path
 
 
 def test_internal_operator_routes_are_registered():
@@ -29,6 +30,16 @@ def test_internal_operator_overview_requires_auth():
 
     response = client.get("/api/v1/internal/operators/overview")
 
+    assert response.status_code == 401
+
+
+def test_internal_operator_routes_are_license_gate_exempt_but_still_auth_protected():
+    assert _is_license_exempt_path("/api/v1/internal/operators/watch") is True
+    assert _is_license_exempt_path("/api/v1/internal/operators/digest") is True
+    assert _is_license_exempt_path("/api/v1/ai/complete") is False
+
+    client = TestClient(app)
+    response = client.post("/api/v1/internal/operators/watch")
     assert response.status_code == 401
 
 

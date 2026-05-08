@@ -21,7 +21,7 @@ from db.models import Alert, AlertSeverity, AIAuditLog, SecurityAuditLog, Worksp
 
 @dataclass(frozen=True)
 class WatchFinding:
-    key: str
+    code: str
     title: str
     severity: AlertSeverity
     signal: str
@@ -43,7 +43,7 @@ def _alert_fingerprint(finding: WatchFinding, workspace_id: str | None) -> str:
     raw = json.dumps(
         {
             "workspace_id": workspace_id or "global",
-            "key": finding.key,
+            "code": finding.code,
             "signal": finding.signal,
             "operator_action": finding.operator_action,
         },
@@ -74,7 +74,7 @@ def _find_or_create_alert(
         db.query(Alert)
         .filter(
             Alert.workspace_id == workspace_id,
-            Alert.alert_type == f"operator_watch:{finding.key}",
+            Alert.alert_type == f"operator_watch:{finding.code}",
             Alert.status == "open",
         )
         .first()
@@ -99,7 +99,7 @@ def _find_or_create_alert(
         title=finding.title,
         description=finding.diagnosis,
         severity=finding.severity,
-        alert_type=f"operator_watch:{finding.key}",
+        alert_type=f"operator_watch:{finding.code}",
         status="open",
         source="backend_operator_watch",
         details=details,
@@ -124,7 +124,7 @@ def _record_self_healing(
             success=True,
             details=json.dumps(
                 {
-                    "finding": finding.key,
+                    "finding": finding.code,
                     "action": finding.self_healing_action,
                     "reason": finding.diagnosis,
                     "metadata": finding.metadata,
@@ -175,7 +175,7 @@ def evaluate_operator_watch(
     if total_1h >= 5 and p95 >= 3000:
         findings.append(
             WatchFinding(
-                key="latency_p95_precritical",
+                code="latency_p95_precritical",
                 title="Latency pressure is above pre-critical threshold",
                 severity=AlertSeverity.HIGH if p95 >= 5000 else AlertSeverity.MEDIUM,
                 signal=f"p95={p95}ms p50={p50}ms samples={total_1h}",
@@ -189,7 +189,7 @@ def evaluate_operator_watch(
     if total_1h >= 5 and error_rate_pct >= 5:
         findings.append(
             WatchFinding(
-                key="error_rate_precritical",
+                code="error_rate_precritical",
                 title="Request error rate is above autonomous guardrail",
                 severity=AlertSeverity.CRITICAL if error_rate_pct >= 15 else AlertSeverity.HIGH,
                 signal=f"error_rate={error_rate_pct}% failed={failed_1h}/{total_1h}",
@@ -203,7 +203,7 @@ def evaluate_operator_watch(
     if total_1h >= 5 and fallback_pct >= 40:
         findings.append(
             WatchFinding(
-                key="fallback_pressure",
+                code="fallback_pressure",
                 title="Fallback route pressure is rising",
                 severity=AlertSeverity.MEDIUM,
                 signal=f"fallback={fallback_pct}% samples={total_1h}",
@@ -219,7 +219,7 @@ def evaluate_operator_watch(
         if drift_seconds >= 900:
             findings.append(
                 WatchFinding(
-                    key="audit_telemetry_drift",
+                    code="audit_telemetry_drift",
                     title="Audit and request telemetry are drifting",
                     severity=AlertSeverity.MEDIUM,
                     signal=f"latest_request={latest_request_at.isoformat()} latest_audit={latest_audit_at.isoformat()}",
@@ -234,7 +234,7 @@ def evaluate_operator_watch(
     if len(critical_open) >= 3:
         findings.append(
             WatchFinding(
-                key="open_alert_backlog",
+                code="open_alert_backlog",
                 title="Operator alert backlog is accumulating",
                 severity=AlertSeverity.HIGH,
                 signal=f"high_or_critical_open_alerts={len(critical_open)}",
@@ -273,7 +273,7 @@ def evaluate_operator_watch(
         },
         "findings": [
             {
-                "key": finding.key,
+                "code": finding.code,
                 "title": finding.title,
                 "severity": finding.severity.value,
                 "signal": finding.signal,

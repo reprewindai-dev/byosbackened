@@ -104,6 +104,7 @@ Read this entire file before doing anything else. No exceptions.
 | `backend/HONEST_AUDIT_REPORT.md` | Real benchmark numbers, bug history |
 | `backend/scripts/bootstrap_prod.sh` | Run once to verify/wire Postgres+Redis into Coolify |
 | `backend/scripts/build_buyer_package.py` | Builds buyer zip (excludes server-side files) |
+| `docs/INSTITUTIONAL_COMPUTE_GOVERNANCE.md` | Canonical doctrine and vocabulary for UACP, Sunnyvale, Silicon Valley, Archives, and Builder Agents |
 | `docs/BUILDER_AGENTS.md` | Clean-room Builder Agent operating model and Upstash Box experiment contract |
 | `docs/UPSTASH_OPERATORS.md` | QStash schedules, Upstash operator guardrails, optional Builder Agent heartbeat |
 | `backend/license/server.py` | License server (needs separate deploy to license.veklom.com) |

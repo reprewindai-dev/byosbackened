@@ -4,9 +4,13 @@ import {
   Activity,
   AlertCircle,
   ArrowUpRight,
+  CheckCircle2,
   Copy,
+  Eye,
   KeyRound,
+  Loader2,
   MoreHorizontal,
+  PlayCircle,
   Plus,
   RotateCcw,
   Server,
@@ -15,7 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
-import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
+import { actionUnavailableMessage, isRouteUnavailable, responseDetail, responseStatus } from "@/lib/errors";
 
 interface Deployment {
   id: string;
@@ -51,6 +55,23 @@ interface ModelChoice {
   enabled: boolean;
   connected: boolean;
   route?: string;
+}
+
+interface DeploymentTestResult {
+  status: string;
+  response_text: string;
+  latency_ms: number;
+  provider: string;
+  model: string;
+  requested_model: string;
+  endpoint: string;
+  audit_log_id?: string | null;
+  audit_created: boolean;
+  usage_recorded: boolean;
+  cost_usd: string;
+  reserve_units_debited: number;
+  request_id: string;
+  tested_at: string;
 }
 
 async function fetchDeployments(): Promise<DeploymentsResp> {
@@ -203,7 +224,7 @@ export function DeploymentsPage() {
             onPromote={(id) => promoteMut.mutate(id)}
             onRollback={(id) => rollbackMut.mutate(id)}
           />
-          <DropInPanel />
+          <DropInPanel deployment={selected} />
         </div>
       </section>
 
@@ -377,6 +398,22 @@ function EndpointDetail({
   onRollback: (id: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [prompt, setPrompt] = useState("Reply with exactly: OK");
+  const [maxTokens, setMaxTokens] = useState(20);
+  const qc = useQueryClient();
+  const testMut = useMutation({
+    mutationFn: async ({ id, prompt, maxTokens }: { id: string; prompt: string; maxTokens: number }) => {
+      const r = await api.post<DeploymentTestResult>(
+        `/deployments/${id}/test`,
+        { prompt, max_tokens: maxTokens },
+        { timeout: 120_000 },
+      );
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["deployments"] });
+    },
+  });
 
   if (!deployment) {
     return (
@@ -390,11 +427,14 @@ function EndpointDetail({
   const metrics = deployment.health_metrics ?? {};
   const rpsSeries = toNumberArray(metrics.rps_series);
   const p50 = metricNumber(metrics, ["p50_ms", "latency_p50_ms"]);
+  const lastTested = metricString(metrics, ["last_tested_at"]);
+  const lastTestStatus = metricString(metrics, ["last_test_status"]);
   const endpoint = endpointPath(deployment);
   const copyEndpoint = () => {
     navigator.clipboard?.writeText(endpoint);
     setCopied(true);
   };
+  const runTest = () => testMut.mutate({ id: deployment.id, prompt, maxTokens });
 
   return (
     <div className="frame col-span-12 p-4 lg:col-span-7">
@@ -407,7 +447,26 @@ function EndpointDetail({
           <StatusBadge status={deployment.status} />
           <Badge tone={deployment.provider === "ollama" ? "primary" : "info"}>{deployment.provider ?? "provider unset"}</Badge>
           <Badge tone="muted">{p50 === undefined ? "p50 no data" : `p50 ${p50}ms`}</Badge>
+          {lastTestStatus && <Badge tone={lastTestStatus === "passed" ? "ok" : "warn"}>{lastTestStatus}</Badge>}
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2 border-y border-rule/80 py-3">
+        <button className="v-btn-primary h-8 px-3 text-xs" disabled={testMut.isPending || !prompt.trim()} onClick={runTest}>
+          {testMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
+          {testMut.isPending ? "Testing..." : "Run test"}
+        </button>
+        <button className="v-btn-ghost h-8 px-3 text-xs" onClick={copyEndpoint}>
+          <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy endpoint"}
+        </button>
+        <a className="v-btn-ghost h-8 px-3 text-xs" href="#/monitoring">
+          <Eye className="h-3.5 w-3.5" /> View logs
+        </a>
+        {lastTested && (
+          <div className="ml-auto self-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
+            Last tested {relativeTime(lastTested)}
+          </div>
+        )}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11.5px] md:grid-cols-3">
@@ -417,6 +476,19 @@ function EndpointDetail({
         <DetailTile label="CORS" value={metricString(metrics, ["cors"]) ?? "not reported"} />
         <DetailTile label="IP allowlist" value={metricString(metrics, ["ip_allowlist"]) ?? "not reported"} />
         <DetailTile label="Webhook" value={metricString(metrics, ["webhook"]) ?? "not reported"} />
+      </div>
+
+      <div className="mt-4">
+        <EndpointTestPanel
+          prompt={prompt}
+          maxTokens={maxTokens}
+          pending={testMut.isPending}
+          result={testMut.data}
+          error={testMut.error}
+          onPromptChange={setPrompt}
+          onMaxTokensChange={setMaxTokens}
+          onRun={runTest}
+        />
       </div>
 
       <div className="mt-4">
@@ -431,9 +503,6 @@ function EndpointDetail({
           {deployment.deployed_at ? ` · deployed ${relativeTime(deployment.deployed_at)}` : ""}
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost h-8 px-3 text-xs" onClick={copyEndpoint}>
-            <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy endpoint"}
-          </button>
           <button
             className="v-btn-ghost h-8 px-3 text-xs"
             disabled={promotePending || (deployment.status === "active" && deployment.traffic_percent === 100)}
@@ -460,15 +529,109 @@ function EndpointDetail({
   );
 }
 
-function DropInPanel() {
+function EndpointTestPanel({
+  prompt,
+  maxTokens,
+  pending,
+  result,
+  error,
+  onPromptChange,
+  onMaxTokensChange,
+  onRun,
+}: {
+  prompt: string;
+  maxTokens: number;
+  pending: boolean;
+  result?: DeploymentTestResult;
+  error: unknown;
+  onPromptChange: (value: string) => void;
+  onMaxTokensChange: (value: number) => void;
+  onRun: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-brass/25 bg-gradient-to-br from-brass/[0.07] via-ink-1/70 to-ink-2/70 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-eyebrow">Test this endpoint</div>
+          <div className="mt-1 text-sm font-semibold text-bone">Verify the endpoint before copying code.</div>
+          <p className="mt-1 max-w-xl text-[12px] text-muted">
+            This runs through the live governed completion path and reports audit, usage, health, model, provider, and latency.
+          </p>
+        </div>
+        {result && (
+          <Badge tone="ok" dot>
+            Test passed
+          </Badge>
+        )}
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_120px]">
+        <Field label="Prompt">
+          <textarea
+            className="v-input min-h-[86px] resize-y leading-relaxed"
+            value={prompt}
+            onChange={(event) => onPromptChange(event.target.value)}
+          />
+        </Field>
+        <Field label="Max tokens">
+          <input
+            type="number"
+            min={1}
+            max={512}
+            className="v-input"
+            value={maxTokens}
+            onChange={(event) => onMaxTokensChange(Math.max(1, Math.min(512, Number(event.target.value) || 1)))}
+          />
+          <button className="v-btn-primary mt-3 h-9 w-full px-3 text-xs" disabled={pending || !prompt.trim()} onClick={onRun}>
+            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
+            {pending ? "Running" : "Run test"}
+          </button>
+        </Field>
+      </div>
+
+      {Boolean(error) && (
+        <div className="mt-3 rounded-md border border-crimson/30 bg-crimson/5 p-3 text-[12px] text-crimson">
+          {deploymentTestError(error)}
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-3 grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-md border border-rule bg-ink/70 p-3">
+            <div className="mb-2 flex items-center gap-2 text-eyebrow text-moss">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Result
+            </div>
+            <pre className="max-h-[160px] whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-bone">
+              {result.response_text || "(empty response)"}
+            </pre>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11.5px]">
+            <DetailTile label="Latency" value={`${result.latency_ms}ms`} />
+            <DetailTile label="Provider" value={result.provider} />
+            <DetailTile label="Model" value={result.model} />
+            <DetailTile label="Status" value={result.status} />
+            <DetailTile label="Audit" value={result.audit_created ? "created" : "not returned"} />
+            <DetailTile label="Usage" value={result.usage_recorded ? "recorded" : "not recorded"} />
+            <DetailTile label="Cost" value={`$${result.cost_usd}`} />
+            <DetailTile label="Audit id" value={result.audit_log_id ?? "not returned"} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropInPanel({ deployment }: { deployment: Deployment | null }) {
   const [copied, setCopied] = useState(false);
+  const endpoint = deployment ? endpointPath(deployment) : "https://api.veklom.com/v1/api/your-endpoint";
+  const model = deployment?.model_slug ?? "your-deployed-model";
   const snippet = `from openai import OpenAI
 client = OpenAI(
-  base_url="https://api.veklom.com/v1",
+  base_url="${endpoint}",
   api_key=os.environ["VEKLOM_API_KEY"],
 )
 client.chat.completions.create(
-  model="your-deployed-model",
+  model="${model}",
   messages=[{"role": "user", "content": "hi"}],
 )`;
 
@@ -476,7 +639,9 @@ client.chat.completions.create(
     <div className="frame col-span-12 p-4 lg:col-span-5">
       <div className="text-eyebrow">Adoption · drop-in</div>
       <div className="font-display text-[14px] font-semibold text-bone">Veklom is OpenAI-compatible</div>
-      <p className="mt-1 text-[12px] text-muted">Existing OpenAI clients can switch the base URL and keep the same call shape.</p>
+      <p className="mt-1 text-[12px] text-muted">
+        First verify the endpoint in Veklom. Then copy the endpoint or client snippet into your app.
+      </p>
       <pre className="mt-3 max-h-[260px] overflow-auto rounded-md border border-rule bg-ink-1/70 p-3 font-mono text-[11.5px] leading-relaxed text-bone-2">
         {snippet}
       </pre>
@@ -659,6 +824,18 @@ function endpointPath(deployment: Deployment): string {
   const type = deployment.service_type || "api";
   const slug = deployment.slug || deployment.name || deployment.id;
   return `https://api.veklom.com/v1/${type}/${slug}`;
+}
+
+function deploymentTestError(error: unknown): string {
+  const status = responseStatus(error);
+  const detail = responseDetail(error);
+  if (status === 401 || status === 403) return `Authentication or policy blocked the endpoint test: ${detail}`;
+  if (status === 404) return `Endpoint or model was not found: ${detail}`;
+  if (status === 409) return `Endpoint is not ready for testing: ${detail}`;
+  if (status === 422) return `Endpoint configuration is incomplete: ${detail}`;
+  if (status === 503) return `Provider or model unavailable: ${detail}`;
+  if (status === 402) return `Usage could not be recorded because reserve policy blocked the run: ${detail}`;
+  return detail;
 }
 
 function metricNumber(metrics: Record<string, unknown>, keys: string[]): number | undefined {

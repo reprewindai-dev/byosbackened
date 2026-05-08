@@ -242,6 +242,7 @@ export function PipelinesPage() {
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [testPanelOpen, setTestPanelOpen] = useState(false);
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
@@ -286,9 +287,13 @@ export function PipelinesPage() {
     },
     onSuccess: (run) => {
       setActionError(null);
+      setTestPanelOpen(true);
       setSelectedRunId(run.id);
     },
-    onError: (error) => setActionError(error),
+    onError: (error) => {
+      setActionError(error);
+      setTestPanelOpen(true);
+    },
   });
 
   const deployMut = useMutation({
@@ -402,7 +407,11 @@ export function PipelinesPage() {
                 },
               })
             }
-            onExecute={() => selectedPipeline && executeMut.mutate(selectedPipeline.id)}
+            onExecute={() => {
+              if (!selectedPipeline) return;
+              setTestPanelOpen(true);
+              executeMut.mutate(selectedPipeline.id);
+            }}
             onDeploy={() => selectedPipeline && deployMut.mutate({ pipeline: selectedPipeline, graph })}
           />
           <NodePalette
@@ -435,6 +444,24 @@ export function PipelinesPage() {
           pricingTier={user?.plan}
           onSelectRun={setSelectedRunId}
         />
+
+        {testPanelOpen && (
+          <PipelineTestResultPanel
+            run={executeMut.data}
+            pending={executeMut.isPending}
+            error={executeMut.error}
+            pipeline={selectedPipeline}
+            pricingTier={user?.plan}
+            deploying={deploying || deployMut.isPending}
+            onClose={() => setTestPanelOpen(false)}
+            onDeploy={() => selectedPipeline && deployMut.mutate({ pipeline: selectedPipeline, graph })}
+            onRunAgain={() => selectedPipeline && executeMut.mutate(selectedPipeline.id)}
+            onViewTrace={() => {
+              if (executeMut.data?.id) setSelectedRunId(executeMut.data.id);
+              document.getElementById("pipeline-run-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+        )}
       </section>
 
       {showNew && (
@@ -1114,6 +1141,127 @@ function PipelinesTable({
   );
 }
 
+function PipelineTestResultPanel({
+  run,
+  pending,
+  error,
+  pipeline,
+  pricingTier,
+  deploying,
+  onClose,
+  onDeploy,
+  onRunAgain,
+  onViewTrace,
+}: {
+  run?: PipelineRun;
+  pending: boolean;
+  error: unknown;
+  pipeline: PipelineSummary | null;
+  pricingTier?: string;
+  deploying: boolean;
+  onClose: () => void;
+  onDeploy: () => void;
+  onRunAgain: () => void;
+  onViewTrace: () => void;
+}) {
+  const steps = run?.step_trace ?? [];
+  const succeeded = run?.status === "succeeded";
+  const failed = Boolean(error) || run?.status === "failed" || run?.status === "blocked_policy";
+  const eventPrice = governedRunPrice(pricingTier);
+  const outputPreview = pipelineOutputPreview(run);
+  const syntheticSteps = pending
+    ? [
+        { label: "Input", state: "passed" },
+        { label: "Policy gate", state: "running" },
+        { label: "LLM step", state: "queued" },
+      ]
+    : [
+        { label: "Input", state: steps[0]?.status ?? (succeeded ? "succeeded" : "pending") },
+        { label: "Policy gate", state: policyResult(run) },
+        { label: "LLM step", state: steps.find((step) => step.type === "model")?.status ?? (succeeded ? "succeeded" : "pending") },
+      ];
+
+  return (
+    <aside className="fixed right-4 top-24 z-40 w-[min(460px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-brass/25 bg-ink/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
+      <header className="flex items-start justify-between gap-3 border-b border-rule/80 bg-brass/[0.06] px-4 py-3">
+        <div>
+          <div className="text-eyebrow">Immediate test result</div>
+          <h3 className="font-display mt-1 text-base font-semibold text-bone">
+            {pending ? "Running pipeline test..." : succeeded ? "Pipeline test succeeded" : failed ? "Pipeline test needs attention" : "Pipeline test result"}
+          </h3>
+          <p className="mt-1 text-[12px] text-muted">{pipeline?.name ?? "Selected pipeline"} / v{run?.version ?? pipeline?.current_version ?? 1}</p>
+        </div>
+        <button className="text-muted transition hover:text-bone" onClick={onClose} aria-label="Close pipeline test result">
+          <X className="h-4 w-4" />
+        </button>
+      </header>
+
+      <div className="space-y-3 p-4">
+        <div className="grid gap-2">
+          {syntheticSteps.map((step, index) => (
+            <div key={`${step.label}-${index}`} className="grid grid-cols-[28px_1fr_auto] items-center gap-3 rounded-md border border-rule/70 bg-ink-2/70 px-3 py-2">
+              <span className={cn("flex h-7 w-7 items-center justify-center rounded-md border", stepStateTone(step.state))}>
+                {index + 1}
+              </span>
+              <span className="text-sm text-bone">{step.label}</span>
+              <Badge tone={step.state === "succeeded" || step.state === "passed" ? "ok" : step.state === "running" ? "primary" : step.state === "failed" || step.state === "blocked_policy" ? "warn" : "muted"}>
+                {step.state}
+              </Badge>
+            </div>
+          ))}
+        </div>
+
+        {pending && (
+          <div className="rounded-md border border-electric/25 bg-electric/5 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-electric">
+            Input - policy gate - LLM step
+          </div>
+        )}
+
+        {failed && (
+          <div className="rounded-md border border-crimson/30 bg-crimson/5 p-3 text-[12px] text-crimson">
+            {pipelineTestError(error, run)}
+          </div>
+        )}
+
+        {run && (
+          <>
+            <div className="rounded-lg border border-rule/70 bg-black/20 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-eyebrow">Response / output preview</div>
+                <Badge tone={succeeded ? "ok" : failed ? "warn" : "primary"}>{run.status}</Badge>
+              </div>
+              <pre className="max-h-[150px] whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-bone">
+                {outputPreview}
+              </pre>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <RunMetric label="steps" value={`${steps.filter((step) => step.status === "succeeded").length} / ${Math.max(steps.length, 3)}`} />
+              <RunMetric label="trace" value={formatMs(runTraceLatency(run))} />
+              <RunMetric label="policy" value={policyResult(run)} />
+              <RunMetric label="audit" value={succeeded ? "created" : failed ? "needs review" : "pending"} />
+              <RunMetric label="reserve impact" value={eventPrice.value} />
+              <RunMetric label="version" value={`v${run.version}`} />
+            </div>
+          </>
+        )}
+
+        <div className="flex flex-wrap gap-2 border-t border-rule/80 pt-3">
+          <button className="v-btn-primary h-8 px-3 text-xs" disabled={!run || !succeeded || deploying} onClick={onDeploy}>
+            <RocketIcon /> {deploying ? "Deploying..." : "Deploy as endpoint"}
+          </button>
+          <button className="v-btn-ghost h-8 px-3 text-xs" disabled={!run} onClick={onViewTrace}>
+            <Activity className="h-3.5 w-3.5" /> View trace
+          </button>
+          <button className="v-btn-ghost h-8 px-3 text-xs" disabled={pending || !pipeline} onClick={onRunAgain}>
+            <Play className="h-3.5 w-3.5" /> Run again
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function RecentRunsPanel({
   runs,
   loading,
@@ -1128,7 +1276,7 @@ function RecentRunsPanel({
   onSelectRun: (id: string | null) => void;
 }) {
   return (
-    <section className="frame mt-4 overflow-hidden">
+    <section id="pipeline-run-ledger" className="frame mt-4 overflow-hidden">
       <header className="flex items-center justify-between border-b border-rule/80 px-5 py-3">
         <div>
           <div className="text-eyebrow">Pipeline run ledger</div>
@@ -1269,6 +1417,36 @@ function RunMetric({ label, value }: { label: string; value: string }) {
       <div className="mt-1 text-sm font-semibold text-bone">{value}</div>
     </div>
   );
+}
+
+function pipelineOutputPreview(run?: PipelineRun): string {
+  if (!run) return "Waiting for pipeline output.";
+  if (typeof run.outputs?.response === "string") return run.outputs.response;
+  if (typeof run.outputs?.summary === "string") return run.outputs.summary;
+  if (typeof run.outputs?.output === "string") return run.outputs.output;
+  if (run.error_message) return run.error_message;
+  if (run.outputs) return JSON.stringify(run.outputs, null, 2);
+  return `${run.step_trace?.length ?? 0} step trace returned.`;
+}
+
+function policyResult(run?: PipelineRun): string {
+  if (!run) return "pending";
+  if (run.status === "blocked_policy") return "blocked_policy";
+  const gate = run.step_trace?.find((step) => step.type === "gate" || /policy/i.test(step.node_id));
+  return gate?.status ?? (run.status === "succeeded" ? "passed" : run.status);
+}
+
+function pipelineTestError(error: unknown, run?: PipelineRun): string {
+  if (run?.status === "blocked_policy") return run.error_message ?? "Policy blocked this pipeline test.";
+  if (run?.error_message) return run.error_message;
+  return actionUnavailableMessage(error, "Pipeline test");
+}
+
+function stepStateTone(state: string): string {
+  if (state === "succeeded" || state === "passed") return "border-moss/35 bg-moss/10 text-moss";
+  if (state === "running") return "border-brass/40 bg-brass/10 text-brass-2";
+  if (state === "failed" || state === "blocked_policy") return "border-crimson/35 bg-crimson/10 text-crimson";
+  return "border-rule bg-white/[0.03] text-muted";
 }
 
 function CreatePipelineModal({

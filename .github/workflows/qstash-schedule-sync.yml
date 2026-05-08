@@ -7,6 +7,10 @@ on:
         description: "Print schedules without creating/updating them"
         required: false
         default: "false"
+      enable_builder_agent_heartbeat:
+        description: "Enable the Builder Agent Box readiness heartbeat schedule"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -32,4 +36,5 @@ jobs:
           JOB_PROCESSOR_API_KEY: ${{ secrets.JOB_PROCESSOR_API_KEY }}
           MARKETPLACE_AUTOMATION_API_KEY: ${{ secrets.MARKETPLACE_AUTOMATION_API_KEY }}
           INTERNAL_OPERATOR_TOKEN: ${{ secrets.INTERNAL_OPERATOR_TOKEN || secrets.INTERNAL_API_KEY }}
+          ENABLE_BUILDER_AGENT_QSTASH: ${{ github.event.inputs.enable_builder_agent_heartbeat }}
         run: python backend/scripts/setup_qstash_schedules.py

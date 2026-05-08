@@ -215,7 +215,8 @@ const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_TOP_P = 0.95;
 const DEFAULT_TOP_K = 40;
 const DEFAULT_SEED = 42;
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 90_000;
+const COMPARE_REQUEST_TIMEOUT_MS = 120_000;
 const PREFLIGHT_TIMEOUT_MS = 25_000;
 const MAX_CONVERSATION_TURNS = 20; // safety cap — keeps context window sane
 const PLAYGROUND_STORAGE_KEY = "veklom.workspace.playground.v3";
@@ -596,6 +597,7 @@ export function PlaygroundPage() {
     userContent: string,
     billingEventType: "governed_run" | "compare_run",
     signal: AbortSignal,
+    timeoutMs = REQUEST_TIMEOUT_MS,
   ) => {
     const startedAt = performance.now();
     const resp = await api.post<AICompleteResponse>(
@@ -620,7 +622,7 @@ export function PlaygroundPage() {
         billing_event_type: billingEventType,
         max_tokens: maxTokens,
       },
-      { signal, timeout: REQUEST_TIMEOUT_MS },
+      { signal, timeout: timeoutMs },
     );
     const elapsedMs = Math.round(performance.now() - startedAt);
     const payload = resp.data;
@@ -737,7 +739,16 @@ export function PlaygroundPage() {
         const settled = await Promise.allSettled(
           compareModels.map(async (model) => {
             try {
-              return { model, result: await executeCompletion(model, userContent, "compare_run", controller.signal) };
+              return {
+                model,
+                result: await executeCompletion(
+                  model,
+                  userContent,
+                  "compare_run",
+                  controller.signal,
+                  COMPARE_REQUEST_TIMEOUT_MS,
+                ),
+              };
             } catch (error) {
               throw { model, error };
             }

@@ -5,6 +5,10 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   operator-watch:
     runs-on: ubuntu-latest
@@ -12,10 +16,13 @@ jobs:
       - name: Run backend operator watch
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
-          INTERNAL_OPERATOR_TOKEN: ${{ secrets.INTERNAL_OPERATOR_TOKEN }}
+          INTERNAL_OPERATOR_TOKEN: ${{ secrets.INTERNAL_OPERATOR_TOKEN || secrets.INTERNAL_API_KEY }}
         run: |
           set -euo pipefail
-          test -n "${INTERNAL_OPERATOR_TOKEN:-}" || (echo "INTERNAL_OPERATOR_TOKEN is missing" && exit 1)
+          test -n "${INTERNAL_OPERATOR_TOKEN:-}" || (
+            echo "INTERNAL_OPERATOR_TOKEN/INTERNAL_API_KEY is missing. Create a superuser-owned API key with AUTOMATION or ADMIN scope and save it as the GitHub Actions secret INTERNAL_OPERATOR_TOKEN."
+            exit 1
+          )
           RESPONSE="$(curl -fsS -X POST \
             -H "Authorization: Bearer ${INTERNAL_OPERATOR_TOKEN}" \
             "${BACKEND_URL%/}/api/v1/internal/operators/watch")"
@@ -39,7 +46,7 @@ jobs:
           Workflow: $GITHUB_WORKFLOW
           Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           Impact: backend operator watch detected critical pressure or could not run.
-          Action: Check /api/v1/internal/operators/digest and open backend alerts.
+          Action: Check the workflow log, verify INTERNAL_OPERATOR_TOKEN exists, then check /api/v1/internal/operators/digest and backend alerts.
           EOF
           gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "[OPS] Operator watch requires attention" \

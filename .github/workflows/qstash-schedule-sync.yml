@@ -31,4 +31,5 @@ jobs:
           BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
           JOB_PROCESSOR_API_KEY: ${{ secrets.JOB_PROCESSOR_API_KEY }}
           MARKETPLACE_AUTOMATION_API_KEY: ${{ secrets.MARKETPLACE_AUTOMATION_API_KEY }}
+          INTERNAL_OPERATOR_TOKEN: ${{ secrets.INTERNAL_OPERATOR_TOKEN || secrets.INTERNAL_API_KEY }}
         run: python backend/scripts/setup_qstash_schedules.py

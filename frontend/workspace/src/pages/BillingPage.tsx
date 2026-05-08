@@ -37,6 +37,7 @@ interface TxnRow {
   endpoint_method: string | null;
   request_id: string | null;
   description: string | null;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -142,7 +143,14 @@ export function BillingPage() {
   });
 
   const evaluationRunsUsed = useMemo(() => {
-    return (txns.data?.transactions ?? []).filter((txn) => txn.transaction_type === "usage").length;
+    return (txns.data?.transactions ?? []).filter((txn) => {
+      return (
+        txn.transaction_type === "usage" &&
+        txn.endpoint_path === "/api/v1/ai/complete" &&
+        txn.metadata?.pricing_tier === "free_evaluation" &&
+        txn.metadata?.billing_event_type === "governed_run"
+      );
+    }).length;
   }, [txns.data?.transactions]);
   const evaluationPct = Math.min(100, Math.round((evaluationRunsUsed / FREE_EVALUATION_RUNS) * 100));
   const evaluationLimitReached = !txns.isLoading && evaluationRunsUsed >= FREE_EVALUATION_RUNS;

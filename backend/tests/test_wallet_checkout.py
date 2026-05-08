@@ -179,3 +179,99 @@ def test_paid_activation_credits_only_reserve_portion():
     assert tx.transaction_type == "purchase"
     assert tx.amount == 150_000
     assert tx.stripe_checkout_session_id == "cs_paid_activation"
+
+
+def test_wallet_balance_hides_legacy_reserve_without_paid_activation():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    for table in (Subscription.__table__, TokenWallet.__table__, TokenTransaction.__table__):
+        table.create(engine, checkfirst=True)
+    session_factory = sessionmaker(bind=engine)
+    db = session_factory()
+    db.add(
+        TokenWallet(
+            workspace_id="workspace-free",
+            balance=49_980,
+            total_credits_purchased=50_000,
+            total_credits_used=20,
+        )
+    )
+    db.commit()
+
+    result = asyncio.run(token_wallet.get_balance(workspace_id="workspace-free", db=db))
+
+    assert result.balance == 0
+    assert result.reserve_balance_units == 0
+    assert result.reserve_balance_usd == "0.00"
+    assert result.total_credits_purchased == 0
+    assert result.total_credits_used == 0
+
+
+def test_first_paid_activation_resets_legacy_non_cash_reserve_before_credit():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    for table in (Subscription.__table__, TokenWallet.__table__, TokenTransaction.__table__):
+        table.create(engine, checkfirst=True)
+    session_factory = sessionmaker(bind=engine)
+    db = session_factory()
+    db.add(
+        Subscription(
+            workspace_id="workspace-legacy",
+            plan=PlanTier.STARTER,
+            status=SubscriptionStatus.INCOMPLETE,
+            billing_cycle="activation",
+        )
+    )
+    db.add(
+        TokenWallet(
+            workspace_id="workspace-legacy",
+            balance=49_980,
+            total_credits_purchased=50_000,
+            total_credits_used=20,
+        )
+    )
+    db.commit()
+
+    applied = _apply_paid_checkout_session(
+        db,
+        {
+            "id": "cs_paid_activation_legacy",
+            "mode": "payment",
+            "payment_status": "paid",
+            "customer": "cus_paid",
+            "payment_intent": "pi_paid",
+            "metadata": {
+                "type": "workspace_activation",
+                "workspace_id": "workspace-legacy",
+                "plan": "starter",
+                "activation_cents": "39500",
+                "minimum_reserve_cents": "15000",
+                "reserve_units": "150000",
+            },
+        },
+    )
+
+    wallet = db.query(TokenWallet).filter(TokenWallet.workspace_id == "workspace-legacy").first()
+    txs = (
+        db.query(TokenTransaction)
+        .filter(TokenTransaction.workspace_id == "workspace-legacy")
+        .order_by(TokenTransaction.created_at.asc())
+        .all()
+    )
+
+    assert applied is True
+    assert wallet.balance == 150_000
+    assert wallet.total_credits_purchased == 150_000
+    assert wallet.total_credits_used == 0
+    assert [tx.transaction_type for tx in txs] == ["adjustment", "purchase"]
+    assert txs[0].amount == -49_980
+    assert txs[0].balance_after == 0
+    assert txs[1].amount == 150_000
+    assert txs[1].balance_before == 0
+    assert txs[1].balance_after == 150_000

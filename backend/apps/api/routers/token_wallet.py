@@ -1,6 +1,7 @@
 """Operating reserve router - balance, transactions, and reserve funding."""
+import json
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -46,6 +47,7 @@ class TransactionResponse(BaseModel):
     endpoint_method: Optional[str]
     request_id: Optional[str]
     description: Optional[str]
+    metadata: Optional[dict[str, Any]] = None
     created_at: str
 
 
@@ -157,6 +159,29 @@ def _invalidate_balance_cache(workspace_id: str):
         pass
 
 
+def _has_active_paid_subscription(db: Session, workspace_id: str) -> bool:
+    """Operating Reserve is cash-backed only after paid activation."""
+    return (
+        db.query(Subscription)
+        .filter(
+            Subscription.workspace_id == workspace_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .first()
+        is not None
+    )
+
+
+def _parse_transaction_metadata(raw: Optional[str]) -> Optional[dict[str, Any]]:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/balance", response_model=WalletBalanceResponse)
@@ -169,22 +194,26 @@ async def get_balance(
     cached = _get_cached_balance(workspace_id)
     
     wallet = _get_or_create_wallet(db, workspace_id)
+    paid_active = _has_active_paid_subscription(db, workspace_id)
+    effective_balance = wallet.balance if paid_active else 0
+    effective_purchased = wallet.total_credits_purchased if paid_active else 0
+    effective_used = wallet.total_credits_used if paid_active else 0
     
     # Update cache if different
-    if cached != wallet.balance:
-        _cache_balance(workspace_id, wallet.balance)
+    if cached != effective_balance:
+        _cache_balance(workspace_id, effective_balance)
     
     return WalletBalanceResponse(
         workspace_id=wallet.workspace_id,
-        reserve_balance_units=wallet.balance,
-        reserve_balance_usd=f"{wallet.balance / RESERVE_UNITS_PER_USD:.2f}",
-        balance=wallet.balance,
-        monthly_credits_included=wallet.monthly_credits_included or 0,
-        monthly_credits_used=wallet.monthly_credits_used or 0,
+        reserve_balance_units=effective_balance,
+        reserve_balance_usd=f"{effective_balance / RESERVE_UNITS_PER_USD:.2f}",
+        balance=effective_balance,
+        monthly_credits_included=wallet.monthly_credits_included if paid_active else 0,
+        monthly_credits_used=wallet.monthly_credits_used if paid_active else 0,
         monthly_period_start=wallet.monthly_period_start.isoformat() if wallet.monthly_period_start else None,
         monthly_period_end=wallet.monthly_period_end.isoformat() if wallet.monthly_period_end else None,
-        total_credits_purchased=wallet.total_credits_purchased or 0,
-        total_credits_used=wallet.total_credits_used or 0,
+        total_credits_purchased=effective_purchased or 0,
+        total_credits_used=effective_used or 0,
     )
 
 
@@ -222,6 +251,7 @@ async def get_transactions(
                 endpoint_method=t.endpoint_method,
                 request_id=t.request_id,
                 description=t.description,
+                metadata=_parse_transaction_metadata(t.metadata_json),
                 created_at=t.created_at.isoformat() if t.created_at else None,
             )
             for t in transactions

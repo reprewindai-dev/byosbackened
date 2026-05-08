@@ -1,4 +1,5 @@
 """Stripe activation and Operating Reserve management."""
+import json
 import stripe
 from datetime import datetime
 from typing import Optional
@@ -32,6 +33,62 @@ RESERVE_UNITS_PER_USD = 1000
 def _reserve_units_from_cents(cents: int | str | None) -> int:
     """Convert paid reserve cents into integer reserve units."""
     return int(cents or 0) * RESERVE_UNITS_PER_USD // 100
+
+
+def _reset_legacy_non_cash_reserve_before_activation(
+    db: Session,
+    workspace_id: str,
+    session_id: str,
+) -> None:
+    """Remove stale non-cash balances before the first paid reserve credit.
+
+    Older evaluation accounts could have wallet balances from token-era grants
+    or endpoint middleware debits. Operating Reserve must only become spendable
+    after Stripe-backed activation, so first activation starts from zero and then
+    credits the paid reserve portion.
+    """
+    wallet = db.query(TokenWallet).filter(TokenWallet.workspace_id == workspace_id).first()
+    if not wallet or wallet.balance == 0:
+        return
+
+    prior_paid_purchase = (
+        db.query(TokenTransaction)
+        .filter(
+            TokenTransaction.workspace_id == workspace_id,
+            TokenTransaction.transaction_type == "purchase",
+            TokenTransaction.stripe_checkout_session_id.isnot(None),
+        )
+        .first()
+    )
+    if prior_paid_purchase:
+        return
+
+    balance_before = wallet.balance
+    wallet.balance = 0
+    wallet.total_credits_purchased = 0
+    wallet.total_credits_used = 0
+    wallet.monthly_credits_used = 0
+    wallet.updated_at = datetime.utcnow()
+    db.add(
+        TokenTransaction(
+            wallet_id=wallet.id,
+            workspace_id=workspace_id,
+            transaction_type="adjustment",
+            amount=-balance_before,
+            balance_before=balance_before,
+            balance_after=0,
+            request_id=f"{session_id}:legacy-reserve-reset",
+            description="Legacy non-cash reserve reset before paid activation",
+            metadata_json=json.dumps(
+                {
+                    "reason": "legacy_non_cash_reserve_reset",
+                    "source": "workspace_activation",
+                    "cash_backed": False,
+                }
+            ),
+        )
+    )
+    db.flush()
 
 PLANS = {
     "starter": {
@@ -576,6 +633,7 @@ def _apply_paid_checkout_session(db: Session, session) -> bool:
                 TokenTransaction.transaction_type == "purchase",
             ).first()
             if not existing:
+                _reset_legacy_non_cash_reserve_before_activation(db, workspace_id, session_id)
                 _credit_token_wallet(
                     db,
                     workspace_id,

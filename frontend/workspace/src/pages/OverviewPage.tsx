@@ -1,40 +1,50 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import {
-  Activity,
   AlertCircle,
+  Archive,
   ArrowRight,
-  Box,
-  CheckCircle2,
-  CircleDollarSign,
-  Cloud,
+  BadgeCheck,
+  BrainCircuit,
+  CircleDot,
+  CircuitBoard,
   Cpu,
   Database,
   FileCheck2,
-  Gauge,
+  GitBranch,
   Hash,
-  MoreHorizontal,
-  Plus,
-  Server,
+  Landmark,
+  Layers3,
+  Network,
+  OctagonAlert,
+  RadioTower,
+  Scale,
   ShieldCheck,
-  TerminalSquare,
-  TrendingDown,
-  TrendingUp,
-  Zap,
+  Split,
+  Vote,
+  Workflow,
 } from "lucide-react";
 import { Sparkline } from "@/components/overview/Sparkline";
+import { useAuthStore } from "@/store/auth-store";
 import { api } from "@/lib/api";
 import {
   cn,
   dateFromApiTimestamp,
   fmtCents,
-  fmtDelta,
   fmtNumber,
   formatApiTime,
   relativeTime,
 } from "@/lib/cn";
 import { isRouteUnavailable } from "@/lib/errors";
-import type { Alert, AuditEntry, FleetModel, OverviewPayload, PolicyEvent, RecentRun } from "@/types/api";
+import type {
+  Alert,
+  AuditEntry,
+  FleetModel,
+  OverviewPayload,
+  PlatformPulse,
+  PolicyEvent,
+  RecentRun,
+} from "@/types/api";
 
 async function fetchOverview(): Promise<OverviewPayload> {
   try {
@@ -44,6 +54,16 @@ async function fetchOverview(): Promise<OverviewPayload> {
     if (!isRouteUnavailable(err)) throw err;
     const resp = await api.get<LegacyWorkspaceOverview>("/workspace/overview");
     return fromLegacyOverview(resp.data);
+  }
+}
+
+async function fetchPlatformPulse(): Promise<PlatformPulse | null> {
+  try {
+    const resp = await api.get<PlatformPulse>("/platform/pulse");
+    return resp.data;
+  } catch (err) {
+    if (isRouteUnavailable(err)) return null;
+    throw err;
   }
 }
 
@@ -191,226 +211,199 @@ function routingFromRuns(rows: NonNullable<LegacyWorkspaceOverview["live_feed"]>
 }
 
 export function OverviewPage() {
-  const { data, isLoading, isError, error } = useQuery({
+  const user = useAuthStore((state) => state.user);
+  const overview = useQuery({
     queryKey: ["overview"],
     queryFn: fetchOverview,
     refetchInterval: 15_000,
   });
+  const pulse = useQuery({
+    queryKey: ["platform-pulse"],
+    queryFn: fetchPlatformPulse,
+    refetchInterval: 30_000,
+  });
+
+  const data = overview.data;
+  const pulseData = pulse.data ?? null;
+  const state = data ? deriveInstitutionalState(data, pulseData) : null;
 
   return (
-    <div className="mx-auto w-full max-w-[1400px]">
-      <PageHeader />
+    <div className="command-wall">
+      <CommandHeader
+        userScope={user?.is_superuser ? "Veklom Superuser" : "Tenant Command Center"}
+        workspace={user?.workspace_name ?? user?.workspace_id ?? "workspace"}
+        state={state}
+        isLoading={overview.isLoading}
+      />
 
-      {isError && (
-        <div className="frame mb-4 flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
-          <AlertCircle className="mt-0.5 h-4 w-4" />
-          <div>
-            <div className="font-semibold">Failed to load overview</div>
-            <div className="mt-1 text-xs opacity-80">
-              {(error as Error)?.message ?? "Unknown error"} - the backend endpoint{" "}
-              <span className="font-mono">/api/v1/monitoring/overview</span> may not be implemented yet.
-            </div>
-          </div>
+      {overview.isError && (
+        <div className="command-alert">
+          <AlertCircle className="h-4 w-4" />
+          <span>{(overview.error as Error)?.message ?? "Unable to load command center telemetry"}</span>
         </div>
       )}
 
-      <section>
-        <KpiStrip data={data} isLoading={isLoading} />
+      <ScopeRail isSuperuser={Boolean(user?.is_superuser)} />
 
-        <div className="mt-4 grid grid-cols-12 gap-4">
-          <RoutingPanel data={data} isLoading={isLoading} />
-          <SpendPanel data={data} isLoading={isLoading} />
-        </div>
-
-        <div className="mt-4 grid grid-cols-12 gap-4">
-          <RecentRunsPanel rows={data?.recent_runs ?? []} isLoading={isLoading} />
-          <PolicyTimelinePanel events={data?.policy_events ?? []} isLoading={isLoading} />
-        </div>
-
-        <div className="mt-4 grid grid-cols-12 gap-4">
-          <AlertsPanel alerts={data?.alerts ?? []} isLoading={isLoading} />
-          <AuditTrailPanel entries={data?.audit_trail ?? []} isLoading={isLoading} />
-          <FleetPanel fleet={data?.fleet ?? []} isLoading={isLoading} />
-        </div>
+      <section className="sv-chamber">
+        <SectionTitle
+          eyebrow="Hello, Silicon Valley"
+          title="Institutional consciousness"
+          text="Strategic posture, route integrity, memory continuity, and unresolved pressure from live control-plane telemetry."
+        />
+        <SiliconValleyWall data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} />
       </section>
+
+      <section className="sunnyvale-floor">
+        <SectionTitle
+          eyebrow="Hello, Sunnyvale"
+          title="Operational execution"
+          text="Agent runs, committee decisions, intervention requests, blocked workflows, evidence, and execution traces."
+        />
+        <SunnyvaleFloor data={data} state={state} isLoading={overview.isLoading} />
+      </section>
+
+      <ArchivesLayer data={data} isLoading={overview.isLoading} />
     </div>
   );
 }
 
-function PageHeader() {
+function CommandHeader({
+  userScope,
+  workspace,
+  state,
+  isLoading,
+}: {
+  userScope: string;
+  workspace: string;
+  state: InstitutionalState | null;
+  isLoading: boolean;
+}) {
   return (
-    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <header className="command-header">
       <div>
-        <div className="text-eyebrow">Workspace - Overview</div>
-        <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">Sovereign control plane</h1>
-        <p className="mt-2 max-w-2xl text-sm text-bone-2">
-          Every governed run routed, policed, and audited across Hetzner primary and approved fallback paths without leaving your
-          perimeter.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <LiveBadge label="LIVE BACKEND CONNECTED" />
-          <Badge tone="muted">SOC2-ready</Badge>
-          <Badge tone="muted">HIPAA-aware</Badge>
-          <Badge tone="muted">EU-sovereign</Badge>
-        </div>
+        <div className="command-kicker">Veklom sovereign command center</div>
+        <h1>Hello, Silicon Valley / Hello, Sunnyvale</h1>
+        <p>{userScope} - {workspace}</p>
       </div>
-      <div className="flex gap-2">
-        <a href="#/deployments" className="v-btn-ghost h-8 px-3 text-xs">
-          <Plus className="h-3.5 w-3.5" /> New deployment
-        </a>
-        <a href="#/playground" className="v-btn-primary h-8 px-3 text-xs">
-          <TerminalSquare className="h-3.5 w-3.5" /> Open Playground
-        </a>
+      <div className="command-status-strip">
+        <StatusDatum label="Institutional state" value={isLoading ? "synchronizing" : state?.posture ?? "no signal"} tone={state?.tone ?? "neutral"} />
+        <StatusDatum label="Execution confidence" value={state ? `${state.executionConfidence}%` : "-"} tone={state?.executionConfidence && state.executionConfidence >= 80 ? "stable" : "watch"} />
+        <StatusDatum label="Route integrity" value={state ? `${state.routeIntegrity}%` : "-"} tone={state?.routeIntegrity && state.routeIntegrity >= 80 ? "stable" : "watch"} />
+        <StatusDatum label="Memory continuity" value={state ? `${state.memoryContinuity}%` : "-"} tone="stable" />
       </div>
     </header>
   );
 }
 
-function KpiStrip({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
-  const cards = [
-    {
-      label: "Runs / min",
-      value: data ? fmtNumber(data.kpi.requests_per_minute) : "-",
-      delta: data ? fmtDelta(data.kpi.requests_delta_pct, "%") : undefined,
-      positive: !data || data.kpi.requests_delta_pct >= 0,
-      spark: data?.kpi.requests_series,
-      icon: Activity,
-    },
-    {
-      label: "P50 latency",
-      value: data ? `${data.kpi.p50_latency_ms} ms` : "-",
-      delta: data ? fmtDelta(data.kpi.p50_delta_ms, " ms") : undefined,
-      positive: !data || data.kpi.p50_delta_ms <= 0,
-      spark: undefined,
-      icon: Gauge,
-    },
-    {
-      label: "Run units / sec",
-      value: data ? fmtNumber(data.kpi.tokens_per_second) : "-",
-      delta: data ? fmtDelta(data.kpi.tokens_delta_pct, "%") : undefined,
-      positive: !data || data.kpi.tokens_delta_pct >= 0,
-      spark: data?.kpi.tokens_series,
-      icon: Zap,
-    },
-    {
-      label: "Reserve used",
-      value: data ? fmtCents(data.kpi.spend_today_cents) : "-",
-      delta: data ? `${data.kpi.spend_cap_pct}% reserve policy` : undefined,
-      positive: !data || data.kpi.spend_cap_pct < 80,
-      spark: data?.kpi.spend_series,
-      icon: CircleDollarSign,
-    },
-    {
-      label: "Active models",
-      value: data ? String(data.kpi.active_models) : "-",
-      delta: data ? `${data.kpi.active_models_quantized} quantized` : undefined,
-      positive: true,
-      spark: undefined,
-      icon: Box,
-    },
-    {
-      label: "Audit entries",
-      value: data ? fmtNumber(data.kpi.audit_entries) : "-",
-      delta: data ? `${data.kpi.audit_verified_pct}% verified` : undefined,
-      positive: true,
-      spark: undefined,
-      icon: ShieldCheck,
-    },
+function ScopeRail({ isSuperuser }: { isSuperuser: boolean }) {
+  const superuser = ["Silicon Valley", "Global UACP", "Global Agents", "Archives", "Tenants", "Risk", "Marketplace", "Billing", "Backend Deployments"];
+  const tenant = ["Sunnyvale", "My Runs", "My Agents", "My Evidence", "My Routes", "My Usage", "My Tasks", "My Marketplace"];
+  const enterprise = ["Own deployment", "Command shell", "Policies", "Agents", "Archives"];
+  return (
+    <nav className="scope-rail" aria-label="Command center scope">
+      <ScopeGroup title={isSuperuser ? "Veklom Superuser" : "Superuser scope"} items={superuser} active={isSuperuser ? "Silicon Valley" : undefined} locked={!isSuperuser} />
+      <ScopeGroup title="Tenant User" items={tenant} active="Sunnyvale" />
+      <ScopeGroup title="Enterprise Deployment" items={enterprise} active={undefined} />
+    </nav>
+  );
+}
+
+function ScopeGroup({ title, items, active, locked }: { title: string; items: string[]; active?: string; locked?: boolean }) {
+  return (
+    <div className={cn("scope-group", locked && "opacity-55")}>
+      <span>{title}</span>
+      <div>
+        {items.map((item) => (
+          <b key={item} className={cn(item === active && "active")}>{item}</b>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SiliconValleyWall({
+  data,
+  pulse,
+  state,
+  isLoading,
+}: {
+  data?: OverviewPayload;
+  pulse: PlatformPulse | null;
+  state: InstitutionalState | null;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="sv-grid">
+      <InstitutionalStatePanel state={state} data={data} isLoading={isLoading} />
+      <StrategicTrajectory data={data} state={state} />
+      <AgentAlignment data={data} />
+      <InstitutionalEvents data={data} pulse={pulse} isLoading={isLoading} />
+      <ResourcePosture data={data} pulse={pulse} />
+    </div>
+  );
+}
+
+function InstitutionalStatePanel({ state, data, isLoading }: { state: InstitutionalState | null; data?: OverviewPayload; isLoading: boolean }) {
+  const metrics = [
+    { label: "System coherence", value: state ? `${state.systemCoherence}%` : "-", icon: BrainCircuit },
+    { label: "Convergence pressure", value: state ? `${state.convergencePressure}%` : "-", icon: Split },
+    { label: "Operational drift", value: state ? `${state.operationalDrift}%` : "-", icon: GitBranch },
+    { label: "Unresolved escalations", value: String(data?.alerts.length ?? 0), icon: OctagonAlert },
+    { label: "Policy stability", value: state ? `${state.policyStability}%` : "-", icon: Scale },
+    { label: "Resource posture", value: data ? `${data.kpi.spend_cap_pct}%` : "-", icon: Database },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      {cards.map((card) => (
-        <KpiCard key={card.label} {...card} loading={isLoading} />
-      ))}
-    </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  delta,
-  positive,
-  loading,
-  spark,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  delta?: string;
-  positive?: boolean;
-  loading: boolean;
-  spark?: number[];
-  icon: ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div className="frame p-3">
-      <div className="text-eyebrow flex items-center justify-between text-bone-2">
-        <span className="flex items-center gap-1.5">
-          <Icon className="h-3.5 w-3.5" />
-          {label}
-        </span>
+    <div className="sv-prime mineral-panel">
+      <PanelChrome label="Institutional state" icon={Landmark} />
+      <div className="state-core">
+        <div className={cn("state-orbit", state?.tone)}>
+          <span />
+          <b>{isLoading ? "SYNC" : state?.posture ?? "NO SIGNAL"}</b>
+        </div>
+        <div>
+          <h3>Consciousness layer</h3>
+          <p>{state?.narrative ?? "Waiting for live institutional telemetry from the command plane."}</p>
+        </div>
       </div>
-      <div className="mt-1 flex items-baseline justify-between gap-2">
-        <span className="font-display text-[19px] font-semibold tracking-tight text-bone">
-          {loading ? <span className="inline-block h-5 w-16 animate-pulse rounded bg-rule" /> : value}
-        </span>
-        {delta && (
-          <span
-            className={cn(
-              "flex items-center gap-0.5 whitespace-nowrap font-mono text-[10.5px]",
-              positive ? "text-moss" : "text-crimson",
-            )}
-          >
-            {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {delta}
-          </span>
-        )}
-      </div>
-      <div className="mt-1.5 h-9">
-        <Sparkline values={spark ?? []} />
+      <div className="state-matrix">
+        {metrics.map((metric) => (
+          <SignalReadout key={metric.label} {...metric} />
+        ))}
       </div>
     </div>
   );
 }
 
-function RoutingPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
-  const primaryPct = data?.routing.primary_util_pct ?? 0;
-  const burstPct = data?.routing.burst_util_pct ?? 0;
-  const hostTiles = getHostTiles(data);
-
+function StrategicTrajectory({ data, state }: { data?: OverviewPayload; state: InstitutionalState | null }) {
   return (
-    <div className="frame col-span-12 lg:col-span-8">
-      <PanelHeader
-        eyebrow="Routing - last 24h"
-        title={`${data?.routing.primary_plane ?? "Hetzner primary"} - ${data?.routing.burst_plane ?? "Approved fallback"}`}
-        actions={
-          <>
-            <Badge tone="primary" dot>
-              Hetzner {primaryPct}%
-            </Badge>
-            <Badge tone="info" dot>
-              Fallback {burstPct}%
-            </Badge>
-            <a href="#/monitoring" className="v-btn-ghost h-7 px-2">
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </a>
-          </>
-        }
-      />
-      <div className="px-3 pt-2">
-        <RoutingChart data={data} isLoading={isLoading} />
+    <div className="sv-trajectory mineral-panel">
+      <PanelChrome label="Strategic trajectory" icon={Network} />
+      <div className="trajectory-bands">
+        <TrajectoryBand label="Route integrity" value={state?.routeIntegrity ?? 0} tone="cyan" />
+        <TrajectoryBand label="Execution confidence" value={state?.executionConfidence ?? 0} tone="teal" />
+        <TrajectoryBand label="Memory continuity" value={state?.memoryContinuity ?? 0} tone="amber" />
       </div>
-      <div className="grid grid-cols-1 gap-px border-t border-rule bg-rule md:grid-cols-3">
-        {hostTiles.map((tile) => (
-          <div key={tile.label} className="bg-ink-2 px-4 py-3">
-            <div className="text-eyebrow flex items-center gap-1.5">
-              <tile.icon className={cn("h-3.5 w-3.5", tile.tone === "info" ? "text-electric" : "text-brass-2")} />
-              {tile.label}
-            </div>
-            <div className="font-display mt-1 text-[14px] text-bone">{tile.value}</div>
-            <div className="text-[11px] text-muted">{tile.sub}</div>
+      <div className="signal-chart">
+        <Sparkline values={data?.kpi.requests_series ?? []} />
+        <span>Long-range movement derives from live run cadence and audit continuity.</span>
+      </div>
+    </div>
+  );
+}
+
+function AgentAlignment({ data }: { data?: OverviewPayload }) {
+  const committees = buildCommittees(data);
+  return (
+    <div className="sv-alignment mineral-panel">
+      <PanelChrome label="Global agent behavior" icon={CircuitBoard} />
+      <div className="alignment-map">
+        {committees.map((committee) => (
+          <div key={committee.name} className={cn("alignment-node", committee.tone)}>
+            <span>{committee.name}</span>
+            <b>{committee.state}</b>
+            <small>{committee.detail}</small>
           </div>
         ))}
       </div>
@@ -418,526 +411,384 @@ function RoutingPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: 
   );
 }
 
-function RoutingChart({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
-  const series = data?.routing.series ?? [];
-  const hasActivity =
-    series.some((point) => point.primary > 0 || point.burst > 0) ||
-    (data?.recent_runs?.length ?? 0) > 0 ||
-    (data?.routing.primary_hosts ?? []).some((host) => host.util_pct > 0);
-  const points = series.length
-    ? series.slice(-24)
-    : Array.from({ length: 24 }, (_, index) => ({ t: `${String(index).padStart(2, "0")}:00`, primary: 0, burst: 0 }));
-
-  const W = 800;
-  const H = 220;
-  const padL = 34;
-  const padR = 10;
-  const padT = 12;
-  const padB = 24;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
-  const maxY = 120;
-
-  const yFor = (v: number) => padT + innerH * (1 - Math.max(0, Math.min(maxY, v)) / maxY);
-  const xFor = (i: number) => padL + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
-
-  function curvePath(values: number[]): { line: string; area: string } {
-    const pts = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
-    if (!pts.length) {
-      const y = yFor(0);
-      return { line: `M ${padL} ${y} L ${W - padR} ${y}`, area: `M ${padL} ${y} L ${W - padR} ${y}` };
-    }
-    let line = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
-    for (let i = 1; i < pts.length; i++) {
-      const prev = pts[i - 1];
-      const cur = pts[i];
-      const midX = (prev.x + cur.x) / 2;
-      const midY = (prev.y + cur.y) / 2;
-      line += ` Q ${prev.x.toFixed(2)} ${prev.y.toFixed(2)}, ${midX.toFixed(2)} ${midY.toFixed(2)}`;
-    }
-    const last = pts[pts.length - 1];
-    line += ` T ${last.x.toFixed(2)} ${last.y.toFixed(2)}`;
-    const area = `${line} L ${last.x.toFixed(2)} ${(padT + innerH).toFixed(2)} L ${pts[0].x.toFixed(2)} ${(padT + innerH).toFixed(2)} Z`;
-    return { line, area };
-  }
-
-  const primary = curvePath(points.map((p) => p.primary));
-  const burst = curvePath(points.map((p) => p.burst));
-  const yTicks = [120, 90, 60, 30];
-  const xTicks = [0, Math.floor((points.length - 1) / 2), points.length - 1];
-
+function InstitutionalEvents({ data, pulse, isLoading }: { data?: OverviewPayload; pulse: PlatformPulse | null; isLoading: boolean }) {
+  const events = buildStrategicEvents(data, pulse);
   return (
-    <div className="relative">
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="h-[220px] w-full"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="Hetzner primary versus approved fallback routing utilization"
-      >
-        {yTicks.map((tick) => (
-          <g key={tick}>
-            <line x1={padL} x2={W - padR} y1={yFor(tick)} y2={yFor(tick)} stroke="rgba(255,255,255,0.055)" />
-            <text
-              x={padL - 7}
-              y={yFor(tick) + 3}
-              textAnchor="end"
-              fontSize="10"
-              fontFamily="JetBrains Mono, monospace"
-              fill="rgba(200,203,214,0.55)"
-            >
-              {tick}
-            </text>
-          </g>
+    <div className="sv-events mineral-panel">
+      <PanelChrome label="Strategic events" icon={RadioTower} />
+      <div className="event-column">
+        {events.map((event) => (
+          <EventLine key={event.id} event={event} />
         ))}
-        <path d={burst.area} fill="rgba(110, 168, 254, 0.15)" />
-        <path d={burst.line} fill="none" stroke="rgba(110, 168, 254, 0.95)" strokeWidth="1.8" strokeLinecap="round" />
-        <path d={primary.area} fill="rgba(229, 177, 110, 0.18)" />
-        <path d={primary.line} fill="none" stroke="rgba(229, 177, 110, 0.98)" strokeWidth="2.2" strokeLinecap="round" />
-        {xTicks.map((i) => (
-          <text
-            key={i}
-            x={xFor(i)}
-            y={H - 7}
-            textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
-            fontSize="10"
-            fontFamily="JetBrains Mono, monospace"
-            fill="rgba(200,203,214,0.5)"
-          >
-            {points[i]?.t ?? ""}
-          </text>
-        ))}
-      </svg>
-      {isLoading && (
-        <div className="absolute inset-0 grid place-items-center bg-ink-2/30 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-          Loading routing telemetry
-        </div>
-      )}
-      {!isLoading && !hasActivity && (
-        <div className="absolute inset-0 grid place-items-center text-center">
-          <div className="rounded-md border border-rule bg-ink/80 px-3 py-2 font-mono text-[11px] text-muted">
-            No routing events yet. Run the Playground to populate this chart.
+        {!events.length && <EmptyLine text={isLoading ? "Synchronizing strategic event stream." : "No strategic events in the live window."} />}
+      </div>
+    </div>
+  );
+}
+
+function ResourcePosture({ data, pulse }: { data?: OverviewPayload; pulse: PlatformPulse | null }) {
+  return (
+    <div className="sv-resource mineral-panel">
+      <PanelChrome label="Resource posture" icon={Layers3} />
+      <div className="resource-grid">
+        <StatusDatum label="Reserve used" value={data ? fmtCents(data.spend.spend_cents) : "-"} tone="stable" />
+        <StatusDatum label="Burn rate" value={data ? `${fmtCents(data.spend.burn_rate_per_min_cents)} / min` : "-"} tone="neutral" />
+        <StatusDatum label="Active models" value={data ? String(data.kpi.active_models) : "-"} tone="stable" />
+        <StatusDatum label="Marketplace orders" value={pulse ? String(pulse.orders_30d.count) : "-"} tone="neutral" />
+      </div>
+    </div>
+  );
+}
+
+function SunnyvaleFloor({ data, state, isLoading }: { data?: OverviewPayload; state: InstitutionalState | null; isLoading: boolean }) {
+  return (
+    <div className="sunnyvale-grid">
+      <ExecutionLanes runs={data?.recent_runs ?? []} isLoading={isLoading} />
+      <CommitteeSessions events={data?.policy_events ?? []} state={state} isLoading={isLoading} />
+      <InterventionQueue alerts={data?.alerts ?? []} runs={data?.recent_runs ?? []} isLoading={isLoading} />
+      <EvidenceTray entries={data?.audit_trail ?? []} isLoading={isLoading} />
+      <FleetMatrix fleet={data?.fleet ?? []} />
+    </div>
+  );
+}
+
+function ExecutionLanes({ runs, isLoading }: { runs: RecentRun[]; isLoading: boolean }) {
+  return (
+    <div className="ops-lanes mineral-panel">
+      <PanelChrome label="Active runs and execution traces" icon={Workflow} action={<a href="#/playground">Open Playground <ArrowRight className="h-3 w-3" /></a>} />
+      <div className="trace-table">
+        {runs.slice(0, 7).map((run) => (
+          <div key={run.id} className="trace-row">
+            <span className={cn("route-light", run.route)} />
+            <b>{run.model}</b>
+            <em>{run.route === "burst" ? "Fallback route" : "Hetzner primary"}</em>
+            <strong>{run.latency_ms} ms</strong>
+            <small>{run.tokens} units</small>
+            <PolicySeal policy={run.policy} />
+            <time>{relativeTime(run.when)}</time>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SpendPanel({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
-  const spend = data?.spend;
-  const capText = spend?.cap_cents
-    ? `${fmtCents(spend.spend_cents)} of ${fmtCents(spend.cap_cents)} reserve policy`
-    : `${fmtCents(spend?.spend_cents ?? 0)} reserve used`;
-  const capPct = data?.kpi.spend_cap_pct ?? spend?.forecast_cap_pct ?? 0;
-
-  return (
-    <div className="frame col-span-12 lg:col-span-4">
-      <PanelHeader
-        eyebrow="Operating reserve - today"
-        title={isLoading ? "Loading reserve ledger" : capText}
-        actions={
-          <Badge tone={capPct >= 90 ? "warn" : "success"} dot>
-            {capPct >= 90 ? "watch" : "on-pace"}
-          </Badge>
-        }
-      />
-      <div className="px-4 py-3">
-        <div className="h-3 overflow-hidden rounded-full bg-rule">
-          <div className="h-full bg-gradient-to-r from-brass/80 to-brass" style={{ width: `${Math.min(100, capPct)}%` }} />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-          <SpendRow label="Inference" cents={spend?.inference_cents} total={spend?.spend_cents} />
-          <SpendRow label="Embeddings" cents={spend?.embeddings_cents} total={spend?.spend_cents} />
-          <SpendRow label="Fallback compute" cents={spend?.gpu_burst_cents} total={spend?.spend_cents} />
-          <SpendRow label="Storage" cents={spend?.storage_cents} total={spend?.spend_cents} />
-        </div>
-      </div>
-      <div className="border-t border-rule px-4 py-2 text-[11px]">
-        <div className="flex items-center justify-between">
-          <span className="text-muted">Burn rate</span>
-          <span className="font-mono text-bone">{spend ? `${fmtCents(spend.burn_rate_per_min_cents)} / min` : "-"}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-muted">Forecast EOD</span>
-          <span className="font-mono text-bone">
-            {spend ? `${fmtCents(spend.forecast_eod_cents)} (${spend.forecast_cap_pct}% reserve policy)` : "-"}
-          </span>
-        </div>
+        ))}
+        {!runs.length && <EmptyLine text={isLoading ? "Synchronizing active run lanes." : "No active runs in the live window."} />}
       </div>
     </div>
   );
 }
 
-function SpendRow({ label, cents, total }: { label: string; cents?: number; total?: number }) {
-  const pct = cents !== undefined && total && total > 0 ? Math.round((cents / total) * 100) : 0;
+function CommitteeSessions({ events, state, isLoading }: { events: PolicyEvent[]; state: InstitutionalState | null; isLoading: boolean }) {
   return (
-    <div className="rounded-md border border-rule bg-ink/40 px-2.5 py-1.5">
-      <div className="flex items-center justify-between text-muted">
-        <span>{label}</span>
-        <span className="font-mono">{pct}%</span>
+    <div className="committee-panel mineral-panel">
+      <PanelChrome label="Committee sessions" icon={Vote} />
+      <div className="committee-score">
+        <span>Alignment</span>
+        <b>{state ? `${state.committeeAlignment}%` : "-"}</b>
+        <small>{events.length} live policy event{events.length === 1 ? "" : "s"}</small>
       </div>
-      <div className="font-mono text-[12px] text-bone">{cents !== undefined ? fmtCents(cents) : "-"}</div>
-    </div>
-  );
-}
-
-function RecentRunsPanel({ rows, isLoading }: { rows: RecentRun[]; isLoading: boolean }) {
-  return (
-    <div className="frame col-span-12 lg:col-span-7">
-      <PanelHeader
-        eyebrow="Recent runs - live"
-        title="Per-run routing, latency, reserve impact"
-        actions={
-          <a href="#/playground" className="v-btn-ghost h-7 px-2 text-xs">
-            Playground <ArrowRight className="h-3.5 w-3.5" />
-          </a>
-        }
-      />
-      <div className="overflow-hidden">
-        <table className="w-full text-[12px]">
-          <thead className="border-b border-rule bg-ink/40 text-eyebrow">
-            <tr>
-              <th className="px-4 py-2 text-left">Model</th>
-              <th className="px-4 py-2 text-left">Route</th>
-              <th className="px-4 py-2 text-right">Latency</th>
-              <th className="px-4 py-2 text-right">Run units</th>
-              <th className="px-4 py-2 text-right">Reserve</th>
-              <th className="px-4 py-2 text-left">Policy</th>
-              <th className="px-4 py-2 text-right">When</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.slice(0, 5).map((row) => (
-              <tr key={row.id} className="hover-elevate border-b border-rule/60 last:border-0">
-                <td className="px-4 py-2 text-bone">{row.model}</td>
-                <td className="px-4 py-2">
-                  <RouteBadge route={row.route} />
-                </td>
-                <td className="px-4 py-2 text-right font-mono text-bone">{row.latency_ms} ms</td>
-                <td className="px-4 py-2 text-right font-mono">{row.tokens}</td>
-                <td className="px-4 py-2 text-right font-mono text-bone">{fmtCents(row.cost_cents)}</td>
-                <td className="px-4 py-2">
-                  <Badge
-                    tone={row.policy === "passed" ? "success" : row.policy === "redacted" ? "warn" : "danger"}
-                    icon={<ShieldCheck className="h-3 w-3" />}
-                  >
-                    {row.policy}
-                  </Badge>
-                </td>
-                <td className="px-4 py-2 text-right font-mono text-muted">{relativeTime(row.when)}</td>
-              </tr>
-            ))}
-            {!rows.length && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted">
-                  {isLoading ? "Loading runs..." : "No runs yet. Open the Playground to generate the first one."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function PolicyTimelinePanel({ events, isLoading }: { events: PolicyEvent[]; isLoading: boolean }) {
-  return (
-    <div className="frame col-span-12 lg:col-span-5">
-      <PanelHeader eyebrow="Policy interception - live" title="Decision before execution" actions={<LiveBadge />} />
-      <ol className="relative space-y-3 px-5 py-4">
-        <span className="absolute bottom-3 left-7 top-3 w-px bg-rule" />
+      <div className="session-list">
         {events.slice(0, 5).map((event) => (
-          <TimelineItem
-            key={event.id}
-            time={formatApiTime(event.ts)}
-            title={event.summary}
-            body={event.detail}
-            tone={event.kind === "audit_signed" ? "success" : event.kind === "route_decision" ? "primary" : "neutral"}
-            icon={event.kind === "audit_signed" ? FileCheck2 : event.kind === "route_decision" ? Server : TerminalSquare}
-          />
-        ))}
-        {!events.length && (
-          <li className="relative flex gap-3 pl-2">
-            <div className="z-10 mt-0.5 grid h-5 w-5 place-items-center rounded-full border border-rule bg-ink text-muted">
-              <Activity className="h-3 w-3" />
+          <div key={event.id} className="session-row">
+            <CircleDot className="h-3.5 w-3.5" />
+            <div>
+              <b>{event.summary}</b>
+              <span>{event.detail}</span>
             </div>
-            <div className="flex-1 text-[12px] text-muted">
-              {isLoading ? "Waiting on policy engine..." : "No policy events in the current window."}
-            </div>
-          </li>
-        )}
-      </ol>
-    </div>
-  );
-}
-
-function TimelineItem({
-  time,
-  title,
-  body,
-  tone,
-  icon: Icon,
-}: {
-  time: string;
-  title: string;
-  body: string;
-  tone: "neutral" | "success" | "primary" | "info";
-  icon: ComponentType<{ className?: string }>;
-}) {
-  return (
-    <li className="relative flex gap-3 pl-2">
-      <div
-        className={cn(
-          "z-10 mt-0.5 grid h-5 w-5 place-items-center rounded-full border bg-ink",
-          tone === "success"
-            ? "border-moss/40 text-moss"
-            : tone === "primary"
-              ? "border-brass/40 text-brass-2"
-              : tone === "info"
-                ? "border-electric/40 text-electric"
-                : "border-rule text-muted",
-        )}
-      >
-        <Icon className="h-3 w-3" />
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[12.5px] text-bone">{title}</span>
-          <span className="whitespace-nowrap font-mono text-[10.5px] text-muted">{time}</span>
-        </div>
-        <div className="text-[11.5px] text-muted">{body}</div>
-      </div>
-    </li>
-  );
-}
-
-function AlertsPanel({ alerts, isLoading }: { alerts: Alert[]; isLoading: boolean }) {
-  return (
-    <div className="frame col-span-12 lg:col-span-4">
-      <PanelHeader eyebrow="Alerts" title={`${alerts.length} open`} />
-      <div className="divide-y divide-rule/60">
-        {alerts.slice(0, 5).map((alert) => (
-          <div key={alert.id} className="flex items-start gap-3 px-4 py-3">
-            <span
-              className={cn(
-                "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                alert.severity === "error" ? "bg-crimson" : alert.severity === "warn" ? "bg-amber" : "bg-electric",
-              )}
-            />
-            <div className="flex-1">
-              <div className="text-[12.5px] text-bone">{alert.title}</div>
-              <div className="text-eyebrow mt-0.5 flex items-center gap-2">
-                <span>{alert.scope}</span>
-                <span>-</span>
-                <span>{relativeTime(alert.when)}</span>
-              </div>
-            </div>
+            <time>{formatApiTime(event.ts)}</time>
           </div>
         ))}
-        {!alerts.length && (
-          <EmptyPanel
-            icon={isLoading ? Activity : CheckCircle2}
-            text={isLoading ? "Loading alert state..." : "No open alerts. The control plane is calm."}
-          />
-        )}
+        {!events.length && <EmptyLine text={isLoading ? "Waiting for committee decisions." : "No committee sessions in this window."} />}
       </div>
     </div>
   );
 }
 
-function AuditTrailPanel({ entries, isLoading }: { entries: AuditEntry[]; isLoading: boolean }) {
+function InterventionQueue({ alerts, runs, isLoading }: { alerts: Alert[]; runs: RecentRun[]; isLoading: boolean }) {
+  const blocked = runs.filter((run) => run.policy === "blocked");
+  const interventions = [
+    ...alerts.map((alert) => ({
+      id: alert.id,
+      title: alert.title,
+      detail: `${alert.scope} - ${relativeTime(alert.when)}`,
+      severity: alert.severity,
+    })),
+    ...blocked.map((run) => ({
+      id: run.id,
+      title: "Blocked workflow",
+      detail: `${run.model} - ${relativeTime(run.when)}`,
+      severity: "error" as const,
+    })),
+  ];
   return (
-    <div className="frame col-span-12 lg:col-span-4">
-      <PanelHeader
-        eyebrow="Audit trail - tamper-evident"
-        title="Hash-chained"
-        actions={
-          <Badge tone="success" icon={<ShieldCheck className="h-3 w-3" />}>
-            verified
-          </Badge>
-        }
-      />
-      <div className="divide-y divide-rule/60">
-        {entries.slice(0, 5).map((entry) => (
-          <div key={entry.id} className="px-4 py-2.5 text-[12px]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="truncate font-mono text-bone">{entry.kind}</span>
-              <span className="whitespace-nowrap font-mono text-[10.5px] text-muted">{formatApiTime(entry.ts)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3 text-[11px] text-muted">
-              <span className="truncate">
-                {entry.subject} - {entry.actor}
-              </span>
-              <span className="flex items-center gap-1 font-mono">
-                <Hash className="h-3 w-3" />
-                {entry.hash_prefix}
-              </span>
-            </div>
+    <div className="intervention-panel mineral-panel">
+      <PanelChrome label="Open intervention" icon={OctagonAlert} />
+      <div className="intervention-stack">
+        {interventions.slice(0, 5).map((item) => (
+          <div key={item.id} className={cn("intervention-row", item.severity)}>
+            <span />
+            <b>{item.title}</b>
+            <small>{item.detail}</small>
           </div>
         ))}
-        {!entries.length && (
-          <EmptyPanel
-            icon={isLoading ? Activity : Hash}
-            text={isLoading ? "Loading audit chain..." : "No audit records yet. Successful runs appear here."}
-          />
-        )}
+        {!interventions.length && <EmptyLine text={isLoading ? "Scanning intervention queue." : "No open intervention requests."} />}
       </div>
     </div>
   );
 }
 
-function FleetPanel({ fleet, isLoading }: { fleet: FleetModel[]; isLoading: boolean }) {
+function EvidenceTray({ entries, isLoading }: { entries: AuditEntry[]; isLoading: boolean }) {
   return (
-    <div className="frame col-span-12 lg:col-span-4">
-      <PanelHeader eyebrow="Fleet" title="Models - deployments" />
-      <div className="space-y-2 px-3 py-3">
-        {fleet.slice(0, 4).map((model) => (
-          <div key={model.id} className="flex items-center justify-between rounded-md border border-rule bg-ink/40 px-3 py-2">
-            <div className="min-w-0">
-              <div className="truncate text-[12.5px] text-bone">{model.name}</div>
-              <div className="font-mono text-[10.5px] text-muted">
-                {model.quant} - {model.replicas} replicas
-              </div>
+    <div className="evidence-panel mineral-panel">
+      <PanelChrome label="Attached evidence" icon={FileCheck2} />
+      <div className="evidence-list">
+        {entries.slice(0, 6).map((entry) => (
+          <div key={entry.id} className="evidence-row">
+            <Hash className="h-3.5 w-3.5" />
+            <div>
+              <b>{entry.kind}</b>
+              <span>{entry.subject}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <RouteBadge route={model.route} />
-              <LatencyBadge ms={model.p50_ms} />
-            </div>
+            <code>{entry.hash_prefix || "pending"}</code>
           </div>
         ))}
-        {!fleet.length && (
-          <div className="rounded-md border border-rule bg-ink/40 px-3 py-6 text-center text-[12px] text-muted">
-            {isLoading ? "Loading fleet..." : "No model fleet telemetry yet."}
+        {!entries.length && <EmptyLine text={isLoading ? "Loading evidence chain." : "No evidence attachments yet."} />}
+      </div>
+    </div>
+  );
+}
+
+function FleetMatrix({ fleet }: { fleet: FleetModel[] }) {
+  return (
+    <div className="fleet-panel mineral-panel">
+      <PanelChrome label="Delegated agents and routes" icon={Cpu} />
+      <div className="fleet-matrix">
+        {fleet.slice(0, 6).map((model) => (
+          <div key={model.id} className="fleet-row">
+            <b>{model.name}</b>
+            <span>{model.quant}</span>
+            <em>{model.route === "burst" ? "fallback" : "primary"}</em>
+            <code>{model.p50_ms || "-"} p50</code>
           </div>
-        )}
+        ))}
+        {!fleet.length && <EmptyLine text="No model fleet telemetry yet." />}
       </div>
     </div>
   );
 }
 
-function PanelHeader({
-  eyebrow,
-  title,
-  actions,
-}: {
-  eyebrow: string;
-  title: string;
-  actions?: ReactNode;
-}) {
+function ArchivesLayer({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
+  const archiveEntries = buildArchiveLineage(data);
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
-      <div className="min-w-0">
-        <div className="text-eyebrow">{eyebrow}</div>
-        <div className="font-display truncate text-[15px] text-bone">{title}</div>
+    <section className="archives-spine">
+      <div>
+        <div className="archive-mark"><Archive className="h-4 w-4" /> The Archives</div>
+        <h2>Historical lineage</h2>
+        <p>Permanent record of votes, executions, disagreements, policy changes, escalations, and institutional transitions.</p>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      <div className="archive-line">
+        {archiveEntries.map((entry) => (
+          <div key={entry.id}>
+            <b>{entry.kind}</b>
+            <span>{entry.subject}</span>
+            <code>{entry.hash}</code>
+          </div>
+        ))}
+        {!archiveEntries.length && <EmptyLine text={isLoading ? "Reconstructing lineage." : "No archive lineage available from live telemetry yet."} />}
+      </div>
+    </section>
+  );
+}
+
+function PanelChrome({ label, icon: Icon, action }: { label: string; icon: ComponentType<{ className?: string }>; action?: ReactNode }) {
+  return (
+    <div className="panel-chrome">
+      <span><Icon className="h-3.5 w-3.5" /> {label}</span>
+      {action && <div>{action}</div>}
     </div>
   );
 }
 
-function Badge({
-  children,
-  tone = "neutral",
-  icon,
-  dot,
-}: {
-  children: ReactNode;
-  tone?: "neutral" | "muted" | "success" | "warn" | "info" | "primary" | "danger";
-  icon?: ReactNode;
-  dot?: boolean;
-}) {
+function SectionTitle({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
   return (
-    <span
-      className={cn(
-        "chip",
-        tone === "success" && "border-moss/30 bg-moss/10 text-moss",
-        tone === "warn" && "border-amber/30 bg-amber/10 text-amber",
-        tone === "info" && "border-electric/30 bg-electric/10 text-electric",
-        tone === "primary" && "border-brass/40 bg-brass/10 text-brass-2",
-        tone === "danger" && "border-crimson/30 bg-crimson/10 text-crimson",
-        tone === "muted" && "border-rule bg-white/[0.02] text-muted",
-        tone === "neutral" && "border-rule bg-ink/40 text-bone-2",
-      )}
-    >
-      {dot && (
-        <span
-          className={cn(
-            "h-1.5 w-1.5 rounded-full",
-            tone === "success" ? "bg-moss" : tone === "warn" ? "bg-amber" : tone === "info" ? "bg-electric" : "bg-brass-2",
-          )}
-        />
-      )}
-      {icon}
-      {children}
+    <div className="command-section-title">
+      <span>{eyebrow}</span>
+      <h2>{title}</h2>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function SignalReadout({ label, value, icon: Icon }: { label: string; value: string; icon: ComponentType<{ className?: string }> }) {
+  return (
+    <div className="signal-readout">
+      <Icon className="h-3.5 w-3.5" />
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+function TrajectoryBand({ label, value, tone }: { label: string; value: number; tone: "cyan" | "teal" | "amber" }) {
+  return (
+    <div className={cn("trajectory-band", tone)}>
+      <div><span>{label}</span><b>{value}%</b></div>
+      <i style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+function StatusDatum({ label, value, tone }: { label: string; value: string; tone: "stable" | "watch" | "critical" | "neutral" }) {
+  return (
+    <div className={cn("status-datum", tone)}>
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+function EventLine({ event }: { event: StrategicEvent }) {
+  return (
+    <div className={cn("event-line", event.tone)}>
+      <span />
+      <div>
+        <b>{event.title}</b>
+        <small>{event.detail}</small>
+      </div>
+      <time>{event.when}</time>
+    </div>
+  );
+}
+
+function PolicySeal({ policy }: { policy: RecentRun["policy"] }) {
+  return (
+    <span className={cn("policy-seal", policy)}>
+      {policy === "passed" ? <ShieldCheck className="h-3 w-3" /> : policy === "redacted" ? <BadgeCheck className="h-3 w-3" /> : <OctagonAlert className="h-3 w-3" />}
+      {policy}
     </span>
   );
 }
 
-function LiveBadge({ label = "LIVE" }: { label?: string }) {
-  return (
-    <Badge tone="success" dot>
-      {label}
-    </Badge>
-  );
+function EmptyLine({ text }: { text: string }) {
+  return <div className="empty-line">{text}</div>;
 }
 
-function RouteBadge({ route }: { route: "primary" | "burst" }) {
-  return route === "burst" ? <Badge tone="info">Fallback</Badge> : <Badge tone="primary">HTZ primary</Badge>;
+interface InstitutionalState {
+  posture: string;
+  tone: "stable" | "watch" | "critical" | "neutral";
+  narrative: string;
+  systemCoherence: number;
+  convergencePressure: number;
+  operationalDrift: number;
+  executionConfidence: number;
+  routeIntegrity: number;
+  memoryContinuity: number;
+  policyStability: number;
+  committeeAlignment: number;
 }
 
-function LatencyBadge({ ms }: { ms: number }) {
-  return <span className="rounded-md border border-rule px-1.5 py-0.5 font-mono text-[10px] text-muted">{ms || "-"} p50</span>;
+interface StrategicEvent {
+  id: string;
+  title: string;
+  detail: string;
+  when: string;
+  tone: "stable" | "watch" | "critical" | "neutral";
 }
 
-function EmptyPanel({ icon: Icon, text }: { icon: ComponentType<{ className?: string }>; text: string }) {
-  return (
-    <div className="flex items-center gap-2 px-4 py-6 text-[12px] text-muted">
-      <Icon className="h-4 w-4" />
-      <span>{text}</span>
-    </div>
-  );
+function deriveInstitutionalState(data: OverviewPayload, pulse: PlatformPulse | null): InstitutionalState {
+  const totalRuns = data.recent_runs.length;
+  const passedRuns = data.recent_runs.filter((run) => run.policy === "passed").length;
+  const blockedRuns = data.recent_runs.filter((run) => run.policy === "blocked").length;
+  const executionConfidence = totalRuns ? pct(passedRuns, totalRuns) : data.kpi.audit_verified_pct;
+  const routeIntegrity = Math.max(0, Math.round(100 - data.routing.burst_util_pct));
+  const memoryContinuity = data.kpi.audit_entries ? data.kpi.audit_verified_pct : 0;
+  const policyStability = Math.max(0, Math.round(100 - blockedRuns * 18 - data.alerts.length * 12));
+  const operationalDrift = Math.min(100, Math.round(Math.max(0, data.kpi.p50_delta_ms) / 20 + data.routing.burst_util_pct + data.alerts.length * 8));
+  const convergencePressure = Math.min(100, Math.round(data.policy_events.length * 10 + data.alerts.length * 16 + (pulse?.orders_30d.delta_pct_vs_prior ?? 0) / 2));
+  const committeeAlignment = Math.max(0, Math.round((executionConfidence + policyStability + routeIntegrity) / 3));
+  const systemCoherence = Math.max(0, Math.round((executionConfidence + routeIntegrity + memoryContinuity + policyStability) / 4));
+  const tone: InstitutionalState["tone"] = data.alerts.some((alert) => alert.severity === "error") || blockedRuns > 0
+    ? "critical"
+    : operationalDrift > 35 || convergencePressure > 55
+      ? "watch"
+      : totalRuns || data.kpi.audit_entries
+        ? "stable"
+        : "neutral";
+  const posture = tone === "critical" ? "Escalation pressure" : tone === "watch" ? "Controlled drift" : tone === "stable" ? "Coherent" : "Awaiting signal";
+  const narrative = `${fmtNumber(data.kpi.audit_entries)} audit entries, ${fmtNumber(totalRuns)} live run traces, ${data.routing.primary_plane} at ${data.routing.primary_util_pct}% with ${data.routing.burst_plane} at ${data.routing.burst_util_pct}%.`;
+
+  return {
+    posture,
+    tone,
+    narrative,
+    systemCoherence,
+    convergencePressure,
+    operationalDrift,
+    executionConfidence,
+    routeIntegrity,
+    memoryContinuity,
+    policyStability,
+    committeeAlignment,
+  };
 }
 
-function getHostTiles(data?: OverviewPayload): Array<{
-  label: string;
-  value: string;
-  sub: string;
-  tone: "primary" | "info";
-  icon: ComponentType<{ className?: string }>;
-}> {
-  if (!data) {
-    return [
-      { label: "Hetzner primary", value: "-", sub: "Loading host telemetry", tone: "primary", icon: Server },
-      { label: "Approved fallback", value: "-", sub: "Loading fallback telemetry", tone: "info", icon: Cloud },
-      { label: "Workspace events", value: "-", sub: "Loading live run window", tone: "primary", icon: Database },
-    ];
+function pct(part: number, total: number): number {
+  return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+function buildCommittees(data?: OverviewPayload) {
+  const policyEvents = data?.policy_events.length ?? 0;
+  const alerts = data?.alerts.length ?? 0;
+  const burst = data?.routing.burst_util_pct ?? 0;
+  const audit = data?.kpi.audit_verified_pct ?? 0;
+  return [
+    { name: "Policy", state: alerts ? "contested" : "aligned", detail: `${policyEvents} decision event${policyEvents === 1 ? "" : "s"}`, tone: alerts ? "watch" : "stable" },
+    { name: "Routing", state: burst > 20 ? "conflicted" : "aligned", detail: `${burst}% fallback posture`, tone: burst > 20 ? "watch" : "stable" },
+    { name: "Memory", state: audit >= 95 ? "continuous" : "thin", detail: `${audit}% verified lineage`, tone: audit >= 95 ? "stable" : "neutral" },
+    { name: "Fleet", state: data?.kpi.active_models ? "online" : "quiet", detail: `${data?.kpi.active_models ?? 0} model routes`, tone: data?.kpi.active_models ? "stable" : "neutral" },
+  ];
+}
+
+function buildStrategicEvents(data?: OverviewPayload, pulse?: PlatformPulse | null): StrategicEvent[] {
+  const events: StrategicEvent[] = [];
+  (data?.alerts ?? []).slice(0, 3).forEach((alert) => {
+    events.push({
+      id: `alert-${alert.id}`,
+      title: "Escalation path opened",
+      detail: `${alert.title} - ${alert.scope}`,
+      when: relativeTime(alert.when),
+      tone: alert.severity === "error" ? "critical" : "watch",
+    });
+  });
+  (data?.policy_events ?? []).slice(0, 4).forEach((event) => {
+    events.push({
+      id: `policy-${event.id}`,
+      title: event.kind === "audit_signed" ? "Historical lineage written" : "Policy posture shifted",
+      detail: event.summary,
+      when: relativeTime(event.ts),
+      tone: "stable",
+    });
+  });
+  if (pulse) {
+    events.push({
+      id: "pulse-marketplace",
+      title: "External signal changed",
+      detail: `${pulse.active_listings.total} active listings, ${pulse.orders_30d.count} paid orders in 30d`,
+      when: relativeTime(pulse.generated_at),
+      tone: "neutral",
+    });
   }
+  return events.slice(0, 6);
+}
 
-  const hosts = data.routing.primary_hosts.slice(0, 2).map((host) => ({
-    label: host.name,
-    value: `${host.util_pct}% util`,
-    sub: host.detail,
-    tone: "primary" as const,
-    icon: Server,
+function buildArchiveLineage(data?: OverviewPayload) {
+  const audits = (data?.audit_trail ?? []).slice(0, 5).map((entry) => ({
+    id: `audit-${entry.id}`,
+    kind: entry.kind,
+    subject: entry.subject,
+    hash: entry.hash_prefix || "unsealed",
   }));
-
-  const burst = {
-    label: data.routing.burst_plane || "Approved fallback",
-    value: `${data.routing.burst_util_pct}% engaged`,
-    sub: "On-demand - gated by tenant policy",
-    tone: "info" as const,
-    icon: Cloud,
-  };
-
-  const events = {
-    label: "Workspace events",
-    value: `${data.recent_runs.length} run${data.recent_runs.length === 1 ? "" : "s"}`,
-    sub: `${data.policy_events.length} policy event${data.policy_events.length === 1 ? "" : "s"} in window`,
-    tone: "primary" as const,
-    icon: Cpu,
-  };
-
-  return [...hosts, burst, events].slice(0, 3);
+  const policies = (data?.policy_events ?? []).slice(0, Math.max(0, 5 - audits.length)).map((event) => ({
+    id: `policy-${event.id}`,
+    kind: event.kind,
+    subject: event.summary,
+    hash: event.id.slice(0, 10),
+  }));
+  return [...audits, ...policies];
 }

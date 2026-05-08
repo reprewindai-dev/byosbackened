@@ -9,6 +9,15 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
+PUBLIC_ENDPOINTS = {
+    "/api/v1/edge/demo/summary",
+    "/api/v1/edge/demo/infrastructure",
+    "/api/v1/demo/pipeline/health",
+    "/api/v1/demo/pipeline/stream",
+}
+DEFAULT_ENDPOINT_COSTS: dict[str, int] = {}
+
+
 class TokenDeductionMiddleware(BaseHTTPMiddleware):
     """Compatibility shim that never mutates wallet state."""
 

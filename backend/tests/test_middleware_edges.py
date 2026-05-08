@@ -18,13 +18,8 @@ def test_edge_entitlement_paths_requirements():
     assert middleware._get_required_plan("GET", "/api/v1/edge/protocol/modbus") == "pro"
 
 
-def test_edge_token_cost_policies_for_protocol_and_webhook():
-    assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/input/webhook"] == 25
-    assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/snmp"] == 40
-    assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/modbus"] == 40
-    assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/protocol/snmp"] == 40
-    assert DEFAULT_ENDPOINT_COSTS["/api/v1/edge/protocol/modbus"] == 40
-    assert DEFAULT_ENDPOINT_COSTS["/api/v1/internal/operators"] == 0
+def test_token_deduction_middleware_has_no_hidden_endpoint_costs():
+    assert DEFAULT_ENDPOINT_COSTS == {}
 
 
 def test_public_demo_and_pipeline_routes_are_free_and_public():

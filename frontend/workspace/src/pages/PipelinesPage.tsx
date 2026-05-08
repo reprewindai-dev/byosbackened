@@ -91,6 +91,35 @@ interface PipelineRun {
   created_at: string;
 }
 
+interface PipelineEndpointDeployment {
+  id: string;
+  name?: string | null;
+  slug?: string | null;
+  region: string;
+  service_type: string;
+  model_slug?: string | null;
+  provider?: string | null;
+  version?: string | null;
+}
+
+interface DeploymentTestResult {
+  status: string;
+  response_text: string;
+  latency_ms: number;
+  provider: string;
+  model: string;
+  audit_created: boolean;
+  usage_recorded: boolean;
+  cost_usd: string;
+}
+
+interface PipelineDeployDraft {
+  endpointName: string;
+  region: string;
+  strategy: "direct" | "blue_green" | "canary";
+  trafficPercent: number;
+}
+
 interface CreatePipelinePayload {
   name: string;
   description?: string;
@@ -243,6 +272,9 @@ export function PipelinesPage() {
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [testPanelOpen, setTestPanelOpen] = useState(false);
+  const [testPrompt, setTestPrompt] = useState("Reply with exactly: OK");
+  const [deployDraft, setDeployDraft] = useState<PipelineDeployDraft | null>(null);
+  const [deployedEndpoint, setDeployedEndpoint] = useState<PipelineEndpointDeployment | null>(null);
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
@@ -278,7 +310,7 @@ export function PipelinesPage() {
   const executeMut = useMutation({
     mutationFn: async (id: string) => {
       setCreating(id);
-      const r = await api.post<PipelineRun>(`/pipelines/${id}/execute`, { inputs: {} });
+      const r = await api.post<PipelineRun>(`/pipelines/${id}/execute`, { inputs: { prompt: testPrompt } });
       return r.data;
     },
     onSettled: () => {
@@ -297,25 +329,28 @@ export function PipelinesPage() {
   });
 
   const deployMut = useMutation({
-    mutationFn: async ({ pipeline, graph }: { pipeline: PipelineSummary; graph?: PipelineGraph }) => {
+    mutationFn: async ({ pipeline, graph, draft }: { pipeline: PipelineSummary; graph?: PipelineGraph; draft: PipelineDeployDraft }) => {
       setDeploying(true);
       const modelNode = graph?.nodes.find((node) => node.type === "model" && node.model);
       const modelSlug = modelNode?.model ?? "qwen2.5:3b";
       const provider = modelSlug.includes("llama-3") ? "groq" : "ollama";
-      const r = await api.post("/deployments", {
-        name: `${pipeline.slug}-endpoint`,
-        region: "hetzner-fsn1",
+      const r = await api.post<PipelineEndpointDeployment>("/deployments", {
+        name: draft.endpointName,
+        region: draft.region,
         service_type: "pipeline",
         model_slug: modelSlug,
         provider,
         version: `pipeline-v${pipeline.current_version}`,
-        strategy: "direct",
-        traffic_percent: 100,
+        strategy: draft.strategy,
+        traffic_percent: draft.trafficPercent,
       });
       return r.data;
     },
-    onSuccess: () => {
+    onSuccess: (endpoint) => {
       setActionError(null);
+      setDeployDraft(null);
+      setTestPanelOpen(false);
+      setDeployedEndpoint(endpoint);
       qc.invalidateQueries({ queryKey: ["deployments"] });
     },
     onError: (error) => setActionError(error),
@@ -407,12 +442,8 @@ export function PipelinesPage() {
                 },
               })
             }
-            onExecute={() => {
-              if (!selectedPipeline) return;
-              setTestPanelOpen(true);
-              executeMut.mutate(selectedPipeline.id);
-            }}
-            onDeploy={() => selectedPipeline && deployMut.mutate({ pipeline: selectedPipeline, graph })}
+            onExecute={() => setTestPanelOpen(true)}
+            onDeploy={() => selectedPipeline && setDeployDraft(defaultDeployDraft(selectedPipeline))}
           />
           <NodePalette
             search={nodeSearch}
@@ -453,13 +484,35 @@ export function PipelinesPage() {
             pipeline={selectedPipeline}
             pricingTier={user?.plan}
             deploying={deploying || deployMut.isPending}
+            prompt={testPrompt}
+            onPromptChange={setTestPrompt}
             onClose={() => setTestPanelOpen(false)}
-            onDeploy={() => selectedPipeline && deployMut.mutate({ pipeline: selectedPipeline, graph })}
+            onDeploy={() => selectedPipeline && setDeployDraft(defaultDeployDraft(selectedPipeline))}
+            onRunTest={() => selectedPipeline && executeMut.mutate(selectedPipeline.id)}
             onRunAgain={() => selectedPipeline && executeMut.mutate(selectedPipeline.id)}
             onViewTrace={() => {
               if (executeMut.data?.id) setSelectedRunId(executeMut.data.id);
               document.getElementById("pipeline-run-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
+          />
+        )}
+
+        {deployDraft && selectedPipeline && (
+          <PipelineDeployModal
+            draft={deployDraft}
+            pipeline={selectedPipeline}
+            pending={deployMut.isPending}
+            error={deployMut.error}
+            onChange={setDeployDraft}
+            onClose={() => setDeployDraft(null)}
+            onCreate={() => deployMut.mutate({ pipeline: selectedPipeline, graph, draft: deployDraft })}
+          />
+        )}
+
+        {deployedEndpoint && (
+          <EndpointCreatedPanel
+            endpoint={deployedEndpoint}
+            onClose={() => setDeployedEndpoint(null)}
           />
         )}
       </section>
@@ -1148,8 +1201,11 @@ function PipelineTestResultPanel({
   pipeline,
   pricingTier,
   deploying,
+  prompt,
+  onPromptChange,
   onClose,
   onDeploy,
+  onRunTest,
   onRunAgain,
   onViewTrace,
 }: {
@@ -1159,8 +1215,11 @@ function PipelineTestResultPanel({
   pipeline: PipelineSummary | null;
   pricingTier?: string;
   deploying: boolean;
+  prompt: string;
+  onPromptChange: (value: string) => void;
   onClose: () => void;
   onDeploy: () => void;
+  onRunTest: () => void;
   onRunAgain: () => void;
   onViewTrace: () => void;
 }) {
@@ -1197,6 +1256,24 @@ function PipelineTestResultPanel({
       </header>
 
       <div className="space-y-3 p-4">
+        <div className="rounded-lg border border-rule/70 bg-ink-2/70 p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-eyebrow">Test pipeline</div>
+            <Badge tone="primary">{eventPrice.label}</Badge>
+          </div>
+          <textarea
+            className="v-input min-h-[78px] resize-y leading-relaxed"
+            value={prompt}
+            onChange={(event) => onPromptChange(event.target.value)}
+            placeholder="Reply with exactly: OK"
+          />
+          {!run && !pending && !error && (
+            <button className="v-btn-primary mt-3 h-8 px-3 text-xs" disabled={!pipeline || !prompt.trim()} onClick={onRunTest}>
+              <Play className="h-3.5 w-3.5" /> Run test
+            </button>
+          )}
+        </div>
+
         <div className="grid gap-2">
           {syntheticSteps.map((step, index) => (
             <div key={`${step.label}-${index}`} className="grid grid-cols-[28px_1fr_auto] items-center gap-3 rounded-md border border-rule/70 bg-ink-2/70 px-3 py-2">
@@ -1256,6 +1333,218 @@ function PipelineTestResultPanel({
           <button className="v-btn-ghost h-8 px-3 text-xs" disabled={pending || !pipeline} onClick={onRunAgain}>
             <Play className="h-3.5 w-3.5" /> Run again
           </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function PipelineDeployModal({
+  draft,
+  pipeline,
+  pending,
+  error,
+  onChange,
+  onClose,
+  onCreate,
+}: {
+  draft: PipelineDeployDraft;
+  pipeline: PipelineSummary;
+  pending: boolean;
+  error: unknown;
+  onChange: (draft: PipelineDeployDraft) => void;
+  onClose: () => void;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm">
+      <div className="frame w-full max-w-xl overflow-hidden">
+        <header className="flex items-start justify-between gap-3 border-b border-rule/80 bg-brass/[0.055] px-5 py-4">
+          <div>
+            <div className="text-eyebrow">Deploy tested pipeline</div>
+            <h3 className="font-display mt-1 text-lg font-semibold text-bone">Deploy pipeline as endpoint</h3>
+            <p className="mt-1 text-[12px] text-muted">
+              Create a governed API endpoint from {pipeline.name}. Verification stays on this page after creation.
+            </p>
+          </div>
+          <button className="text-muted hover:text-bone" onClick={onClose} aria-label="Close deployment dialog">
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block md:col-span-2">
+              <div className="v-label">Endpoint name</div>
+              <input
+                className="v-input"
+                value={draft.endpointName}
+                onChange={(event) => onChange({ ...draft, endpointName: event.target.value })}
+                placeholder="finance-summary"
+                autoFocus
+              />
+            </label>
+            <label className="block">
+              <div className="v-label">Region</div>
+              <select className="v-input" value={draft.region} onChange={(event) => onChange({ ...draft, region: event.target.value })}>
+                <option value="hetzner-fsn1">hetzner-fsn1</option>
+                <option value="hetzner-nbg1">hetzner-nbg1</option>
+                <option value="groq-fallback">groq-fallback</option>
+              </select>
+            </label>
+            <label className="block">
+              <div className="v-label">Strategy</div>
+              <select
+                className="v-input"
+                value={draft.strategy}
+                onChange={(event) => onChange({ ...draft, strategy: event.target.value as PipelineDeployDraft["strategy"] })}
+              >
+                <option value="direct">direct</option>
+                <option value="blue_green">blue_green</option>
+                <option value="canary">canary</option>
+              </select>
+            </label>
+            <label className="block md:col-span-2">
+              <div className="v-label">Initial traffic</div>
+              <input
+                className="v-input"
+                type="number"
+                min={1}
+                max={100}
+                value={draft.trafficPercent}
+                onChange={(event) => onChange({ ...draft, trafficPercent: Number(event.target.value) })}
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <RunMetric label="version" value={`v${pipeline.current_version}`} />
+            <RunMetric label="auth" value="Bearer required" />
+            <RunMetric label="flow" value="test -> deploy -> verify" />
+            <RunMetric label="traffic" value={`${Math.min(100, Math.max(1, draft.trafficPercent || 1))}%`} />
+          </div>
+
+          {Boolean(error) && <div className="rounded-md border border-crimson/30 bg-crimson/5 p-3 text-[12px] text-crimson">{actionUnavailableMessage(error, "Endpoint deployment")}</div>}
+
+          <div className="flex justify-end gap-2 border-t border-rule/80 pt-4">
+            <button className="v-btn-ghost" disabled={pending} onClick={onClose}>
+              Cancel
+            </button>
+            <button className="v-btn-primary" disabled={pending || !draft.endpointName.trim()} onClick={onCreate}>
+              <RocketIcon /> {pending ? "Creating endpoint..." : "Create endpoint"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EndpointCreatedPanel({ endpoint, onClose }: { endpoint: PipelineEndpointDeployment; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [prompt, setPrompt] = useState("Reply with exactly: OK");
+  const [copied, setCopied] = useState(false);
+  const endpointUrl = pipelineEndpointUrl(endpoint);
+
+  const endpointTestMut = useMutation({
+    mutationFn: async () => {
+      const response = await api.post<DeploymentTestResult>(`/deployments/${endpoint.id}/test`, {
+        prompt,
+        max_tokens: 20,
+        timeout_ms: 120_000,
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deployments"] });
+      queryClient.invalidateQueries({ queryKey: ["operator-overview"] });
+    },
+  });
+
+  const result = endpointTestMut.data;
+
+  return (
+    <aside className="fixed right-4 top-24 z-50 w-[min(500px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-moss/25 bg-ink/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
+      <header className="flex items-start justify-between gap-3 border-b border-rule/80 bg-moss/[0.055] px-4 py-3">
+        <div>
+          <div className="text-eyebrow">Endpoint created</div>
+          <h3 className="font-display mt-1 text-base font-semibold text-bone">{endpoint.name ?? endpoint.slug ?? "Governed endpoint"}</h3>
+          <p className="mt-1 break-all font-mono text-[11px] text-moss">{endpointUrl}</p>
+        </div>
+        <button className="text-muted transition hover:text-bone" onClick={onClose} aria-label="Close endpoint created panel">
+          <X className="h-4 w-4" />
+        </button>
+      </header>
+
+      <div className="space-y-3 p-4">
+        <div className="grid grid-cols-2 gap-2">
+          <RunMetric label="region" value={endpoint.region} />
+          <RunMetric label="auth" value="Bearer required" />
+          <RunMetric label="model" value={endpoint.model_slug ?? endpoint.provider ?? "pipeline"} />
+          <RunMetric label="version" value={endpoint.version ?? "current"} />
+        </div>
+
+        <div className="rounded-lg border border-rule/70 bg-ink-2/70 p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-eyebrow">Run endpoint test</div>
+            <Badge tone={result?.status === "ok" ? "ok" : endpointTestMut.isPending ? "primary" : "muted"} dot>
+              {result?.status === "ok" ? "passed" : endpointTestMut.isPending ? "running" : "not tested"}
+            </Badge>
+          </div>
+          <textarea
+            className="v-input min-h-[74px] resize-y leading-relaxed"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="Reply with exactly: OK"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="v-btn-primary h-8 px-3 text-xs" disabled={endpointTestMut.isPending || !prompt.trim()} onClick={() => endpointTestMut.mutate()}>
+              {endpointTestMut.isPending ? <Activity className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              {endpointTestMut.isPending ? "Running endpoint..." : "Run endpoint"}
+            </button>
+            <button
+              className="v-btn-ghost h-8 px-3 text-xs"
+              onClick={() => {
+                void navigator.clipboard?.writeText(endpointUrl);
+                setCopied(true);
+              }}
+            >
+              <Link2 className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy endpoint"}
+            </button>
+          </div>
+        </div>
+
+        {endpointTestMut.isError && (
+          <div className="rounded-md border border-crimson/30 bg-crimson/5 p-3 text-[12px] text-crimson">
+            {actionUnavailableMessage(endpointTestMut.error, "Endpoint test")}
+          </div>
+        )}
+
+        {result && (
+          <div className="rounded-lg border border-moss/25 bg-moss/[0.045] p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-eyebrow">Endpoint test passed</div>
+              <Badge tone="ok">status 200</Badge>
+            </div>
+            <pre className="max-h-[130px] whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-bone">{result.response_text || "OK"}</pre>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <RunMetric label="latency" value={formatMs(result.latency_ms)} />
+              <RunMetric label="provider" value={result.provider} />
+              <RunMetric label="audit" value={result.audit_created ? "created" : "not returned"} />
+              <RunMetric label="usage" value={result.usage_recorded ? "recorded" : "not returned"} />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2 border-t border-rule/80 pt-3">
+          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="/deployments">
+            Deployments
+          </a>
+          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="/monitoring">
+            View logs
+          </a>
+          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="/compliance">
+            View evidence
+          </a>
         </div>
       </div>
     </aside>
@@ -2068,6 +2357,21 @@ function runCost(run: PipelineRun): number {
   const total = Number(run.total_cost_usd ?? 0);
   if (Number.isFinite(total) && total > 0) return total;
   return (run.step_trace ?? []).reduce((sum, step) => sum + Number(step.cost_usd ?? 0), 0);
+}
+
+function defaultDeployDraft(pipeline: PipelineSummary): PipelineDeployDraft {
+  return {
+    endpointName: `${pipeline.slug}-endpoint`,
+    region: "hetzner-fsn1",
+    strategy: "direct",
+    trafficPercent: 100,
+  };
+}
+
+function pipelineEndpointUrl(endpoint: PipelineEndpointDeployment): string {
+  const serviceType = endpoint.service_type || "pipeline";
+  const slug = endpoint.slug || endpoint.name || endpoint.id;
+  return `https://api.veklom.com/v1/${serviceType}/${slug}`;
 }
 
 function governedRunPrice(pricingTier?: string): { label: string; value: string } {

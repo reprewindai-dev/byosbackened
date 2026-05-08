@@ -9,7 +9,7 @@ import pyotp
 import time
 from datetime import datetime, timedelta
 from typing import Optional, List
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
@@ -510,7 +510,7 @@ async def mfa_setup(current_user: User = Depends(get_current_user), db: Session 
     return MFASetupResponse(
         secret=secret,
         provisioning_uri=uri,
-        qr_url=f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={uri}",
+        qr_url=f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={quote(uri, safe='')}",
     )
 
 

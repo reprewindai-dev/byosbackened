@@ -5,7 +5,11 @@ export function responseStatus(error: unknown): number | undefined {
 export function responseDetail(error: unknown): string {
   const code = (error as { code?: string })?.code;
   const message = (error as Error)?.message;
-  const timeout = (error as { config?: { timeout?: number } })?.config?.timeout;
+  const config = (error as { config?: { timeout?: number; method?: string; url?: string; baseURL?: string } })?.config;
+  const timeout = config?.timeout;
+  const method = config?.method?.toUpperCase();
+  const url = config?.url;
+  const route = method && url ? `${method} ${url}` : url;
   const data = (error as { response?: { data?: unknown } })?.response?.data;
   if (typeof data === "string") return data;
   if (data && typeof data === "object" && "detail" in data) {
@@ -15,11 +19,12 @@ export function responseDetail(error: unknown): string {
   if (code === "ECONNABORTED" || /timeout/i.test(message ?? "")) {
     const seconds = timeout ? Math.round(timeout / 1000) : undefined;
     return seconds
-      ? `Request timed out after ${seconds}s waiting for the live backend/model response.`
-      : "Request timed out waiting for the live backend/model response.";
+      ? `${route ? `${route} ` : ""}timed out after ${seconds}s waiting for the live backend/model response.`
+      : `${route ? `${route} ` : "Request"} timed out waiting for the live backend/model response.`;
   }
   if (code === "ERR_NETWORK" || /network error/i.test(message ?? "")) {
-    return "Network transport failed before the backend returned a response. Check API reachability, CORS, or a browser-side timeout.";
+    const base = config?.baseURL ? ` via ${config.baseURL}` : "";
+    return `${route ? `${route} ` : "Request"}could not reach the live API${base}. The browser did not receive a backend response; retry once, then check auth/session and API health.`;
   }
   return message ?? "Request failed";
 }

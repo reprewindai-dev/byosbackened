@@ -133,6 +133,7 @@ export function TeamPage() {
   const [inviteRole, setInviteRole] = useState("user");
   const [issuedInvite, setIssuedInvite] = useState<Invite | null>(null);
   const [mfaCode, setMfaCode] = useState("");
+  const [mfaQrFailed, setMfaQrFailed] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -231,6 +232,7 @@ export function TeamPage() {
             <button
               className="v-btn-ghost"
               onClick={() => {
+                setMfaQrFailed(false);
                 setShowMfa(true);
                 mfaSetupMut.mutate();
               }}
@@ -282,10 +284,11 @@ export function TeamPage() {
           { label: "Invite member", onClick: () => setShowInvite(true), disabled: inviteRouteUnavailable, primary: true },
           {
             label: currentMfaEnabled ? "MFA enabled" : "Set up MFA",
-            onClick: () => {
-              setShowMfa(true);
-              mfaSetupMut.mutate();
-            },
+          onClick: () => {
+            setMfaQrFailed(false);
+            setShowMfa(true);
+            mfaSetupMut.mutate();
+          },
             disabled: currentMfaEnabled || mfaSetupMut.isPending,
           },
           { label: "Refresh team", onClick: () => void refetch(), disabled: isLoading },
@@ -314,6 +317,7 @@ export function TeamPage() {
           <button
             className="v-btn-ghost"
             onClick={() => {
+              setMfaQrFailed(false);
               setShowMfa(true);
               mfaSetupMut.mutate();
             }}
@@ -506,8 +510,19 @@ export function TeamPage() {
             {mfaSetupMut.data && (
               <div className="space-y-4">
                 <div className="flex flex-col gap-4 md:flex-row">
-                  <div className="rounded-md border border-rule bg-white p-2">
-                    <img src={mfaSetupMut.data.qr_url} alt="MFA QR code" className="h-40 w-40" />
+                  <div className="grid h-44 w-44 place-items-center rounded-md border border-rule bg-white p-2 text-center">
+                    {mfaQrFailed ? (
+                      <div className="px-2 font-mono text-[10px] uppercase tracking-[0.12em] text-ink">
+                        QR unavailable. Use manual secret.
+                      </div>
+                    ) : (
+                      <img
+                        src={mfaSetupMut.data.qr_url}
+                        alt="MFA QR code"
+                        className="h-40 w-40"
+                        onError={() => setMfaQrFailed(true)}
+                      />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="v-label">Manual secret</div>

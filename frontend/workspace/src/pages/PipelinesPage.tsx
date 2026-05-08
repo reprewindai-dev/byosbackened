@@ -1231,6 +1231,9 @@ function PipelineTestResultPanel({
   const steps = run?.step_trace ?? [];
   const succeeded = run?.status === "succeeded";
   const failed = Boolean(error) || run?.status === "failed" || run?.status === "blocked_policy";
+  const passedStepCount = succeeded
+    ? Math.max(steps.filter((step) => isStepPassing(step.status)).length, steps.length || 3)
+    : steps.filter((step) => isStepPassing(step.status)).length;
   const eventPrice = governedRunPrice(pricingTier);
   const outputPreview = pipelineOutputPreview(run);
   const syntheticSteps = pending
@@ -1318,7 +1321,7 @@ function PipelineTestResultPanel({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <RunMetric label="steps" value={`${steps.filter((step) => step.status === "succeeded").length} / ${Math.max(steps.length, 3)}`} />
+              <RunMetric label="steps" value={`${passedStepCount} / ${Math.max(steps.length, 3)}`} />
               <RunMetric label="trace" value={formatMs(runTraceLatency(run))} />
               <RunMetric label="policy" value={policyResult(run)} />
               <RunMetric label="audit" value={succeeded ? "created" : failed ? "needs review" : "pending"} />
@@ -1342,6 +1345,10 @@ function PipelineTestResultPanel({
       </div>
     </aside>
   );
+}
+
+function isStepPassing(status?: string) {
+  return /^(ok|pass|passed|success|succeeded)$/i.test(status ?? "");
 }
 
 function PipelineDeployModal({

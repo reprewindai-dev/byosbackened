@@ -31,17 +31,20 @@ export function resolveStripePk(): string {
 
 const API_BASE = resolveApiBase();
 const API_PREFIX = "/api/v1";
-const DEFAULT_API_TIMEOUT_MS = 7_000;
+const DEFAULT_API_TIMEOUT_MS = 25_000;
+const AUTH_API_TIMEOUT_MS = 20_000;
 
 export const api: AxiosInstance = axios.create({
   baseURL: `${API_BASE}${API_PREFIX}`,
   timeout: DEFAULT_API_TIMEOUT_MS,
   withCredentials: false,
+  transitional: { clarifyTimeoutError: true },
 });
 
 export const apiRoot: AxiosInstance = axios.create({
   baseURL: API_BASE || "/",
   timeout: DEFAULT_API_TIMEOUT_MS,
+  transitional: { clarifyTimeoutError: true },
 });
 
 function attachAuthHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
@@ -70,7 +73,7 @@ async function refreshAccessToken(): Promise<string | null> {
       const resp = await axios.post(
         `${API_BASE}${API_PREFIX}/auth/refresh`,
         { refresh_token: refreshToken },
-        { timeout: DEFAULT_API_TIMEOUT_MS },
+        { timeout: AUTH_API_TIMEOUT_MS, transitional: { clarifyTimeoutError: true } },
       );
       const { access_token, refresh_token, expires_in } = resp.data as {
         access_token: string;
@@ -97,7 +100,20 @@ function makeResponseInterceptor(instance: AxiosInstance) {
   instance.interceptors.response.use(
     (r) => r,
     async (error: AxiosError) => {
-      const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+      const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean; _networkRetried?: boolean }) | undefined;
+      const method = original?.method?.toLowerCase() ?? "get";
+      const safeToRetry = method === "get" || method === "head" || method === "options";
+      const transientTransportFailure =
+        error.code === "ERR_NETWORK" ||
+        error.code === "ECONNABORTED" ||
+        error.code === "ETIMEDOUT" ||
+        /network error|timeout/i.test(error.message);
+
+      if (original && safeToRetry && transientTransportFailure && !original._networkRetried) {
+        original._networkRetried = true;
+        return instance.request(original);
+      }
+
       if (error.response?.status === 401 && original && !original._retried) {
         original._retried = true;
         const fresh = await refreshAccessToken();

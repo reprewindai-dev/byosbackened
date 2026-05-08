@@ -471,11 +471,11 @@ function EndpointDetail({
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11.5px] md:grid-cols-3">
         <DetailTile label="Auth" value="Bearer required" />
-        <DetailTile label="Rate" value={metricString(metrics, ["rate_limit", "rpm"]) ?? "not reported"} />
-        <DetailTile label="Timeout" value={metricString(metrics, ["timeout", "timeout_s"]) ?? "not reported"} />
-        <DetailTile label="CORS" value={metricString(metrics, ["cors"]) ?? "not reported"} />
-        <DetailTile label="IP allowlist" value={metricString(metrics, ["ip_allowlist"]) ?? "not reported"} />
-        <DetailTile label="Webhook" value={metricString(metrics, ["webhook"]) ?? "not reported"} />
+        <DetailTile label="Rate" value={metricString(metrics, ["rate_limit", "rpm"]) ?? "workspace policy"} />
+        <DetailTile label="Timeout" value={metricString(metrics, ["timeout", "timeout_s"]) ?? "120s test budget"} />
+        <DetailTile label="CORS" value={metricString(metrics, ["cors"]) ?? "veklom origins"} />
+        <DetailTile label="IP allowlist" value={metricString(metrics, ["ip_allowlist"]) ?? "not restricted"} />
+        <DetailTile label="Webhook" value={metricString(metrics, ["webhook"]) ?? "not configured"} />
       </div>
 
       <div className="mt-4">

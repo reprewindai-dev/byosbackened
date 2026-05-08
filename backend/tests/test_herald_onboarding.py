@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from apps.api.routers.auth import FREE_TRIAL_CREDITS
+from apps.api.routers.auth import FREE_TRIAL_CREDITS, _totp_qr_data_uri
 from db.models import APIKey, SecurityAuditLog, TokenWallet
 from herald.resend_sequences import HeraldContact, build_sequence
 from onboarding import trial as trial_onboarding
@@ -15,6 +15,13 @@ from onboarding import trial as trial_onboarding
 
 def test_free_evaluation_no_longer_grants_hardcoded_50k_credits():
     assert FREE_TRIAL_CREDITS == 0
+
+
+def test_mfa_qr_uses_csp_safe_data_uri():
+    qr_url = _totp_qr_data_uri("otpauth://totp/Veklom:buyer@example.com?secret=ABCDEF&issuer=Veklom")
+
+    assert qr_url.startswith("data:image/svg+xml;base64,")
+    assert "api.qrserver.com" not in qr_url
 
 
 def test_herald_sequences_do_not_advertise_50k_trial_credit_pool():

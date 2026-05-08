@@ -33,6 +33,10 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
+# Backwards-compatible hook for tests and internal scripts that patched the
+# pre-cache model resolver name before `get_model_setting_fast` was introduced.
+get_model_setting = get_model_setting_fast
+
 RESERVE_UNITS_PER_USD = Decimal("1000")
 FREE_EVALUATION_GOVERNED_RUNS = 15
 FREE_EVALUATION_COMPARE_RUNS = 3
@@ -617,7 +621,7 @@ async def complete(
 ):
     """Run a governed completion through the configured production LLM stack."""
     try:
-        model_row = get_model_setting_fast(db, current_user.workspace_id, payload.model)
+        model_row = get_model_setting(db, current_user.workspace_id, payload.model)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if not model_row.enabled:

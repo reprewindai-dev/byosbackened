@@ -2,14 +2,19 @@
 import base64
 import hashlib
 import hmac
+import io
+import json
 import httpx
 import secrets
 import logging
 import pyotp
+import qrcode
 import time
 from datetime import datetime, timedelta
 from typing import Optional, List
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
+
+from qrcode.image.svg import SvgPathImage
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
@@ -21,6 +26,7 @@ from db.session import get_db
 from db.models import (
     APIKey,
     InviteStatus,
+    SecurityAuditLog,
     TokenWallet,
     User,
     UserRole,
@@ -184,6 +190,15 @@ def _normalize_api_key_scopes(scopes: List[str], current_user: User) -> List[str
 
 
 # ─── Auth Routes ─────────────────────────────────────────────────────────────
+
+def _totp_qr_data_uri(provisioning_uri: str) -> str:
+    """Return a CSP-safe QR image payload for authenticator apps."""
+    img = qrcode.make(provisioning_uri, image_factory=SvgPathImage)
+    buffer = io.BytesIO()
+    img.save(buffer)
+    payload = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/svg+xml;base64,{payload}"
+
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
@@ -510,7 +525,7 @@ async def mfa_setup(current_user: User = Depends(get_current_user), db: Session 
     return MFASetupResponse(
         secret=secret,
         provisioning_uri=uri,
-        qr_url=f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={quote(uri, safe='')}",
+        qr_url=_totp_qr_data_uri(uri),
     )
 
 
@@ -527,8 +542,25 @@ async def mfa_verify(
     if not totp.verify(code, valid_window=1):
         raise HTTPException(status_code=400, detail="Invalid TOTP code")
     current_user.mfa_enabled = True
+    db.add(
+        SecurityAuditLog(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            event_type="mfa_enabled",
+            event_category="authentication",
+            success=True,
+            details=json.dumps(
+                {
+                    "method": "totp",
+                    "issuer": settings.app_name,
+                    "confirmed_state": "enabled",
+                },
+                sort_keys=True,
+            ),
+        )
+    )
     db.commit()
-    return {"message": "MFA enabled successfully"}
+    return {"message": "MFA enabled successfully", "mfa_enabled": True, "audit_event": "mfa_enabled"}
 
 
 @router.delete("/mfa/disable")

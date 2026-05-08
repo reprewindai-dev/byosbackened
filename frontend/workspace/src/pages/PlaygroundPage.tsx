@@ -439,12 +439,16 @@ export function PlaygroundPage() {
   const runnableModels = useMemo(
     () =>
       (models.data ?? [])
-        .filter((model) => model.enabled && model.connected)
+        .filter((model) => model.enabled && model.connected && model.provider !== "groq")
         .sort((a, b) => {
-          const score = (model: WorkspaceModel) =>
-            model.slug === "groq-fast" ? 0 : model.provider === "groq" ? 1 : model.provider === "ollama" ? 2 : 3;
+          const score = (model: WorkspaceModel) => model.provider === "ollama" ? 0 : 1;
           return score(a) - score(b);
         }),
+    [models.data],
+  );
+
+  const quarantinedGroqModels = useMemo(
+    () => (models.data ?? []).filter((model) => model.enabled && model.connected && model.provider === "groq"),
     [models.data],
   );
 
@@ -453,7 +457,7 @@ export function PlaygroundPage() {
     if (effectiveLockToOnPrem) {
       return runnableModels.find((model) => model.provider === "ollama") ?? runnableModels[0];
     }
-    return runnableModels.find((model) => model.slug === "groq-fast") ?? runnableModels.find((model) => model.provider === "groq") ?? runnableModels[0];
+    return runnableModels.find((model) => model.provider === "ollama") ?? runnableModels[0];
   }, [effectiveLockToOnPrem, runnableModels]);
 
   useEffect(() => {
@@ -1538,6 +1542,11 @@ export function PlaygroundPage() {
                       <option key={model.slug} value={model.slug}>{model.name}</option>
                     ))}
                   </select>
+                  {quarantinedGroqModels.length > 0 && (
+                    <div className="mt-2 rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[11px] text-brass-2">
+                      Groq direct Playground sends are paused until provider health is verified. The default buyer path is using live Ollama.
+                    </div>
+                  )}
                   <div className="mt-3 rounded-lg border border-brass/25 bg-brass/10 px-3 py-2">
                     <div className="truncate font-display text-sm text-bone">
                       {selectedModel?.name ?? "Llama 3.1 70B Instruct"}
@@ -1559,7 +1568,7 @@ export function PlaygroundPage() {
                 </>
               ) : (
                 <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[12px] text-brass-2">
-                  No connected models are enabled for this workspace.
+                  No connected non-Groq models are enabled for this workspace. Groq direct Playground sends are paused until provider health is verified.
                 </div>
               )}
             </div>
@@ -1729,6 +1738,11 @@ export function PlaygroundPage() {
                     </option>
                   ))}
                 </select>
+                {quarantinedGroqModels.length > 0 && (
+                  <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[11px] text-brass-2">
+                    Groq direct Playground sends are paused until provider health is verified. The default buyer path is using live Ollama.
+                  </div>
+                )}
                 {selectedModel && (
                   <div className="space-y-1 font-mono text-[11px] text-muted">
                     <div>slug: <span className="text-bone">{selectedModel.slug}</span></div>
@@ -1788,7 +1802,7 @@ export function PlaygroundPage() {
               </div>
             ) : (
               <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[12px] text-brass-2">
-                No connected models are enabled for this workspace.
+                No connected non-Groq models are enabled for this workspace. Groq direct Playground sends are paused until provider health is verified.
               </div>
             )}
           </div>

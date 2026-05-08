@@ -135,7 +135,15 @@ export function BillingPage() {
     return (txns.data?.transactions ?? []).filter((txn) => txn.transaction_type === "usage").length;
   }, [txns.data?.transactions]);
   const evaluationPct = Math.min(100, Math.round((evaluationRunsUsed / FREE_EVALUATION_RUNS) * 100));
+  const evaluationLimitReached = !txns.isLoading && evaluationRunsUsed >= FREE_EVALUATION_RUNS;
   const pricingRows = useMemo(() => buildPricingRows(plans.data?.plans ?? []), [plans.data?.plans]);
+  const firstReservePack = packs.data?.options[0]?.pack_name ?? null;
+
+  const startReserveCheckout = () => {
+    if (!firstReservePack || topup.isPending) return;
+    setSelectedPack(firstReservePack);
+    topup.mutate(firstReservePack);
+  };
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -216,6 +224,37 @@ export function BillingPage() {
             {balance.data?.monthly_period_end && (
               <div className="mt-2 font-mono text-[10px] text-muted">
                 resets {formatApiDate(balance.data.monthly_period_end)}
+              </div>
+            )}
+            {evaluationLimitReached && (
+              <div className="mt-4 rounded-xl border border-crimson/35 bg-crimson/10 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-crimson" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-bone">Evaluation limit reached</div>
+                    <p className="mt-1 text-sm leading-relaxed text-bone-2">
+                      This workspace has used {FREE_EVALUATION_RUNS} / {FREE_EVALUATION_RUNS} governed evaluation runs.
+                      Production routing and exportable evidence require activation before more governed buyer traffic runs.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="v-btn-primary"
+                        type="button"
+                        onClick={startReserveCheckout}
+                        disabled={!firstReservePack || topup.isPending}
+                      >
+                        {topup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                        Add reserve
+                      </button>
+                      <a className="v-btn-ghost" href="https://veklom.com/pricing/">
+                        Start activation
+                      </a>
+                      <a className="v-btn-ghost" href="https://veklom.com/#contact">
+                        Request regulated access
+                      </a>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

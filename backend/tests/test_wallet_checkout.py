@@ -48,7 +48,7 @@ def test_topup_checkout_preserves_existing_success_query(monkeypatch):
         captured.update(kwargs)
         return SimpleNamespace(url="https://checkout.stripe.test/topup", id="cs_test_topup")
 
-    monkeypatch.setattr(token_wallet.settings, "stripe_secret_key", "sk_test_wallet")
+    monkeypatch.setattr(token_wallet.settings, "stripe_secret_key", "unit-test-stripe-key")
     monkeypatch.setattr(stripe.checkout.Session, "create", fake_checkout_session_create)
 
     result = asyncio.run(
@@ -79,7 +79,7 @@ def test_topup_checkout_preserves_existing_success_query(monkeypatch):
 
 
 def test_topup_checkout_requires_paid_activation(monkeypatch):
-    monkeypatch.setattr(token_wallet.settings, "stripe_secret_key", "sk_test_wallet")
+    monkeypatch.setattr(token_wallet.settings, "stripe_secret_key", "unit-test-stripe-key")
     try:
         asyncio.run(
             create_topup_checkout(
@@ -106,7 +106,7 @@ def test_activation_checkout_collects_minimum_reserve(monkeypatch):
         captured.update(kwargs)
         return SimpleNamespace(url="https://checkout.stripe.test/activate", id="cs_test_activate")
 
-    monkeypatch.setattr(subscriptions.settings, "stripe_secret_key", "sk_test_subscriptions")
+    monkeypatch.setattr(subscriptions.settings, "stripe_secret_key", "unit-test-stripe-key")
     monkeypatch.setattr(stripe.checkout.Session, "create", fake_checkout_session_create)
 
     result = asyncio.run(

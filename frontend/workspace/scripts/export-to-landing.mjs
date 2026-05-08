@@ -1,6 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -11,16 +10,7 @@ const landingRoot = resolve(repoRoot, "backend", "landing");
 const assetSource = resolve(distRoot, "workspace-assets");
 const assetTarget = resolve(landingRoot, "workspace-assets");
 const workspaceShell = resolve(landingRoot, "workspace-app.html");
-const assetVersion = (
-  process.env.GITHUB_SHA ||
-  (() => {
-    try {
-      return execSync("git rev-parse --short HEAD", { cwd: repoRoot, encoding: "utf8" }).trim();
-    } catch {
-      return Date.now().toString(36);
-    }
-  })()
-).slice(0, 12);
+const assetVersion = process.env.WORKSPACE_ASSET_VERSION || "workspace";
 
 const routeShells = [
   "control-center",

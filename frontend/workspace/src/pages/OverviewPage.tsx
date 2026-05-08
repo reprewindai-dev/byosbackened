@@ -235,6 +235,7 @@ export function OverviewPage() {
         state={state}
         isLoading={overview.isLoading}
       />
+      <CommandOpsDock />
 
       {overview.isError && (
         <div className="command-alert">
@@ -265,6 +266,32 @@ export function OverviewPage() {
 
       <ArchivesLayer data={data} isLoading={overview.isLoading} />
     </div>
+  );
+}
+
+function CommandOpsDock() {
+  const routes = [
+    { label: "Control", to: "#/control-center" },
+    { label: "Playground", to: "#/playground" },
+    { label: "Marketplace", to: "#/marketplace" },
+    { label: "Monitoring", to: "#/monitoring" },
+    { label: "Billing", to: "#/billing" },
+    { label: "Vault", to: "#/vault" },
+    { label: "Settings", to: "#/settings" },
+  ];
+
+  return (
+    <nav className="command-ops-dock" aria-label="Return to workspace operations">
+      <span>App ingress</span>
+      <div>
+        {routes.map((route) => (
+          <a key={route.to} href={route.to}>
+            {route.label}
+            <ArrowRight className="h-3 w-3" />
+          </a>
+        ))}
+      </div>
+    </nav>
   );
 }
 

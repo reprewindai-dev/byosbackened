@@ -269,6 +269,57 @@
     border: 1px solid rgba(185, 197, 200, 0.12);
   }
 
+  .command-ops-dock {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border: 1px solid rgba(186, 198, 205, 0.14);
+    border-left: 3px solid rgba(146, 214, 208, 0.42);
+    background:
+      linear-gradient(90deg, rgba(146, 214, 208, 0.08), rgba(255, 255, 255, 0.018)),
+      rgba(5, 8, 11, 0.78);
+    padding: 9px 12px;
+  }
+
+  .command-ops-dock > span {
+    white-space: nowrap;
+    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(198, 207, 211, 0.62);
+  }
+
+  .command-ops-dock div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .command-ops-dock a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(185, 197, 200, 0.14);
+    padding: 5px 8px;
+    font-family: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(228, 232, 231, 0.72);
+    text-decoration: none;
+    transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  }
+
+  .command-ops-dock a:hover {
+    border-color: rgba(146, 214, 208, 0.48);
+    background: rgba(146, 214, 208, 0.08);
+    color: #eaf6f5;
+  }
+
   .scope-group {
     min-width: 0;
     padding: 12px;
@@ -858,6 +909,15 @@
     .command-status-strip,
     .archive-line {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .command-ops-dock {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .command-ops-dock div {
+      justify-content: flex-start;
     }
 
     .trace-row {

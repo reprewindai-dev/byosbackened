@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, fmtCents, fmtNumber, formatApiDate, relativeTime } from "@/lib/cn";
+import { LiveErrorBox, ProofStrip } from "@/components/workspace/FlowPrimitives";
 
 interface WalletBalance {
   workspace_id: string;
@@ -58,14 +59,21 @@ interface TopupOptions {
   options: TopupOption[];
 }
 
-const FREE_EVALUATION_RUNS = 15;
+interface PlanDefinition {
+  name: string;
+  tier: string;
+  activation_cents: number | null;
+  minimum_reserve_cents: number | null;
+  self_serve_checkout: boolean;
+  free_evaluation_limits?: { governed_playground_runs?: number; compare_runs?: number; policy_tests?: number };
+  features?: Record<string, unknown>;
+}
 
-const PRICING_ROWS = [
-  { tier: "Free Evaluation", activation: "$0", reserve: "$0", runs: "15 governed runs", evidence: "Locked" },
-  { tier: "Founding", activation: "$395 one-time", reserve: "$150 min", runs: "$0.25 / run", evidence: "$99" },
-  { tier: "Standard", activation: "$795 one-time", reserve: "$300 min", runs: "$0.40 / run", evidence: "$149" },
-  { tier: "Regulated", activation: "From $2,500", reserve: "$2,500 min", runs: "Contact", evidence: "$199" },
-];
+interface PlansResponse {
+  plans: PlanDefinition[];
+}
+
+const FREE_EVALUATION_RUNS = 15;
 
 const EVENT_PRICES = [
   ["Compare run", "$0.75 Founding / $1.20 Standard"],
@@ -82,6 +90,10 @@ async function fetchTransactions() {
 }
 async function fetchTopupOptions() {
   return (await api.get<TopupOptions>("/wallet/topup/options")).data;
+}
+
+async function fetchPlans() {
+  return (await api.get<PlansResponse>("/subscriptions/plans")).data;
 }
 
 async function createTopup(pack: string) {
@@ -109,6 +121,7 @@ export function BillingPage() {
   const balance = useQuery({ queryKey: ["wallet-balance"], queryFn: fetchBalance, refetchInterval: 30_000 });
   const txns = useQuery({ queryKey: ["wallet-txns"], queryFn: fetchTransactions });
   const packs = useQuery({ queryKey: ["wallet-topup-options"], queryFn: fetchTopupOptions });
+  const plans = useQuery({ queryKey: ["subscription-plans"], queryFn: fetchPlans, staleTime: 5 * 60_000 });
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
 
   const topup = useMutation({
@@ -122,6 +135,7 @@ export function BillingPage() {
     return (txns.data?.transactions ?? []).filter((txn) => txn.transaction_type === "usage").length;
   }, [txns.data?.transactions]);
   const evaluationPct = Math.min(100, Math.round((evaluationRunsUsed / FREE_EVALUATION_RUNS) * 100));
+  const pricingRows = useMemo(() => buildPricingRows(plans.data?.plans ?? []), [plans.data?.plans]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -243,12 +257,26 @@ export function BillingPage() {
         </div>
       </section>
 
+      <ProofStrip
+        items={[
+          { label: "pricing source", value: plans.data ? "/api/v1/subscriptions/plans" : plans.isError ? "unavailable" : "loading" },
+          { label: "reserve source", value: balance.data ? "/api/v1/wallet/balance" : balance.isError ? "unavailable" : "loading" },
+          { label: "ledger source", value: txns.data ? "/api/v1/wallet/transactions" : txns.isError ? "unavailable" : "loading" },
+          { label: "checkout source", value: packs.data ? "/api/v1/wallet/topup/options" : packs.isError ? "unavailable" : "loading" },
+        ]}
+      />
+
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
         <div className="v-card p-0">
           <header className="border-b border-rule px-5 py-3">
             <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Access model</div>
             <h2 className="mt-1 text-lg font-semibold">Free lets you see governed AI. Paid lets you prove it.</h2>
           </header>
+          {plans.isError && (
+            <div className="p-4">
+              <LiveErrorBox title="Pricing plans unavailable" error={plans.error} />
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
               <thead className="border-b border-rule font-mono text-[10px] uppercase tracking-wider text-muted">
@@ -261,7 +289,21 @@ export function BillingPage() {
                 </tr>
               </thead>
               <tbody>
-                {PRICING_ROWS.map((row) => (
+                {plans.isLoading && (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-6 text-center font-mono text-muted">
+                      loading pricing from /api/v1/subscriptions/plans...
+                    </td>
+                  </tr>
+                )}
+                {!plans.isLoading && !plans.isError && pricingRows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-6 text-center font-mono text-muted">
+                      No plans returned by the billing API.
+                    </td>
+                  </tr>
+                )}
+                {pricingRows.map((row) => (
                   <tr key={row.tier} className="border-b border-rule/60 last:border-0">
                     <td className="px-5 py-2.5 font-semibold text-bone">{row.tier}</td>
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.activation}</td>
@@ -444,6 +486,35 @@ export function BillingPage() {
       </section>
     </div>
   );
+}
+
+function buildPricingRows(plans: PlanDefinition[]) {
+  const order = ["free", "starter", "pro", "sovereign", "enterprise"];
+  return [...plans].sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier)).map((plan) => {
+    const limits = plan.free_evaluation_limits ?? {};
+    return {
+      tier: planLabel(plan),
+      activation: plan.activation_cents == null ? "Contact" : plan.activation_cents === 0 ? "$0" : `${fmtCents(plan.activation_cents)} one-time`,
+      reserve: plan.minimum_reserve_cents == null ? "Private" : plan.minimum_reserve_cents === 0 ? "$0" : `${fmtCents(plan.minimum_reserve_cents)} min`,
+      runs:
+        plan.tier === "free"
+          ? `${limits.governed_playground_runs ?? FREE_EVALUATION_RUNS} governed runs`
+          : plan.tier === "starter"
+            ? "$0.25 / run"
+            : plan.tier === "pro"
+              ? "$0.40 / run"
+              : "Private terms",
+      evidence: plan.features?.compliance_reports || plan.features?.audit_exports ? "available" : "activation required",
+    };
+  });
+}
+
+function planLabel(plan: PlanDefinition): string {
+  if (plan.tier === "free") return "Free Evaluation";
+  if (plan.tier === "starter") return "Founding";
+  if (plan.tier === "pro") return "Standard";
+  if (plan.tier === "sovereign") return "Regulated";
+  return plan.name || plan.tier;
 }
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

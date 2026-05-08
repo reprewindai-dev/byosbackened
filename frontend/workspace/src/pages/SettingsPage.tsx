@@ -15,6 +15,7 @@ import {
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { cn, relativeTime } from "@/lib/cn";
+import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
 
 type Tab = "identity" | "keys" | "models";
 
@@ -129,8 +130,27 @@ function apiErrorMessage(error: unknown, fallback: string) {
   return (error as Error)?.message ?? fallback;
 }
 
+async function testWorkspaceConfig() {
+  const started = performance.now();
+  const [identity, keys, models] = await Promise.allSettled([
+    api.get("/auth/me"),
+    api.get("/workspace/api-keys"),
+    api.get("/workspace/models"),
+  ]);
+  const rows = [
+    { label: "identity", result: identity },
+    { label: "api keys", result: keys },
+    { label: "models", result: models },
+  ];
+  return {
+    latency_ms: Math.round(performance.now() - started),
+    rows: rows.map((row) => ({ label: row.label, ok: row.result.status === "fulfilled" })),
+  };
+}
+
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>("identity");
+  const configTest = useMutation({ mutationFn: testWorkspaceConfig });
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -156,6 +176,39 @@ export function SettingsPage() {
           Models
         </TabBtn>
       </nav>
+
+      <RunStatePanel
+        eyebrow="Settings proof"
+        title="Workspace configuration test"
+        status={configTest.isPending ? "running" : configTest.isError ? "failed" : configTest.data ? "succeeded" : "idle"}
+        summary="Settings does not fake saved configuration. This test reads live identity, key inventory, and model governance routes before the user leaves the page."
+        steps={[
+          { label: "Identity route", status: configTest.data?.rows.find((row) => row.label === "identity")?.ok ? "succeeded" : configTest.isError ? "failed" : configTest.isPending ? "running" : "idle", detail: "/api/v1/auth/me" },
+          { label: "API key route", status: configTest.data?.rows.find((row) => row.label === "api keys")?.ok ? "succeeded" : configTest.isError ? "failed" : configTest.isPending ? "running" : "idle", detail: "/api/v1/workspace/api-keys" },
+          { label: "Model route", status: configTest.data?.rows.find((row) => row.label === "models")?.ok ? "succeeded" : configTest.isError ? "failed" : configTest.isPending ? "running" : "idle", detail: "/api/v1/workspace/models" },
+        ]}
+        metrics={[
+          { label: "latency", value: configTest.data ? `${configTest.data.latency_ms}ms` : configTest.isPending ? "running" : "not tested" },
+          { label: "routes passed", value: configTest.data ? `${configTest.data.rows.filter((row) => row.ok).length} / ${configTest.data.rows.length}` : "not tested" },
+          { label: "active tab", value: tab },
+          { label: "source", value: "live backend" },
+        ]}
+        error={configTest.error}
+        actions={[
+          { label: "Test settings", onClick: () => configTest.mutate(), disabled: configTest.isPending, primary: true },
+          { label: "Open Vault", href: "#/vault" },
+          { label: "Open Team", href: "#/team" },
+        ]}
+      />
+
+      <ProofStrip
+        items={[
+          { label: "identity", value: "/api/v1/auth/me" },
+          { label: "keys", value: "/api/v1/workspace/api-keys" },
+          { label: "models", value: "/api/v1/workspace/models" },
+          { label: "result", value: configTest.data ? "verified" : "pending" },
+        ]}
+      />
 
       {tab === "identity" && <IdentityTab />}
       {tab === "keys" && <ApiKeysTab />}

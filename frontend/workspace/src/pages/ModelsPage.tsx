@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, fmtNumber } from "@/lib/cn";
+import { ResultDrawer, RunStatePanel, ProofStrip, type FlowStatus } from "@/components/workspace/FlowPrimitives";
 
 interface ModelEntry {
   slug: string;
@@ -40,6 +41,32 @@ interface ModelEntry {
   telemetry_series: number[];
 }
 
+interface ModelTestResponse {
+  response_text: string;
+  model: string;
+  bedrock_model_id?: string;
+  provider?: string;
+  requested_provider?: string;
+  requested_model?: string;
+  fallback_triggered?: boolean;
+  routing_reason?: string;
+  request_id?: string;
+  audit_log_id?: string;
+  audit_hash?: string;
+  output_tokens?: number;
+  latency_ms?: number;
+  cost_usd?: string;
+  reserve_debited?: number;
+  billing_event_type?: string;
+  pricing_tier?: string;
+}
+
+interface ModelTestRun {
+  model: ModelEntry;
+  response: ModelTestResponse;
+  measured_latency_ms: number;
+}
+
 interface ModelsResp {
   models?: ModelEntry[];
   items?: ModelEntry[];
@@ -62,6 +89,29 @@ async function fetchModels(): Promise<ModelEntry[]> {
 async function toggleModel({ slug, enabled }: { slug: string; enabled: boolean }) {
   const resp = await api.patch<{ model_slug: string; enabled: boolean }>(`/workspace/models/${encodeURIComponent(slug)}`, { enabled });
   return resp.data;
+}
+
+async function testModel(model: ModelEntry): Promise<ModelTestRun> {
+  const started = performance.now();
+  const resp = await api.post<ModelTestResponse>(
+    "/ai/complete",
+    {
+      model: model.slug,
+      prompt: "Reply with exactly: OK",
+      session_tag: "Standard",
+      auto_redact: true,
+      sign_audit_on_export: true,
+      billing_event_type: "governed_run",
+      max_tokens: 20,
+      temperature: 0,
+    },
+    { timeout: 90_000 },
+  );
+  return {
+    model,
+    response: resp.data,
+    measured_latency_ms: Math.round(performance.now() - started),
+  };
 }
 
 function normalizeModel(raw: unknown): ModelEntry {
@@ -149,6 +199,7 @@ export function ModelsPage() {
   const [modality, setModality] = useState("all");
   const [provider, setProvider] = useState("all");
   const [view, setView] = useState<"grid" | "table">("grid");
+  const [testTarget, setTestTarget] = useState<ModelEntry | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["models-fleet"],
@@ -170,6 +221,11 @@ export function ModelsPage() {
       if (context?.previous) qc.setQueryData(["models-fleet"], context.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["models-fleet"] }),
+  });
+
+  const tester = useMutation({
+    mutationFn: testModel,
+    onMutate: (model) => setTestTarget(model),
   });
 
   const models = data ?? [];
@@ -268,7 +324,12 @@ export function ModelsPage() {
                   key={model.slug}
                   model={model}
                   onToggle={() => toggler.mutate({ slug: model.slug, enabled: !model.enabled })}
+                  onTest={() => {
+                    tester.reset();
+                    tester.mutate(model);
+                  }}
                   toggling={toggler.isPending && toggler.variables?.slug === model.slug}
+                  testing={tester.isPending && tester.variables?.slug === model.slug}
                 />
               ))}
             </div>
@@ -276,13 +337,36 @@ export function ModelsPage() {
             <ModelTable
               models={filteredModels}
               onToggle={(model) => toggler.mutate({ slug: model.slug, enabled: !model.enabled })}
+              onTest={(model) => {
+                tester.reset();
+                tester.mutate(model);
+              }}
               togglingSlug={toggler.isPending ? toggler.variables?.slug : undefined}
+              testingSlug={tester.isPending ? tester.variables?.slug : undefined}
             />
           )
         )}
 
         <VersioningPanel splits={activeSplits} />
       </section>
+
+      <ModelTestDrawer
+        model={tester.data?.model ?? testTarget}
+        run={tester.data}
+        pending={tester.isPending}
+        error={tester.error}
+        onClose={() => {
+          setTestTarget(null);
+          tester.reset();
+        }}
+        onRunAgain={() => {
+          const model = tester.data?.model ?? testTarget;
+          if (model) {
+            tester.reset();
+            tester.mutate(model);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -440,11 +524,15 @@ function SelectBox({
 function ModelCard({
   model,
   onToggle,
+  onTest,
   toggling,
+  testing,
 }: {
   model: ModelEntry;
   onToggle: () => void;
+  onTest: () => void;
   toggling: boolean;
+  testing: boolean;
 }) {
   return (
     <div className="frame group p-4 transition hover:border-brass/30">
@@ -492,6 +580,14 @@ function ModelCard({
         <div className="max-w-[44%] truncate font-mono text-[10.5px] text-muted">{model.license ?? model.family}</div>
         <div className="flex items-center gap-1">
           <button
+            className="v-btn-ghost h-7 px-2.5 text-[11.5px]"
+            disabled={!model.enabled || !model.connected || testing}
+            title={!model.enabled || !model.connected ? "Enable and connect this model before testing." : "Run a governed one-token model test."}
+            onClick={onTest}
+          >
+            {testing ? "Testing" : "Test"}
+          </button>
+          <button
             className="inline-flex h-7 cursor-not-allowed items-center gap-1 rounded-md px-2 text-[11.5px] text-muted opacity-70"
             disabled
             title="Version history endpoint is not wired yet."
@@ -518,26 +614,31 @@ function ModelCard({
 function ModelTable({
   models,
   onToggle,
+  onTest,
   togglingSlug,
+  testingSlug,
 }: {
   models: ModelEntry[];
   onToggle: (model: ModelEntry) => void;
+  onTest: (model: ModelEntry) => void;
   togglingSlug?: string;
+  testingSlug?: string;
 }) {
   return (
     <div className="frame overflow-hidden">
-      <div className="grid grid-cols-[1.5fr_0.8fr_0.7fr_0.7fr_0.7fr_0.6fr] gap-3 border-b border-rule bg-ink-1/70 px-4 py-2 text-eyebrow">
+      <div className="grid grid-cols-[1.5fr_0.8fr_0.7fr_0.7fr_0.7fr_0.6fr_0.7fr] gap-3 border-b border-rule bg-ink-1/70 px-4 py-2 text-eyebrow">
         <span>Model</span>
         <span>Provider</span>
         <span>Context</span>
         <span>Route</span>
         <span>Cost</span>
         <span>Status</span>
+        <span>Action</span>
       </div>
       {models.map((model) => (
         <div
           key={model.slug}
-          className="grid grid-cols-[1.5fr_0.8fr_0.7fr_0.7fr_0.7fr_0.6fr] items-center gap-3 border-b border-rule/60 px-4 py-3 text-xs last:border-b-0"
+          className="grid grid-cols-[1.5fr_0.8fr_0.7fr_0.7fr_0.7fr_0.6fr_0.7fr] items-center gap-3 border-b border-rule/60 px-4 py-3 text-xs last:border-b-0"
         >
           <div className="min-w-0">
             <div className="truncate font-semibold text-bone">{model.name}</div>
@@ -554,9 +655,76 @@ function ModelTable({
             {model.output_cost_per_1k !== undefined ? `$${model.output_cost_per_1k.toFixed(3)}` : "not set"}
           </div>
           <ToggleSwitch enabled={model.enabled} disabled={togglingSlug === model.slug} onClick={() => onToggle(model)} />
+          <button
+            className="v-btn-ghost h-7 px-2.5 text-[11.5px]"
+            disabled={!model.enabled || !model.connected || testingSlug === model.slug}
+            onClick={() => onTest(model)}
+          >
+            {testingSlug === model.slug ? "Testing" : "Test"}
+          </button>
         </div>
       ))}
     </div>
+  );
+}
+
+function ModelTestDrawer({
+  model,
+  run,
+  pending,
+  error,
+  onClose,
+  onRunAgain,
+}: {
+  model: ModelEntry | null;
+  run?: ModelTestRun;
+  pending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onRunAgain: () => void;
+}) {
+  const status: FlowStatus = pending ? "running" : error ? "failed" : run ? "succeeded" : "idle";
+  const response = run?.response;
+  return (
+    <ResultDrawer open={Boolean(model || run || pending || error)} title={model?.name ?? "Model test"} eyebrow="Model verification" onClose={onClose}>
+      <RunStatePanel
+        title="Test model before deployment"
+        status={status}
+        summary="This sends a real governed completion through /api/v1/ai/complete and reports the model, provider, latency, audit, and deployability."
+        steps={[
+          { label: "Provider connection", status: pending ? "running" : response ? "succeeded" : error ? "failed" : "idle", detail: model?.provider ?? "provider" },
+          { label: "Policy and reserve gate", status: pending ? "idle" : response ? "succeeded" : error ? "failed" : "idle", detail: response?.billing_event_type ?? "governed_run" },
+          { label: "Model completion", status: pending ? "idle" : response ? "succeeded" : error ? "failed" : "idle", detail: response?.model ?? model?.slug ?? "selected model" },
+        ]}
+        metrics={[
+          { label: "latency", value: response ? `${response.latency_ms ?? run?.measured_latency_ms ?? 0}ms` : pending ? "running" : "not tested" },
+          { label: "provider", value: response?.provider ?? model?.provider ?? "unknown" },
+          { label: "policy", value: response ? "passed" : pending ? "checking" : "not tested" },
+          { label: "deployable", value: model?.enabled && model.connected ? "yes" : "no" },
+        ]}
+        error={error}
+        result={response && (
+          <div>
+            <div className="mb-2 text-eyebrow">Response</div>
+            <pre className="max-h-40 whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-bone">{response.response_text || "(empty response)"}</pre>
+            <ProofStrip
+              className="mt-3"
+              items={[
+                { label: "audit", value: response.audit_log_id ?? response.audit_hash ?? "created" },
+                { label: "request", value: response.request_id ?? "recorded" },
+                { label: "cost", value: response.cost_usd ? `$${response.cost_usd}` : "recorded" },
+                { label: "route", value: response.routing_reason ?? (response.fallback_triggered ? "fallback" : "primary") },
+              ]}
+            />
+          </div>
+        )}
+        actions={[
+          { label: "Run again", onClick: onRunAgain, disabled: pending || !model },
+          { label: "Deploy endpoint", href: "#/deployments", disabled: !model?.enabled || !model.connected, primary: true },
+          { label: "Open Playground", href: "#/playground" },
+        ]}
+      />
+    </ResultDrawer>
   );
 }
 

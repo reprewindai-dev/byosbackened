@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   CalendarClock,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
 
 interface Regulation {
   id: string;
@@ -48,6 +50,8 @@ async function runCheck(regulation_id: string): Promise<CheckResult> {
 }
 
 export function CompliancePage() {
+  const [searchParams] = useSearchParams();
+  const evidenceFocus = searchParams.get("run") ?? searchParams.get("audit") ?? "";
   const regs = useQuery({ queryKey: ["compliance-regs"], queryFn: fetchRegulations });
   const [selected, setSelected] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, CheckResult>>({});
@@ -94,6 +98,45 @@ export function CompliancePage() {
             setSelected(id);
             check.mutate(id);
           }}
+        />
+
+        <div className="mt-4">
+          <RunStatePanel
+            eyebrow="Compliance run state"
+            title={selectedReg ? `Evidence check: ${selectedReg.name}` : evidenceFocus ? "Evidence focus ready" : "Select a framework to run a live check"}
+            status={check.isPending ? "running" : check.isError ? "failed" : selectedResult ? "succeeded" : regs.isError ? "failed" : "idle"}
+            summary={
+              evidenceFocus
+                ? `Evidence focus ${evidenceFocus} is carried from Monitoring. Run a framework check to bind this view to live compliance controls.`
+                : "Compliance checks execute against the live compliance API and show pass/fail proof on this page."
+            }
+            steps={[
+              { label: "Framework selected", status: selectedReg ? "succeeded" : "idle", detail: selectedReg?.id ?? "none" },
+              { label: "Control check", status: check.isPending ? "running" : selectedResult ? "succeeded" : check.isError ? "failed" : "idle", detail: "/api/v1/compliance/check" },
+              { label: "Evidence package", status: selectedResult ? "succeeded" : "idle", detail: selectedResult?.compliant ? "ready" : "awaiting check" },
+            ]}
+            metrics={[
+              { label: "score", value: selectedResult?.score != null ? `${selectedResult.score}%` : "not run" },
+              { label: "status", value: selectedResult ? (selectedResult.compliant ? "compliant" : "review") : "pending" },
+              { label: "issues", value: String(selectedResult?.issues?.length ?? 0) },
+              { label: "focus", value: evidenceFocus || "none" },
+            ]}
+            error={check.error}
+            actions={[
+              { label: "Run selected check", onClick: () => selectedReg && check.mutate(selectedReg.id), disabled: !selectedReg || check.isPending, primary: true },
+              { label: "Open monitoring", href: evidenceFocus ? `#/monitoring?audit=${encodeURIComponent(evidenceFocus)}` : "#/monitoring" },
+            ]}
+          />
+        </div>
+
+        <ProofStrip
+          className="mt-4"
+          items={[
+            { label: "frameworks", value: regs.data ? "/api/v1/compliance/regulations" : regs.isError ? "unavailable" : "loading" },
+            { label: "checks", value: "/api/v1/compliance/check" },
+            { label: "selected", value: selectedReg?.id ?? "none" },
+            { label: "evidence focus", value: evidenceFocus || "none" },
+          ]}
         />
 
         <ControlsTable regulation={selectedReg} result={selectedResult} pending={check.isPending} error={check.error} />

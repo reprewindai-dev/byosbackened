@@ -459,7 +459,7 @@ function EndpointDetail({
         <button className="v-btn-ghost h-8 px-3 text-xs" onClick={copyEndpoint}>
           <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy endpoint"}
         </button>
-        <a className="v-btn-ghost h-8 px-3 text-xs" href="/monitoring">
+        <a className="v-btn-ghost h-8 px-3 text-xs" href="#/monitoring">
           <Eye className="h-3.5 w-3.5" /> View logs
         </a>
         {lastTested && (
@@ -655,10 +655,10 @@ client.chat.completions.create(
         >
           <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy"}
         </button>
-        <a href="/vault" className="v-btn-primary h-8 px-3 text-xs">
+        <a href="#/vault" className="v-btn-primary h-8 px-3 text-xs">
           <KeyRound className="h-3.5 w-3.5" /> API keys
         </a>
-        <a href="/monitoring" className="v-btn-ghost ml-auto h-8 px-3 text-xs">
+        <a href="#/monitoring" className="v-btn-ghost ml-auto h-8 px-3 text-xs">
           <Activity className="h-3.5 w-3.5" />
         </a>
       </div>

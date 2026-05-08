@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
+import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
 
 interface ApiKey {
   id: string;
@@ -87,6 +88,41 @@ export function VaultPage() {
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <PageHeader active={active} revoked={revoked} expiring={expiring} onNew={() => setCreating(true)} />
+
+      <RunStatePanel
+        className="mb-4"
+        eyebrow="Key lifecycle"
+        title={justCreated ? "API key issued - copy it now" : "Create, verify, rotate, revoke"}
+        status={create.isPending || revoke.isPending || keys.isFetching ? "running" : create.isError || revoke.isError || keys.isError ? "failed" : justCreated ? "succeeded" : "idle"}
+        summary="Vault uses the live API-key route. Newly issued secrets are shown once, active keys stay visible, and revoke updates the same ledger."
+        steps={[
+          { label: "Key inventory", status: keys.isFetching ? "running" : keys.isError ? "failed" : "succeeded", detail: "/api/v1/auth/api-keys" },
+          { label: "Create key", status: create.isPending ? "running" : justCreated ? "succeeded" : create.isError ? "failed" : "idle", detail: justCreated?.key_prefix ?? "not issued" },
+          { label: "Revoke or rotate", status: revoke.isPending ? "running" : revoke.isError ? "failed" : "idle", detail: "live revoke route" },
+        ]}
+        metrics={[
+          { label: "active", value: String(active) },
+          { label: "revoked", value: String(revoked) },
+          { label: "expiring", value: String(expiring) },
+          { label: "visible result", value: justCreated ? "secret shown once" : "inventory" },
+        ]}
+        error={create.error || revoke.error || keys.error}
+        actions={[
+          { label: "Issue key", onClick: () => setCreating(true), disabled: create.isPending, primary: true },
+          { label: "Refresh inventory", onClick: () => keys.refetch(), disabled: keys.isFetching },
+          { label: "Open monitoring", href: "#/monitoring" },
+        ]}
+      />
+
+      <ProofStrip
+        className="mb-4"
+        items={[
+          { label: "inventory", value: keys.data ? "/api/v1/auth/api-keys" : keys.isError ? "unavailable" : "loading" },
+          { label: "created", value: justCreated?.key_prefix ?? "none this session" },
+          { label: "active", value: String(active) },
+          { label: "scope", value: "workspace" },
+        ]}
+      />
 
       {justCreated && <JustCreatedBanner item={justCreated} onDismiss={() => setJustCreated(null)} />}
 

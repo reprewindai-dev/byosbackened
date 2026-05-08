@@ -14,6 +14,7 @@ import {
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
 import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
+import { ProofStrip, RunStatePanel, type FlowStatus } from "@/components/workspace/FlowPrimitives";
 import { useAuthStore } from "@/store/auth-store";
 
 interface TeamUser {
@@ -194,6 +195,16 @@ export function TeamPage() {
   const pendingInvites = (invitesQ.data ?? []).filter((i) => i.status === "pending");
   const currentMember = (data ?? []).find((member) => member.id === user?.id || member.email === user?.email);
   const currentMfaEnabled = currentMember?.mfa_enabled ?? user?.mfa_enabled ?? false;
+  const teamFlowStatus: FlowStatus = inviteMut.isPending || revokeMut.isPending || mfaSetupMut.isPending || mfaVerifyMut.isPending
+    ? "running"
+    : inviteMut.isError || revokeMut.isError || mfaSetupMut.isError || mfaVerifyMut.isError || (isError && !adminOnly)
+      ? "failed"
+      : inviteRouteUnavailable
+        ? "unavailable"
+        : issuedInvite || inviteMut.isSuccess || mfaVerifyMut.isSuccess
+          ? "succeeded"
+          : "idle";
+  const teamFlowError = inviteMut.error || revokeMut.error || mfaSetupMut.error || mfaVerifyMut.error || (!adminOnly ? error : null);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -232,6 +243,64 @@ export function TeamPage() {
           </button>
         </div>
       </header>
+
+      <RunStatePanel
+        eyebrow="Team loop"
+        title="Invite, assign role, enforce MFA, and keep an audit trail"
+        status={teamFlowStatus}
+        summary="Team actions stay on this page: load members, create an invite, copy the one-time link, revoke if needed, and prove MFA posture from live auth routes."
+        steps={[
+          {
+            label: "Member directory",
+            status: isLoading || invitesQ.isLoading ? "running" : isError && !adminOnly ? "failed" : "succeeded",
+            detail: adminOnly ? "current role cannot enumerate members" : "/workspace/members",
+          },
+          {
+            label: "Invite member",
+            status: inviteMut.isPending ? "running" : inviteMut.isError ? "failed" : issuedInvite || inviteMut.isSuccess ? "succeeded" : "idle",
+            detail: inviteRouteUnavailable ? "invite route unavailable" : pendingInvites.length ? `${pendingInvites.length} pending` : "ready",
+          },
+          {
+            label: "MFA setup",
+            status: mfaSetupMut.isPending || mfaVerifyMut.isPending ? "running" : mfaSetupMut.isError || mfaVerifyMut.isError ? "failed" : currentMfaEnabled ? "succeeded" : "idle",
+            detail: currentMfaEnabled ? "signed-in account protected" : "TOTP not enabled",
+          },
+          {
+            label: "Audit posture",
+            status: data || issuedInvite || pendingInvites.length ? "succeeded" : "idle",
+            detail: "member, invite, and auth state are backend-sourced",
+          },
+        ]}
+        metrics={[
+          { label: "members", value: String(stats.total) },
+          { label: "pending", value: String(pendingInvites.length) },
+          { label: "MFA", value: `${stats.mfa} / ${stats.total}` },
+          { label: "role", value: currentMember?.role ?? user?.role ?? "unknown" },
+        ]}
+        error={teamFlowError}
+        actions={[
+          { label: "Invite member", onClick: () => setShowInvite(true), disabled: inviteRouteUnavailable, primary: true },
+          {
+            label: currentMfaEnabled ? "MFA enabled" : "Set up MFA",
+            onClick: () => {
+              setShowMfa(true);
+              mfaSetupMut.mutate();
+            },
+            disabled: currentMfaEnabled || mfaSetupMut.isPending,
+          },
+          { label: "Refresh team", onClick: () => void refetch(), disabled: isLoading },
+          { label: "View evidence", href: "#/compliance" },
+        ]}
+      />
+
+      <ProofStrip
+        items={[
+          { label: "Members source", value: adminOnly ? "/auth/me fallback" : "/workspace/members" },
+          { label: "Invite source", value: inviteRouteUnavailable ? "unavailable" : "/workspace/members/invites" },
+          { label: "MFA source", value: "/auth/mfa/setup + verify" },
+          { label: "Latest proof", value: issuedInvite ? `invite ${issuedInvite.status}` : currentMfaEnabled ? "MFA enabled" : "awaiting action" },
+        ]}
+      />
 
       {!currentMfaEnabled && (
         <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">

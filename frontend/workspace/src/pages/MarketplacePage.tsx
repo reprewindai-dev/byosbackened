@@ -18,6 +18,7 @@ import {
 import { PlatformPulseSection } from "@/components/overview/PlatformPulseSection";
 import { api } from "@/lib/api";
 import { fmtCents, cn } from "@/lib/cn";
+import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
 
 interface ListingCard {
   id: string;
@@ -606,6 +607,41 @@ export function MarketplacePage() {
                 </div>
               ) : null}
             </section>
+
+            <RunStatePanel
+              eyebrow="Tool acquisition flow"
+              title="Verify, acquire, then configure"
+              status={checkoutMut.isPending ? "running" : checkoutMut.isError ? "failed" : preflightQ.data ? "succeeded" : preflightQ.isLoading ? "running" : preflightQ.isError ? "unavailable" : "idle"}
+              summary="Marketplace detail keeps source, price, pre-flight, and acquisition proof on this page before sending the buyer elsewhere."
+              steps={[
+                { label: "Source and license visible", status: selected.source_url || selected.use_url ? "succeeded" : "unavailable", detail: selected.source_verified ? "verified" : "pending" },
+                { label: "Pre-flight estimate", status: preflightQ.isLoading ? "running" : preflightQ.data ? "succeeded" : preflightQ.isError ? "unavailable" : "idle", detail: "/api/v1/marketplace/listings/:id/preflight" },
+                { label: selected.price_cents > 0 ? "Checkout" : "Open product", status: checkoutMut.isPending ? "running" : checkoutMut.isError ? "failed" : "idle", detail: selected.price_cents > 0 ? "Stripe checkout" : "external source" },
+              ]}
+              metrics={[
+                { label: "price", value: selected.price_cents > 0 ? fmtCents(selected.price_cents) : "Free" },
+                { label: "quality", value: preflightQ.data?.predicted_quality != null ? `${(preflightQ.data.predicted_quality * 100).toFixed(0)}%` : "not returned" },
+                { label: "risk", value: preflightQ.data?.failure_risk != null ? `${(preflightQ.data.failure_risk * 100).toFixed(0)}%` : "not returned" },
+                { label: "type", value: selected.listing_type },
+              ]}
+              error={checkoutMut.error}
+              actions={[
+                ...(selected.source_url || selected.use_url ? [{ label: "View source", href: selected.source_url ?? selected.use_url ?? "#" }] : []),
+                selected.price_cents > 0
+                  ? { label: checkoutMut.isPending ? "Opening checkout" : "Purchase", onClick: () => checkoutMut.mutate(selected.id), disabled: checkoutMut.isPending, primary: true }
+                  : { label: "Open product", href: selected.use_url ?? selected.source_url ?? "#", disabled: !selected.use_url && !selected.source_url, primary: true },
+                { label: "View billing", href: "#/billing" },
+              ]}
+            />
+
+            <ProofStrip
+              items={[
+                { label: "listing", value: selected.id },
+                { label: "source", value: selected.source_verified ? "verified" : "pending" },
+                { label: "preflight", value: preflightQ.data ? "returned" : preflightQ.isError ? "unavailable" : "loading" },
+                { label: "orders", value: "/api/v1/marketplace/orders/me" },
+              ]}
+            />
 
             {/* Compliance badges */}
             {(selected.source_verified || selected.compliance_badges?.length) ? (

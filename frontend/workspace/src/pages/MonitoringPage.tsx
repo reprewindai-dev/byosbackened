@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   Activity,
   AlertCircle,
@@ -17,6 +18,7 @@ import {
 import { api } from "@/lib/api";
 import { cn, dateFromApiTimestamp, fmtNumber, formatApiDateTime, relativeTime } from "@/lib/cn";
 import type { OverviewPayload } from "@/types/api";
+import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
 
 interface AuditLog {
   id: string;
@@ -33,6 +35,7 @@ interface AuditLog {
   total_latency_ms?: number | null;
   status?: string | null;
   log_hash?: string | null;
+  request_id?: string | null;
 }
 
 interface AuditLogsResp {
@@ -77,9 +80,11 @@ async function verifyLog(id: string) {
 const OP_TYPES = ["all", "exec", "chat", "completion", "embedding", "tool"] as const;
 
 export function MonitoringPage() {
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get("run") ?? searchParams.get("audit") ?? searchParams.get("endpoint") ?? "";
   const [opType, setOpType] = useState<string>("all");
   const [selected, setSelected] = useState<AuditLog | null>(null);
-  const [logSearch, setLogSearch] = useState("");
+  const [logSearch, setLogSearch] = useState(focusId);
 
   const query = useQuery({
     queryKey: ["audit-logs", opType],
@@ -98,12 +103,51 @@ export function MonitoringPage() {
   const throughput = useMemo(() => buildBuckets(logs, overview.data), [logs, overview.data]);
   const latencySamples = useMemo(() => latencySeries(logs, overview.data), [logs, overview.data]);
 
+  useEffect(() => {
+    if (!focusId || selected || !logs.length) return;
+    const match = logs.find((log) => {
+      const haystack = `${log.id} ${log.request_id ?? ""} ${log.operation_type} ${log.model} ${log.input_preview} ${log.output_preview}`.toLowerCase();
+      return haystack.includes(focusId.toLowerCase());
+    });
+    if (match) setSelected(match);
+  }, [focusId, logs, selected]);
+
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <PageHeader fetching={query.isFetching || overview.isFetching} updatedAt={query.dataUpdatedAt || overview.dataUpdatedAt} />
 
       <section>
         <KpiStrip stats={stats} />
+
+        {focusId && (
+          <RunStatePanel
+            className="mt-4"
+            eyebrow="Filtered evidence"
+            title="Monitoring is scoped to the selected run or endpoint"
+            status={query.isFetching ? "running" : filteredLogs.length ? "succeeded" : query.isError ? "failed" : "unavailable"}
+            summary={`Focus: ${focusId}. This page filters live /api/v1/audit/logs rows instead of sending the user to a generic observability screen.`}
+            metrics={[
+              { label: "matched logs", value: String(filteredLogs.length) },
+              { label: "latency p50", value: `${percentile(latencySamples, 0.5)}ms` },
+              { label: "errors", value: String(stats.errorCount) },
+              { label: "cost", value: `$${stats.totalCost.toFixed(4)}` },
+            ]}
+            actions={[
+              { label: "Clear filter", href: "#/monitoring" },
+              { label: "Open evidence", href: `#/compliance?audit=${encodeURIComponent(focusId)}`, primary: true },
+            ]}
+          />
+        )}
+
+        <ProofStrip
+          className="mt-4"
+          items={[
+            { label: "logs", value: "/api/v1/audit/logs" },
+            { label: "overview", value: overview.data ? "/api/v1/monitoring/overview" : overview.isError ? "unavailable" : "loading" },
+            { label: "freshness", value: query.dataUpdatedAt ? new Date(query.dataUpdatedAt).toLocaleTimeString() : "pending" },
+            { label: "verification", value: "per-row hash check" },
+          ]}
+        />
 
         <div className="mt-4 grid grid-cols-12 gap-4">
           <ThroughputPanel buckets={throughput} />

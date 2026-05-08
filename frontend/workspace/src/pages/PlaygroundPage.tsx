@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { ProofStrip, RunStatePanel, type FlowStatus } from "@/components/workspace/FlowPrimitives";
 import { responseDetail } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
@@ -1133,6 +1134,31 @@ export function PlaygroundPage() {
   // Show live observed latency when available; fall back to model profile only as a secondary estimate.
   const p50Label = stats.latency_ms ? `${stats.latency_ms} ms` : selectedModel?.p50_ms ? `~${selectedModel.p50_ms} ms` : "-";
   const p95Label = selectedModel?.p95_ms ? `~${selectedModel.p95_ms} ms` : "-";
+  const playgroundFlowStatus: FlowStatus = running
+    ? "running"
+    : error
+      ? "failed"
+      : hasRunOutput
+        ? "succeeded"
+        : models.isError
+          ? "unavailable"
+          : "idle";
+  const completionStepStatus: FlowStatus = running
+    ? "running"
+    : error
+      ? "failed"
+      : hasRunOutput
+        ? "succeeded"
+        : "idle";
+  const policyStepStatus: FlowStatus = running
+    ? "running"
+    : error
+      ? "failed"
+      : eventCount || hasRunOutput
+        ? "succeeded"
+        : "idle";
+  const traceHref = `#/monitoring${stats.request_id ? `?run=${encodeURIComponent(stats.request_id)}` : ""}`;
+  const proofAudit = stats.audit_hash ?? stats.request_id ?? (hasCompareOutput ? "compare results returned" : "not created yet");
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
@@ -1174,6 +1200,61 @@ export function PlaygroundPage() {
           </button>
         </div>
       </header>
+
+      <RunStatePanel
+        className="mb-4"
+        eyebrow="Playground loop"
+        title={compareOpen ? "Compare is running governed model-specific completions" : "Prompt, run, prove, then save as pipeline"}
+        status={playgroundFlowStatus}
+        summary="This page now completes the run loop here: the prompt starts in Playground, `/ai/complete` executes live, telemetry is shown, proof is available, and the next action is explicit."
+        steps={[
+          {
+            label: "Prompt prepared",
+            status: prompt.trim() ? "succeeded" : "idle",
+            detail: prompt.trim() ? `${inputEstimate} estimated input tokens` : "enter a prompt",
+          },
+          {
+            label: "Policy and reserve gate",
+            status: policyStepStatus,
+            detail: `${sessionTag} / outbound.public.v3`,
+          },
+          {
+            label: compareOpen ? "Two model completions" : "Model completion",
+            status: completionStepStatus,
+            detail: compareOpen
+              ? `${selectedModel?.slug ?? "primary"} + ${secondaryCompareModel?.slug ?? "secondary"}`
+              : selectedModel?.slug ?? "no connected model",
+          },
+          {
+            label: "Pipeline handoff",
+            status: savedPipelineSlug ? "succeeded" : "idle",
+            detail: savedPipelineSlug ?? "available after a successful run",
+          },
+        ]}
+        metrics={[
+          { label: "mode", value: compareOpen ? "compare" : "single" },
+          { label: "latency", value: stats.latency_ms ? `${stats.latency_ms}ms` : running ? "running" : "not run" },
+          { label: "output", value: hasCompareOutput ? `${Object.values(compareResults).filter((result) => result.status === "done").length} panes` : `${tokenCount} tokens` },
+          { label: "proof", value: stats.audit_hash ? "audit hash" : stats.request_id ? "request id" : hasCompareOutput ? "per-model proof" : "pending" },
+        ]}
+        error={error}
+        actions={[
+          { label: running ? "Running" : "Send", onClick: () => void run(), disabled: !canRun || running, primary: true },
+          { label: "Save as Pipeline", onClick: () => void saveAsPipeline(), disabled: !hasRunOutput || running || savingPipeline },
+          { label: "Open pipeline", href: "#/pipelines", disabled: !savedPipelineSlug },
+          { label: "View trace", href: traceHref, disabled: !stats.request_id && !stats.audit_hash && !hasCompareOutput },
+        ]}
+      />
+
+      <ProofStrip
+        className="mb-4"
+        items={[
+          { label: "Completion route", value: "/api/v1/ai/complete" },
+          { label: "Model source", value: selectedModel?.slug ?? "workspace model required" },
+          { label: "Audit proof", value: proofAudit },
+          { label: "Pipeline", value: savedPipelineSlug ?? "not saved yet" },
+        ]}
+      />
 
       <div className="grid grid-cols-12 gap-4 py-4">
         <aside className="col-span-12 space-y-3 xl:col-span-2">

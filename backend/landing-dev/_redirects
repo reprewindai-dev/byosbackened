@@ -12,6 +12,8 @@ https://www.veklom.dev/*  https://veklom.dev/:splat  301
 /contract/        /#contract     302
 /routes           /#routes       302
 /routes/          /#routes       302
+/demo             /demo/index.html  200
+/demo/            /demo/index.html  200
 
 /status           /status/index.html  200
 /status/          /status/index.html  200

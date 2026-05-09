@@ -230,40 +230,50 @@ export function OverviewPage() {
   const data = overview.data;
   const pulseData = pulse.data ?? null;
   const state = data ? deriveInstitutionalState(data, pulseData) : null;
+  const isSuperuser = Boolean(user?.is_superuser);
 
   return (
     <div className="command-wall">
       <CommandHeader
-        userScope={user?.is_superuser ? "Veklom Superuser" : "Tenant Command Center"}
+        userScope={isSuperuser ? "Owner Command Center" : "Tenant Overview Center"}
         workspace={user?.workspace_name ?? user?.workspace_id ?? "workspace"}
         state={state}
         isLoading={overview.isLoading}
+        isSuperuser={isSuperuser}
       />
-      <CommandBridge data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} />
+      <CommandBridge data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} isSuperuser={isSuperuser} />
 
       {overview.isError && (
         <div className="command-alert">
           <AlertCircle className="h-4 w-4" />
-          <span>{(overview.error as Error)?.message ?? "Unable to load command center telemetry"}</span>
+          <span>{(overview.error as Error)?.message ?? "Unable to load overview telemetry"}</span>
         </div>
       )}
 
-      <SurfaceMap data={data} pulse={pulseData} state={state} isSuperuser={Boolean(user?.is_superuser)} />
+      <SurfaceMap data={data} pulse={pulseData} state={state} isSuperuser={isSuperuser} />
 
       <section className="sv-chamber">
         <SectionTitle
-          eyebrow="Hello, Silicon Valley"
-          title="Institutional consciousness"
-          text="Strategic posture, route integrity, memory continuity, and unresolved pressure from live control-plane telemetry."
+          eyebrow={isSuperuser ? "Hello, Silicon Valley" : "Workspace posture"}
+          title={isSuperuser ? "Institutional consciousness" : "Governed workspace overview"}
+          text={
+            isSuperuser
+              ? "Strategic posture, route integrity, memory continuity, and unresolved pressure from live control-plane telemetry."
+              : "Tenant-scoped telemetry for routes, runs, models, reserve usage, evidence, and operational health."
+          }
         />
-        <SiliconValleyWall data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} />
+        <SiliconValleyWall data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} isSuperuser={isSuperuser} />
       </section>
 
       <section className="sunnyvale-floor">
         <SectionTitle
-          eyebrow="Hello, Sunnyvale"
+          eyebrow={isSuperuser ? "Hello, Sunnyvale" : "Workspace activity"}
           title="Operational execution"
-          text="Agent runs, committee decisions, intervention requests, blocked workflows, evidence, and execution traces."
+          text={
+            isSuperuser
+              ? "Agent runs, committee decisions, intervention requests, blocked workflows, evidence, and execution traces."
+              : "Runs, endpoint activity, policy outcomes, evidence, routes, and execution traces for this workspace."
+          }
         />
         <SunnyvaleFloor data={data} state={state} isLoading={overview.isLoading} />
       </section>
@@ -278,17 +288,19 @@ function CommandHeader({
   workspace,
   state,
   isLoading,
+  isSuperuser,
 }: {
   userScope: string;
   workspace: string;
   state: InstitutionalState | null;
   isLoading: boolean;
+  isSuperuser: boolean;
 }) {
   return (
     <header className="command-header">
       <div>
-        <div className="command-kicker">Veklom sovereign command center</div>
-        <h1>Institutional command overview</h1>
+        <div className="command-kicker">{isSuperuser ? "Veklom owner command center" : "Veklom workspace overview"}</div>
+        <h1>{isSuperuser ? "Institutional command center" : "Workspace overview center"}</h1>
         <p>{userScope} - {workspace}</p>
       </div>
       <div className="command-status-strip">
@@ -306,11 +318,13 @@ function CommandBridge({
   pulse,
   state,
   isLoading,
+  isSuperuser,
 }: {
   data?: OverviewPayload;
   pulse: PlatformPulse | null;
   state: InstitutionalState | null;
   isLoading: boolean;
+  isSuperuser: boolean;
 }) {
   const primarySignal = isLoading
     ? "Synchronizing live spine"
@@ -349,11 +363,12 @@ function CommandBridge({
   return (
     <section className="command-bridge" aria-label="Live command bridge">
       <div className="bridge-prime">
-        <span>Live command bridge</span>
+        <span>{isSuperuser ? "Live owner command bridge" : "Live workspace overview"}</span>
         <h2>{primarySignal}</h2>
         <p>
-          This overview is the control surface: institutional telemetry, execution lanes, evidence lineage, and the
-          operating actions that move the system.
+          {isSuperuser
+            ? "This overview is the control surface: institutional telemetry, execution lanes, evidence lineage, and the operating actions that move the system."
+            : "This overview is tenant-scoped: governed runs, routing, evidence, billing posture, and the next useful workspace action."}
         </p>
         <div className="bridge-pulse">
           <i />
@@ -387,56 +402,107 @@ function SurfaceMap({
   state: InstitutionalState | null;
   isSuperuser: boolean;
 }) {
-  const surfaces = [
-    {
-      title: "Deterministic Engine",
-      label: "Public narrative",
-      value: state ? `${state.convergencePressure}% pressure` : "story layer",
-      detail: "Intent, doctrine, and the reason governed autonomy matters.",
-      tone: "neutral",
-      to: "#/control-center",
-    },
-    {
-      title: "Silicon Valley",
-      label: isSuperuser ? "Strategic governance" : "Scoped governance",
-      value: state ? `${state.systemCoherence}% coherence` : "syncing",
-      detail: "UACP posture, policy stability, escalation pressure, and route authority.",
-      tone: state?.tone ?? "neutral",
-      to: "#/overview",
-    },
-    {
-      title: "Sunnyvale",
-      label: "Execution floor",
-      value: `${fmtNumber(data?.recent_runs.length ?? 0)} runs`,
-      detail: "Agents, queues, workflows, tools, blocked jobs, and intervention paths.",
-      tone: data?.recent_runs.length ? "stable" : "neutral",
-      to: "#/playground",
-    },
-    {
-      title: "Archives",
-      label: "Memory spine",
-      value: `${fmtNumber(data?.audit_trail.length ?? data?.kpi.audit_entries ?? 0)} records`,
-      detail: "Replayable judgment, evidence ledger, provenance, and institutional continuity.",
-      tone: data?.audit_trail.length ? "stable" : "watch",
-      to: "#/compliance",
-    },
-    {
-      title: "Marketplace",
-      label: "Asset factory",
-      value: pulse ? `${pulse.active_listings.total} live` : "Builder lane",
-      detail: "Sovereign Builder Agents convert public pain into governed sellable tools.",
-      tone: "neutral",
-      to: "#/marketplace",
-    },
-    {
-      title: "Control room",
-      label: "Tuning",
-      value: data ? `${data.routing.primary_util_pct}% primary` : "no signal",
-      detail: "Models, billing, settings, routes, and operational spine controls.",
-      tone: "stable",
-      to: "#/settings",
-    },
-  ];
+  const surfaces = isSuperuser
+    ? [
+        {
+          title: "Deterministic Engine",
+          label: "Public narrative",
+          value: state ? `${state.convergencePressure}% pressure` : "story layer",
+          detail: "Intent, doctrine, and the reason governed autonomy matters.",
+          tone: "neutral",
+          to: "#/control-center",
+        },
+        {
+          title: "Silicon Valley",
+          label: "Strategic governance",
+          value: state ? `${state.systemCoherence}% coherence` : "syncing",
+          detail: "UACP posture, policy stability, escalation pressure, and route authority.",
+          tone: state?.tone ?? "neutral",
+          to: "#/overview",
+        },
+        {
+          title: "Sunnyvale",
+          label: "Execution floor",
+          value: `${fmtNumber(data?.recent_runs.length ?? 0)} runs`,
+          detail: "Agents, queues, workflows, tools, blocked jobs, and intervention paths.",
+          tone: data?.recent_runs.length ? "stable" : "neutral",
+          to: "#/playground",
+        },
+        {
+          title: "Archives",
+          label: "Memory spine",
+          value: `${fmtNumber(data?.audit_trail.length ?? data?.kpi.audit_entries ?? 0)} records`,
+          detail: "Replayable judgment, evidence ledger, provenance, and institutional continuity.",
+          tone: data?.audit_trail.length ? "stable" : "watch",
+          to: "#/compliance",
+        },
+        {
+          title: "Marketplace",
+          label: "Asset factory",
+          value: pulse ? `${pulse.active_listings.total} live` : "Builder lane",
+          detail: "Sovereign Builder Agents convert public pain into governed sellable tools.",
+          tone: "neutral",
+          to: "#/marketplace",
+        },
+        {
+          title: "Control room",
+          label: "Tuning",
+          value: data ? `${data.routing.primary_util_pct}% primary` : "no signal",
+          detail: "Models, billing, settings, routes, and operational spine controls.",
+          tone: "stable",
+          to: "#/settings",
+        },
+      ]
+    : [
+        {
+          title: "Overview Center",
+          label: "Workspace status",
+          value: state ? `${state.systemCoherence}% health` : "syncing",
+          detail: "Tenant-scoped health, runs, route posture, reserve usage, and evidence state.",
+          tone: state?.tone ?? "neutral",
+          to: "#/overview",
+        },
+        {
+          title: "Playground",
+          label: "Prompt test",
+          value: `${fmtNumber(data?.recent_runs.length ?? 0)} runs`,
+          detail: "Run prompts, compare available models, save useful tests into pipelines.",
+          tone: data?.recent_runs.length ? "stable" : "neutral",
+          to: "#/playground",
+        },
+        {
+          title: "Pipelines",
+          label: "Workflow builder",
+          value: `${fmtNumber(data?.policy_events.length ?? 0)} events`,
+          detail: "Build, test, prove, and deploy governed workflows.",
+          tone: "stable",
+          to: "#/pipelines",
+        },
+        {
+          title: "Deployments",
+          label: "Endpoint verification",
+          value: data ? `${data.routing.primary_util_pct}% primary` : "no signal",
+          detail: "Create endpoints, run same-page tests, inspect logs, and copy code after proof.",
+          tone: "stable",
+          to: "#/deployments",
+        },
+        {
+          title: "Evidence",
+          label: "Audit trail",
+          value: `${fmtNumber(data?.audit_trail.length ?? data?.kpi.audit_entries ?? 0)} records`,
+          detail: "View run evidence, policy results, audit hashes, and export availability by plan.",
+          tone: data?.audit_trail.length ? "stable" : "watch",
+          to: "#/compliance",
+        },
+        {
+          title: "Billing",
+          label: "Reserve posture",
+          value: data ? fmtCents(data.spend.spend_cents) : "$0.00",
+          detail: "Track governed usage, reserve impact, plan status, and activation requirements.",
+          tone: "neutral",
+          to: "#/billing",
+        },
+      ];
 
   return (
     <section className="surface-map" aria-label="Institutional product surface map">
@@ -457,15 +523,17 @@ function SiliconValleyWall({
   pulse,
   state,
   isLoading,
+  isSuperuser,
 }: {
   data?: OverviewPayload;
   pulse: PlatformPulse | null;
   state: InstitutionalState | null;
   isLoading: boolean;
+  isSuperuser: boolean;
 }) {
   return (
     <div className="sv-grid">
-      <InstitutionalStatePanel state={state} data={data} isLoading={isLoading} />
+      <InstitutionalStatePanel state={state} data={data} isLoading={isLoading} isSuperuser={isSuperuser} />
       <StrategicTrajectory data={data} state={state} />
       <AgentAlignment data={data} />
       <InstitutionalEvents data={data} pulse={pulse} isLoading={isLoading} />
@@ -474,7 +542,7 @@ function SiliconValleyWall({
   );
 }
 
-function InstitutionalStatePanel({ state, data, isLoading }: { state: InstitutionalState | null; data?: OverviewPayload; isLoading: boolean }) {
+function InstitutionalStatePanel({ state, data, isLoading, isSuperuser }: { state: InstitutionalState | null; data?: OverviewPayload; isLoading: boolean; isSuperuser: boolean }) {
   const metrics = [
     { label: "System coherence", value: state ? `${state.systemCoherence}%` : "-", icon: BrainCircuit },
     { label: "Convergence pressure", value: state ? `${state.convergencePressure}%` : "-", icon: Split },
@@ -486,15 +554,15 @@ function InstitutionalStatePanel({ state, data, isLoading }: { state: Institutio
 
   return (
     <div className="sv-prime mineral-panel">
-      <PanelChrome label="Institutional state" icon={Landmark} />
+      <PanelChrome label={isSuperuser ? "Institutional state" : "Workspace state"} icon={Landmark} />
       <div className="state-core">
         <div className={cn("state-orbit", state?.tone)}>
           <span />
           <b>{isLoading ? "SYNC" : state?.posture ?? "NO SIGNAL"}</b>
         </div>
         <div>
-          <h3>Consciousness layer</h3>
-          <p>{state?.narrative ?? "Waiting for live institutional telemetry from the command plane."}</p>
+          <h3>{isSuperuser ? "Consciousness layer" : "Governed overview"}</h3>
+          <p>{state?.narrative ?? "Waiting for live workspace telemetry."}</p>
         </div>
       </div>
       <div className="state-matrix">

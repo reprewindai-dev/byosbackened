@@ -99,47 +99,70 @@ jobs:
           lines = compose.splitlines()
           try:
               services_idx = next(i for i, line in enumerate(lines) if line.strip() == "services:")
+              services_indent = len(lines[services_idx]) - len(lines[services_idx].lstrip(" "))
               service_idx = next(
                   i for i in range(services_idx + 1, len(lines))
-                  if re.match(r"^  [A-Za-z0-9_.-]+:\s*$", lines[i])
+                  if (
+                      lines[i].strip()
+                      and not lines[i].lstrip().startswith("#")
+                      and lines[i].rstrip().endswith(":")
+                      and len(lines[i]) - len(lines[i].lstrip(" ")) > services_indent
+                  )
               )
           except StopIteration as exc:
               raise SystemExit("Could not locate first compose service") from exc
 
+          service_indent = len(lines[service_idx]) - len(lines[service_idx].lstrip(" "))
+          child_indent = service_indent + 2
+          env_item_indent = child_indent + 2
+          child_prefix = " " * child_indent
+          env_item_prefix = " " * env_item_indent
           service_end = len(lines)
           for i in range(service_idx + 1, len(lines)):
-              if re.match(r"^  [A-Za-z0-9_.-]+:\s*$", lines[i]):
+              if (
+                  lines[i].strip()
+                  and not lines[i].lstrip().startswith("#")
+                  and lines[i].rstrip().endswith(":")
+                  and len(lines[i]) - len(lines[i].lstrip(" ")) <= service_indent
+              ):
                   service_end = i
                   break
 
           env_idx = None
           for i in range(service_idx + 1, service_end):
-              if lines[i].strip() == "environment:" and lines[i].startswith("    "):
+              if (
+                  lines[i].strip() == "environment:"
+                  and len(lines[i]) - len(lines[i].lstrip(" ")) == child_indent
+              ):
                   env_idx = i
                   break
 
-          rendered = [f"      {key}: {quote(value)}" for key, value in sorted(env_values.items())]
+          rendered = [f"{env_item_prefix}{key}: {quote(value)}" for key, value in sorted(env_values.items())]
           if env_idx is None:
-              lines[service_idx + 1:service_idx + 1] = ["    environment:", *rendered]
+              lines[service_idx + 1:service_idx + 1] = [f"{child_prefix}environment:", *rendered]
           else:
               env_end = service_end
               for i in range(env_idx + 1, service_end):
-                  if lines[i].strip() and re.match(r"^    [A-Za-z0-9_.-]+:", lines[i]):
+                  if (
+                      lines[i].strip()
+                      and len(lines[i]) - len(lines[i].lstrip(" ")) <= child_indent
+                      and lines[i].rstrip().endswith(":")
+                  ):
                       env_end = i
                       break
               existing_keys = set()
               new_block = []
               for line in lines[env_idx + 1:env_end]:
-                  match = re.match(r"^      ([A-Za-z_][A-Za-z0-9_]*):", line)
+                  match = re.match(rf"^{re.escape(env_item_prefix)}([A-Za-z_][A-Za-z0-9_]*):", line)
                   if match and match.group(1) in env_values:
                       key = match.group(1)
                       existing_keys.add(key)
-                      new_block.append(f"      {key}: {quote(env_values[key])}")
+                      new_block.append(f"{env_item_prefix}{key}: {quote(env_values[key])}")
                   else:
                       new_block.append(line)
               for key, value in sorted(env_values.items()):
                   if key not in existing_keys:
-                      new_block.append(f"      {key}: {quote(value)}")
+                      new_block.append(f"{env_item_prefix}{key}: {quote(value)}")
               lines[env_idx + 1:env_end] = new_block
 
           compose = "\n".join(lines) + "\n"

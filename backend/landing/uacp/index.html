@@ -2,35 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Veklom UACP Demo</title>
-    <script type="module" crossorigin src="/uacp/assets/index-DtONRLkC.js"></script>
-    <link rel="stylesheet" crossorigin href="/uacp/assets/index-CPQXqtCU.css">
-  <script>
-(function () {
-  var api = "https://uacpgemini.onrender.com";
-  var originalFetch = window.fetch.bind(window);
-  window.fetch = function (input, init) {
-    if (typeof input === "string" && input.indexOf("/api/") === 0) {
-      return originalFetch(api + input, init);
-    }
-    if (input && typeof input.url === "string" && input.url.indexOf(location.origin + "/api/") === 0) {
-      return originalFetch(api + input.url.slice(location.origin.length), init);
-    }
-    return originalFetch(input, init);
-  };
-  var OriginalWebSocket = window.WebSocket;
-  window.WebSocket = function (url, protocols) {
-    if (typeof url === "string" && (url.indexOf("ws://") === 0 || url.indexOf("wss://") === 0)) {
-      return new OriginalWebSocket("wss://uacpgemini.onrender.com", protocols);
-    }
-    return new OriginalWebSocket(url, protocols);
-  };
-  window.WebSocket.prototype = OriginalWebSocket.prototype;
-})();
-</script></head>
-  <body>
-    <div id="root"></div>
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Veklom · Sovereign Control Plane</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="/workspace-config.js"></script>
+    <script type="module" crossorigin src="/workspace-assets/index-D0QMcn1C.js?v=workspace"></script>
+    <link rel="modulepreload" crossorigin href="/workspace-assets/rolldown-runtime-D3WCi_bD.js?v=workspace">
+    <link rel="modulepreload" crossorigin href="/workspace-assets/query-py7MAgma.js?v=workspace">
+    <link rel="modulepreload" crossorigin href="/workspace-assets/react-DUpM2YDl.js?v=workspace">
+    <link rel="stylesheet" crossorigin href="/workspace-assets/index-BJ0mVb-B.css?v=workspace">
+  </head>
+  <body class="bg-ink text-bone antialiased">
+    <div id="root"></div>
   </body>
 </html>
-

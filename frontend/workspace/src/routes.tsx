@@ -6,6 +6,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { ControlCenterPage } from "./pages/ControlCenterPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { UacpPage } from "./pages/UacpPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { BillingPage } from "./pages/BillingPage";
@@ -36,6 +37,7 @@ export function AppRoutes() {
         <Route path="/dashboard" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
         <Route path="/control-center" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
         <Route path="/overview" element={<OverviewPage />} />
+        <Route path="/uacp" element={<UacpPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/marketplace/:slug" element={<MarketplacePage />} />

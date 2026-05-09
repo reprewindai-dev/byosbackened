@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   Activity,
   Box,
+  BrainCircuit,
   ChevronLeft,
   CircuitBoard,
   Command,
@@ -32,6 +33,7 @@ const CUSTOMER_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Workspace",
     items: [
       { to: "/overview", label: "Overview Center", icon: Command, badge: "LIVE" },
+      { to: "/uacp", label: "UACP", icon: BrainCircuit, badge: "PAID" },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],

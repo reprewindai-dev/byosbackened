@@ -65,6 +65,18 @@ jobs:
           cd "$build_dir/backend"
           docker build -f infra/docker/Dockerfile.api -t "${APP_ID}:${COMMIT_SHA}" .
           cd "$APP_DIR"
+          if ! docker compose config >/dev/null 2>&1; then
+            echo "Current compose is invalid; restoring latest valid actions backup before deploy"
+            restored=0
+            for backup in $(ls -1t docker-compose.yaml.bak-actions-* 2>/dev/null || true); do
+              if docker compose -f "$backup" config >/dev/null 2>&1; then
+                cp "$backup" docker-compose.yaml
+                restored=1
+                break
+              fi
+            done
+            test "$restored" = "1" || (echo "No valid compose backup found" && exit 1)
+          fi
           cp docker-compose.yaml "docker-compose.yaml.bak-actions-${COMMIT_SHA}-$(date +%Y%m%d%H%M%S)"
           python3 - <<'PY'
           import os
@@ -113,20 +125,28 @@ jobs:
               raise SystemExit("Could not locate first compose service") from exc
 
           service_indent = len(lines[service_idx]) - len(lines[service_idx].lstrip(" "))
-          child_indent = service_indent + 2
-          env_item_indent = child_indent + 2
-          child_prefix = " " * child_indent
-          env_item_prefix = " " * env_item_indent
           service_end = len(lines)
           for i in range(service_idx + 1, len(lines)):
               if (
                   lines[i].strip()
                   and not lines[i].lstrip().startswith("#")
-                  and lines[i].rstrip().endswith(":")
                   and len(lines[i]) - len(lines[i].lstrip(" ")) <= service_indent
               ):
                   service_end = i
                   break
+
+          child_indent = None
+          for i in range(service_idx + 1, service_end):
+              if lines[i].strip() and not lines[i].lstrip().startswith("#"):
+                  indent = len(lines[i]) - len(lines[i].lstrip(" "))
+                  if indent > service_indent:
+                      child_indent = indent
+                      break
+          if child_indent is None:
+              child_indent = service_indent + 4
+          env_item_indent = child_indent + 4
+          child_prefix = " " * child_indent
+          env_item_prefix = " " * env_item_indent
 
           env_idx = None
           for i in range(service_idx + 1, service_end):
@@ -141,12 +161,18 @@ jobs:
           if env_idx is None:
               lines[service_idx + 1:service_idx + 1] = [f"{child_prefix}environment:", *rendered]
           else:
+              for i in range(env_idx + 1, service_end):
+                  if lines[i].strip() and not lines[i].lstrip().startswith("#"):
+                      indent = len(lines[i]) - len(lines[i].lstrip(" "))
+                      if indent > child_indent:
+                          env_item_indent = indent
+                          env_item_prefix = " " * env_item_indent
+                      break
               env_end = service_end
               for i in range(env_idx + 1, service_end):
                   if (
                       lines[i].strip()
                       and len(lines[i]) - len(lines[i].lstrip(" ")) <= child_indent
-                      and lines[i].rstrip().endswith(":")
                   ):
                       env_end = i
                       break

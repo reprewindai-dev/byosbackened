@@ -8,10 +8,10 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 
 # Truthful workspace routes. The workspace shell is generated from
 # frontend/workspace so all app routes use the same maintainable React build.
-/dashboard         /workspace-app#/control-center      302
-/dashboard/        /workspace-app#/control-center      302
-/control-center    /workspace-app#/control-center      302
-/control-center/   /workspace-app#/control-center      302
+/dashboard         /workspace-app#/overview      302
+/dashboard/        /workspace-app#/overview      302
+/control-center    /workspace-app#/overview      302
+/control-center/   /workspace-app#/overview      302
 /overview          /workspace-app#/overview      302
 /overview/         /workspace-app#/overview      302
 /playground        /workspace-app#/playground      302

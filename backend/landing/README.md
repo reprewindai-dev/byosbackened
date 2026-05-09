@@ -1,19 +1,22 @@
-# Veklom Landing + Marketplace Surface
+# Veklom Landing + Site Split Surface
 
 This directory is the production static web surface for:
 
-- `veklom.com` (showpiece + live demo + marketplace entry)
-- `veklom.dev` (acquisition/strategic surface when deployed)
+- `veklom.com` (buyer-facing Veklom Sovereign AI Hub + GPC demo)
+- `veklom.dev` (developer/BYOS backend proof site + legacy hookup demo)
 
 ## Messaging authority lock
 
 - Canonical public copy source is `COPY_LOCK_ISSUE1.md`.
-- Required `.com` hierarchy is demo-first and marketplace-entry-first.
-- Acquisition positioning is secondary on `.com` and must not be foregrounded.
+- Required `.com` hierarchy is buyer Hub first: Playground, GPC / Plan Compiler, Models, Tools, Pipelines, Governance, Deployments, Monitoring.
+- Required `.dev` hierarchy is technical proof first: BYOS backend, legacy integrations, API/backend health, license/access flow, tenant isolation, private deployment, policy/fallback/routing, archive/evidence/replay.
+- Marketplace/Tools is one module inside the hub. Do not describe Veklom itself as a marketplace.
 
 ## Included routes
 
-- `/` marketing page
+- `/` host-aware marketing page:
+  - `veklom.com` frames the Sovereign AI Hub and defaults the live theater to GPC.
+  - `veklom.dev` frames the Developer Platform and defaults the live theater to BYOS legacy infrastructure.
 - `/signup/` self-serve workspace creation
 - `/login/` authentication
 - `/dashboard/` API key + subscription management

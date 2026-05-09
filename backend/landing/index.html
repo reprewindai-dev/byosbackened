@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Veklom - Self-Hosted AI Gateway for Regulated Teams</title>
-  <meta name="description" content="Private AI gateway for regulated teams: route, audit, and control every LLM request with policy, cost checks, circuit breakers, and signed evidence." />
+  <title>Veklom Sovereign AI Hub</title>
+  <meta name="description" content="Test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace. Use GPC to turn raw AI and business intent into governed plans before they become pipelines." />
   <link rel="canonical" href="https://veklom.com/" />
-  <meta name="keywords" content="self-hosted AI gateway, private AI gateway, governed AI, LLM audit trail, LLM cost control, HIPAA AI gateway, SOC 2 AI governance, sovereign AI, SNMP Modbus edge control layer" />
+  <meta name="keywords" content="sovereign AI hub, governed plan compiler, private AI workspace, governed AI, LLM audit trail, AI deployment governance, AI monitoring, tenant scoped AI" />
   <meta property="og:url" content="https://veklom.com/" />
-  <meta property="og:title" content="Veklom - Self-Hosted AI Gateway for Regulated Teams" />
-  <meta property="og:description" content="Route, audit, and control every LLM request with policy, cost checks, circuit breakers, and signed evidence." />
+  <meta property="og:title" content="Veklom Sovereign AI Hub" />
+  <meta property="og:description" content="Test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace." />
   <meta property="og:image" content="https://veklom.com/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="Veklom — Sovereign control plane for governed inference" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Veklom - Self-Hosted AI Gateway" />
-  <meta name="twitter:description" content="Private AI gateway for regulated teams: routing, audit, cost control, circuit breakers, and signed evidence." />
+  <meta name="twitter:title" content="Veklom Sovereign AI Hub" />
+  <meta name="twitter:description" content="Governed private AI from Playground to GPC, pipelines, deployments, monitoring, and proof." />
   <meta name="twitter:image" content="https://veklom.com/og-image.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
@@ -542,11 +542,11 @@
       <span class="badge" id="navStatus">Sovereign Control Node</span>
     </a>
     <nav class="links" aria-label="Primary">
-      <a href="#theater">Live demo</a>
-      <a href="#why">Control plane</a>
+      <a href="#theater">GPC demo</a>
+      <a href="#why">Hub modules</a>
       <a href="#pricing">Pricing</a>
-      <a href="/workspace-app#/marketplace">Marketplace</a>
-      <a href="/workspace-app#/overview">Dashboard</a>
+      <a href="/workspace-app#/marketplace">Tools</a>
+      <a href="/workspace-app#/overview">Workspace</a>
       <a class="cta-ghost" href="/login/">Sign in</a>
       <a class="cta-primary" href="/signup/">Start free trial</a>
     </nav>
@@ -557,13 +557,13 @@
   <!-- ============ HERO ============ -->
   <section class="hero">
     <div class="container">
-      <span class="eyebrow">Private AI Gateway · Governed Control Plane · Auditable Execution</span>
-      <h1><span class="grad">Watch AI get governed</span><br /><span class="soft">before it ever runs.</span></h1>
+      <span class="eyebrow">Veklom Sovereign AI Hub · Tenant-Scoped Workspace · Governed Plan Compiler</span>
+      <h1><span class="grad">Veklom Sovereign AI Hub</span><br /><span class="soft">Private AI from intent to deployment.</span></h1>
       <p class="lead">
-        Veklom is the control plane between your systems, AI, policy, cost, and audit. Routing, memory, circuit-breakers, and trace artifacts — on prompts <em>and</em> on the legacy infrastructure you already run.
+        Test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace. GPC turns raw AI and business intent into a governed plan before it becomes a pipeline.
       </p>
       <div class="actions">
-        <a class="cta-primary" href="#theater">Run the live demo ↓</a>
+        <a class="cta-primary" href="#theater">Run the GPC demo ↓</a>
         <a class="cta-ghost" href="/signup/">Start Free Evaluation</a>
         <a class="cta-ghost" href="#pricing">View pricing</a>
       </div>
@@ -583,21 +583,21 @@
       <div class="theater" aria-label="Veklom Live Pipeline Theater">
         <div class="theater-head">
           <div class="left">
-            <span class="title">Live Pipeline Theater</span>
+            <span class="title">GPC · Governed Plan Compiler</span>
             <span class="chip ok" id="chipBackend"><span class="dot"></span>Backend: live</span>
             <span class="chip" id="chipProvider"><span class="dot"></span>Provider: idle</span>
             <span class="chip" id="chipCB"><span class="dot"></span>Circuit: closed</span>
           </div>
           <div class="mode-toggle" role="tablist" aria-label="Theater mode">
-            <button role="tab" data-mode="ai">AI Request</button>
-            <button role="tab" class="active" data-mode="edge">Legacy Infrastructure</button>
+            <button role="tab" class="active" data-mode="ai">Plan Compiler</button>
+            <button role="tab" data-mode="edge">BYOS Backend</button>
           </div>
         </div>
 
         <div class="theater-body">
           <!-- ---- CONTROLS ---- -->
           <aside class="pane controls-pane" aria-label="Controls">
-            <div class="pane-title" id="ctrlTitle">Legacy Infrastructure · Scenario</div>
+            <div class="pane-title" id="ctrlTitle">GPC · Intent</div>
 
             <div class="verticals" id="verticals" role="tablist" data-visible="ai">
               <button class="vertical active" data-vertical="default">Default</button>
@@ -608,7 +608,7 @@
               <button class="vertical" data-vertical="infrastructure">Infrastructure</button>
             </div>
 
-            <div id="aiControls" hidden>
+            <div id="aiControls">
               <textarea
                 id="promptInput"
                 class="prompt"
@@ -623,7 +623,7 @@
 
               <div class="scenario-grid">
                 <button class="scenario-btn primary" id="btnAI">
-                  <span class="sb-title">AI Request</span>
+                  <span class="sb-title">Compile Plan</span>
                   <span class="sb-sub">Ollama → Groq fallback</span>
                 </button>
                 <button class="scenario-btn danger" id="btnChaos">
@@ -633,7 +633,7 @@
               </div>
             </div>
 
-            <div id="edgeControls">
+            <div id="edgeControls" hidden>
               <div class="scenario-grid" style="grid-template-columns: 1fr;">
                 <button class="scenario-btn" id="btnNetwork">
                   <span class="sb-title">Network Instability</span>
@@ -647,13 +647,13 @@
             </div>
 
             <button class="run-btn" id="btnRun">
-              <span id="runLabel">Run network scenario</span>
+              <span id="runLabel">Compile governed plan</span>
             </button>
 
             <div class="control-note">
               The request in front of you is <strong style="color:var(--bone);">real</strong>.
               It flows through Veklom's public demo endpoint, rate-limited to 5/min per IP,
-              output capped at 250 tokens, no key exposure.
+              output capped at 250 tokens, no key exposure. On veklom.dev this same shell runs the BYOS backend legacy hookup demo.
             </div>
 
             <div class="protocol-card" id="protocolCard">
@@ -707,7 +707,7 @@
                 </defs>
 
                 <!-- Lane label -->
-                <text class="lane-label" id="laneLabel" x="28" y="36">AI Request Control Plane</text>
+                <text class="lane-label" id="laneLabel" x="28" y="36">Governed Plan Compiler</text>
 
                 <!-- Pipeline edges + nodes injected here -->
                 <g id="edgesLayer"></g>
@@ -767,9 +767,9 @@
   <!-- ============ WHY / PILLARS ============ -->
   <section class="section" id="why">
     <div class="container">
-      <span class="section-eyebrow">The control plane for governed AI</span>
-      <h2 class="section-title">Every execution — routed, policed, traced.</h2>
-      <p class="section-copy">No lock-ins, no blind call chains, no surprise invoices. Veklom ships private-by-default and is designed for teams operating under CISO, compliance, and procurement constraints.</p>
+      <span class="section-eyebrow">The hub for governed private AI</span>
+      <h2 class="section-title">Playground, GPC, models, tools, pipelines, deployments, monitoring.</h2>
+      <p class="section-copy">Veklom gives teams one tenant-scoped workspace to test intent, compile governed plans, route models, attach tools, deploy endpoints, monitor runtime health, and preserve evidence.</p>
       <div class="pillars">
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg></div>
@@ -793,8 +793,8 @@
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9 5 9-5M3 7v10l9 5 9-5V7"/></svg></div>
-          <h3>Legacy-aware</h3>
-          <p>SNMP, Modbus, MQTT in. Normalized signals → governed AI decisions → the same audit trail as every prompt.</p>
+          <h3>Tools as governed modules</h3>
+          <p>Tools are governed modules inside the hub: source-verified actions, connectors, and services wrapped by policy and audit.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg></div>
@@ -821,7 +821,7 @@
             <li>3 compare runs · 20 policy tests</li>
             <li>2 watermarked exports</li>
             <li>BYOK provider testing</li>
-            <li>Marketplace browsing</li>
+            <li>Tools browsing</li>
           </ul>
         </article>
         <article class="plan highlight">
@@ -973,7 +973,7 @@
         recordkeeping, or regulatory audit use. Free lets you see governed AI. Paid lets you prove it.
       </div>
 
-      <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Marketplace vendors monetize through a 12% standard take (8% for preferred partners). Founding vendors keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
+      <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Tools providers monetize through a 12% standard take (8% for preferred partners). Founding providers keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
 
       <div class="cta-band">
         <div>
@@ -982,7 +982,7 @@
         </div>
         <div style="display:flex; gap:12px;">
           <a class="cta-primary" href="/signup/">Start Free Evaluation</a>
-          <a class="cta-ghost" href="/workspace-app#/marketplace">Talk to sales</a>
+          <a class="cta-ghost" href="mailto:founder@veklom.com">Talk to sales</a>
         </div>
       </div>
     </div>
@@ -993,7 +993,7 @@
   <div class="container f-inner">
     <div>
       <a href="/status.html">Status</a>
-      <a href="/workspace-app#/marketplace">Marketplace</a>
+      <a href="/workspace-app#/marketplace">Tools</a>
       <a href="/legal/terms">Terms</a>
       <a href="/legal/privacy">Privacy</a>
       <a href="/login/">Sign In</a>
@@ -1024,7 +1024,7 @@
   // Pipeline definitions (the shape of the control plane)
   const PIPELINES = {
     ai: {
-      label: "AI Request Control Plane",
+      label: "Governed Plan Compiler",
       nodes: [
         { id: "request_received",    title: "Request",        sub: "inbound" },
         { id: "zero_trust_check",    title: "Zero-Trust",     sub: "auth · policy" },
@@ -1106,7 +1106,8 @@
   const verticalsBar  = $("verticals");
   const ctrlTitle     = $("ctrlTitle");
 
-  let mode = "edge";
+  const SITE_IS_DEV = /(^|\.)veklom\.dev$/i.test(window.location.hostname || "");
+  let mode = SITE_IS_DEV ? "edge" : "ai";
   let selectedEdgeScenario = "network";
   let selectedVertical = "default";
   let currentES = null;
@@ -1116,6 +1117,58 @@
   let streamLine = null;
   let latencyStart = 0;
   let latencyTimer = null;
+
+  function setText(selector, value) {
+    const el = document.querySelector(selector);
+    if (el) el.textContent = value;
+  }
+
+  function setMeta(selector, value) {
+    const el = document.querySelector(selector);
+    if (el) el.setAttribute("content", value);
+  }
+
+  function applySiteSplit() {
+    if (!SITE_IS_DEV) {
+      const edgeTab = document.querySelector(".mode-toggle button[data-mode='edge']");
+      if (edgeTab) edgeTab.hidden = true;
+      return;
+    }
+
+    document.title = "Veklom Developer Platform";
+    setMeta('meta[name="description"]', "Integrate, self-host, and verify governed AI execution with the BYOS backend.");
+    setMeta('meta[property="og:title"]', "Veklom Developer Platform");
+    setMeta('meta[property="og:description"]', "Connect Veklom to existing infrastructure and prove governed AI execution without replacing legacy systems.");
+    setMeta('meta[name="twitter:title"]', "Veklom Developer Platform");
+    setMeta('meta[name="twitter:description"]', "BYOS backend, legacy integration, policy routing, fallback, archive, evidence, and replay.");
+
+    setText(".links a[href='#theater']", "BYOS demo");
+    setText(".links a[href='#why']", "Backend proof");
+    setText(".links a[href='/workspace-app#/marketplace']", "Tools");
+    setText(".links a[href='/workspace-app#/overview']", "Workspace");
+    setText(".hero .eyebrow", "Veklom Developer Platform · BYOS Backend · Legacy Integration");
+    setText(".hero h1 .grad", "Veklom Developer Platform");
+    setText(".hero h1 .soft", "Self-host and verify governed AI.");
+    setText(".hero .lead", "Integrate, self-host, and verify governed AI execution with the BYOS backend. Connect Veklom to existing infrastructure and prove policy, fallback, routing, archive, evidence, and replay without replacing legacy systems.");
+    setText(".hero .cta-primary", "Run the BYOS backend demo ↓");
+    setText(".theater-head .title", "BYOS Backend Demo");
+    setText(".section-eyebrow", "Technical proof for governed AI execution");
+    setText(".section-title", "BYOS backend, legacy integration, license flow, tenant isolation, evidence.");
+    setText(".section-copy", "Veklom.dev is the technical proof site for backend health, legacy hookups, private deployment posture, policy evaluation, fallback routing, archive, evidence, and replay.");
+
+    document.querySelectorAll(".mode-toggle button").forEach((button) => {
+      button.classList.toggle("active", button.dataset.mode === "edge");
+      if (button.dataset.mode === "ai") button.textContent = "AI Request";
+      if (button.dataset.mode === "edge") button.textContent = "Legacy Infrastructure";
+    });
+    const aiTab = document.querySelector(".mode-toggle button[data-mode='ai']");
+    if (aiTab) aiTab.hidden = true;
+    aiControls.hidden = true;
+    edgeControls.hidden = false;
+    verticalsBar.style.display = "none";
+    ctrlTitle.textContent = "Legacy Infrastructure · Scenario";
+    runLabel.textContent = "Run network scenario";
+  }
 
   // ---- Pipeline render ----
   const NS = "http://www.w3.org/2000/svg";
@@ -1609,8 +1662,8 @@
       if (mode === "ai") {
         aiControls.hidden = false; edgeControls.hidden = true;
         verticalsBar.dataset.visible = "ai"; verticalsBar.style.display = "";
-        ctrlTitle.textContent = "AI Request · Vertical";
-        runLabel.textContent = "Run pipeline";
+        ctrlTitle.textContent = "GPC · Intent";
+        runLabel.textContent = SITE_IS_DEV ? "Run pipeline" : "Compile governed plan";
       } else {
         aiControls.hidden = true; edgeControls.hidden = false;
         verticalsBar.style.display = "none";
@@ -1703,9 +1756,14 @@
   }
 
   // ---- Init ----
+  applySiteSplit();
   renderPipeline();
   updatePromptCount();
-  setSelectedEdgeScenario(selectedEdgeScenario);
+  if (mode === "edge") {
+    setSelectedEdgeScenario(selectedEdgeScenario);
+  } else {
+    runLabel.textContent = "Compile governed plan";
+  }
   probeBackend();
   probeProtocolValidation();
   setInterval(probeBackend, 15000);

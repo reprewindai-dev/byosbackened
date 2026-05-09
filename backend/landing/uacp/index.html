@@ -4,27 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Veklom UACP Demo</title>
-    <script type="module" crossorigin src="/uacp/assets/index-BGfraBVa.js"></script>
-    <link rel="stylesheet" crossorigin href="/uacp/assets/index-DyqLSLvr.css">
-      <script>
-  (function(){
-    const API_ORIGIN = "https://uacpgemini.onrender.com";
-    const nativeFetch = window.fetch.bind(window);
-    window.fetch = function(input, init){
-      const raw = typeof input === "string" ? input : input && input.url;
-      if (raw && raw.startsWith("/api/")) return nativeFetch(API_ORIGIN + raw, init);
-      return nativeFetch(input, init);
-    };
-    const NativeWebSocket = window.WebSocket;
-    window.WebSocket = function(url, protocols){
-      const nextUrl = String(url)
-        .replace(/^ws:\/\/[^/]+/i, "wss://uacpgemini.onrender.com")
-        .replace(/^wss:\/\/[^/]+/i, "wss://uacpgemini.onrender.com");
-      return protocols ? new NativeWebSocket(nextUrl, protocols) : new NativeWebSocket(nextUrl);
-    };
-    window.WebSocket.prototype = NativeWebSocket.prototype;
-  })();
-  </script></head>
+    <script type="module" crossorigin src="/uacp/assets/index-C695eTtn.js"></script>
+    <link rel="stylesheet" crossorigin href="/uacp/assets/index-XkE63axS.css">
+  <script>
+(function () {
+  var api = "https://uacpgemini.onrender.com";
+  var originalFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    if (typeof input === "string" && input.indexOf("/api/") === 0) {
+      return originalFetch(api + input, init);
+    }
+    if (input && typeof input.url === "string" && input.url.indexOf(location.origin + "/api/") === 0) {
+      return originalFetch(api + input.url.slice(location.origin.length), init);
+    }
+    return originalFetch(input, init);
+  };
+  var OriginalWebSocket = window.WebSocket;
+  window.WebSocket = function (url, protocols) {
+    if (typeof url === "string" && (url.indexOf("ws://") === 0 || url.indexOf("wss://") === 0)) {
+      return new OriginalWebSocket("wss://uacpgemini.onrender.com", protocols);
+    }
+    return new OriginalWebSocket(url, protocols);
+  };
+  window.WebSocket.prototype = OriginalWebSocket.prototype;
+})();
+</script></head>
   <body>
     <div id="root"></div>
   </body>

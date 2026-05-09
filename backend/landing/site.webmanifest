@@ -1,7 +1,7 @@
 {
   "name": "Veklom",
   "short_name": "Veklom",
-  "description": "Self-hosted AI operations platform for hospitals, banks, and defense. Sovereign multi-LLM gateway with cost kill switches, RBAC, audit logging, and GDPR endpoints.",
+  "description": "Veklom Sovereign AI Hub: test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

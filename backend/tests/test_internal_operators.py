@@ -26,6 +26,8 @@ def test_internal_operator_routes_are_registered():
     assert "/api/v1/internal/uacp/summary" in paths
     assert "/api/v1/internal/uacp/events" in paths
     assert "/api/v1/internal/uacp/event-stream" in paths
+    assert "/api/v1/internal/uacp/evaluation-surgeon" in paths
+    assert "/api/v1/internal/uacp/growth-opportunities" in paths
     assert "/api/v1/internal/uacp/workspaces" in paths
     assert "/api/v1/internal/uacp/runs" in paths
     assert "/api/v1/internal/uacp/deployments" in paths
@@ -166,6 +168,43 @@ def test_internal_uacp_unknown_events_fail_to_safe_sentinel_owner():
         "committee_ids": ["experience-assurance"],
         "worker_ids": ["sentinel"],
     }
+
+
+def test_internal_uacp_evaluation_scoring_prioritizes_real_buyer_signals():
+    activation, risk = internal_uacp._evaluation_score(
+        tier="free",
+        runs_used=15,
+        endpoint_created=True,
+        endpoint_tested=True,
+        evidence_count=3,
+        billing_events=2,
+        reserve_units=0,
+        error_count=0,
+    )
+
+    assert activation >= 80
+    assert risk >= 25
+    assert internal_uacp._workspace_top_action(
+        tier="free",
+        runs_used=15,
+        endpoint_created=True,
+        endpoint_tested=True,
+        evidence_count=3,
+        reserve_units=0,
+        error_count=0,
+    ) == "Explain activation, reserve funding, and regulated access path."
+
+
+def test_internal_uacp_failed_evaluation_assigns_assurance_workers():
+    workers = internal_uacp._assigned_workers_for_evaluation(
+        error_count=2,
+        endpoint_created=True,
+        endpoint_tested=False,
+        evidence_count=0,
+        reserve_units=0,
+    )
+
+    assert {"sentinel", "sheriff", "mirror", "mint"}.issubset(workers)
 
 
 def test_worker_committees_are_resolved():

@@ -85,6 +85,8 @@ The first internal read surface is mounted under `/api/v1/internal/uacp` and gua
 - `GET /api/v1/internal/uacp/summary`
 - `GET /api/v1/internal/uacp/events`
 - `GET /api/v1/internal/uacp/event-stream`
+- `GET /api/v1/internal/uacp/evaluation-surgeon`
+- `GET /api/v1/internal/uacp/growth-opportunities`
 - `GET /api/v1/internal/uacp/workspaces`
 - `GET /api/v1/internal/uacp/runs`
 - `GET /api/v1/internal/uacp/deployments`
@@ -93,7 +95,7 @@ The first internal read surface is mounted under `/api/v1/internal/uacp` and gua
 - `GET /api/v1/internal/uacp/monitoring`
 - `GET /api/v1/internal/uacp/security`
 
-These endpoints are read-only. They expose backend truth to UACP with normalized event ownership hints.
+These endpoints are read-only. They expose backend truth to UACP with normalized event ownership hints. `evaluation-surgeon` ranks workspaces from real evaluation, billing, endpoint, evidence, and security signals. `growth-opportunities` ranks only marketplace, integration, order, listing, or failed-route signals.
 
 ## UACP APIs Backend Can Call
 

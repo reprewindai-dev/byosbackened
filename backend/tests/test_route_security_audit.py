@@ -44,6 +44,8 @@ def test_internal_operator_and_workspace_routes_remain_protected():
         ("POST", "/api/v1/internal/operators/runs"),
         ("GET", "/api/v1/internal/uacp/summary"),
         ("GET", "/api/v1/internal/uacp/events"),
+        ("GET", "/api/v1/internal/uacp/evaluation-surgeon"),
+        ("GET", "/api/v1/internal/uacp/growth-opportunities"),
         ("GET", "/api/v1/internal/uacp/billing"),
         ("GET", "/api/v1/workspace/overview"),
         ("GET", "/api/v1/workspace/members"),

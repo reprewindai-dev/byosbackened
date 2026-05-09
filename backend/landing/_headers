@@ -37,6 +37,11 @@
 /workspace-config.js
   Cache-Control: public, max-age=300, must-revalidate
 
+/gpc/*
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.veklom.com https://api.veklom.dev https://uacpgemini.onrender.com wss://uacpgemini.onrender.com https://cloudflareinsights.com https://static.cloudflareinsights.com; frame-ancestors 'self' https://veklom.com; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  Cache-Control: public, max-age=300, must-revalidate
+
 # HTML gets short cache so updates propagate quickly
 /*.html
   Cache-Control: public, max-age=300, must-revalidate

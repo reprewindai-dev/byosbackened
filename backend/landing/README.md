@@ -2,7 +2,7 @@
 
 This directory is the production static web surface for:
 
-- `veklom.com` (buyer-facing Veklom Sovereign AI Hub + GPC demo)
+- `veklom.com` (buyer-facing Veklom Sovereign AI Hub + UACP demo)
 - `veklom.dev` (developer/BYOS backend proof site + legacy hookup demo)
 
 ## Messaging authority lock

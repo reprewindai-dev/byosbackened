@@ -1,6 +1,6 @@
 # Cloudflare Pages config for the shared Veklom static shell.
 # Deploys to:
-# - veklom.com as the buyer-facing Sovereign AI Hub / GPC demo.
+# - veklom.com as the buyer-facing Sovereign AI Hub / UACP demo.
 # - veklom.dev as the technical BYOS backend / legacy hookup demo.
 # This is a STATIC SITE; runtime secrets/env vars live with the API services.
 #

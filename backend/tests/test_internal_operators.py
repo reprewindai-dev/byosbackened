@@ -9,7 +9,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
-from apps.api.routers import auth, internal_operators
+from apps.api.routers import auth, internal_operators, internal_uacp
 from license.middleware import _is_license_exempt_path
 
 
@@ -23,6 +23,16 @@ def test_internal_operator_routes_are_registered():
     assert "/api/v1/internal/operators/digest" in paths
     assert "/api/v1/internal/operators/watch" in paths
     assert "/api/v1/internal/operators/workers/{worker_id}/heartbeat" in paths
+    assert "/api/v1/internal/uacp/summary" in paths
+    assert "/api/v1/internal/uacp/events" in paths
+    assert "/api/v1/internal/uacp/event-stream" in paths
+    assert "/api/v1/internal/uacp/workspaces" in paths
+    assert "/api/v1/internal/uacp/runs" in paths
+    assert "/api/v1/internal/uacp/deployments" in paths
+    assert "/api/v1/internal/uacp/billing" in paths
+    assert "/api/v1/internal/uacp/evidence" in paths
+    assert "/api/v1/internal/uacp/monitoring" in paths
+    assert "/api/v1/internal/uacp/security" in paths
 
 
 def test_internal_operator_overview_requires_auth():
@@ -33,13 +43,25 @@ def test_internal_operator_overview_requires_auth():
     assert response.status_code == 401
 
 
+def test_internal_uacp_summary_requires_auth():
+    client = TestClient(app)
+
+    response = client.get("/api/v1/internal/uacp/summary")
+
+    assert response.status_code == 401
+
+
 def test_internal_operator_routes_are_license_gate_exempt_but_still_auth_protected():
     assert _is_license_exempt_path("/api/v1/internal/operators/watch") is True
     assert _is_license_exempt_path("/api/v1/internal/operators/digest") is True
+    assert _is_license_exempt_path("/api/v1/internal/uacp/summary") is True
+    assert _is_license_exempt_path("/api/v1/internal/uacp/events") is True
     assert _is_license_exempt_path("/api/v1/ai/complete") is False
 
     client = TestClient(app)
     response = client.post("/api/v1/internal/operators/watch")
+    assert response.status_code == 401
+    response = client.get("/api/v1/internal/uacp/events")
     assert response.status_code == 401
 
 
@@ -114,6 +136,36 @@ def test_worker_registry_is_internal_only():
         assert payload["success_metric"]
         assert payload["escalation"]
         assert payload["rollout_stage"] in {"ready", "staged", "minimum_live"}
+
+
+def test_internal_uacp_events_preserve_backend_truth_and_owner_mapping():
+    event = internal_uacp._event(
+        event_id="request:req_123",
+        event_type="request.failed",
+        workspace_id="ws_123",
+        user_id="user_123",
+        entity_type="workspace_request",
+        entity_id="req_123",
+        severity="error",
+        status="failed",
+        timestamp=None,
+        payload={"latency_ms": 7000, "error_message": "Network Error"},
+    )
+
+    assert event["source"] == "veklom_backend"
+    assert event["workspace_id"] == "ws_123"
+    assert event["tenant_id"] == "ws_123"
+    assert event["payload"]["error_message"] == "Network Error"
+    assert event["uacp"]["committee_ids"] == ["experience-assurance"]
+    assert event["uacp"]["worker_ids"] == ["sentinel", "sheriff", "pulse"]
+
+
+def test_internal_uacp_unknown_events_fail_to_safe_sentinel_owner():
+    assert internal_uacp._owner_mapping("unknown.event") == {
+        "pillar_ids": ["operations"],
+        "committee_ids": ["experience-assurance"],
+        "worker_ids": ["sentinel"],
+    }
 
 
 def test_worker_committees_are_resolved():

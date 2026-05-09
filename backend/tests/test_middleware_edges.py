@@ -89,6 +89,8 @@ def test_internal_operator_routes_are_not_public():
         "/api/v1/internal/operators/overview",
         "/api/v1/internal/operators/workers",
         "/api/v1/internal/operators/runs",
+        "/api/v1/internal/uacp/summary",
+        "/api/v1/internal/uacp/events",
     }
 
     assert protected_paths.isdisjoint(ZERO_TRUST_PUBLIC_PATHS)

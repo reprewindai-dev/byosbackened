@@ -33,6 +33,7 @@ LICENSE_EXEMPT_PATHS = {
 
 LICENSE_EXEMPT_PREFIXES = (
     "/api/v1/internal/operators",
+    "/api/v1/internal/uacp",
 )
 
 

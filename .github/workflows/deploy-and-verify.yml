@@ -11,6 +11,16 @@ jobs:
       VEKLOM_HOST: 5.78.135.11
       VEKLOM_APP_ID: zjhp30ys1jlk8yaoxc96h2zd
       VEKLOM_APP_DIR: /data/coolify/applications/zjhp30ys1jlk8yaoxc96h2zd
+      USER_EMAIL: ${{ secrets.USER_EMAIL }}
+      CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+      DEFAULT_RESEARCH_QUERY: ${{ secrets.DEFAULT_RESEARCH_QUERY }}
+      UACP_ADMIN_KEY: ${{ secrets.UACP_ADMIN_KEY }}
+      UACP_INTERNAL_API_KEY: ${{ secrets.UACP_INTERNAL_API_KEY }}
+      LICENSE_ISSUE_URL: ${{ secrets.LICENSE_ISSUE_URL }}
+      LICENSE_ISSUE_BACKUP_URL: ${{ secrets.LICENSE_ISSUE_BACKUP_URL }}
+      LICENSE_VERIFY_URL: ${{ secrets.LICENSE_VERIFY_URL }}
+      BUYER_DOWNLOAD_BASE_URL: ${{ secrets.BUYER_DOWNLOAD_BASE_URL }}
+      BUYER_DOWNLOAD_VERSION: ${{ secrets.BUYER_DOWNLOAD_VERSION }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,8 +38,23 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/backend-${GITHUB_SHA}.tar"
+          env_file="$RUNNER_TEMP/backend-env-${GITHUB_SHA}"
+          umask 077
+          printf '%s\n' \
+            "USER_EMAIL=${USER_EMAIL}" \
+            "CONTACT_EMAIL=${CONTACT_EMAIL}" \
+            "DEFAULT_RESEARCH_QUERY=${DEFAULT_RESEARCH_QUERY}" \
+            "UACP_ADMIN_KEY=${UACP_ADMIN_KEY}" \
+            "UACP_INTERNAL_API_KEY=${UACP_INTERNAL_API_KEY}" \
+            "LICENSE_ISSUE_URL=${LICENSE_ISSUE_URL}" \
+            "LICENSE_ISSUE_BACKUP_URL=${LICENSE_ISSUE_BACKUP_URL}" \
+            "LICENSE_VERIFY_URL=${LICENSE_VERIFY_URL}" \
+            "BUYER_DOWNLOAD_BASE_URL=${BUYER_DOWNLOAD_BASE_URL}" \
+            "BUYER_DOWNLOAD_VERSION=${BUYER_DOWNLOAD_VERSION}" \
+            > "$env_file"
           git archive --format=tar -o "$archive" HEAD backend
           scp -i ~/.ssh/veklom-deploy "$archive" "root@${VEKLOM_HOST}:/tmp/backend-${GITHUB_SHA}.tar"
+          scp -i ~/.ssh/veklom-deploy "$env_file" "root@${VEKLOM_HOST}:/tmp/backend-env-${GITHUB_SHA}"
           ssh -i ~/.ssh/veklom-deploy "root@${VEKLOM_HOST}" \
             "COMMIT_SHA='${GITHUB_SHA}' APP_ID='${VEKLOM_APP_ID}' APP_DIR='${VEKLOM_APP_DIR}' bash -s" <<'REMOTE'
           set -euo pipefail
@@ -49,6 +74,7 @@ jobs:
           app_id = os.environ["APP_ID"]
           commit_sha = os.environ["COMMIT_SHA"]
           compose_path = Path("docker-compose.yaml")
+          env_path = Path(f"/tmp/backend-env-{commit_sha}")
           compose = compose_path.read_text()
           compose, count = re.subn(
               r"image: '[^']+'",
@@ -58,10 +84,69 @@ jobs:
           )
           if count != 1:
               raise SystemExit("Could not update live compose image tag")
+
+          env_values = {}
+          for raw_line in env_path.read_text().splitlines():
+              line = raw_line.strip()
+              if not line or "=" not in line:
+                  continue
+              key, value = line.split("=", 1)
+              env_values[key] = value
+
+          def quote(value: str) -> str:
+              return "'" + value.replace("'", "''") + "'"
+
+          lines = compose.splitlines()
+          try:
+              services_idx = next(i for i, line in enumerate(lines) if line.strip() == "services:")
+              service_idx = next(
+                  i for i in range(services_idx + 1, len(lines))
+                  if re.match(r"^  [A-Za-z0-9_.-]+:\s*$", lines[i])
+              )
+          except StopIteration as exc:
+              raise SystemExit("Could not locate first compose service") from exc
+
+          service_end = len(lines)
+          for i in range(service_idx + 1, len(lines)):
+              if re.match(r"^  [A-Za-z0-9_.-]+:\s*$", lines[i]):
+                  service_end = i
+                  break
+
+          env_idx = None
+          for i in range(service_idx + 1, service_end):
+              if lines[i].strip() == "environment:" and lines[i].startswith("    "):
+                  env_idx = i
+                  break
+
+          rendered = [f"      {key}: {quote(value)}" for key, value in sorted(env_values.items())]
+          if env_idx is None:
+              lines[service_idx + 1:service_idx + 1] = ["    environment:", *rendered]
+          else:
+              env_end = service_end
+              for i in range(env_idx + 1, service_end):
+                  if lines[i].strip() and re.match(r"^    [A-Za-z0-9_.-]+:", lines[i]):
+                      env_end = i
+                      break
+              existing_keys = set()
+              new_block = []
+              for line in lines[env_idx + 1:env_end]:
+                  match = re.match(r"^      ([A-Za-z_][A-Za-z0-9_]*):", line)
+                  if match and match.group(1) in env_values:
+                      key = match.group(1)
+                      existing_keys.add(key)
+                      new_block.append(f"      {key}: {quote(env_values[key])}")
+                  else:
+                      new_block.append(line)
+              for key, value in sorted(env_values.items()):
+                  if key not in existing_keys:
+                      new_block.append(f"      {key}: {quote(value)}")
+              lines[env_idx + 1:env_end] = new_block
+
+          compose = "\n".join(lines) + "\n"
           compose_path.write_text(compose)
           PY
           docker compose up -d --remove-orphans
-          rm -rf "$build_dir" "/tmp/backend-${COMMIT_SHA}.tar"
+          rm -rf "$build_dir" "/tmp/backend-${COMMIT_SHA}.tar" "/tmp/backend-env-${COMMIT_SHA}"
           REMOTE
 
       - name: Wait for live API health

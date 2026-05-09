@@ -31,6 +31,41 @@ jobs:
       - name: Install Wrangler
         run: npm install -g wrangler
 
+      - name: Sync Cloudflare Pages environment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'veklom' }}
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+          DEFAULT_RESEARCH_QUERY: ${{ secrets.DEFAULT_RESEARCH_QUERY }}
+          UACP_ADMIN_KEY: ${{ secrets.UACP_ADMIN_KEY }}
+          UACP_INTERNAL_API_KEY: ${{ secrets.UACP_INTERNAL_API_KEY }}
+          LICENSE_ISSUE_URL: ${{ secrets.LICENSE_ISSUE_URL }}
+          LICENSE_ISSUE_BACKUP_URL: ${{ secrets.LICENSE_ISSUE_BACKUP_URL }}
+          LICENSE_VERIFY_URL: ${{ secrets.LICENSE_VERIFY_URL }}
+          BUYER_DOWNLOAD_BASE_URL: ${{ secrets.BUYER_DOWNLOAD_BASE_URL }}
+          BUYER_DOWNLOAD_VERSION: ${{ secrets.BUYER_DOWNLOAD_VERSION }}
+        run: |
+          set -euo pipefail
+          sync_secret() {
+            local name="$1"
+            local value="$2"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | wrangler pages secret put "$name" --project-name="$CLOUDFLARE_PAGES_PROJECT"
+            fi
+          }
+          sync_secret USER_EMAIL "$USER_EMAIL"
+          sync_secret CONTACT_EMAIL "$CONTACT_EMAIL"
+          sync_secret DEFAULT_RESEARCH_QUERY "$DEFAULT_RESEARCH_QUERY"
+          sync_secret UACP_ADMIN_KEY "$UACP_ADMIN_KEY"
+          sync_secret UACP_INTERNAL_API_KEY "$UACP_INTERNAL_API_KEY"
+          sync_secret LICENSE_ISSUE_URL "$LICENSE_ISSUE_URL"
+          sync_secret LICENSE_ISSUE_BACKUP_URL "$LICENSE_ISSUE_BACKUP_URL"
+          sync_secret LICENSE_VERIFY_URL "$LICENSE_VERIFY_URL"
+          sync_secret BUYER_DOWNLOAD_BASE_URL "$BUYER_DOWNLOAD_BASE_URL"
+          sync_secret BUYER_DOWNLOAD_VERSION "$BUYER_DOWNLOAD_VERSION"
+
       - name: Deploy public site to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

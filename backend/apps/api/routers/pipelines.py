@@ -1,6 +1,7 @@
 """Pipelines router — governed multi-step LLM workflow CRUD + versioning + execution."""
 from __future__ import annotations
 
+import json
 import re
 import time
 import uuid
@@ -8,17 +9,27 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
+from apps.api.routers.ai import (
+    RESERVE_UNITS_PER_USD,
+    _enforce_free_quota,
+    _get_or_create_wallet,
+    _invalidate_wallet_cache,
+    _pricing_tier,
+    _reserve_units_for_event,
+    _reserve_units_to_usd,
+)
 from db.models import (
     Pipeline,
     PipelineRun,
     PipelineRunStatus,
     PipelineStatus,
     PipelineVersion,
+    TokenTransaction,
     User,
 )
 from db.session import get_db
@@ -134,6 +145,55 @@ def _serialize_run(r: PipelineRun) -> dict:
         "finished_at": r.finished_at.isoformat() if r.finished_at else None,
         "created_at": r.created_at.isoformat(),
     }
+
+
+def _debit_pipeline_test_reserve(db: Session, workspace_id: str, run_id: str) -> tuple[str, int, str, int | None]:
+    pricing_tier = _pricing_tier(db, workspace_id)
+    billing_event_type = "pipeline_test"
+    reserve_units_debited = _reserve_units_for_event(billing_event_type, pricing_tier)
+    free_evaluation_remaining = (
+        _enforce_free_quota(db, workspace_id, billing_event_type)
+        if pricing_tier == "free_evaluation"
+        else None
+    )
+    wallet = _get_or_create_wallet(db, workspace_id)
+    if reserve_units_debited > wallet.balance:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient operating reserve")
+
+    balance_before = wallet.balance
+    balance_after = balance_before - reserve_units_debited
+    cost_usd = _reserve_units_to_usd(reserve_units_debited)
+    transaction = TokenTransaction(
+        wallet_id=wallet.id,
+        workspace_id=workspace_id,
+        transaction_type="usage",
+        amount=-reserve_units_debited,
+        balance_before=balance_before,
+        balance_after=balance_after,
+        endpoint_path="/api/v1/pipelines/execute",
+        endpoint_method="POST",
+        request_id=run_id,
+        description=f"Pipeline Test ({pricing_tier})",
+        metadata_json=json.dumps(
+            {
+                "billing_event_type": billing_event_type,
+                "pricing_tier": pricing_tier,
+                "pipeline_run_id": run_id,
+                "reserve_units_debited": reserve_units_debited,
+                "reserve_units_per_usd": int(RESERVE_UNITS_PER_USD),
+                "cost_usd": str(cost_usd),
+                "free_evaluation_remaining": free_evaluation_remaining,
+            },
+            sort_keys=True,
+        ),
+    )
+    db.add(transaction)
+    wallet.balance = balance_after
+    wallet.monthly_credits_used = (wallet.monthly_credits_used or 0) + reserve_units_debited
+    wallet.total_credits_used = (wallet.total_credits_used or 0) + reserve_units_debited
+    wallet.updated_at = datetime.utcnow()
+    _invalidate_wallet_cache(workspace_id)
+    return billing_event_type, reserve_units_debited, str(cost_usd), free_evaluation_remaining
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
@@ -392,7 +452,15 @@ async def execute_pipeline(
     if not pv:
         raise HTTPException(404, f"Pipeline version {target_version} not found")
 
+    run_id = str(uuid.uuid4())
+    billing_event_type, reserve_units_debited, reserve_cost_usd, free_evaluation_remaining = _debit_pipeline_test_reserve(
+        db,
+        current_user.workspace_id,
+        run_id,
+    )
+
     run = PipelineRun(
+        id=run_id,
         pipeline_id=p.id,
         version=target_version,
         workspace_id=current_user.workspace_id,
@@ -444,6 +512,12 @@ async def execute_pipeline(
             run.outputs = {
                 "summary": f"Executed {len(trace)} step(s)",
                 "node_count": len(trace),
+                "billing_event_type": billing_event_type,
+                "pricing_tier": _pricing_tier(db, current_user.workspace_id),
+                "reserve_units_debited": reserve_units_debited,
+                "reserve_impact_usd": reserve_cost_usd,
+                "free_evaluation_remaining": free_evaluation_remaining,
+                "internal_provider_cost_estimate_usd": str(total_cost),
             }
 
     except Exception as exc:  # pragma: no cover - defensive
@@ -452,7 +526,7 @@ async def execute_pipeline(
 
     run.step_trace = trace
     run.total_latency_ms = int((time.time() - t0) * 1000)
-    run.total_cost_usd = str(total_cost)
+    run.total_cost_usd = reserve_cost_usd
     run.finished_at = datetime.utcnow()
     db.commit()
     db.refresh(run)

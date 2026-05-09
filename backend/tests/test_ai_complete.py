@@ -391,6 +391,70 @@ def test_complete_debits_compare_run_price(monkeypatch):
     assert wallet.balance == 250
 
 
+def test_complete_debits_uacp_compile_price(monkeypatch):
+    wallet = SimpleNamespace(
+        id="wallet-1",
+        workspace_id="workspace-1",
+        balance=5000,
+        monthly_credits_used=0,
+        total_credits_used=0,
+        updated_at=None,
+    )
+    subscription = SimpleNamespace(plan=SimpleNamespace(value="starter"))
+    fake_db = _FakeDB(wallet=wallet, subscription=subscription)
+    runtime = _RuntimeCall(output_text="compiled governed plan", output_tokens=96)
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-uacp-compile"))
+    payload = AICompleteRequest(
+        model="ollama-default",
+        prompt="Compile this intent into a governed plan",
+        max_tokens=512,
+        billing_event_type="uacp_plan_compile",
+    )
+
+    result = asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert result.billing_event_type == "uacp_plan_compile"
+    assert result.reserve_debited == 1500
+    assert result.cost_usd == "1.500000"
+    assert result.wallet_balance == 3500
+    assert wallet.balance == 3500
+
+
+def test_free_evaluation_rejects_paid_only_event(monkeypatch):
+    wallet = SimpleNamespace(
+        id="wallet-1",
+        workspace_id="workspace-1",
+        balance=0,
+        monthly_credits_used=0,
+        total_credits_used=0,
+        updated_at=None,
+    )
+    fake_db = _FakeDB(wallet=wallet, transactions=[])
+    runtime = _RuntimeCall(output_text="should not run", output_tokens=42)
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-paid-only"))
+    payload = AICompleteRequest(
+        model="ollama-default",
+        prompt="Compile this intent",
+        max_tokens=512,
+        billing_event_type="uacp_plan_compile",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert exc.value.status_code == 402
+    assert "activated workspace" in exc.value.detail
+    assert runtime.called is False
+
+
 def test_complete_rejects_unknown_model_slug(monkeypatch):
     fake_db = _FakeDB(wallet=None)
     monkeypatch.setattr(

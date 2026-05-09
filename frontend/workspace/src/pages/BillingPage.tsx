@@ -68,6 +68,8 @@ interface PlanDefinition {
   self_serve_checkout: boolean;
   free_evaluation_limits?: { governed_playground_runs?: number; compare_runs?: number; policy_tests?: number };
   features?: Record<string, unknown>;
+  event_pricing?: Record<string, number | string | null>;
+  pricing?: Record<string, number | string | null>;
 }
 
 interface PlansResponse {
@@ -82,6 +84,11 @@ interface CurrentSubscription {
 const FREE_EVALUATION_RUNS = 15;
 
 const EVENT_PRICES = [
+  ["UACP plan compile", "$1.50 Founding / $2.00 Standard"],
+  ["UACP run execution", "$3 Founding / $4 Standard"],
+  ["UACP artifact generation", "$5 Founding / $7 Standard / $10 Regulated"],
+  ["Pipeline test", "$0.25 Founding / $0.40 Standard"],
+  ["Endpoint/deployment verification", "$0.50 Founding / $0.80 Standard"],
   ["Compare run", "$0.75 Founding / $1.20 Standard"],
   ["BYOK governance calls", "$6 Founding / $8 Standard per 1K"],
   ["Managed governance calls", "$12 Founding / $16 Standard per 1K"],
@@ -560,14 +567,17 @@ function buildPricingRows(plans: PlanDefinition[]) {
       runs:
         plan.tier === "free"
           ? `${limits.governed_playground_runs ?? FREE_EVALUATION_RUNS} governed runs`
-          : plan.tier === "starter"
-            ? "$0.25 / run"
-            : plan.tier === "pro"
-              ? "$0.40 / run"
-              : "Private terms",
+          : fmtEventCents(plan, "playground_run_cents", "/ run"),
       evidence: plan.features?.compliance_reports || plan.features?.audit_exports ? "available" : "activation required",
     };
   });
+}
+
+function fmtEventCents(plan: PlanDefinition, key: string, suffix = ""): string {
+  const pricing = plan.event_pricing ?? plan.pricing ?? {};
+  const cents = pricing[key];
+  if (typeof cents !== "number") return "Private terms";
+  return `${fmtCents(cents)}${suffix}`;
 }
 
 function planLabel(plan: PlanDefinition): string {

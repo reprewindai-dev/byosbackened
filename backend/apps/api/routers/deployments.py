@@ -333,7 +333,7 @@ async def test_deployment(
         prompt=payload.prompt,
         max_tokens=payload.max_tokens,
         temperature=0,
-        billing_event_type="governed_run",
+        billing_event_type="endpoint_test",
         session_tag="Standard",
         auto_redact=True,
         sign_audit_on_export=True,

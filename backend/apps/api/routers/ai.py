@@ -44,6 +44,16 @@ FREE_EVALUATION_COMPARE_RUNS = 3
 BillingEventType = Literal[
     "governed_run",
     "compare_run",
+    "pipeline_test",
+    "endpoint_test",
+    "deployment_verification",
+    "uacp_plan_compile",
+    "uacp_run_execution",
+    "uacp_artifact_generation",
+    "signed_export",
+    "audit_export",
+    "evidence_package",
+    "auditor_bundle",
     "byok_governance_call",
     "managed_governance_call",
 ]
@@ -61,6 +71,66 @@ EVENT_PRICING_UNITS: dict[str, dict[str, int]] = {
         "founding": 750,    # $0.75
         "standard": 1200,   # $1.20
         "regulated": 1200,  # Default until an Order Form supplies custom pricing.
+    },
+    "pipeline_test": {
+        "free_evaluation": 0,
+        "founding": 250,   # $0.25
+        "standard": 400,   # $0.40
+        "regulated": 400,  # Default until an Order Form supplies custom pricing.
+    },
+    "endpoint_test": {
+        "free_evaluation": 0,
+        "founding": 500,   # $0.50
+        "standard": 800,   # $0.80
+        "regulated": 1000, # Default until an Order Form supplies custom pricing.
+    },
+    "deployment_verification": {
+        "free_evaluation": 0,
+        "founding": 500,   # $0.50
+        "standard": 800,   # $0.80
+        "regulated": 1000, # Default until an Order Form supplies custom pricing.
+    },
+    "uacp_plan_compile": {
+        "free_evaluation": 0,
+        "founding": 1500,   # $1.50
+        "standard": 2000,   # $2.00
+        "regulated": 2500,  # Default until an Order Form supplies custom pricing.
+    },
+    "uacp_run_execution": {
+        "free_evaluation": 0,
+        "founding": 3000,   # $3.00
+        "standard": 4000,   # $4.00
+        "regulated": 5000,  # Default until an Order Form supplies custom pricing.
+    },
+    "uacp_artifact_generation": {
+        "free_evaluation": 0,
+        "founding": 5000,    # $5.00
+        "standard": 7000,    # $7.00
+        "regulated": 10000,  # Default until an Order Form supplies custom pricing.
+    },
+    "signed_export": {
+        "free_evaluation": 0,
+        "founding": 3000,   # $3.00
+        "standard": 4000,   # $4.00
+        "regulated": 4000,  # Default until an Order Form supplies custom pricing.
+    },
+    "audit_export": {
+        "free_evaluation": 0,
+        "founding": 3000,   # $3.00
+        "standard": 4000,   # $4.00
+        "regulated": 4000,  # Default until an Order Form supplies custom pricing.
+    },
+    "evidence_package": {
+        "free_evaluation": 0,
+        "founding": 99000,     # $99
+        "standard": 149000,    # $149
+        "regulated": 199000,   # $199
+    },
+    "auditor_bundle": {
+        "free_evaluation": 0,
+        "founding": 249000,    # $249
+        "standard": 349000,    # $349
+        "regulated": 499000,   # $499
     },
     "byok_governance_call": {
         "free_evaluation": 0,

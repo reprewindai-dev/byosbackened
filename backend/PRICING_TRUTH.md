@@ -26,6 +26,11 @@ Free Evaluation includes 15 governed Playground runs, 3 compare runs, 20 policy 
 |---|---:|---:|---:|
 | Playground governed run | $0.25 | $0.40 | contact |
 | Compare run | $0.75 | $1.20 | contact |
+| Pipeline test | $0.25 | $0.40 | contact |
+| Endpoint test / deployment verification | $0.50 | $0.80 | contact |
+| UACP plan compile | $1.50 | $2.00 | contact |
+| UACP governed execution | $3 | $4 | contact |
+| UACP artifact generation | $5 | $7 | $10 |
 | Signed Playground export | $3 | $4 | contact |
 | BYOK Governance Calls (per 1,000) | $6 | $8 | $10 |
 | Managed Governance Calls (per 1,000) | $12 | $16 | $20 |
@@ -39,6 +44,8 @@ Free Evaluation includes 15 governed Playground runs, 3 compare runs, 20 policy 
 | Public pricing page | `landing/pricing.html` | Activation + reserve + event ladder |
 | Backend plan catalog | `apps/api/routers/subscriptions.py` -> `PLANS` | activation cents and minimum reserve cents |
 | AI billing route | `apps/api/routers/ai.py` | per-event reserve unit debits |
+| Pipeline execution route | `apps/api/routers/pipelines.py` | pipeline test reserve debits |
+| Deployment test route | `apps/api/routers/deployments.py` | endpoint test reserve debits |
 | Wallet route | `apps/api/routers/token_wallet.py` | Operating Reserve packs |
 | API endpoint | `GET /api/v1/subscriptions/plans` | Returns this public plan model |
 | Stripe Dashboard | Products / Checkout | One-time activation payments and reserve funding |

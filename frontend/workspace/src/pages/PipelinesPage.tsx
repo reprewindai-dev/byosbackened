@@ -1698,7 +1698,7 @@ function RunTraceDetail({ run, pricingTier }: { run: PipelineRun; pricingTier?: 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <RunMetric label="steps" value={String(steps.length)} />
             <RunMetric label="trace" value={formatMs(runTraceLatency(run))} />
-            <RunMetric label="run price" value={eventPrice.value} />
+            <RunMetric label="pipeline test" value={eventPrice.value} />
             <RunMetric label="version" value={`v${run.version}`} />
           </div>
           <div className="mt-3 rounded-md border border-electric/20 bg-electric/5 px-3 py-2 text-[11px] leading-5 text-bone-2">
@@ -2388,10 +2388,10 @@ function pipelineEndpointUrl(endpoint: PipelineEndpointDeployment): string {
 
 function governedRunPrice(pricingTier?: string): { label: string; value: string } {
   const tier = (pricingTier ?? "founding").toLowerCase();
-  if (tier.includes("standard")) return { label: "Governed run $0.40", value: "$0.40" };
-  if (tier.includes("regulated") || tier.includes("enterprise")) return { label: "Governed run private", value: "private" };
-  if (tier.includes("free")) return { label: "Evaluation run included", value: "included" };
-  return { label: "Governed run $0.25", value: "$0.25" };
+  if (tier.includes("standard")) return { label: "Pipeline test $0.40", value: "$0.40" };
+  if (tier.includes("regulated") || tier.includes("enterprise")) return { label: "Pipeline test private", value: "private" };
+  if (tier.includes("free")) return { label: "Activation required", value: "activation required" };
+  return { label: "Pipeline test $0.25", value: "$0.25" };
 }
 
 function formatMs(value: number): string {

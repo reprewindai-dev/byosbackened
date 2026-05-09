@@ -736,7 +736,7 @@
           </div>
           <div class="mode-toggle" role="tablist" aria-label="Theater mode">
             <button role="tab" class="active" data-mode="ai">Plan Compiler</button>
-            <button role="tab" data-mode="edge">BYOS Backend</button>
+            <button role="tab" data-mode="edge">Infrastructure</button>
           </div>
         </div>
 
@@ -799,7 +799,7 @@
             <div class="control-note">
               The request in front of you is <strong style="color:var(--bone);">real</strong>.
               It flows through Veklom's public demo endpoint, rate-limited to 5/min per IP,
-              output capped at 250 tokens, no key exposure. On veklom.dev this same shell runs the BYOS backend legacy hookup demo.
+              output capped at 250 tokens, no key exposure.
             </div>
 
             <div class="protocol-card" id="protocolCard">
@@ -1179,12 +1179,11 @@
    - All animation state derives from real server events.
    ============================================================== */
 (function () {
-  // Mirror app/auth.js host routing: .dev → api.veklom.dev, else api.veklom.com.
+  // Buyer site routes public demo traffic to the production API.
   // Allow override via window.VEKLOM_API for local dev.
   const API_BASE = (function () {
     if (typeof window !== "undefined" && window.VEKLOM_API) return window.VEKLOM_API.replace(/\/+$/, "");
     const h = (typeof location !== "undefined" && location.hostname) || "";
-    if (/veklom\.dev$/i.test(h)) return "https://api.veklom.dev/api/v1";
     if (/^localhost$|^127\.|^0\.0\.0\.0$/.test(h)) return "/api/v1"; // same-origin when served by backend
     return "https://api.veklom.com/api/v1";
   })();
@@ -1223,7 +1222,7 @@
       },
     },
     edge: {
-      label: "Legacy Infrastructure Control Plane",
+      label: "Infrastructure Control Plane",
       nodes: [
         { id: "legacy_signal",    title: "Legacy Signal",   sub: "snmp · modbus" },
         { id: "protocol_ingest",  title: "Protocol Ingest", sub: "adapters" },
@@ -1274,8 +1273,7 @@
   const verticalsBar  = $("verticals");
   const ctrlTitle     = $("ctrlTitle");
 
-  const SITE_IS_DEV = /(^|\.)veklom\.dev$/i.test(window.location.hostname || "");
-  let mode = SITE_IS_DEV ? "edge" : "ai";
+  let mode = "ai";
   let selectedEdgeScenario = "network";
   let selectedVertical = "default";
   let currentES = null;
@@ -1285,58 +1283,6 @@
   let streamLine = null;
   let latencyStart = 0;
   let latencyTimer = null;
-
-  function setText(selector, value) {
-    const el = document.querySelector(selector);
-    if (el) el.textContent = value;
-  }
-
-  function setMeta(selector, value) {
-    const el = document.querySelector(selector);
-    if (el) el.setAttribute("content", value);
-  }
-
-  function applySiteSplit() {
-    if (!SITE_IS_DEV) {
-      const edgeTab = document.querySelector(".mode-toggle button[data-mode='edge']");
-      if (edgeTab) edgeTab.hidden = true;
-      return;
-    }
-
-    document.title = "Veklom Developer Platform";
-    setMeta('meta[name="description"]', "Integrate, self-host, and verify governed AI execution with the BYOS backend.");
-    setMeta('meta[property="og:title"]', "Veklom Developer Platform");
-    setMeta('meta[property="og:description"]', "Connect Veklom to existing infrastructure and prove governed AI execution without replacing legacy systems.");
-    setMeta('meta[name="twitter:title"]', "Veklom Developer Platform");
-    setMeta('meta[name="twitter:description"]', "BYOS backend, legacy integration, policy routing, fallback, archive, evidence, and replay.");
-
-    setText(".links a[href='#theater']", "BYOS demo");
-    setText(".links a[href='#why']", "Backend proof");
-    setText(".links a[href='/workspace-app#/marketplace']", "Tools");
-    setText(".links a[href='/workspace-app#/overview']", "Workspace");
-    setText(".hero .eyebrow", "Veklom Developer Platform · BYOS Backend · Legacy Integration");
-    setText(".hero h1 .grad", "Veklom Developer Platform");
-    setText(".hero h1 .soft", "Self-host and verify governed AI.");
-    setText(".hero .lead", "Integrate, self-host, and verify governed AI execution with the BYOS backend. Connect Veklom to existing infrastructure and prove policy, fallback, routing, archive, evidence, and replay without replacing legacy systems.");
-    setText(".hero .cta-primary", "Run the BYOS backend demo ↓");
-    setText(".theater-head .title", "BYOS Backend Demo");
-    setText(".section-eyebrow", "Technical proof for governed AI execution");
-    setText(".section-title", "BYOS backend, legacy integration, license flow, tenant isolation, evidence.");
-    setText(".section-copy", "Veklom.dev is the technical proof site for backend health, legacy hookups, private deployment posture, policy evaluation, fallback routing, archive, evidence, and replay.");
-
-    document.querySelectorAll(".mode-toggle button").forEach((button) => {
-      button.classList.toggle("active", button.dataset.mode === "edge");
-      if (button.dataset.mode === "ai") button.textContent = "AI Request";
-      if (button.dataset.mode === "edge") button.textContent = "Legacy Infrastructure";
-    });
-    const aiTab = document.querySelector(".mode-toggle button[data-mode='ai']");
-    if (aiTab) aiTab.hidden = true;
-    aiControls.hidden = true;
-    edgeControls.hidden = false;
-    verticalsBar.style.display = "none";
-    ctrlTitle.textContent = "Legacy Infrastructure · Scenario";
-    runLabel.textContent = "Run network scenario";
-  }
 
   // ---- Pipeline render ----
   const NS = "http://www.w3.org/2000/svg";
@@ -1831,11 +1777,11 @@
         aiControls.hidden = false; edgeControls.hidden = true;
         verticalsBar.dataset.visible = "ai"; verticalsBar.style.display = "";
         ctrlTitle.textContent = "GPC · Intent";
-        runLabel.textContent = SITE_IS_DEV ? "Run pipeline" : "Compile governed plan";
+        runLabel.textContent = "Compile governed plan";
       } else {
         aiControls.hidden = true; edgeControls.hidden = false;
         verticalsBar.style.display = "none";
-        ctrlTitle.textContent = "Legacy Infrastructure · Scenario";
+        ctrlTitle.textContent = "Infrastructure scenario";
         setSelectedEdgeScenario(selectedEdgeScenario);
       }
     });
@@ -1924,7 +1870,8 @@
   }
 
   // ---- Init ----
-  applySiteSplit();
+  const edgeTab = document.querySelector(".mode-toggle button[data-mode='edge']");
+  if (edgeTab) edgeTab.hidden = true;
   renderPipeline();
   updatePromptCount();
   if (mode === "edge") {

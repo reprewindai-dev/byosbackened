@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'backend/landing/**'
+      - 'backend/landing-dev/**'
       - 'frontend/workspace/**'
       - 'landing/**'
       - '.github/workflows/deploy-pricing-page.yml'

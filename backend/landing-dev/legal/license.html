@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Software License Agreement - Veklom</title>
+<meta name="description" content="Veklom Software License Agreement for the self-hosted Veklom platform, including sovereign execution, license key terms, plan tiers, payment terms, warranty, liability, and Ontario governing law." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://veklom.com/legal/license" />
+<link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+
+<nav class="legal-nav">
+  <div class="container">
+    <a href="../" class="brand">
+      <img src="../logo.svg" alt="Veklom logo"/>
+      <span>Veklom</span>
+    </a>
+    <div class="crumb">
+      <a href="../">Home</a><span class="sep">.</span><a href="./">Legal</a><span class="sep">.</span>Software License Agreement
+    </div>
+  </div>
+</nav>
+
+<header class="legal-head">
+  <div class="container">
+    <div class="legal-eyebrow">Document 01 . Core</div>
+    <h1 class="legal-title">Software <span class="it">License Agreement</span></h1>
+    <div class="legal-meta">
+      <span><strong>Last updated:</strong> May 2, 2026</span>
+      <span><strong>Effective date:</strong> May 2, 2026</span>
+      <span><strong>Governing law:</strong> Ontario, Canada</span>
+    </div>
+    <div class="legal-disclaimer">
+      Veklom operates entirely within your infrastructure. No model weights, no prompt data, no execution logs, and no API keys ever leave your environment. Veklom does not provide a hosted or cloud-managed service. This Agreement governs the installation and use of the Veklom platform software inside infrastructure controlled by the customer.
+    </div>
+  </div>
+</header>
+
+<nav class="legal-toc">
+  <div class="container">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#deployment-model">Deployment Model and Sovereign Execution Guarantee</a></li>
+      <li><a href="#use-of-software">Use of Software</a></li>
+      <li><a href="#customer-data">Customer Data and Data Sovereignty</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#ip">Intellectual Property</a></li>
+      <li><a href="#confidentiality">Confidentiality</a></li>
+      <li><a href="#fees">Fees, Payment and License Keys</a></li>
+      <li><a href="#term">Term and Termination</a></li>
+      <li><a href="#warranty">Warranty</a></li>
+      <li><a href="#support">Support and Availability</a></li>
+      <li><a href="#indemnification">Indemnification</a></li>
+      <li><a href="#liability">Limitation of Remedies and Damages</a></li>
+      <li><a href="#general">General Terms</a></li>
+      <li><a href="#definitions">Definitions</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main class="legal-body">
+  <div class="container">
+
+    <section>
+      <h2><span class="num">Preamble</span>Parties and Acceptance</h2>
+      <p>These Veklom software license terms (the <span class="term">"Agreement"</span>) are entered into by and between Veklom Inc. (<span class="term">"Veklom"</span>) and the entity or person placing an order for, installing, accessing, or using any Veklom software offerings (<span class="term">"Customer"</span> or <span class="term">"You"</span>).</p>
+      <p>By indicating your acceptance of this Agreement or by installing, accessing, or using any Veklom software, you agree to be bound by all terms and conditions of this Agreement. If you do not agree, you may not install or use the Software.</p>
+      <div class="callout">
+        <p><strong>Deployment model:</strong> The Software is licensed to customers and installed within infrastructure controlled by the customer. The Software is not provided as a hosted or software-as-a-service offering.</p>
+      </div>
+    </section>
+
+    <section id="deployment-model">
+      <h2><span class="num">1</span>Deployment Model and Sovereign Execution Guarantee</h2>
+      <h3>1.1 Self-Hosted Architecture</h3>
+      <p>The Veklom platform is provided exclusively as self-hosted enterprise software. The Software is installed and operated within infrastructure controlled by the Customer, including customer-managed cloud infrastructure, private cloud environments, or on-premise systems. Veklom does not host, operate, manage, or monitor the infrastructure on which the Software runs.</p>
+      <h3>1.2 Sovereign Execution Guarantee</h3>
+      <p>Veklom warrants that the Software, when used in accordance with the Documentation:</p>
+      <ul>
+        <li>Does not transmit Customer Data, prompt content, model outputs, execution logs, or API keys to Veklom or any Veklom-controlled server;</li>
+        <li>Executes AI inference operations locally within the Customer Environment via Ollama or Customer-configured model providers;</li>
+        <li>Does not establish persistent outbound connections to Veklom infrastructure during normal operation;</li>
+        <li>Stores audit logs, HMAC records, cost telemetry, and compliance reports exclusively within the Customer Environment.</li>
+      </ul>
+      <p>The sole exception is license key validation, which requires a brief, cryptographically signed outbound call to <code>license.veklom.com</code> containing only the license key hash and a timestamp. No Customer Data is transmitted during license validation.</p>
+      <h3>1.3 Operational Responsibility</h3>
+      <p>Customer acknowledges that the performance, availability, and security of the Software depend on the configuration and operation of the Customer Environment. Customer is responsible for provisioning and maintaining all infrastructure, networking, runtime configuration, storage, and security controls. Veklom is not responsible for outages, data loss, or security incidents resulting from failures or misconfiguration of Customer infrastructure, cloud providers, or third-party systems.</p>
+    </section>
+
+    <section id="use-of-software">
+      <h2><span class="num">2</span>Use of Software</h2>
+      <h3>2.1 License Grant</h3>
+      <p>Subject to the terms of this Agreement and payment of applicable Fees, Veklom grants Customer a limited, non-transferable, non-sublicensable, non-exclusive license during the Subscription Term to install and use the Software in object code form within the Customer Environment solely for Customer's internal business purposes in accordance with the Documentation and applicable Order Form.</p>
+      <h3>2.2 License Key Activation</h3>
+      <p>Use of the Software requires a valid license key issued by Veklom upon purchase. License keys are:</p>
+      <ul>
+        <li>Tied to a specific Customer entity and plan tier;</li>
+        <li>Non-transferable and may not be shared across unaffiliated organizations;</li>
+        <li>Validated periodically via a signed request to <code>license.veklom.com</code> as described in Section 1.2;</li>
+        <li>Subject to revocation upon termination of this Agreement or violation of its terms.</li>
+      </ul>
+      <p>Customer is responsible for maintaining the confidentiality of license keys and for all use of the Software under their key.</p>
+      <h3>2.3 Permitted Plans</h3>
+      <p>The Software is offered under the following plan tiers, each with associated call limits, feature gates, and pricing as set out in the applicable Order Form:</p>
+      <table>
+        <thead>
+          <tr><th>Plan</th><th>Commercial Terms</th><th>Summary</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Sovereign Trial</td><td>14-day evaluation period</td><td>50,000 credits included, full feature access</td></tr>
+          <tr><td>Team</td><td>$12,000/month</td><td>Production use up to 10 seats</td></tr>
+          <tr><td>Business</td><td>$35,000/month</td><td>Multi-tenant deployment, full compliance suite</td></tr>
+          <tr><td>Enterprise</td><td>Custom pricing</td><td>Air-gap deployment options, dedicated SLA</td></tr>
+        </tbody>
+      </table>
+      <p>Feature access is enforced at runtime via license middleware. Attempting to access features above the licensed tier without upgrade constitutes a material breach of this Agreement.</p>
+      <h3>2.4 Affiliates</h3>
+      <p>Customer Affiliates may purchase licenses by executing an Order Form referencing this Agreement. Each such Order Form establishes a separate agreement between the Affiliate and Veklom. Each Affiliate is bound by the terms of this Agreement as if it were the Customer.</p>
+      <h3>2.5 General Restrictions</h3>
+      <p>Customer shall not, and shall not permit any third party to:</p>
+      <ol>
+        <li>Sell, rent, lease, sublicense, or otherwise make the Software available to any third party as a hosted or managed service;</li>
+        <li>Use the Software to provide a service bureau, outsourced AI inference, or multi-tenant AI processing service for the benefit of unaffiliated third parties under a single license;</li>
+        <li>Reverse engineer, decompile, disassemble, or attempt to derive source code or model weights bundled with the Software;</li>
+        <li>Remove, alter, or obscure any proprietary notices, trademarks, or copyright notices in the Software;</li>
+        <li>Use the Software to process data in violation of applicable laws, including HIPAA-regulated data without a signed BAA where required by a paid services engagement;</li>
+        <li>Attempt to bypass, disable, or circumvent the license key validation system or any feature gate enforced by the Software.</li>
+      </ol>
+    </section>
+
+    <section id="customer-data">
+      <h2><span class="num">3</span>Customer Data and Data Sovereignty</h2>
+      <h3>3.1 Customer Ownership</h3>
+      <p>As between the parties, Customer retains all right, title, and interest in and to Customer Data. Veklom acquires no rights in Customer Data. Because the Software operates entirely within the Customer Environment, Customer Data is never transmitted to or stored by Veklom except as explicitly authorized in writing by Customer for support purposes.</p>
+      <h3>3.2 HIPAA and Regulated Data</h3>
+      <p>Customer may use the Software to process HIPAA-regulated data within the Customer Environment. Because Veklom does not access, store, or process Customer Data on its own infrastructure, Veklom is not a Business Associate under HIPAA with respect to standard deployments. If Customer requests that Veklom access Customer Data during a technical services engagement, the parties must execute a Business Associate Agreement prior to such access.</p>
+      <h3>3.3 Data Localization</h3>
+      <p>Because all data processing occurs within Customer's chosen infrastructure, Customer retains full control over data residency and localization. The Software supports deployment in EU-sovereign, air-gapped, and regulated-cloud environments. Customer is solely responsible for selecting infrastructure compliant with applicable data localization laws.</p>
+      <h3>3.4 Audit Logs</h3>
+      <p>The Software generates HMAC-SHA256-signed immutable audit logs for every execution event. These logs are stored exclusively within the Customer Environment. Veklom has no access to audit logs unless Customer explicitly shares them for support diagnosis. Audit log integrity is the responsibility of Customer's infrastructure.</p>
+    </section>
+
+    <section id="security">
+      <h2><span class="num">4</span>Security</h2>
+      <h3>4.1 Built-In Security Controls</h3>
+      <p>The Software includes the following security capabilities, each operating within the Customer Environment:</p>
+      <ul>
+        <li>Zero-trust middleware with JWT authentication and optional MFA;</li>
+        <li>AES-256-GCM encryption for data at rest;</li>
+        <li>Row-Level Security enforced at the PostgreSQL layer per tenant;</li>
+        <li>API key management with SHA-256 hashing;</li>
+        <li>RBAC across relevant endpoints;</li>
+        <li>HMAC-SHA256 immutable audit trail for execution events;</li>
+        <li>Content safety filters including NSFW detection and CSAM zero-tolerance blocking.</li>
+      </ul>
+      <h3>4.2 Customer Security Responsibility</h3>
+      <p>Customer is responsible for the security posture of the Customer Environment, including network segmentation, firewall configuration, TLS termination, secret management, and access control to the host system. Veklom is not responsible for security incidents arising from misconfiguration of Customer infrastructure.</p>
+    </section>
+
+    <section id="ip">
+      <h2><span class="num">5</span>Intellectual Property</h2>
+      <h3>5.1 Veklom Technology</h3>
+      <p>Veklom and its licensors retain all right, title, and interest in and to the Software, Documentation, and all underlying technology, including the circuit breaker engine, cost intelligence layer, policy enforcement middleware, and compliance reporting modules. No rights are granted to Customer beyond the limited license set out in Section 2.1.</p>
+      <h3>5.2 Feedback</h3>
+      <p>If Customer provides feedback, suggestions, or enhancement requests, Veklom may freely use and incorporate that feedback into its products without restriction, obligation, or compensation to Customer.</p>
+      <h3>5.3 Usage Data</h3>
+      <p>Because the Software runs locally, Veklom does not collect operational telemetry from Customer deployments by default. If Customer opts in to telemetry sharing, Usage Data may be transmitted to Veklom solely for product improvement. Usage Data will never include Customer Data, prompt content, or personally identifiable information.</p>
+      <h3>5.4 Marketing</h3>
+      <p>Veklom may reference Customer's name as a customer in marketing materials. Upon written request, Veklom will remove such references within 30 days.</p>
+    </section>
+
+    <section id="confidentiality">
+      <h2><span class="num">6</span>Confidentiality</h2>
+      <h3>6.1 Mutual Confidentiality</h3>
+      <p>Each party will protect the other party's Confidential Information using the same degree of care it applies to its own confidential information, but no less than reasonable care. Each party agrees to use Confidential Information solely for purposes consistent with this Agreement and to limit access to employees, contractors, and advisors who need it and are bound by equivalent confidentiality obligations.</p>
+      <h3>6.2 Compelled Disclosure</h3>
+      <p>If legally required to disclose Confidential Information, the receiving party will, to the extent permitted, provide prompt written notice and cooperate with any effort to obtain confidential treatment.</p>
+    </section>
+
+    <section id="fees">
+      <h2><span class="num">7</span>Fees, Payment and License Keys</h2>
+      <h3>7.1 Fees and Payment</h3>
+      <p>All Fees and payment terms are set forth in the applicable Order Form. Except as expressly stated, all payment obligations are non-cancelable and all Fees are non-refundable. Fees do not include applicable taxes; Customer is responsible for all taxes except those based on Veklom's net income.</p>
+      <h3>7.2 Stripe Billing</h3>
+      <p>Veklom uses Stripe as its payment processor. By providing payment information, Customer agrees to Stripe's terms of service. Subscription renewals are automatic unless cancelled before the renewal date. Customer may manage billing through the Veklom customer portal.</p>
+      <h3>7.3 Payment Disputes</h3>
+      <p>Veklom will not suspend licenses with respect to Fees that Customer is disputing in good faith, provided Customer notifies Veklom in writing within 10 business days of the invoice date and cooperates to resolve the dispute within 30 days. Undisputed amounts must be paid on time.</p>
+      <h3>7.4 License Suspension for Non-Payment</h3>
+      <p>If Fees remain unpaid for 30 or more days after the due date and are not subject to a good-faith dispute, Veklom may suspend license key validation, which will prevent the Software from accepting new execution requests until payment is received.</p>
+    </section>
+
+    <section id="term">
+      <h2><span class="num">8</span>Term and Termination</h2>
+      <h3>8.1 Term</h3>
+      <p>This Agreement becomes effective on the Effective Date and continues until terminated. Each Order Form remains in effect for the License Term specified therein unless earlier terminated.</p>
+      <h3>8.2 Termination for Cause</h3>
+      <p>Either party may terminate this Agreement if the other party fails to cure a material breach within 30 days of written notice, ceases business operations without a successor, or enters bankruptcy or insolvency proceedings not dismissed within 60 days. If Customer terminates for cause due to uncured material breach by Veklom, Customer is entitled to a pro-rated refund of prepaid Fees for the unused License Term.</p>
+      <h3>8.3 Effect of Termination</h3>
+      <p>Upon termination, all licenses immediately terminate, Customer must cease all use of the Software, and Customer must delete or destroy all copies of the Software, Documentation, and Veklom Confidential Information in its possession. Because the Software runs in the Customer Environment, Customer retains full control of all Customer Data. Veklom has no obligation to store or return Customer Data. Accrued Fees are not affected by termination.</p>
+      <h3>8.4 Survival</h3>
+      <p>Sections concerning restrictions, intellectual property, confidentiality, fees, warranty disclaimer, liability limits, and general legal terms survive expiration or termination.</p>
+    </section>
+
+    <section id="warranty">
+      <h2><span class="num">9</span>Warranty</h2>
+      <h3>9.1 Service Warranty</h3>
+      <p>Veklom warrants that the Software, when installed and used in accordance with the Documentation, will operate in substantial conformity with the Documentation. If Veklom cannot correct a reported nonconformity within a reasonable time, Customer may terminate the applicable Order Form and receive a refund of prepaid Fees for the unused License Term as its sole and exclusive remedy.</p>
+      <h3>9.2 Mutual Warranty</h3>
+      <p>Each party represents and warrants that it has full authority to enter into this Agreement, that the Agreement constitutes its binding obligation, and that performing its obligations does not violate any other agreement.</p>
+      <h3>9.3 Warranty Disclaimer</h3>
+      <p class="uppercase-block">EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, THE SOFTWARE AND DOCUMENTATION ARE PROVIDED "AS IS." TO THE MAXIMUM EXTENT PERMITTED BY LAW, VEKLOM DISCLAIMS ALL OTHER WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. VEKLOM DOES NOT WARRANT THAT THE SOFTWARE WILL OPERATE WITHOUT INTERRUPTION OR ERROR. VEKLOM DOES NOT REVIEW CUSTOMER DATA AND MAKES NO WARRANTIES REGARDING ITS ACCURACY, COMPLETENESS, OR LEGALITY.</p>
+    </section>
+
+    <section id="support">
+      <h2><span class="num">10</span>Support and Availability</h2>
+      <h3>10.1 Support</h3>
+      <p>During the applicable License Term, Veklom will provide the support level specified in the Order Form. Because the Software runs in the Customer Environment, Veklom support is limited to Software-level issues. Veklom is not responsible for availability or performance issues caused by Customer infrastructure.</p>
+      <h3>10.2 License Server Uptime</h3>
+      <p>Veklom will use commercially reasonable efforts to maintain availability of the license validation service at <code>license.veklom.com</code>. The Software includes a local cache grace window allowing continued operation for a reasonable period if the license server is temporarily unreachable, preventing service disruption during transient network events.</p>
+    </section>
+
+    <section id="indemnification">
+      <h2><span class="num">11</span>Indemnification</h2>
+      <h3>11.1 Indemnification by Veklom</h3>
+      <p>Veklom will defend Customer against any third-party claim alleging that the Software, when used in accordance with this Agreement, infringes that third party's intellectual property rights. Veklom will indemnify Customer from damages, costs, and expenses awarded in such claim. If the Software becomes subject to an infringement claim, Veklom may modify or replace it, procure the right to continue use, or terminate the applicable Order Form and refund prepaid unused Fees.</p>
+      <h3>11.2 Indemnification by Customer</h3>
+      <p>Customer will defend and indemnify Veklom against any third-party claim arising from Customer Data, Customer Materials, or any product or service provided by Customer using the Software.</p>
+      <h3>11.3 Procedures</h3>
+      <p>The indemnified party must promptly notify the indemnifying party in writing, grant the indemnifying party control of the defense, and reasonably cooperate. The indemnifying party may not settle any claim that imposes liability on the indemnified party without prior written consent.</p>
+    </section>
+
+    <section id="liability">
+      <h2><span class="num">12</span>Limitation of Remedies and Damages</h2>
+      <h3>12.1 Excluded Damages</h3>
+      <p class="uppercase-block">EXCEPT FOR EXCLUDED CLAIMS, NEITHER PARTY WILL BE LIABLE FOR LOSS OF USE, LOSS OF DATA, LOSS OF PROFITS, LOSS OF REVENUE, BUSINESS INTERRUPTION, OR ANY INDIRECT, SPECIAL, INCIDENTAL, CONSEQUENTIAL, PUNITIVE, OR EXEMPLARY DAMAGES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+      <h3>12.2 General Liability Cap</h3>
+      <p>Each party's total aggregate liability arising out of or relating to this Agreement will not exceed the total Fees actually paid to Veklom under the applicable Order Form during the twelve months preceding the event giving rise to the claim.</p>
+      <h3>12.3 Data Protection Cap</h3>
+      <p>For Data Protection Claims, aggregate liability will not exceed two times the General Liability Cap. No party will be liable under both caps for the same underlying event.</p>
+    </section>
+
+    <section id="general">
+      <h2><span class="num">13</span>General Terms</h2>
+      <h3>13.1 Assignment</h3>
+      <p>Neither party may assign this Agreement without prior written consent, except in connection with a merger, acquisition, or sale of substantially all assets. Any attempted assignment in violation of this section is void.</p>
+      <h3>13.2 Severability</h3>
+      <p>If any provision is held invalid or unenforceable, it will be limited to the minimum extent necessary and the remainder of the Agreement will remain in effect.</p>
+      <h3>13.3 Dispute Resolution</h3>
+      <p>The parties will attempt in good faith to resolve disputes through senior representative discussions before initiating legal proceedings. Either party may seek injunctive relief to protect intellectual property or Confidential Information without prior notice.</p>
+      <h3>13.4 Governing Law</h3>
+      <p>This Agreement is governed by the laws of the Province of Ontario and the federal laws of Canada applicable therein, without regard to conflict-of-law principles. The parties consent to the exclusive jurisdiction of the courts of Ontario for any dispute arising under this Agreement.</p>
+      <h3>13.5 Entire Agreement</h3>
+      <p>This Agreement, together with all Order Forms and addenda referenced herein, constitutes the entire agreement between the parties and supersedes all prior agreements, representations, and negotiations relating to the Software. In the event of conflict, Order Form terms prevail over this Agreement for the subject matter of that Order Form.</p>
+      <h3>13.6 Force Majeure</h3>
+      <p>Neither party is liable for delays caused by circumstances beyond its reasonable control, including natural disasters, government actions, internet infrastructure failures, or supply chain disruptions. Because the Software operates in Customer's environment, Customer-side force majeure events are the Customer's responsibility.</p>
+      <h3>13.7 Notices</h3>
+      <p>All legal notices must be in writing delivered by email with confirmation of receipt or by courier to the address on the applicable Order Form. Notices to Veklom must be sent to <a href="mailto:legal@veklom.com">legal@veklom.com</a>.</p>
+    </section>
+
+    <section id="definitions" style="border-bottom:none;">
+      <h2><span class="num">14</span>Definitions</h2>
+      <p><span class="term">Affiliate</span> means any entity that directly or indirectly controls, is controlled by, or is under common control with a party.</p>
+      <p><span class="term">Agreement</span> means this Software License Agreement and all incorporated Order Forms, addenda, and exhibits.</p>
+      <p><span class="term">Confidential Information</span> means non-public information designated as confidential or that a reasonable party would recognize as confidential given the circumstances of disclosure, including pricing, source code, architecture, and Customer Data.</p>
+      <p><span class="term">Customer Data</span> means all data, prompts, model outputs, configuration files, and content submitted to or generated by the Software within the Customer Environment.</p>
+      <p><span class="term">Customer Environment</span> means the infrastructure owned, leased, or controlled by Customer on which the Software is installed and operated, including cloud instances, virtual machines, and on-premise servers.</p>
+      <p><span class="term">Documentation</span> means Veklom's technical and user documentation for the Software, including the README, USER_MANUAL, and deployment guides published in the Software repository.</p>
+      <p><span class="term">Excluded Claims</span> means claims arising from gross negligence or willful misconduct, indemnification obligations, Customer's violation of use restrictions, or breach of confidentiality obligations.</p>
+      <p><span class="term">Fees</span> means the subscription, license, or service fees set out in the applicable Order Form.</p>
+      <p><span class="term">License Key</span> means the cryptographic credential issued by Veklom upon purchase that activates the Software and enforces plan-tier feature gates.</p>
+      <p><span class="term">License Term</span> means the subscription period specified in the applicable Order Form, beginning on the activation date of the License Key.</p>
+      <p><span class="term">Order Form</span> means a written or electronic purchase agreement executed by both parties that references this Agreement.</p>
+      <p><span class="term">Software</span> means the Veklom platform binary and related application code, including the FastAPI backend, circuit breaker engine, cost intelligence module, compliance suite, content safety layer, and license enforcement middleware, together with any updates, patches, or new versions provided under the Subscription Term.</p>
+      <p><span class="term">Subscription Term</span> means the period during which Customer is licensed to use the Software under a valid paid Order Form or active Sovereign Trial.</p>
+      <p><span class="term">Usage Data</span> means aggregated, anonymized operational metrics optionally transmitted by the Software when Customer opts in to telemetry sharing. Usage Data does not include Customer Data.</p>
+      <p><span class="term">Veklom Technology</span> means the Software, Documentation, and all underlying technology, algorithms, models, and intellectual property owned or licensed by Veklom.</p>
+      <div class="callout">
+        <p><strong>Questions:</strong> <a href="mailto:legal@veklom.com">legal@veklom.com</a></p>
+        <p>This document is provided for informational purposes. For binding legal effect, execute an Order Form referencing this Agreement.</p>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="legal-foot">
+  <div class="container">
+    <div>&copy; 2026 Veklom Inc. . Document version 2.0</div>
+    <div class="links">
+      <a href="./">All Legal</a>
+      <a href="../">Home</a>
+      <a href="mailto:legal@veklom.com">legal@veklom.com</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

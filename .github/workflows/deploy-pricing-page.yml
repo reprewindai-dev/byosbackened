@@ -81,7 +81,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_DEV_PAGES_PROJECT: ${{ vars.CLOUDFLARE_DEV_PAGES_PROJECT || 'veklom-dev-acquisition' }}
         run: |
-          cd backend/landing
+          cd backend/landing-dev
           wrangler pages deploy . --project-name="$CLOUDFLARE_DEV_PAGES_PROJECT" --branch=main
 
       - name: Verify site live

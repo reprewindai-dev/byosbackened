@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vendor Console - Veklom</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+<style>
+.table-wrap { overflow-x:auto; border:1px solid var(--rule); border-radius:4px; }
+table { width:100%; border-collapse:collapse; }
+th, td { border-bottom:1px solid var(--rule); padding:12px; text-align:left; font-size:13px; }
+th { color:var(--mute); font-family:var(--mono); text-transform:uppercase; letter-spacing:.12em; font-size:10px; }
+</style>
+</head>
+<body>
+<main class="app-shell wide">
+  <div class="app-topnav">
+    <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Vendor Console</div>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="/marketplace/">Marketplace</a>
+      <a href="/dashboard/">Dashboard</a>
+      <a href="#" id="signout">Sign out</a>
+    </div>
+  </div>
+
+  <div id="alert"></div>
+
+  <div class="app-card" style="margin-bottom:20px;">
+    <div class="section-h">Vendor Onboarding</div>
+    <p class="app-sub">Only paid vendor plans can create listings. Every listing goes through review before it can go live. By publishing or selling through the marketplace, you agree to the <a href="/legal/vendor-agreement.html">Marketplace Vendor Agreement</a>.</p>
+    <form id="vendorForm">
+      <div class="field">
+        <label for="display_name">Vendor display name</label>
+        <input id="display_name" required minlength="2" maxlength="120" placeholder="Acme AI Labs" />
+      </div>
+      <button class="btn btn-primary" id="vendorBtn" type="submit">Save Vendor Profile</button>
+      <button class="btn btn-secondary" id="githubBtn" type="button">Connect GitHub</button>
+    </form>
+  </div>
+
+  <div class="app-card" style="margin-bottom:20px;">
+    <div class="section-h">Create Listing</div>
+    <form id="listingForm">
+      <div class="field">
+        <label for="title">Title</label>
+        <input id="title" required minlength="2" maxlength="200" placeholder="Governed API Gateway" />
+      </div>
+      <div class="field">
+        <label for="description">Description</label>
+        <input id="description" placeholder="What this listing does and who it is for." />
+      </div>
+      <div class="field">
+        <label for="price_cents">Price (USD cents)</label>
+        <input id="price_cents" type="number" min="0" step="1" value="9900" />
+      </div>
+      <button class="btn btn-primary" id="listingBtn" type="submit">Create Draft</button>
+    </form>
+  </div>
+
+  <div class="app-card">
+    <div class="section-h">My Listings</div>
+    <p class="muted" style="margin-bottom:12px;">Submit drafts for review. Status must be <code>active</code> before it appears in public marketplace.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Title</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="listingsBody">
+          <tr><td colspan="4" class="muted">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <input id="bundlePicker" type="file" accept=".zip,.json,.yaml,.yml,.md,.txt,.pdf,.png,.jpg,.jpeg" style="display:none;" />
+</main>
+
+<script src="/app/auth.js"></script>
+<script>
+if (!VK.isLoggedIn()) { window.location.href = "/login/"; }
+const $alert = document.getElementById("alert");
+function showError(msg) { $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>'; }
+function showOk(msg) { $alert.innerHTML = '<div class="alert alert-ok">' + msg + '</div>'; }
+function fmtPrice(c, cur) {
+  return new Intl.NumberFormat("en-US", { style:"currency", currency:(cur || "usd").toUpperCase() }).format((c || 0) / 100);
+}
+document.getElementById("signout").addEventListener("click", (e) => { e.preventDefault(); VK.logout(); });
+document.getElementById("githubBtn").addEventListener("click", async () => {
+  try { await VK.startGithubLogin(); } catch (err) { showError(err.message || "GitHub connect failed"); }
+});
+const bundlePicker = document.getElementById("bundlePicker");
+let pendingUploadListingId = null;
+
+async function refreshListings() {
+  const body = document.getElementById("listingsBody");
+  try {
+    const rows = await VK.marketplaceMyListings();
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="4" class="muted">No listings yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(x => {
+      const canSubmit = x.status === "draft" || x.status === "rejected";
+      const submitBtn = canSubmit
+        ? '<button class="btn btn-secondary submit-btn" data-id="' + x.id + '" style="padding:8px 10px; font-size:10px;">Submit for review</button>'
+        : '<span class="muted">Awaiting review</span>';
+      const uploadBtn = '<button class="btn btn-secondary upload-btn" data-id="' + x.id + '" style="padding:8px 10px; font-size:10px;">Upload bundle</button>';
+      return (
+        '<tr>' +
+          '<td>' + x.title + '</td>' +
+          '<td>' + fmtPrice(x.price_cents, x.currency) + '</td>' +
+          '<td><span class="tag">' + x.status + '</span></td>' +
+          '<td style="display:flex; gap:8px; flex-wrap:wrap;">' + uploadBtn + submitBtn + '</td>' +
+        '</tr>'
+      );
+    }).join("");
+    document.querySelectorAll(".submit-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          await VK.marketplaceSubmitListing({ listing_id: btn.getAttribute("data-id") });
+          showOk("Listing submitted for review.");
+          await refreshListings();
+        } catch (err) {
+          showError(err.message || "Submit failed");
+          btn.disabled = false;
+        }
+      });
+    });
+    document.querySelectorAll(".upload-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        pendingUploadListingId = btn.getAttribute("data-id");
+        bundlePicker.value = "";
+        bundlePicker.click();
+      });
+    });
+  } catch (err) {
+    body.innerHTML = '<tr><td colspan="4" class="muted">Unable to load listings: ' + (err.message || "error") + '</td></tr>';
+  }
+}
+
+bundlePicker.addEventListener("change", async () => {
+  const file = bundlePicker.files && bundlePicker.files[0];
+  if (!file || !pendingUploadListingId) return;
+  try {
+    showOk("Uploading " + file.name + "...");
+    const up = await VK.marketplaceGetUploadUrl({
+      listing_id: pendingUploadListingId,
+      file_name: file.name,
+      file_type: file.type || "application/octet-stream"
+    });
+    const putRes = await fetch(up.url, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file
+    });
+    if (!putRes.ok) {
+      throw new Error("Bundle upload failed (storage)");
+    }
+    await VK.marketplaceConfirmFile({
+      listing_id: pendingUploadListingId,
+      s3_key: up.key,
+      size: file.size,
+      file_type: file.type || "application/octet-stream"
+    });
+    showOk("Bundle uploaded and attached to listing.");
+  } catch (err) {
+    showError(err.message || "Upload failed");
+  } finally {
+    pendingUploadListingId = null;
+  }
+});
+
+document.getElementById("vendorForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("vendorBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+  try {
+    await VK.marketplaceCreateVendor({ display_name: document.getElementById("display_name").value.trim() });
+    showOk("Vendor profile saved.");
+  } catch (err) {
+    showError(err.message || "Vendor profile failed");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save Vendor Profile";
+  }
+});
+
+document.getElementById("listingForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("listingBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creating...';
+  try {
+    const out = await VK.marketplaceCreateListing({
+      title: document.getElementById("title").value.trim(),
+      description: document.getElementById("description").value.trim(),
+      price_cents: Number(document.getElementById("price_cents").value || 0),
+      currency: "usd"
+    });
+    showOk("Draft created: " + out.id);
+    document.getElementById("listingForm").reset();
+    document.getElementById("price_cents").value = "9900";
+    await refreshListings();
+  } catch (err) {
+    showError(err.message || "Draft create failed");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create Draft";
+  }
+});
+
+refreshListings();
+</script>
+</body>
+</html>

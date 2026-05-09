@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Create your Veklom workspace</title>
+<meta name="description" content="Create a Veklom workspace and start evaluating self-hosted AI operations in minutes." />
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+<link rel="canonical" href="https://veklom.com/signup/" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+<main class="app-shell">
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
+  <div class="app-card">
+    <h1 class="app-h1">Create your workspace</h1>
+    <p class="app-sub">Create an evaluation account. Free access does not require a card. Team and Business continue directly to Stripe checkout after registration. Enterprise is sales-assisted.</p>
+    <div id="alert"></div>
+    <form id="form">
+      <div class="field">
+        <label for="workspace_name">Organization name</label>
+        <input id="workspace_name" name="workspace_name" required autocomplete="organization" placeholder="Acme Health Systems" />
+      </div>
+      <div class="field">
+        <label for="full_name">Your name</label>
+        <input id="full_name" name="full_name" required autocomplete="name" placeholder="Jane Engineer" />
+      </div>
+      <div class="field">
+        <label for="email">Work email</label>
+        <input id="email" name="email" type="email" required autocomplete="email" placeholder="jane@acme.com" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="new-password" minlength="12" placeholder="12+ chars, uppercase, number" />
+      </div>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">Create workspace</button>
+    </form>
+    <div class="oauth-divider"><span>or</span></div>
+    <button class="btn btn-secondary btn-block" id="github_signup" type="button">Continue with GitHub</button>
+    <p class="foot">Already have a workspace? <a href="/login/">Sign in</a></p>
+  </div>
+  <p class="foot">By creating an account you accept the <a href="/legal/terms.html">Terms of Service</a> and <a href="/legal/privacy.html">Privacy Policy</a>.</p>
+</main>
+<script src="/app/auth.js"></script>
+<script>
+const $alert = document.getElementById("alert");
+const $form  = document.getElementById("form");
+const $btn   = document.getElementById("submit");
+const $githubBtn = document.getElementById("github_signup");
+const SELF_SERVE_PLANS = ["starter", "pro"];
+
+function showError(msg) {
+  $alert.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+}
+
+const params = new URLSearchParams(window.location.search);
+const wantedPlan = params.get("plan");
+const wantedBillingCycle = params.get("billing_cycle") || "monthly";
+
+async function redirectToCheckout(plan) {
+  const out = await VK.createCheckout({
+    plan,
+    billing_cycle: wantedBillingCycle,
+    success_url: window.location.origin + "/dashboard/?checkout=success&plan=" + encodeURIComponent(plan),
+    cancel_url: window.location.origin + "/dashboard/?checkout=cancel&plan=" + encodeURIComponent(plan)
+  });
+  window.location.href = out.checkout_url;
+}
+
+async function afterAuthRedirect() {
+  if (wantedPlan && SELF_SERVE_PLANS.includes(wantedPlan)) {
+    await redirectToCheckout(wantedPlan);
+    return;
+  }
+  if (wantedPlan === "enterprise") {
+    window.location.href = "/dashboard/?plan=enterprise";
+    return;
+  }
+  window.location.href = "/dashboard/?welcome=1";
+}
+
+if (VK.isLoggedIn()) {
+  afterAuthRedirect().catch((err) => {
+    showError(err.message || "Unable to continue to checkout");
+  });
+}
+
+$form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $alert.innerHTML = "";
+  $btn.disabled = true;
+  $btn.innerHTML = '<span class="spinner"></span> Creating...';
+  const data = {
+    email: document.getElementById("email").value.trim().toLowerCase(),
+    password: document.getElementById("password").value,
+    full_name: document.getElementById("full_name").value.trim(),
+    workspace_name: document.getElementById("workspace_name").value.trim(),
+    trial_tier: wantedPlan || "starter"
+  };
+  try {
+    await VK.register(data);
+    await afterAuthRedirect();
+  } catch (err) {
+    showError(err.message || "Registration failed");
+    $btn.disabled = false;
+    $btn.innerHTML = "Create workspace";
+  }
+});
+
+$githubBtn.addEventListener("click", async () => {
+  $alert.innerHTML = "";
+  $githubBtn.disabled = true;
+  $githubBtn.innerHTML = '<span class="spinner"></span> Redirecting...';
+  try {
+    await VK.startGithubLogin();
+  } catch (err) {
+    showError(err.message || "GitHub sign-up failed");
+    $githubBtn.disabled = false;
+    $githubBtn.innerHTML = "Continue with GitHub";
+  }
+});
+</script>
+</body>
+</html>

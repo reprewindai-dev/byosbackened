@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GitHub sign-in - Veklom</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+<main class="app-shell">
+  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
+  <div class="app-card">
+    <h1 class="app-h1">Signing you in</h1>
+    <p class="app-sub">Completing GitHub authorization and creating your secure session.</p>
+    <div id="alert"><div class="alert alert-ok"><span class="spinner"></span> Finalizing OAuth...</div></div>
+  </div>
+</main>
+<script src="/app/auth.js"></script>
+<script>
+const $alert = document.getElementById("alert");
+
+(async function finishOauth() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const state = params.get("state");
+  const ghError = params.get("error");
+
+  if (ghError) {
+    $alert.innerHTML = '<div class="alert alert-error">GitHub authorization failed: ' + ghError + '</div>';
+    setTimeout(() => { window.location.href = "/login/"; }, 1800);
+    return;
+  }
+
+  if (!code || !state) {
+    $alert.innerHTML = '<div class="alert alert-error">Missing OAuth code or state.</div>';
+    setTimeout(() => { window.location.href = "/login/"; }, 1800);
+    return;
+  }
+
+  try {
+    const out = await VK.finishGithubLogin({ code, state });
+    const isNew = !!(out && out.is_new_user);
+    window.location.href = isNew ? "/dashboard/?welcome=1" : "/dashboard/";
+  } catch (err) {
+    $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "GitHub sign-in failed") + '</div>';
+    setTimeout(() => { window.location.href = "/login/"; }, 2200);
+  }
+})();
+</script>
+</body>
+</html>

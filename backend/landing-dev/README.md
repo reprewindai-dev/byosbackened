@@ -17,7 +17,6 @@ This directory is the production static web surface for:
 - `/` host-aware marketing page:
   - `veklom.com` frames the Sovereign AI Hub and defaults the live theater to GPC.
   - `veklom.dev` frames the Developer Platform and defaults the live theater to BYOS legacy infrastructure.
-- `/gpc/` flagship V2/GPC feature, exported from `reprewindai-dev/uacpgemini` and bridged to the live `uacpgemini.onrender.com` runtime.
 - `/signup/` self-serve workspace creation
 - `/login/` authentication
 - `/dashboard/` API key + subscription management

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GPC - Governed Plan Compiler | Veklom</title>
+    <meta name="description" content="GPC is Veklom's V2 Governed Plan Compiler: turn raw intent into research-backed, status-aware plans, artifacts, archive records, replay, and V3-ready handoffs." />
+    <script>
+      (() => {
+        const GPC_ORIGIN = "https://uacpgemini.onrender.com";
+        const originalFetch = window.fetch.bind(window);
+        const bootstrapFallback = () => new Response(JSON.stringify({
+          userEmail: "veklom.com",
+          primaryProvider: "gpc",
+          primaryProviderLabel: "Veklom GPC runtime",
+          providerChain: ["gemini", "groq", "ollama", "fallback"],
+          researchFeedSource: "live GPC backend"
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "X-Veklom-Fallback": "bootstrap-timeout" }
+        });
+        const withTimeout = (promise, ms, fallback) => new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve(fallback()), ms);
+          promise.then((value) => {
+            clearTimeout(timer);
+            resolve(value);
+          }).catch((error) => {
+            clearTimeout(timer);
+            reject(error);
+          });
+        });
+        window.fetch = (input, init) => {
+          if (typeof input === "string" && input.startsWith("/api/")) {
+            const request = originalFetch(`${GPC_ORIGIN}${input}`, init);
+            return input === "/api/bootstrap" ? withTimeout(request, 4500, bootstrapFallback) : request;
+          }
+          if (input instanceof Request && input.url.startsWith(`${window.location.origin}/api/`)) {
+            const nextUrl = input.url.replace(window.location.origin, GPC_ORIGIN);
+            const request = originalFetch(new Request(nextUrl, input), init);
+            return input.url.endsWith("/api/bootstrap") ? withTimeout(request, 4500, bootstrapFallback) : request;
+          }
+          return originalFetch(input, init);
+        };
+
+        const NativeWebSocket = window.WebSocket;
+        window.WebSocket = function VeklomGpcWebSocket(url, protocols) {
+          const currentHost = window.location.host;
+          const nextUrl = String(url).replace(`ws://${currentHost}`, "wss://uacpgemini.onrender.com").replace(`wss://${currentHost}`, "wss://uacpgemini.onrender.com");
+          return protocols ? new NativeWebSocket(nextUrl, protocols) : new NativeWebSocket(nextUrl);
+        };
+        window.WebSocket.prototype = NativeWebSocket.prototype;
+      })();
+    </script>
+    <script type="module" crossorigin src="/gpc/assets/index-BXpgMvSq.js"></script>
+    <link rel="stylesheet" crossorigin href="/gpc/assets/index-CK0Xr9v7.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+

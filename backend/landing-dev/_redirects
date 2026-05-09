@@ -14,8 +14,6 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /control-center/   /workspace-app#/overview      302
 /overview          /workspace-app#/overview      302
 /overview/         /workspace-app#/overview      302
-/gpc               /gpc/index.html      200
-/gpc/              /gpc/index.html      200
 /playground        /workspace-app#/playground      302
 /playground/       /workspace-app#/playground      302
 /monitoring        /workspace-app#/monitoring      302

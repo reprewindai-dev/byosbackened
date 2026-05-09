@@ -90,7 +90,6 @@ CACHEABLE_ENDPOINTS = {
     "/api/v1/suggestions",
     "/api/v1/autonomous/routing/stats",
     "/api/v1/budget",
-    "/status",
     "/health",
 }
 

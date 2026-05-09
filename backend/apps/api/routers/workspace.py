@@ -642,7 +642,7 @@ async def public_status_subscribe(
     }
 
 
-@public_router.get("/status", include_in_schema=False)
+@public_router.get("/status/page", include_in_schema=False)
 async def public_status_page():
     status_path = Path(__file__).resolve().parents[3] / "landing" / "status.html"
     return FileResponse(status_path, media_type="text/html")

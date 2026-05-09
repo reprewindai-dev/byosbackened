@@ -1,7 +1,7 @@
 """Stripe activation and Operating Reserve management."""
 import json
 import stripe
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
@@ -28,6 +28,68 @@ def _configure_stripe() -> None:
 # (1,000 units = $1.00) for exact integer accounting in the existing schema.
 
 RESERVE_UNITS_PER_USD = 1000
+
+EVENT_PRICING = {
+    "free": {
+        "playground_run_cents": None,
+        "compare_run_cents": None,
+        "signed_export_cents": None,
+        "byok_governance_calls_per_1000_cents": None,
+        "managed_governance_calls_per_1000_cents": None,
+        "signed_evidence_package_cents": None,
+        "auditor_bundle_cents": None,
+    },
+    "starter": {
+        "playground_run_cents": 25,
+        "compare_run_cents": 75,
+        "signed_export_cents": 300,
+        "byok_governance_calls_per_1000_cents": 600,
+        "managed_governance_calls_per_1000_cents": 1200,
+        "signed_evidence_package_cents": 9900,
+        "auditor_bundle_cents": 24900,
+    },
+    "pro": {
+        "playground_run_cents": 40,
+        "compare_run_cents": 120,
+        "signed_export_cents": 400,
+        "byok_governance_calls_per_1000_cents": 800,
+        "managed_governance_calls_per_1000_cents": 1600,
+        "signed_evidence_package_cents": 14900,
+        "auditor_bundle_cents": 34900,
+    },
+    "sovereign": {
+        "playground_run_cents": None,
+        "compare_run_cents": None,
+        "signed_export_cents": None,
+        "byok_governance_calls_per_1000_cents": 1000,
+        "managed_governance_calls_per_1000_cents": 2000,
+        "signed_evidence_package_cents": 19900,
+        "auditor_bundle_cents": 49900,
+    },
+    "enterprise": {
+        "playground_run_cents": None,
+        "compare_run_cents": None,
+        "signed_export_cents": None,
+        "byok_governance_calls_per_1000_cents": None,
+        "managed_governance_calls_per_1000_cents": None,
+        "signed_evidence_package_cents": None,
+        "auditor_bundle_cents": None,
+    },
+}
+
+
+def _with_event_pricing(plan: dict) -> dict:
+    """Attach versioned public event pricing to the plan response."""
+    plan_copy = dict(plan)
+    tier = str(plan_copy.get("tier") or "free")
+    pricing = {
+        "version": "v1_public",
+        "currency": "usd",
+        **EVENT_PRICING.get(tier, EVENT_PRICING["free"]),
+    }
+    plan_copy["pricing"] = pricing
+    plan_copy["event_pricing"] = pricing
+    return plan_copy
 
 
 def _reserve_units_from_cents(cents: int | str | None) -> int:
@@ -64,6 +126,7 @@ def _reset_legacy_non_cash_reserve_before_activation(
         return
 
     balance_before = wallet.balance
+    created_at = datetime.utcnow() - timedelta(microseconds=1)
     wallet.balance = 0
     wallet.total_credits_purchased = 0
     wallet.total_credits_used = 0
@@ -79,6 +142,7 @@ def _reset_legacy_non_cash_reserve_before_activation(
             balance_after=0,
             request_id=f"{session_id}:legacy-reserve-reset",
             description="Legacy non-cash reserve reset before paid activation",
+            created_at=created_at,
             metadata_json=json.dumps(
                 {
                     "reason": "legacy_non_cash_reserve_reset",
@@ -284,7 +348,11 @@ class SubscriptionResponse(BaseModel):
 async def list_plans():
     """Return all available plans (public endpoint)."""
     public_keys = ("starter", "pro", "sovereign", "enterprise")
-    return {"plans": [FREE_PLAN] + [PLANS[k] for k in public_keys]}
+    return {
+        "pricing_version": "v1_public",
+        "reserve_units_per_usd": RESERVE_UNITS_PER_USD,
+        "plans": [_with_event_pricing(FREE_PLAN)] + [_with_event_pricing(PLANS[k]) for k in public_keys],
+    }
 
 
 @router.get("/current", response_model=SubscriptionResponse)
@@ -686,7 +754,8 @@ def _credit_token_wallet(
         balance_after=balance_after,
         stripe_checkout_session_id=stripe_checkout_session_id,
         stripe_payment_intent_id=stripe_payment_intent_id,
-        description=description
+        description=description,
+        created_at=datetime.utcnow(),
     )
     db.add(transaction)
     

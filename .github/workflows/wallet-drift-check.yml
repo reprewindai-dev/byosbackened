@@ -9,18 +9,20 @@ jobs:
   drift-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install database driver
-        run: pip install psycopg2-binary
-
-      - name: Check wallet balance against transaction ledger
+      - name: Check wallet balance against transaction ledger in production network
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         run: |
-          python - <<'PY'
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_PRIVATE_KEY" > ~/.ssh/veklom-deploy
+          chmod 600 ~/.ssh/veklom-deploy
+          ssh-keyscan -H 5.78.135.11 >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/veklom-deploy -o IdentitiesOnly=yes root@5.78.135.11 <<'REMOTE'
+          set -euo pipefail
+          cd /data/coolify/applications/zjhp30ys1jlk8yaoxc96h2zd
+          SERVICE="$(docker compose config --services | head -n 1)"
+          docker compose exec -T "$SERVICE" python - <<'PY'
           import os
           import sys
           import psycopg2
@@ -63,3 +65,4 @@ jobs:
 
           print("No wallet drift detected")
           PY
+          REMOTE

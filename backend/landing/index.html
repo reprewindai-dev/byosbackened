@@ -21,7 +21,7 @@
   <meta name="twitter:image" content="https://veklom.com/og-image.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,650;6..72,750&display=swap" rel="stylesheet" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -57,12 +57,15 @@
       --radius:     10px;
       --radius-lg:  14px;
       --shadow-soft: 0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px -20px rgba(0,0,0,0.8);
+      --serif:      "Newsreader", ui-serif, Georgia, serif;
+      --sans:       Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono:       "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--sans);
       background: var(--ink);
       color: var(--bone);
       -webkit-font-smoothing: antialiased;
@@ -94,7 +97,7 @@
     ::selection { background: var(--brass); color: #18120a; }
 
     .container { max-width: 1280px; margin: 0 auto; padding: 0 28px; }
-    .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono { font-family: var(--mono); }
 
     /* ------------ NAV ------------ */
     .nav {
@@ -119,14 +122,14 @@
       color: var(--bone-2); background: rgba(255,255,255,0.02);
       border-radius: 999px; padding: 5px 11px;
       font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-      font-family: "JetBrains Mono", monospace;
+      font-family: var(--mono);
     }
     .links { display: flex; gap: 22px; align-items: center; font-size: 14px; color: var(--bone-2); }
     .links a:hover { color: var(--bone); }
     .cta-ghost {
       border: 1px solid var(--rule-2); color: var(--bone);
       padding: 9px 14px; border-radius: 999px; font-size: 12px;
-      letter-spacing: .05em; font-family: "JetBrains Mono", monospace;
+      letter-spacing: .05em; font-family: var(--mono);
       transition: border-color .2s, color .2s, background .2s;
     }
     .cta-ghost:hover { border-color: var(--brass); color: var(--brass-2); }
@@ -141,10 +144,16 @@
 
     /* ------------ HERO ------------ */
     .hero { padding: 96px 0 24px; }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(340px, .72fr);
+      gap: 42px;
+      align-items: end;
+    }
     .eyebrow {
       display: inline-flex; align-items: center; gap: 10px;
       color: var(--brass-2); font-size: 12px; text-transform: uppercase; letter-spacing: .18em;
-      font-family: "JetBrains Mono", monospace;
+      font-family: var(--mono);
     }
     .eyebrow::before {
       content: ""; width: 28px; height: 1px; background: linear-gradient(90deg, transparent, var(--brass));
@@ -152,7 +161,8 @@
     h1 {
       margin: 18px 0 20px;
       font-size: clamp(2.25rem, 5.4vw, 4.4rem);
-      line-height: 1.02; letter-spacing: -0.02em; font-weight: 700;
+      line-height: 0.98; letter-spacing: -0.035em; font-weight: 750;
+      font-family: var(--serif);
     }
     h1 .grad {
       background: linear-gradient(92deg, #fff 0%, #f6e5c8 40%, var(--brass-2) 70%, #d18c45 100%);
@@ -162,6 +172,7 @@
     .lead { color: var(--bone-2); max-width: 780px; font-size: 19px; line-height: 1.55; }
     .actions { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
     .trust-row {
+      grid-column: 1 / -1;
       margin-top: 34px; display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
       color: var(--muted); font-size: 12px; font-family: "JetBrains Mono", monospace;
       letter-spacing: .05em; text-transform: uppercase;
@@ -174,6 +185,110 @@
       content: ""; width: 7px; height: 7px; border-radius: 50%;
       background: var(--moss); box-shadow: 0 0 12px var(--moss-glow);
       animation: pulse-soft 1.6s infinite;
+    }
+    .hub-flow {
+      margin-top: 34px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-width: 920px;
+    }
+    .pricing-ledger {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 26px 0 24px;
+    }
+    .ledger-cell {
+      border: 1px solid rgba(196,146,91,.22);
+      background: linear-gradient(180deg, rgba(196,146,91,.075), rgba(255,255,255,.012));
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .ledger-cell .label {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .ledger-cell .value {
+      margin-top: 8px;
+      color: var(--bone);
+      font-size: 20px;
+      line-height: 1.15;
+      font-weight: 750;
+      font-family: var(--serif);
+    }
+    .ledger-cell .note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .hub-step {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      border: 1px solid rgba(196,146,91,.22);
+      background: linear-gradient(180deg, rgba(196,146,91,.09), rgba(255,255,255,.015));
+      color: var(--bone-2);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .hero-proof {
+      border: 1px solid var(--rule);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)),
+        radial-gradient(520px 260px at 85% 0%, rgba(110,168,254,.12), transparent 60%);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: var(--shadow-soft);
+    }
+    .hero-proof .proof-kicker {
+      color: var(--brass-2);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .hero-proof h2 {
+      margin: 18px 0 10px;
+      font-family: var(--serif);
+      font-size: clamp(2rem, 4vw, 3.3rem);
+      line-height: .98;
+      letter-spacing: -.035em;
+    }
+    .proof-lines {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+      border-top: 1px solid var(--rule);
+      padding-top: 18px;
+    }
+    .proof-line {
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      color: var(--bone-2);
+      font-size: 13px;
+    }
+    .proof-index {
+      color: var(--brass-2);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .proof-state {
+      color: var(--moss);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
     }
 
     /* ------------ THEATER ------------ */
@@ -513,13 +628,16 @@
       .theater-body { grid-template-columns: 280px minmax(0,1fr) 340px; }
     }
     @media (max-width: 1020px) {
+      .hero-grid { grid-template-columns: 1fr; align-items: start; }
       .theater-body { grid-template-columns: 1fr; }
       .pane { border-right: 0; border-bottom: 1px solid var(--rule); }
       .canvas-wrap { min-height: 460px; }
+      .pricing-ledger { grid-template-columns: 1fr 1fr; }
       .pillars, .pricing-grid { grid-template-columns: 1fr 1fr; }
       .links { display: none; }
     }
     @media (max-width: 640px) {
+      .pricing-ledger { grid-template-columns: 1fr; }
       .pillars, .pricing-grid { grid-template-columns: 1fr; }
       .metric-strip { grid-template-columns: repeat(2, 1fr); }
       .metric:nth-child(5) { display: none; }
@@ -556,16 +674,40 @@
 <main>
   <!-- ============ HERO ============ -->
   <section class="hero">
-    <div class="container">
-      <span class="eyebrow">Veklom Sovereign AI Hub · Tenant-Scoped Workspace · Governed Plan Compiler</span>
-      <h1><span class="grad">Veklom Sovereign AI Hub</span><br /><span class="soft">Private AI from intent to deployment.</span></h1>
-      <p class="lead">
-        Test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace. GPC turns raw AI and business intent into a governed plan before it becomes a pipeline.
-      </p>
-      <div class="actions">
-        <a class="cta-primary" href="#theater">Run the GPC demo ↓</a>
-        <a class="cta-ghost" href="/signup/">Start Free Evaluation</a>
-        <a class="cta-ghost" href="#pricing">View pricing</a>
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow">Veklom Sovereign AI Hub · Governed Plan Compiler</span>
+        <h1><span class="grad">Turn AI intent into governed infrastructure.</span><br /><span class="soft">Then run it, prove it, and deploy it.</span></h1>
+        <p class="lead">
+          Veklom is the tenant-scoped workspace for private AI teams: Playground, GPC, Models, Tools, Pipelines, Governance, Deployments, Monitoring, Billing, Evidence, and Vault.
+        </p>
+        <div class="actions">
+          <a class="cta-primary" href="#theater">Run the GPC demo ↓</a>
+          <a class="cta-ghost" href="/signup/">Start Free Evaluation</a>
+          <a class="cta-ghost" href="#pricing">View pricing</a>
+        </div>
+        <div class="hub-flow" aria-label="Veklom product flow">
+          <span class="hub-step">Playground</span>
+          <span class="hub-step">GPC</span>
+          <span class="hub-step">Models</span>
+          <span class="hub-step">Tools</span>
+          <span class="hub-step">Pipelines</span>
+          <span class="hub-step">Governance</span>
+          <span class="hub-step">Deployments</span>
+          <span class="hub-step">Monitoring</span>
+        </div>
+      </div>
+      <div class="hero-proof" aria-label="GPC proof panel">
+        <div class="proof-kicker">GPC · Governed Plan Compiler</div>
+        <h2>Raw intent does not touch production first.</h2>
+        <p class="lead" style="font-size:15px;">
+          GPC compiles business or AI intent into a governed plan: policy, route, model, tools, reserve impact, evidence path, and deployable pipeline contract.
+        </p>
+        <div class="proof-lines">
+          <div class="proof-line"><span class="proof-index">01</span><span>Intent captured from Playground or operator input</span><span class="proof-state">scoped</span></div>
+          <div class="proof-line"><span class="proof-index">02</span><span>Policy, model, tools, reserve, and evidence gates resolved</span><span class="proof-state">governed</span></div>
+          <div class="proof-line"><span class="proof-index">03</span><span>Pipeline, endpoint, monitoring, and audit path prepared</span><span class="proof-state">deployable</span></div>
+        </div>
       </div>
       <div class="trust-row" role="status" aria-live="polite">
         <span class="live-tag" id="heroLive">Live backend connected</span>
@@ -810,7 +952,29 @@
     <div class="container">
       <span class="section-eyebrow">Pricing</span>
       <h2 class="section-title">Activate once. Fund your reserve. Pay for governed execution.</h2>
-      <p class="section-copy">No subscriptions. No tokens. No surprise invoices. Activate a sovereign workspace, fund an Operating Reserve, and pay per governed run, governance call, or signed evidence package. Reserve balances are USD-denominated and never expire.</p>
+      <p class="section-copy">No subscriptions. No token fiction. No surprise invoices. Free Evaluation has no reserve and no production routing. Paid workspaces activate once, fund a USD Operating Reserve, and debit that reserve only when governed work happens.</p>
+      <div class="pricing-ledger" aria-label="Pricing model">
+        <div class="ledger-cell">
+          <div class="label">Free Evaluation</div>
+          <div class="value">$0 reserve</div>
+          <div class="note">15 governed Playground runs, 3 compare runs, 20 policy tests, 2 watermarked exports.</div>
+        </div>
+        <div class="ledger-cell">
+          <div class="label">Activation</div>
+          <div class="value">$395 / $795 / $2,500+</div>
+          <div class="note">One-time activation by tier: Founding, Standard, or Regulated.</div>
+        </div>
+        <div class="ledger-cell">
+          <div class="label">Operating Reserve</div>
+          <div class="value">$150 / $300 / $2,500</div>
+          <div class="note">Minimum reserve required after activation. USD-denominated and non-expiring.</div>
+        </div>
+        <div class="ledger-cell">
+          <div class="label">Debit rule</div>
+          <div class="value">Per governed event</div>
+          <div class="note">Playground, compare, governance calls, exports, evidence packages, and auditor bundles.</div>
+        </div>
+      </div>
       <div class="pricing-grid">
         <article class="plan">
           <span class="tier">Free Evaluation</span><h4>Evaluate</h4>

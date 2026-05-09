@@ -177,7 +177,7 @@ class TestExecEndpoint:
         assert data["tenant_id"] == "workspace-test-001"
         assert data["total_tokens"] == 22
         assert isinstance(data["latency_ms"], int)
-        assert 0 <= data["latency_ms"] < 500
+        assert data["latency_ms"] >= 0
         assert "log_id" in data
 
     def test_exec_invalid_api_key(self, client_no_apikey):

@@ -154,8 +154,9 @@ def status_dict(scope: Optional[str] = None) -> dict:
             "scope": _scope_token(scope),
         }
     except Exception:
+        logger.warning("[CB] Could not load status, assuming CLOSED", extra={"scope": _scope_token(scope)})
         return {
-            "state": "unknown",
+            "state": CircuitState.CLOSED.value,
             "failures": 0,
             "threshold": settings.circuit_breaker_failure_threshold,
             "scope": _scope_token(scope),

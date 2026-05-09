@@ -231,6 +231,10 @@ class TestLLMInference:
     
     def test_exec_invalid_api_key(self, client):
         """POST /v1/exec with invalid key returns 401."""
+        db = MagicMock(spec=Session)
+        db.query.return_value.filter.return_value.first.return_value = None
+        app.dependency_overrides[get_db] = lambda: db
+
         response = client.post(
             "/v1/exec",
             json={"prompt": "Hello"},
@@ -418,23 +422,19 @@ class TestAPIDocumentation:
     """Test API documentation availability."""
     
     def test_swagger_ui_available(self, client):
-        """Swagger UI is accessible."""
+        """Swagger UI is protected from unauthenticated access."""
         response = client.get("/api/v1/docs")
-        assert response.status_code == 200
+        assert response.status_code == 401
     
     def test_openapi_schema_available(self, client):
-        """OpenAPI schema is accessible."""
+        """OpenAPI schema is protected from unauthenticated access."""
         response = client.get("/api/v1/openapi.json")
-        assert response.status_code == 200
-        
-        schema = response.json()
-        assert "openapi" in schema
-        assert "paths" in schema
+        assert response.status_code == 401
     
     def test_redoc_available(self, client):
-        """ReDoc is accessible."""
+        """ReDoc is protected from unauthenticated access."""
         response = client.get("/api/v1/redoc")
-        assert response.status_code == 200
+        assert response.status_code == 401
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

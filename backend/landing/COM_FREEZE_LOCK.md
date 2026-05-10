@@ -4,7 +4,8 @@ The buyer-facing `.com` landing page is frozen at this artifact:
 
 ```text
 path: backend/landing/index.html
-sha256: 5c062a6cad054253c613fe73e2d16eb59a9feca5ff4fabbddae5752a382357f1
+sha256: 42ddcc746bd6dfdcc2225693c404defece5289726355d9e91cd184a4e0834e18
+hashing: CRLF/LF-normalized
 state: Veklom Sovereign AI Hub with UACP black-box demo
 ```
 

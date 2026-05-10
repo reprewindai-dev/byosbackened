@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Veklom Sovereign AI Hub</title>
-  <meta name="description" content="Test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace." />
+  <meta name="description" content="A sovereign AI gateway plus UACP control plane for routing, running, governing, auditing, and monetizing private AI work." />
   <link rel="canonical" href="https://veklom.com/" />
   <meta name="keywords" content="sovereign AI hub, private AI workspace, governed AI, LLM audit trail, AI deployment governance, AI monitoring, tenant scoped AI" />
   <meta property="og:url" content="https://veklom.com/" />
   <meta property="og:title" content="Veklom Sovereign AI Hub" />
-  <meta property="og:description" content="Test, run, deploy, govern, and monitor private AI from one tenant-scoped workspace." />
+  <meta property="og:description" content="A sovereign AI gateway plus UACP control plane for routing, running, governing, auditing, and monetizing private AI work." />
   <meta property="og:image" content="https://veklom.com/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -17,7 +17,7 @@
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Veklom Sovereign AI Hub" />
-  <meta name="twitter:description" content="Governed private AI from Playground to pipelines, deployments, monitoring, and proof." />
+  <meta name="twitter:description" content="A sovereign AI gateway plus UACP control plane for routing, running, governing, auditing, and monetizing private AI work." />
   <meta name="twitter:image" content="https://veklom.com/og-image.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
@@ -27,7 +27,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <style>
     /* ==========================================================
-       VEKLOM CONTROL PLANE — FOUNDATION STYLES
+       VEKLOM CONTROL PLANE - FOUNDATION STYLES
        This is the look-and-feel reference for the future dashboard.
        Palette: ink / bone / brass / moss / electric / amber / crimson
        Typography: Inter (UI) + JetBrains Mono (telemetry)
@@ -573,7 +573,7 @@
     .muted-small { color: var(--muted); font-size: 12px; font-family: "JetBrains Mono", monospace; }
     .plan ul { margin: 14px 0 0; padding: 0; list-style: none; color: var(--bone-2); font-size: 13px; }
     .plan ul li { padding: 6px 0; border-top: 1px dashed var(--rule); display: flex; gap: 8px; }
-    .plan ul li::before { content: "→"; color: var(--brass-2); }
+    .plan ul li::before { content: "\2192"; color: var(--brass-2); }
 
     /* detailed pricing table */
     .price-table-wrap { margin-top: 32px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
@@ -676,10 +676,10 @@
   <section class="hero">
     <div class="container hero-grid">
       <div>
-        <span class="eyebrow">Veklom Sovereign AI Hub / UACP demo</span>
-        <h1><span class="grad">Turn AI intent into governed infrastructure.</span><br /><span class="soft">Then run it, prove it, and deploy it.</span></h1>
+        <span class="eyebrow">Veklom Sovereign AI Gateway / UACP demo</span>
+        <h1><span class="grad">Open the black box of AI work.</span><br /><span class="soft">Route it, govern it, prove it.</span></h1>
         <p class="lead">
-          Veklom is the tenant-scoped workspace for private AI teams: Playground, Models, Tools, Pipelines, Governance, Deployments, Monitoring, Billing, Evidence, and Vault.
+          Veklom gives private AI teams one gateway for models, tools, pipelines, deployments, usage controls, reserve billing, monitoring, evidence, and UACP-governed execution.
         </p>
         <div class="actions">
           <a class="cta-primary" href="#theater">Open UACP demo</a>
@@ -688,10 +688,11 @@
         </div>
         <div class="hub-flow" aria-label="Veklom product flow">
           <span class="hub-step">Playground</span>
-          <span class="hub-step">Demo</span>
+          <span class="hub-step">UACP</span>
           <span class="hub-step">Models</span>
           <span class="hub-step">Tools</span>
           <span class="hub-step">Pipelines</span>
+          <span class="hub-step">Routing</span>
           <span class="hub-step">Governance</span>
           <span class="hub-step">Deployments</span>
           <span class="hub-step">Monitoring</span>
@@ -701,12 +702,12 @@
         <div class="proof-kicker">UACP preview</div>
         <h2>Raw intent does not touch production first.</h2>
         <p class="lead" style="font-size:15px;">
-          The public demo focuses the UACP interface into one controlled black-box theater. Side feeds stay hidden; the central execution surface stays fully functional.
+          The public demo focuses the UACP interface into one controlled black-box theater: a request enters, governance fires, and proof appears before production is touched.
         </p>
         <div class="proof-lines">
-          <div class="proof-line"><span class="proof-index">01</span><span>Intent captured from Playground or operator input</span><span class="proof-state">scoped</span></div>
-          <div class="proof-line"><span class="proof-index">02</span><span>Policy, model, tools, reserve, and evidence gates resolved</span><span class="proof-state">governed</span></div>
-          <div class="proof-line"><span class="proof-index">03</span><span>Pipeline, endpoint, monitoring, and audit path prepared</span><span class="proof-state">deployable</span></div>
+          <div class="proof-line"><span class="proof-index">01</span><span>Intent captured and compiled before execution</span><span class="proof-state">scoped</span></div>
+          <div class="proof-line"><span class="proof-index">02</span><span>RBAC, policy, route, reserve, and evidence gates resolved</span><span class="proof-state">governed</span></div>
+          <div class="proof-line"><span class="proof-index">03</span><span>Endpoint, monitoring, audit, and replay path prepared</span><span class="proof-state">provable</span></div>
         </div>
         <div class="actions" style="margin-top:22px;">
           <a class="cta-primary" href="#theater">Run the demo</a>
@@ -716,7 +717,7 @@
       <div class="trust-row" role="status" aria-live="polite">
         <span class="live-tag" id="heroLive">Live backend connected</span>
         <span class="sep"></span>
-        <span>SOC2-ready · HIPAA-aware · EU-sovereign</span>
+        <span>SOC2-ready &middot; HIPAA-aware &middot; EU-sovereign</span>
         <span class="sep"></span>
         <span>Zero key exposure in this demo</span>
       </div>
@@ -742,39 +743,39 @@
   <!-- ============ WHY / PILLARS ============ -->
   <section class="section" id="why">
     <div class="container">
-      <span class="section-eyebrow">The hub for governed private AI</span>
-      <h2 class="section-title">Playground, models, tools, pipelines, deployments, monitoring.</h2>
-      <p class="section-copy">Veklom gives teams one tenant-scoped workspace to test intent, compile governed plans, route models, attach tools, deploy endpoints, monitor runtime health, and preserve evidence.</p>
+      <span class="section-eyebrow">Sovereign AI Gateway + UACP</span>
+      <h2 class="section-title">Gateway speed. Institutional control.</h2>
+      <p class="section-copy">Veklom sits in the same production category as an AI gateway: one interface for models, routing, limits, deployments, observability, and spend. The edge is UACP: intent becomes governed plans, evidence, approvals, and replayable institutional memory.</p>
       <div class="pillars">
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg></div>
-          <h3>Sovereign execution</h3>
-          <p>Run on your keys, your perimeter, your region. Local-first via Ollama; fallback only when you explicitly allow it.</p>
+          <h3>Multi-route model gateway</h3>
+          <p>Run local Ollama/Hetzner first, or route to OpenAI-compatible, Gemini, Groq, and Bedrock providers when workspace policy permits it.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2.2"/></svg></div>
           <h3>Policy before provider</h3>
-          <p>Per-tenant routing, budgets, redaction, and kill-switches evaluated <em>before</em> any model is called — on prompts and on edge signals.</p>
+          <p>RBAC, tenant scope, budgets, redaction, and kill-switches are evaluated before provider execution, not after spend or data exposure.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg></div>
           <h3>Audit that holds up</h3>
-          <p>Every request emits a signed artifact: inputs, decisions, provider, tokens, cost. Procurement-ready, legally defensible.</p>
+          <p>Every governed request writes traceable evidence: input hash, output hash, provider, route, tokens, reserve debit, and audit chain.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <h3>Self-healing</h3>
-          <p>Circuit breakers, health probes, and automatic failover between local and hosted providers. No manual reruns.</p>
+          <h3>Fallback and circuit control</h3>
+          <p>Circuit breakers, health probes, latency budget handling, and approved fallback keep buyer paths alive without silently ignoring policy.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9 5 9-5M3 7v10l9 5 9-5V7"/></svg></div>
           <h3>Tools as governed modules</h3>
-          <p>Tools are governed modules inside the hub: source-verified actions, connectors, and services wrapped by policy and audit.</p>
+          <p>Tools are not random add-ons. They are source-verified actions, connectors, and services wrapped by scopes, policy, billing, and audit.</p>
         </div>
         <div class="pill">
           <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg></div>
-          <h3>Cost-intelligent</h3>
-          <p>Token budgets, per-tenant spend caps, and real-time meters that hard-stop at your limit — not after the bill lands.</p>
+          <h3>Cost-intelligent runtime</h3>
+          <p>Reserve debits, token budgets, per-tenant spend caps, exact hot-cache for safe repeat requests, and meters that stop at the policy line.</p>
         </div>
       </div>
     </div>
@@ -815,23 +816,23 @@
           <div class="muted-small">No production routing</div>
           <ul>
             <li>15 governed Playground runs</li>
-            <li>3 compare runs · 20 policy tests</li>
+            <li>3 compare runs &middot; 20 policy tests</li>
             <li>2 watermarked exports</li>
             <li>BYOK provider testing</li>
             <li>Tools browsing</li>
           </ul>
         </article>
         <article class="plan highlight">
-          <span class="tier">Founding · most chosen</span><h4>Founding Activation</h4>
+          <span class="tier">Founding &middot; most chosen</span><h4>Founding Activation</h4>
           <div class="value">$395 <span class="muted-small">one-time</span></div>
           <div class="muted-small">+ $150 minimum Operating Reserve</div>
           <ul>
-            <li>Playground run — $0.25</li>
-            <li>Compare run — $0.75</li>
-            <li>UACP compile — $1.50</li>
-            <li>Pipeline test — $0.25 · endpoint test — $0.50</li>
-            <li>BYOK Governance Calls — $6 / 1,000</li>
-            <li>Managed Governance Calls — $12 / 1,000</li>
+            <li>Playground run - $0.25</li>
+            <li>Compare run - $0.75</li>
+            <li>UACP compile - $1.50</li>
+            <li>Pipeline test - $0.25 &middot; endpoint test - $0.50</li>
+            <li>BYOK Governance Calls - $6 / 1,000</li>
+            <li>Managed Governance Calls - $12 / 1,000</li>
           </ul>
         </article>
         <article class="plan">
@@ -839,21 +840,21 @@
           <div class="value">$795 <span class="muted-small">one-time</span></div>
           <div class="muted-small">+ $300 minimum Operating Reserve</div>
           <ul>
-            <li>Playground run — $0.40</li>
-            <li>Compare run — $1.20</li>
-            <li>UACP compile — $2.00</li>
-            <li>Pipeline test — $0.40 · endpoint test — $0.80</li>
-            <li>BYOK Governance Calls — $8 / 1,000</li>
-            <li>Managed Governance Calls — $16 / 1,000</li>
+            <li>Playground run - $0.40</li>
+            <li>Compare run - $1.20</li>
+            <li>UACP compile - $2.00</li>
+            <li>Pipeline test - $0.40 &middot; endpoint test - $0.80</li>
+            <li>BYOK Governance Calls - $8 / 1,000</li>
+            <li>Managed Governance Calls - $16 / 1,000</li>
           </ul>
         </article>
         <article class="plan">
           <span class="tier">Regulated / Enterprise</span><h4>Regulated</h4>
           <div class="value">From $2,500 <span class="muted-small">activation</span></div>
-          <div class="muted-small">+ $2,500 minimum reserve · private terms</div>
+          <div class="muted-small">+ $2,500 minimum reserve &middot; private terms</div>
           <ul>
-            <li>BYOK Governance Calls — $10 / 1,000</li>
-            <li>Managed Governance Calls — $20 / 1,000</li>
+            <li>BYOK Governance Calls - $10 / 1,000</li>
+            <li>Managed Governance Calls - $20 / 1,000</li>
             <li>Private deployment</li>
             <li>Procurement & security review</li>
           </ul>
@@ -863,7 +864,7 @@
       <div class="price-table-wrap" aria-label="Detailed pricing ladder">
         <div class="price-table-head">
           <h4>Full pricing ladder</h4>
-          <span class="eyebrow">Per event · versioned · v1_public</span>
+          <span class="eyebrow">Per event &middot; versioned &middot; v1_public</span>
         </div>
         <table class="price-table">
           <thead>
@@ -954,7 +955,7 @@
       <div class="access-wrap" aria-label="Playground versus activated workspace">
         <div class="access-head">
           <h4>Playground vs Activated Workspace</h4>
-          <span class="eyebrow">Access model · evidence is paywalled</span>
+          <span class="eyebrow">Access model &middot; evidence is paywalled</span>
         </div>
         <table class="access-table">
           <thead>
@@ -1009,7 +1010,7 @@
       <div class="cta-band">
         <div>
           <h3>You just watched it work. Now run it on your data.</h3>
-          <p>Free Evaluation — 15 governed runs, no card, no key exposure. Keep every audit artifact you generate.</p>
+          <p>Free Evaluation - 15 governed runs, no card, no key exposure. Keep every audit artifact you generate.</p>
         </div>
         <div style="display:flex; gap:12px;">
           <a class="cta-primary" href="/signup/">Start Free Evaluation</a>
@@ -1029,11 +1030,10 @@
       <a href="/legal/privacy">Privacy</a>
       <a href="/login/">Sign In</a>
     </div>
-    <div>© Veklom · Sovereign Control Node</div>
+    <div>&copy; Veklom &middot; Sovereign Control Node</div>
   </div>
 </footer>
 
 <script src="/app/auth.js"></script>
 </body>
 </html>
-

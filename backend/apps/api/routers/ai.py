@@ -40,6 +40,7 @@ get_model_setting = get_model_setting_fast
 RESERVE_UNITS_PER_USD = Decimal("1000")
 FREE_EVALUATION_GOVERNED_RUNS = 15
 FREE_EVALUATION_COMPARE_RUNS = 3
+AI_EXACT_CACHE_TTL_SECONDS = 300
 
 BillingEventType = Literal[
     "governed_run",
@@ -221,6 +222,8 @@ class AICompleteResponse(BaseModel):
     billing_event_type: str
     pricing_tier: str
     free_evaluation_remaining: int | None = None
+    cache_status: Literal["hit", "miss", "bypass", "unavailable"] = "bypass"
+    cache_ttl_seconds: int | None = None
     timestamp: str
 
 
@@ -462,6 +465,69 @@ def _openai_compatible_provider_config(provider: str) -> tuple[str, str, str]:
     if provider == "gemini":
         return settings.gemini_api_key, settings.gemini_base_url.rstrip("/"), "Gemini"
     raise ValueError(f"Unsupported OpenAI-compatible provider: {provider}")
+
+
+def _raw_cache_inspection_text(payload: AICompleteRequest) -> str:
+    parts = [payload.system_prompt or "", payload.prompt]
+    parts.extend(msg.content for msg in _conversation_messages(payload))
+    return "\n".join(part for part in parts if part).strip()
+
+
+def _exact_cache_allowed(payload: AICompleteRequest) -> bool:
+    if payload.stream:
+        return False
+    if payload.session_tag in {"PHI", "PII", "HIPAA", "PCI"}:
+        return False
+    if _effective_on_prem_lock(payload):
+        return False
+    return not bool(detect_pii(_raw_cache_inspection_text(payload)))
+
+
+def _exact_cache_key(workspace_id: str, model_row, payload: AICompleteRequest, request_input_text: str) -> str:
+    updated_at = getattr(model_row, "updated_at", None)
+    fingerprint = {
+        "v": 1,
+        "workspace_id": workspace_id,
+        "model_slug": getattr(model_row, "model_slug", payload.model),
+        "provider": getattr(model_row, "provider", None),
+        "runtime_model": getattr(model_row, "bedrock_model_id", None),
+        "updated_at": updated_at.isoformat() if updated_at else None,
+        "request_hash": _sha256(request_input_text),
+        "max_tokens": payload.max_tokens,
+        "temperature": payload.temperature,
+        "top_p": payload.top_p,
+        "top_k": payload.top_k,
+        "frequency_penalty": payload.frequency_penalty,
+        "presence_penalty": payload.presence_penalty,
+        "response_format": payload.response_format,
+        "seed": payload.seed,
+        "billing_event_type": payload.billing_event_type,
+    }
+    digest = _sha256(json.dumps(fingerprint, sort_keys=True, ensure_ascii=False))
+    return f"ai:complete:exact:{digest}"
+
+
+def _get_exact_cache(cache_key: str) -> tuple[dict | None, Literal["hit", "miss", "unavailable"]]:
+    try:
+        from core.redis_pool import get_redis
+
+        cached = get_redis().get(cache_key)
+        if not cached:
+            return None, "miss"
+        if isinstance(cached, bytes):
+            cached = cached.decode("utf-8")
+        return json.loads(cached), "hit"
+    except Exception:
+        return None, "unavailable"
+
+
+def _set_exact_cache(cache_key: str, value: dict) -> None:
+    try:
+        from core.redis_pool import get_redis
+
+        get_redis().setex(cache_key, AI_EXACT_CACHE_TTL_SECONDS, json.dumps(value, sort_keys=True))
+    except Exception:
+        pass
 
 
 @lru_cache(maxsize=16)
@@ -712,10 +778,39 @@ async def complete(
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient operating reserve")
 
     request_id = getattr(request.state, "request_id", None) or f"ai-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+    request_input_text = _request_input_text(payload)
 
     started_at = datetime.utcnow()
+    cache_status: Literal["hit", "miss", "bypass", "unavailable"] = "bypass"
     try:
-        llm_result, provider, runtime_routing_reason = _call_runtime_model(model_row, payload)
+        cache_key = (
+            _exact_cache_key(current_user.workspace_id, model_row, payload, request_input_text)
+            if _exact_cache_allowed(payload)
+            else None
+        )
+        cached_payload: dict | None = None
+        if cache_key:
+            cached_payload, read_status = _get_exact_cache(cache_key)
+            cache_status = read_status
+
+        if cached_payload:
+            llm_result = dict(cached_payload.get("llm_result") or {})
+            provider = str(cached_payload.get("provider") or model_row.provider)
+            runtime_routing_reason = str(cached_payload.get("routing_reason") or "exact_cache")
+        else:
+            llm_result, provider, runtime_routing_reason = _call_runtime_model(model_row, payload)
+            if cache_key:
+                if cache_status != "unavailable":
+                    cache_status = "miss"
+                _set_exact_cache(
+                    cache_key,
+                    {
+                        "llm_result": llm_result,
+                        "provider": provider,
+                        "routing_reason": runtime_routing_reason,
+                        "stored_at": datetime.utcnow().isoformat(),
+                    },
+                )
     except HTTPException:
         db.rollback()
         raise
@@ -726,8 +821,7 @@ async def complete(
         executed_model = str(llm_result.get("model") or model_row.bedrock_model_id or payload.model)
         requested_provider = str(model_row.provider or "").lower()
         fallback_triggered = provider != requested_provider
-        routing_reason = runtime_routing_reason if fallback_triggered else "primary_runtime"
-        request_input_text = _request_input_text(payload)
+        routing_reason = "exact_cache" if cached_payload else (runtime_routing_reason if fallback_triggered else "primary_runtime")
         input_preview, input_pii = _safe_preview(payload.prompt, payload)
         output_preview, output_pii = _safe_preview(response_text, payload)
         pii_types = sorted({item["type"] for item in input_pii + output_pii if item.get("type")})
@@ -777,6 +871,8 @@ async def complete(
                     "cost_usd": str(cost_usd),
                     "free_evaluation_remaining": free_evaluation_remaining,
                     "governance_controls": governance_controls,
+                    "cache_status": cache_status,
+                    "cache_ttl_seconds": AI_EXACT_CACHE_TTL_SECONDS if cache_status in {"hit", "miss"} else None,
                 },
                 sort_keys=True,
             ),
@@ -858,6 +954,7 @@ async def complete(
                 "pricing_tier": pricing_tier,
                 "reserve_units_debited": reserve_units_debited,
                 "governance_controls": governance_controls,
+                "cache_status": cache_status,
             },
             response_json={
                 "response_text": _safe_log_text(response_text, payload),
@@ -882,6 +979,8 @@ async def complete(
                 "governance_controls": governance_controls,
                 "pii_detected": pii_detected,
                 "pii_types": pii_types,
+                "cache_status": cache_status,
+                "cache_ttl_seconds": AI_EXACT_CACHE_TTL_SECONDS if cache_status in {"hit", "miss"} else None,
             },
             tokens_in=prompt_tokens,
             tokens_out=output_tokens,
@@ -936,5 +1035,7 @@ async def complete(
         billing_event_type=billing_event_type,
         pricing_tier=pricing_tier,
         free_evaluation_remaining=free_evaluation_remaining,
+        cache_status=cache_status,
+        cache_ttl_seconds=AI_EXACT_CACHE_TTL_SECONDS if cache_status in {"hit", "miss"} else None,
         timestamp=started_at.isoformat(),
     )

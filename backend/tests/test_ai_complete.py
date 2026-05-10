@@ -169,6 +169,83 @@ def test_complete_deducts_wallet_and_logs_call(monkeypatch):
     assert any(obj.__class__.__name__ == "AIAuditLog" for obj in fake_db.added)
 
 
+def test_complete_uses_exact_cache_for_safe_repeat_request(monkeypatch):
+    wallet = SimpleNamespace(
+        id="wallet-1",
+        workspace_id="workspace-1",
+        balance=1000,
+        monthly_credits_used=0,
+        total_credits_used=0,
+        updated_at=None,
+    )
+    subscription = SimpleNamespace(plan=SimpleNamespace(value="starter"))
+    fake_db = _FakeDB(wallet=wallet, subscription=subscription)
+    runtime = _RuntimeCall(output_text="should not run")
+    cached = {
+        "llm_result": {
+            "response": "cached governed answer",
+            "model": "qwen2.5:1.5b",
+            "prompt_tokens": 5,
+            "completion_tokens": 7,
+            "total_tokens": 12,
+        },
+        "provider": "ollama",
+        "routing_reason": "primary_runtime",
+    }
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
+    monkeypatch.setattr("apps.api.routers.ai._get_exact_cache", lambda key: (cached, "hit"))
+    monkeypatch.setattr("apps.api.routers.ai._set_exact_cache", lambda key, value: (_ for _ in ()).throw(AssertionError("cache should not be rewritten on hit")))
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-cache-hit"))
+    payload = AICompleteRequest(model="ollama-default", prompt="Summarize approved public release notes", max_tokens=128)
+
+    result = asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert runtime.called is False
+    assert result.response_text == "cached governed answer"
+    assert result.cache_status == "hit"
+    assert result.cache_ttl_seconds == 300
+    assert result.routing_reason == "exact_cache"
+    assert result.reserve_debited == 250
+    assert wallet.balance == 750
+
+
+def test_complete_bypasses_exact_cache_for_protected_sessions(monkeypatch):
+    wallet = SimpleNamespace(
+        id="wallet-1",
+        workspace_id="workspace-1",
+        balance=1000,
+        monthly_credits_used=0,
+        total_credits_used=0,
+        updated_at=None,
+    )
+    subscription = SimpleNamespace(plan=SimpleNamespace(value="starter"))
+    fake_db = _FakeDB(wallet=wallet, subscription=subscription)
+    runtime = _RuntimeCall(output_text="protected response", output_tokens=12)
+    monkeypatch.setattr("apps.api.routers.ai.get_model_setting", lambda db, workspace_id, model: _model_row())
+    monkeypatch.setattr("apps.api.routers.ai._call_runtime_model", runtime)
+    monkeypatch.setattr("apps.api.routers.ai._get_exact_cache", lambda key: (_ for _ in ()).throw(AssertionError("protected sessions must bypass cache")))
+
+    current_user = SimpleNamespace(id="user-1", workspace_id="workspace-1")
+    request = SimpleNamespace(state=SimpleNamespace(request_id="req-cache-bypass"))
+    payload = AICompleteRequest(
+        model="ollama-default",
+        prompt="Summarize this protected policy note",
+        max_tokens=128,
+        session_tag="HIPAA",
+    )
+
+    result = asyncio.run(complete(payload=payload, request=request, current_user=current_user, db=fake_db))
+
+    assert runtime.called is True
+    assert result.response_text == "protected response"
+    assert result.cache_status == "bypass"
+    assert result.cache_ttl_seconds is None
+    assert result.reserve_debited == 250
+
+
 def test_call_runtime_model_executes_openai_through_governed_provider(monkeypatch):
     _FakeOpenAIClient.posted = None
     monkeypatch.setattr("apps.api.routers.ai.httpx.Client", _FakeOpenAIClient)

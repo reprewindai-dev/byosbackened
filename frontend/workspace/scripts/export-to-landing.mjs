@@ -15,7 +15,6 @@ const assetVersion = process.env.WORKSPACE_ASSET_VERSION || "workspace";
 const routeShells = [
   "control-center",
   "dashboard",
-  "uacp",
   "playground",
   "marketplace",
   "models",

@@ -2,24 +2,201 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>Veklom · Sovereign Control Plane</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <script src="/workspace-config.js"></script>
-    <script type="module" crossorigin src="/workspace-assets/index-D0QMcn1C.js?v=workspace"></script>
-    <link rel="modulepreload" crossorigin href="/workspace-assets/rolldown-runtime-D3WCi_bD.js?v=workspace">
-    <link rel="modulepreload" crossorigin href="/workspace-assets/query-py7MAgma.js?v=workspace">
-    <link rel="modulepreload" crossorigin href="/workspace-assets/react-DUpM2YDl.js?v=workspace">
-    <link rel="stylesheet" crossorigin href="/workspace-assets/index-BJ0mVb-B.css?v=workspace">
+    <title>Veklom UACP Black Box Demo</title>
+    <script>
+      (() => {
+        const apiOrigin = "https://uacpgemini.onrender.com";
+        const nativeFetch = window.fetch.bind(window);
+        const NativeWebSocket = window.WebSocket;
+
+        window.fetch = (input, init) => {
+          if (typeof input === "string" && input.startsWith("/api/")) {
+            return nativeFetch(`${apiOrigin}${input}`, { ...init, credentials: "omit" });
+          }
+
+          if (input instanceof Request && new URL(input.url).origin === window.location.origin && new URL(input.url).pathname.startsWith("/api/")) {
+            const next = new Request(`${apiOrigin}${new URL(input.url).pathname}${new URL(input.url).search}`, input);
+            return nativeFetch(next, { ...init, credentials: "omit" });
+          }
+
+          return nativeFetch(input, init);
+        };
+
+        window.WebSocket = class VeklomUacpWebSocket extends NativeWebSocket {
+          constructor(url, protocols) {
+            const parsed = new URL(String(url), window.location.href);
+            const target =
+              parsed.origin === window.location.origin
+                ? "wss://uacpgemini.onrender.com/?public_demo=1"
+                : String(url);
+            super(target, protocols);
+          }
+        };
+
+        const formatPercent = (value) =>
+          typeof value === "number" ? `${Math.round(value * 100)}%` : "unavailable";
+        const formatIndex = (value) =>
+          typeof value === "number" ? value.toFixed(4) : "unavailable";
+
+        const mountPrimeVisualizer = () => {
+          const panel = document.createElement("aside");
+          panel.className = "uacp-live-prime";
+          panel.innerHTML = `
+            <div class="uacp-live-prime__label">Live Prime State</div>
+            <div class="uacp-live-prime__row"><span>Stage</span><strong data-uacp-stage>connecting</strong></div>
+            <div class="uacp-live-prime__row"><span>Readiness</span><strong data-uacp-readiness>unavailable</strong></div>
+            <div class="uacp-live-prime__row"><span>Pressure</span><strong data-uacp-pressure>unavailable</strong></div>
+            <div class="uacp-live-prime__row"><span>Certainty</span><strong data-uacp-certainty>unavailable</strong></div>
+            <div class="uacp-live-prime__bar"><i data-uacp-bar></i></div>
+          `;
+          document.body.appendChild(panel);
+
+          const update = async () => {
+            try {
+              const response = await window.fetch("/api/observability/signals", { cache: "no-store" });
+              if (!response.ok) throw new Error(`signals ${response.status}`);
+              const signals = await response.json();
+              panel.dataset.state = signals.observability_stage || "unavailable";
+              panel.querySelector("[data-uacp-stage]").textContent = signals.observability_stage || "unavailable";
+              panel.querySelector("[data-uacp-readiness]").textContent = formatPercent(signals.prime_readiness);
+              panel.querySelector("[data-uacp-pressure]").textContent = formatPercent(signals.uacp_pressure);
+              panel.querySelector("[data-uacp-certainty]").textContent = formatIndex(signals.certainty_index);
+              panel.querySelector("[data-uacp-bar]").style.width = formatPercent(signals.certainty_index);
+            } catch {
+              panel.dataset.state = "unavailable";
+              panel.querySelector("[data-uacp-stage]").textContent = "unavailable";
+            }
+          };
+
+          update();
+          window.setInterval(update, 5000);
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", mountPrimeVisualizer, { once: true });
+        } else {
+          mountPrimeVisualizer();
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/uacp/assets/index-DykH_g3h.js"></script>
+    <link rel="stylesheet" crossorigin href="/uacp/assets/index-VsQ-ZBb9.css" />
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        background: #050505;
+      }
+
+      body.uacp-public-demo {
+        overflow: hidden;
+      }
+
+      body.uacp-public-demo #root > div {
+        background:
+          radial-gradient(circle at 50% 14%, rgba(96, 165, 250, 0.16), transparent 34rem),
+          #050505 !important;
+      }
+
+      body.uacp-public-demo #root > div > main {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        background: #050505 !important;
+      }
+
+      body.uacp-public-demo #root > div > main > section:first-child,
+      body.uacp-public-demo #root > div > main > section:last-child {
+        display: none !important;
+      }
+
+      body.uacp-public-demo #root > div > main > section:nth-child(2) {
+        grid-column: 1 / -1 !important;
+        width: 100vw !important;
+        max-width: none !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+      }
+
+      body.uacp-public-demo textarea {
+        min-height: 260px;
+      }
+
+      .uacp-live-prime {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 80;
+        width: min(280px, calc(100vw - 36px));
+        border: 1px solid rgba(96, 165, 250, 0.28);
+        background: rgba(5, 5, 5, 0.84);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(18px);
+        padding: 16px;
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .uacp-live-prime__label {
+        color: rgba(147, 197, 253, 0.88);
+        font-size: 9px;
+        margin-bottom: 12px;
+      }
+
+      .uacp-live-prime__row {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 8px 0;
+        font-size: 9px;
+      }
+
+      .uacp-live-prime__row strong {
+        color: #f8fafc;
+        font-weight: 700;
+        text-align: right;
+      }
+
+      .uacp-live-prime[data-state="primed"] .uacp-live-prime__row strong,
+      .uacp-live-prime[data-state="verified"] .uacp-live-prime__row strong {
+        color: #93c5fd;
+      }
+
+      .uacp-live-prime__bar {
+        height: 2px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.08);
+        margin-top: 8px;
+      }
+
+      .uacp-live-prime__bar i {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #60a5fa;
+        box-shadow: 0 0 18px rgba(96, 165, 250, 0.9);
+        transition: width 480ms ease;
+      }
+
+      @media (max-width: 720px) {
+        .uacp-live-prime {
+          right: 12px;
+          bottom: 12px;
+          padding: 12px;
+        }
+      }
+    </style>
   </head>
-  <body class="bg-ink text-bone antialiased">
+  <body class="uacp-public-demo">
     <div id="root"></div>
   </body>
 </html>

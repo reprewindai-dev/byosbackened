@@ -3,7 +3,7 @@
 This directory is the production static web surface for:
 
 - `veklom.com` (buyer-facing Veklom Sovereign AI Hub + GPC demo)
-- `veklom.dev` (developer/BYOS backend proof site + legacy hookup demo)
+- `veklom.dev` (legacy live backend demo at `/` + developer/BYOS backend proof at `/platform/`)
 
 ## Messaging authority lock
 
@@ -14,9 +14,10 @@ This directory is the production static web surface for:
 
 ## Included routes
 
-- `/` host-aware marketing page:
-  - `veklom.com` frames the Sovereign AI Hub and defaults the live theater to GPC.
-  - `veklom.dev` frames the Developer Platform and defaults the live theater to BYOS legacy infrastructure.
+- `/` legacy live backend demo:
+  - `veklom.dev` opens directly on the BYOS/legacy live backend execution theater.
+- `/platform/` developer/BYOS proof page:
+  - technical integration, runtime, contract, route, license, isolation, evidence, and replay positioning.
 - `/signup/` self-serve workspace creation
 - `/login/` authentication
 - `/dashboard/` API key + subscription management

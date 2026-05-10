@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Veklom Developer Platform</title>
+  <meta name="description" content="Integrate, self-host, and verify governed AI execution with the BYOS backend." />
+  <link rel="canonical" href="https://veklom.dev/platform/" />
+  <meta property="og:title" content="Veklom Developer Platform" />
+  <meta property="og:description" content="Technical proof for BYOS backend health, tenant isolation, policy routing, license flow, evidence, and replay." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://veklom.dev/platform/" />
+  <meta property="og:image" content="https://veklom.dev/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Veklom Developer Platform — BYOS backend proof and runtime verification" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://veklom.dev/og-image.png" />
+  <meta name="theme-color" content="#0c1114" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="preconnect" href="https://api.veklom.com" />
+  <link rel="preconnect" href="https://license.veklom.com" />
+  <style>
+    :root {
+      --bg: #080b0c;
+      --panel: #0d1315;
+      --panel-2: #10191c;
+      --text: #edf2ea;
+      --muted: #87928f;
+      --line: rgba(214, 232, 222, 0.14);
+      --line-strong: rgba(214, 232, 222, 0.26);
+      --green: #88f0ba;
+      --amber: #e2b56d;
+      --cyan: #8fd8ff;
+      --red: #f27a70;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: "Aptos", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(143, 216, 255, 0.13), transparent 32rem),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,0.028) 1px, transparent 1px),
+        var(--bg);
+      background-size: auto, 72px 72px, 72px 72px, auto;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .shell {
+      width: min(1480px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(8, 11, 12, 0.82);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 74px;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      font-family: var(--mono);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid rgba(143, 216, 255, 0.35);
+      background: linear-gradient(145deg, rgba(143,216,255,0.18), rgba(136,240,186,0.08));
+      color: var(--cyan);
+      font-family: var(--mono);
+    }
+
+    .links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      color: #a5afac;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .link-strong {
+      color: var(--text);
+      border: 1px solid var(--line-strong);
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .hero {
+      min-height: calc(100svh - 74px);
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+    }
+
+    .hero-copy {
+      padding: 72px 54px 56px;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 42px;
+    }
+
+    .eyebrow,
+    .label {
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.19em;
+      color: var(--cyan);
+      font-size: 11px;
+    }
+
+    h1 {
+      margin: 20px 0 20px;
+      max-width: 760px;
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(58px, 7.5vw, 128px);
+      line-height: 0.88;
+      letter-spacing: -0.075em;
+    }
+
+    .lead {
+      max-width: 650px;
+      margin: 0;
+      color: #b9c4c0;
+      font-size: clamp(17px, 1.7vw, 22px);
+      line-height: 1.5;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .btn {
+      border: 1px solid var(--line-strong);
+      padding: 14px 18px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      border-color: rgba(143,216,255,0.75);
+      background: rgba(143,216,255,0.07);
+    }
+
+    .btn.primary {
+      background: var(--text);
+      color: #080b0c;
+      border-color: var(--text);
+    }
+
+    .hero-foot {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+    }
+
+    .hero-foot div {
+      padding: 18px 16px 0 0;
+      min-height: 84px;
+    }
+
+    .hero-foot strong {
+      display: block;
+      font-family: var(--mono);
+      color: var(--green);
+      font-size: 18px;
+      margin-bottom: 7px;
+    }
+
+    .hero-foot span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .console {
+      position: relative;
+      overflow: hidden;
+      padding: 24px;
+      display: grid;
+      align-content: stretch;
+      background:
+        linear-gradient(135deg, rgba(143,216,255,0.08), transparent 34%),
+        linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+    }
+
+    .console-frame {
+      min-height: 100%;
+      border: 1px solid var(--line-strong);
+      background: rgba(3, 6, 7, 0.78);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .console-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--green);
+    }
+
+    .status-dot::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(136,240,186,0.65);
+    }
+
+    .terminal {
+      padding: 30px;
+      font-family: var(--mono);
+      font-size: clamp(12px, 1.2vw, 15px);
+      line-height: 1.9;
+      color: #c6d1cd;
+    }
+
+    .terminal .cmd { color: var(--cyan); }
+    .terminal .ok { color: var(--green); }
+    .terminal .warn { color: var(--amber); }
+    .terminal .muted { color: var(--muted); }
+
+    .proof-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+    }
+
+    .proof {
+      min-height: 132px;
+      padding: 18px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .proof:nth-child(2n) { border-right: 0; }
+
+    .proof .value {
+      display: block;
+      margin-top: 14px;
+      font-family: var(--mono);
+      color: var(--text);
+      font-size: 24px;
+      word-break: break-word;
+    }
+
+    .section {
+      border-top: 1px solid var(--line);
+      padding: 76px 0;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: 64px;
+    }
+
+    h2 {
+      margin: 14px 0 0;
+      font-family: var(--serif);
+      font-size: clamp(38px, 5vw, 76px);
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+      font-weight: 500;
+    }
+
+    .section p {
+      color: #aab5b1;
+      line-height: 1.65;
+      font-size: 17px;
+    }
+
+    .matrix {
+      border: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      background: rgba(255,255,255,0.018);
+    }
+
+    .matrix-row {
+      min-height: 150px;
+      padding: 24px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .matrix-row:nth-child(2n) { border-right: 0; }
+    .matrix-row:nth-last-child(-n + 2) { border-bottom: 0; }
+
+    .matrix-row h3 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      color: var(--text);
+    }
+
+    .matrix-row p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .routes {
+      display: grid;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .route {
+      display: grid;
+      grid-template-columns: 160px 1fr auto;
+      gap: 18px;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+      color: #c8d3cf;
+    }
+
+    .route span:first-child { color: var(--cyan); }
+    .route span:last-child { color: var(--green); }
+
+    .final {
+      min-height: 380px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border-top: 1px solid var(--line);
+      background: radial-gradient(circle at center, rgba(136,240,186,0.08), transparent 38rem);
+    }
+
+    .final h2 {
+      max-width: 920px;
+      margin-inline: auto;
+    }
+
+    .final .cta-row {
+      justify-content: center;
+    }
+
+    @media (max-width: 980px) {
+      .shell { width: min(100% - 28px, 1480px); }
+      .links a:not(.link-strong) { display: none; }
+      .hero { grid-template-columns: 1fr; }
+      .hero-copy { border-right: 0; padding: 52px 24px; }
+      .section-grid { grid-template-columns: 1fr; gap: 28px; }
+      .matrix { grid-template-columns: 1fr; }
+      .matrix-row,
+      .matrix-row:nth-child(2n) { border-right: 0; }
+      .matrix-row:nth-last-child(-n + 2) { border-bottom: 1px solid var(--line); }
+      .hero-foot { grid-template-columns: 1fr; }
+      .route { grid-template-columns: 1fr; gap: 5px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="shell nav" aria-label="Primary navigation">
+      <a class="brand" href="/" aria-label="Veklom Developer Platform">
+        <span class="mark">VK</span>
+        <span>Veklom.dev / backend proof</span>
+      </a>
+      <div class="links">
+        <a href="#runtime">Runtime</a>
+        <a href="#contract">Contract</a>
+        <a href="#routes">Routes</a>
+        <a class="link-strong" href="https://veklom.com/">Buyer site</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="shell hero">
+      <div class="hero-copy">
+        <div>
+          <div class="eyebrow">Developer Platform / BYOS Backend</div>
+          <h1>Verify governed AI before you install it.</h1>
+          <p class="lead">Veklom.dev is the technical proof site: backend health, license flow, tenant isolation, policy routing, fallback posture, evidence, archive, and replay.</p>
+          <div class="cta-row">
+            <a class="btn primary" href="/demo/">Run live backend demo</a>
+            <a class="btn" href="https://api.veklom.com/status">Open status JSON</a>
+            <a class="btn" href="https://veklom.com/gpc/">View GPC on .com</a>
+          </div>
+        </div>
+        <div class="hero-foot" aria-label="Platform proof points">
+          <div>
+            <strong>BYOS</strong>
+            <span>Private deployment path, license verification, and self-hosted runtime posture.</span>
+          </div>
+          <div>
+            <strong>UACP</strong>
+            <span>Policy, route, reserve, audit, evidence, and replay boundaries.</span>
+          </div>
+          <div>
+            <strong>Live</strong>
+            <span>This page reads public health endpoints instead of decorative claims.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="console" id="runtime">
+        <div class="console-frame">
+          <div class="console-head">
+            <span>runtime inspection</span>
+            <span class="status-dot" id="overallStatus">checking</span>
+          </div>
+          <div class="terminal" aria-live="polite">
+            <div><span class="cmd">$ curl https://api.veklom.com/status</span></div>
+            <div>db: <span id="dbStatus" class="muted">checking</span></div>
+            <div>redis: <span id="redisStatus" class="muted">checking</span></div>
+            <div>llm: <span id="llmStatus" class="muted">checking</span></div>
+            <div>model: <span id="modelStatus" class="muted">pending</span></div>
+            <div>fallback: <span id="fallbackStatus" class="muted">pending</span></div>
+            <br />
+            <div><span class="cmd">$ curl https://license.veklom.com/health</span></div>
+            <div>license: <span id="licenseStatus" class="muted">checking</span></div>
+          </div>
+          <div class="proof-grid">
+            <div class="proof">
+              <div class="label">API</div>
+              <span class="value" id="apiProof">pending</span>
+            </div>
+            <div class="proof">
+              <div class="label">License</div>
+              <span class="value" id="licenseProof">pending</span>
+            </div>
+            <div class="proof">
+              <div class="label">Runtime</div>
+              <span class="value" id="runtimeProof">pending</span>
+            </div>
+            <div class="proof">
+              <div class="label">Updated</div>
+              <span class="value" id="updatedProof">now</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contract">
+      <div class="shell section-grid">
+        <div>
+          <div class="eyebrow">Technical contract</div>
+          <h2>Not the buyer homepage. Not the GPC demo.</h2>
+          <p>This surface exists for engineers, security reviewers, and deployment owners who need proof that the backend can be integrated, verified, and operated without mixing customer marketing with runtime evidence.</p>
+        </div>
+        <div class="matrix">
+          <article class="matrix-row">
+            <h3>License and access flow</h3>
+            <p>Issue, verify, download, and version backend access through explicit license service boundaries.</p>
+          </article>
+          <article class="matrix-row">
+            <h3>Tenant isolation</h3>
+            <p>Workspace, user, run, audit, evidence, and reserve records stay scoped by tenant identity.</p>
+          </article>
+          <article class="matrix-row">
+            <h3>Policy routing</h3>
+            <p>Requests pass through policy, budget, provider, fallback, and audit gates before execution.</p>
+          </article>
+          <article class="matrix-row">
+            <h3>Replayable evidence</h3>
+            <p>Important decisions produce evidence trails that can be inspected, exported, and replayed.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="routes">
+      <div class="shell section-grid">
+        <div>
+          <div class="eyebrow">Integration routes</div>
+          <h2>Backend surfaces that have to stay honest.</h2>
+          <p>The developer site points directly at technical surfaces. The buyer journey and pricing stay on .com; BYOS proof and backend state live here.</p>
+        </div>
+        <div class="routes">
+          <a class="route" href="https://api.veklom.com/health"><span>/health</span><span>API liveness and service identity</span><span>open</span></a>
+          <a class="route" href="https://api.veklom.com/status"><span>/status</span><span>DB, Redis, LLM, fallback, and circuit breaker posture</span><span>open</span></a>
+          <a class="route" href="https://license.veklom.com/health"><span>license health</span><span>License service liveness and uptime</span><span>open</span></a>
+          <a class="route" href="https://veklom.com/gpc/"><span>.com /gpc</span><span>Buyer-facing Governed Plan Compiler flagship demo</span><span>open</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="shell">
+        <div class="eyebrow">Deployment proof path</div>
+        <h2>Use .com to understand the hub. Use .dev to prove the backend.</h2>
+        <div class="cta-row">
+          <a class="btn primary" href="/demo/">Run live backend demo</a>
+          <a class="btn" href="https://api.veklom.com/status">Inspect runtime JSON</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const set = (id, value, cls = "ok") => {
+      const el = $(id);
+      if (!el) return;
+      el.textContent = value;
+      el.className = cls;
+    };
+
+    async function readJson(url) {
+      const started = performance.now();
+      const response = await fetch(url, { cache: "no-store" });
+      const elapsed = Math.round(performance.now() - started);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      return { data: await response.json(), elapsed };
+    }
+
+    async function inspectRuntime() {
+      const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      $("updatedProof").textContent = timestamp;
+      try {
+        const api = await readJson("https://api.veklom.com/status");
+        set("dbStatus", api.data.db_ok ? "ok" : "failed", api.data.db_ok ? "ok" : "warn");
+        set("redisStatus", api.data.redis_ok ? "ok" : "failed", api.data.redis_ok ? "ok" : "warn");
+        set("llmStatus", api.data.llm_ok ? "ok" : "failed", api.data.llm_ok ? "ok" : "warn");
+        set("modelStatus", api.data.llm_model || "not reported");
+        set("fallbackStatus", api.data.groq_fallback_enabled ? "enabled" : "disabled", api.data.groq_fallback_enabled ? "ok" : "warn");
+        $("apiProof").textContent = `${api.elapsed}ms`;
+        $("runtimeProof").textContent = api.data.circuit_breaker?.state || "reported";
+      } catch (error) {
+        set("dbStatus", "unavailable", "warn");
+        set("redisStatus", "unavailable", "warn");
+        set("llmStatus", "unavailable", "warn");
+        $("apiProof").textContent = "failed";
+        $("runtimeProof").textContent = error.message;
+      }
+
+      try {
+        const license = await readJson("https://license.veklom.com/health");
+        set("licenseStatus", license.data.status || "reported");
+        $("licenseProof").textContent = `${license.elapsed}ms`;
+      } catch (error) {
+        set("licenseStatus", "unavailable", "warn");
+        $("licenseProof").textContent = "failed";
+      }
+
+      const failed = ["dbStatus", "redisStatus", "llmStatus", "licenseStatus"].some((id) => $(id).textContent === "failed" || $(id).textContent === "unavailable");
+      $("overallStatus").textContent = failed ? "degraded" : "live";
+    }
+
+    inspectRuntime();
+    window.setInterval(inspectRuntime, 30000);
+  </script>
+</body>
+</html>

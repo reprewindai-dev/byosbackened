@@ -1,613 +1,1889 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Veklom Developer Platform</title>
-  <meta name="description" content="Integrate, self-host, and verify governed AI execution with the BYOS backend." />
-  <meta property="og:title" content="Veklom Developer Platform" />
-  <meta property="og:description" content="Technical proof for BYOS backend health, tenant isolation, policy routing, license flow, evidence, and replay." />
-  <meta property="og:type" content="website" />
+  <title>Veklom Live Backend Demo</title>
+  <meta name="description" content="Run the live Veklom backend demo through policy, rate limit, token budget, circuit breaker, provider routing, memory, response, audit, and cost control." />
+  <link rel="canonical" href="https://veklom.dev/" />
+  <meta name="keywords" content="Veklom backend demo, governed AI backend, policy routing, circuit breaker, audit artifact, provider fallback, private AI infrastructure" />
   <meta property="og:url" content="https://veklom.dev/" />
+  <meta property="og:title" content="Veklom Live Backend Demo" />
+  <meta property="og:description" content="A live backend path through policy, routing, fallback, memory, response, audit, and cost control." />
   <meta property="og:image" content="https://veklom.dev/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Veklom Developer Platform — BYOS backend proof and runtime verification" />
+  <meta property="og:image:alt" content="Veklom Live Backend Demo — tenant-scoped workspace for governed private AI" />
+  <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Veklom Live Backend Demo" />
+  <meta name="twitter:description" content="Live backend execution through policy, routing, fallback, audit, and cost control." />
   <meta name="twitter:image" content="https://veklom.dev/og-image.png" />
-  <meta name="theme-color" content="#0c1114" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,650;6..72,750&display=swap" rel="stylesheet" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="manifest" href="/site.webmanifest" />
-  <link rel="preconnect" href="https://api.veklom.com" />
-  <link rel="preconnect" href="https://license.veklom.com" />
   <style>
+    /* ==========================================================
+       VEKLOM CONTROL PLANE — FOUNDATION STYLES
+       This is the look-and-feel reference for the future dashboard.
+       Palette: ink / bone / brass / moss / electric / amber / crimson
+       Typography: Inter (UI) + JetBrains Mono (telemetry)
+       ========================================================== */
     :root {
-      --bg: #080b0c;
-      --panel: #0d1315;
-      --panel-2: #10191c;
-      --text: #edf2ea;
-      --muted: #87928f;
-      --line: rgba(214, 232, 222, 0.14);
-      --line-strong: rgba(214, 232, 222, 0.26);
-      --green: #88f0ba;
-      --amber: #e2b56d;
-      --cyan: #8fd8ff;
-      --red: #f27a70;
-      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-      --serif: Georgia, "Times New Roman", serif;
-      --sans: "Aptos", "Segoe UI", sans-serif;
+      --ink:        #070810;
+      --ink-1:      #0b0d16;
+      --ink-2:      #10131e;
+      --ink-3:      #161a28;
+      --rule:       #1e2230;
+      --rule-2:     #272c3e;
+      --bone:       #f4f2ed;
+      --bone-2:     #c8cbd6;
+      --muted:      #7b849a;
+      --muted-2:    #566077;
+      --brass:      #c4925b;
+      --brass-2:    #e5b16e;
+      --brass-glow: rgba(229, 177, 110, 0.35);
+      --moss:       #5dd8a5;
+      --moss-glow:  rgba(93, 216, 165, 0.35);
+      --electric:   #6ea8fe;
+      --electric-glow: rgba(110, 168, 254, 0.45);
+      --amber:      #f0b340;
+      --crimson:    #ff6b6b;
+      --violet:     #a78bfa;
+      --radius-sm:  6px;
+      --radius:     10px;
+      --radius-lg:  14px;
+      --shadow-soft: 0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px -20px rgba(0,0,0,0.8);
+      --serif:      "Newsreader", ui-serif, Georgia, serif;
+      --sans:       Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono:       "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
-
     * { box-sizing: border-box; }
-
-    html {
-      scroll-behavior: smooth;
-      background: var(--bg);
-      color: var(--text);
-    }
-
+    html, body { margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
     body {
-      margin: 0;
-      min-height: 100vh;
       font-family: var(--sans);
+      background: var(--ink);
+      color: var(--bone);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+    body::before {
+      /* subtle starfield / grid backdrop */
+      content: "";
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
       background:
-        radial-gradient(circle at 15% 0%, rgba(143, 216, 255, 0.13), transparent 32rem),
-        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255,255,255,0.028) 1px, transparent 1px),
-        var(--bg);
-      background-size: auto, 72px 72px, 72px 72px, auto;
+        radial-gradient(1200px 600px at 15% -10%, rgba(196,146,91,0.08), transparent 60%),
+        radial-gradient(900px 700px at 110% 10%, rgba(110,168,254,0.06), transparent 55%),
+        radial-gradient(800px 500px at 50% 120%, rgba(93,216,165,0.05), transparent 60%),
+        linear-gradient(180deg, #05060b 0%, #070810 30%, #05060b 100%);
     }
-
+    body::after {
+      content: "";
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(1200px 800px at 50% 20%, #000 50%, transparent 100%);
+    }
+    main, header, footer, section { position: relative; z-index: 1; }
     a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    ::selection { background: var(--brass); color: #18120a; }
 
-    .shell {
-      width: min(1480px, calc(100% - 48px));
-      margin: 0 auto;
-    }
+    .container { max-width: 1280px; margin: 0 auto; padding: 0 28px; }
+    .mono { font-family: var(--mono); }
 
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      border-bottom: 1px solid var(--line);
-      background: rgba(8, 11, 12, 0.82);
-      backdrop-filter: blur(18px);
-    }
-
+    /* ------------ NAV ------------ */
     .nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 74px;
-      gap: 24px;
+      position: sticky; top: 0; z-index: 40;
+      border-bottom: 1px solid var(--rule);
+      background: rgba(7,8,16,0.78);
+      backdrop-filter: saturate(140%) blur(14px);
+      -webkit-backdrop-filter: saturate(140%) blur(14px);
     }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 13px;
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; min-height: 68px; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: .01em; }
+    .brand img { width: 22px; height: 22px; }
+    .brand .pulse-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--moss); box-shadow: 0 0 10px var(--moss-glow);
+      animation: pulse-soft 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-soft { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--rule-2);
+      color: var(--bone-2); background: rgba(255,255,255,0.02);
+      border-radius: 999px; padding: 5px 11px;
+      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
       font-family: var(--mono);
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      font-size: 12px;
-      color: var(--muted);
     }
+    .links { display: flex; gap: 22px; align-items: center; font-size: 14px; color: var(--bone-2); }
+    .links a:hover { color: var(--bone); }
+    .cta-ghost {
+      border: 1px solid var(--rule-2); color: var(--bone);
+      padding: 9px 14px; border-radius: 999px; font-size: 12px;
+      letter-spacing: .05em; font-family: var(--mono);
+      transition: border-color .2s, color .2s, background .2s;
+    }
+    .cta-ghost:hover { border-color: var(--brass); color: var(--brass-2); }
+    .cta-primary {
+      background: linear-gradient(180deg, var(--brass-2), var(--brass));
+      color: #1a1203; font-weight: 600; padding: 10px 16px;
+      border-radius: 999px; font-size: 13px; border: 1px solid transparent;
+      box-shadow: 0 10px 30px -12px var(--brass-glow), inset 0 1px 0 rgba(255,255,255,.35);
+      transition: transform .15s, box-shadow .2s;
+    }
+    .cta-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 36px -10px var(--brass-glow), inset 0 1px 0 rgba(255,255,255,.45); }
 
-    .mark {
+    /* ------------ HERO ------------ */
+    .hero { padding: 96px 0 24px; }
+    .hero-grid {
       display: grid;
-      width: 34px;
-      height: 34px;
-      place-items: center;
-      border: 1px solid rgba(143, 216, 255, 0.35);
-      background: linear-gradient(145deg, rgba(143,216,255,0.18), rgba(136,240,186,0.08));
-      color: var(--cyan);
-      font-family: var(--mono);
-    }
-
-    .links {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      color: #a5afac;
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-
-    .link-strong {
-      color: var(--text);
-      border: 1px solid var(--line-strong);
-      padding: 10px 14px;
-      background: rgba(255,255,255,0.03);
-    }
-
-    .hero {
-      min-height: calc(100svh - 74px);
-      display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
-      border-left: 1px solid var(--line);
-      border-right: 1px solid var(--line);
-    }
-
-    .hero-copy {
-      padding: 72px 54px 56px;
-      border-right: 1px solid var(--line);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      grid-template-columns: minmax(0, 1.08fr) minmax(340px, .72fr);
       gap: 42px;
+      align-items: end;
     }
-
-    .eyebrow,
-    .label {
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--brass-2); font-size: 12px; text-transform: uppercase; letter-spacing: .18em;
       font-family: var(--mono);
-      text-transform: uppercase;
-      letter-spacing: 0.19em;
-      color: var(--cyan);
-      font-size: 11px;
     }
-
+    .eyebrow::before {
+      content: ""; width: 28px; height: 1px; background: linear-gradient(90deg, transparent, var(--brass));
+    }
     h1 {
-      margin: 20px 0 20px;
-      max-width: 760px;
+      margin: 18px 0 20px;
+      font-size: clamp(2.25rem, 5.4vw, 4.4rem);
+      line-height: 0.98; letter-spacing: -0.035em; font-weight: 750;
       font-family: var(--serif);
-      font-weight: 500;
-      font-size: clamp(58px, 7.5vw, 128px);
-      line-height: 0.88;
-      letter-spacing: -0.075em;
     }
-
-    .lead {
-      max-width: 650px;
-      margin: 0;
-      color: #b9c4c0;
-      font-size: clamp(17px, 1.7vw, 22px);
-      line-height: 1.5;
+    h1 .grad {
+      background: linear-gradient(92deg, #fff 0%, #f6e5c8 40%, var(--brass-2) 70%, #d18c45 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-
-    .cta-row {
+    h1 .soft { color: var(--muted); font-weight: 500; }
+    .lead { color: var(--bone-2); max-width: 780px; font-size: 19px; line-height: 1.55; }
+    .actions { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+    .trust-row {
+      grid-column: 1 / -1;
+      margin-top: 34px; display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+      color: var(--muted); font-size: 12px; font-family: "JetBrains Mono", monospace;
+      letter-spacing: .05em; text-transform: uppercase;
+    }
+    .trust-row .sep { width: 4px; height: 4px; background: var(--rule-2); border-radius: 50%; }
+    .trust-row .live-tag {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--moss);
+    }
+    .trust-row .live-tag::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--moss); box-shadow: 0 0 12px var(--moss-glow);
+      animation: pulse-soft 1.6s infinite;
+    }
+    .hub-flow {
+      margin-top: 34px;
       display: flex;
       flex-wrap: wrap;
+      gap: 8px;
+      max-width: 920px;
+    }
+    .pricing-ledger {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
-      margin-top: 34px;
+      margin: 26px 0 24px;
     }
-
-    .btn {
-      border: 1px solid var(--line-strong);
-      padding: 14px 18px;
+    .ledger-cell {
+      border: 1px solid rgba(196,146,91,.22);
+      background: linear-gradient(180deg, rgba(196,146,91,.075), rgba(255,255,255,.012));
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .ledger-cell .label {
+      color: var(--muted);
       font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .ledger-cell .value {
+      margin-top: 8px;
+      color: var(--bone);
+      font-size: 20px;
+      line-height: 1.15;
+      font-weight: 750;
+      font-family: var(--serif);
+    }
+    .ledger-cell .note {
+      margin-top: 8px;
+      color: var(--muted);
       font-size: 12px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+      line-height: 1.45;
     }
-
-    .btn:hover {
-      transform: translateY(-2px);
-      border-color: rgba(143,216,255,0.75);
-      background: rgba(143,216,255,0.07);
-    }
-
-    .btn.primary {
-      background: var(--text);
-      color: #080b0c;
-      border-color: var(--text);
-    }
-
-    .hero-foot {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      border-top: 1px solid var(--line);
-    }
-
-    .hero-foot div {
-      padding: 18px 16px 0 0;
-      min-height: 84px;
-    }
-
-    .hero-foot strong {
-      display: block;
-      font-family: var(--mono);
-      color: var(--green);
-      font-size: 18px;
-      margin-bottom: 7px;
-    }
-
-    .hero-foot span {
-      display: block;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    .console {
-      position: relative;
-      overflow: hidden;
-      padding: 24px;
-      display: grid;
-      align-content: stretch;
-      background:
-        linear-gradient(135deg, rgba(143,216,255,0.08), transparent 34%),
-        linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
-    }
-
-    .console-frame {
-      min-height: 100%;
-      border: 1px solid var(--line-strong);
-      background: rgba(3, 6, 7, 0.78);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-    }
-
-    .console-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 18px;
-      border-bottom: 1px solid var(--line);
-      font-family: var(--mono);
-      color: var(--muted);
-      font-size: 11px;
-      letter-spacing: 0.11em;
-      text-transform: uppercase;
-    }
-
-    .status-dot {
+    .hub-step {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      color: var(--green);
-    }
-
-    .status-dot::before {
-      content: "";
-      width: 7px;
-      height: 7px;
-      background: var(--green);
-      box-shadow: 0 0 18px rgba(136,240,186,0.65);
-    }
-
-    .terminal {
-      padding: 30px;
+      min-height: 34px;
+      border: 1px solid rgba(196,146,91,.22);
+      background: linear-gradient(180deg, rgba(196,146,91,.09), rgba(255,255,255,.015));
+      color: var(--bone-2);
+      border-radius: 999px;
+      padding: 8px 12px;
       font-family: var(--mono);
-      font-size: clamp(12px, 1.2vw, 15px);
-      line-height: 1.9;
-      color: #c6d1cd;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
     }
-
-    .terminal .cmd { color: var(--cyan); }
-    .terminal .ok { color: var(--green); }
-    .terminal .warn { color: var(--amber); }
-    .terminal .muted { color: var(--muted); }
-
-    .proof-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      border-top: 1px solid var(--line);
-    }
-
-    .proof {
-      min-height: 132px;
-      padding: 18px;
-      border-right: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-    }
-
-    .proof:nth-child(2n) { border-right: 0; }
-
-    .proof .value {
-      display: block;
-      margin-top: 14px;
-      font-family: var(--mono);
-      color: var(--text);
-      font-size: 24px;
-      word-break: break-word;
-    }
-
-    .section {
-      border-top: 1px solid var(--line);
-      padding: 76px 0;
-    }
-
-    .section-grid {
-      display: grid;
-      grid-template-columns: 0.8fr 1.2fr;
-      gap: 64px;
-    }
-
-    h2 {
-      margin: 14px 0 0;
-      font-family: var(--serif);
-      font-size: clamp(38px, 5vw, 76px);
-      line-height: 0.95;
-      letter-spacing: -0.055em;
-      font-weight: 500;
-    }
-
-    .section p {
-      color: #aab5b1;
-      line-height: 1.65;
-      font-size: 17px;
-    }
-
-    .matrix {
-      border: 1px solid var(--line);
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      background: rgba(255,255,255,0.018);
-    }
-
-    .matrix-row {
-      min-height: 150px;
+    .hero-proof {
+      border: 1px solid var(--rule);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)),
+        radial-gradient(520px 260px at 85% 0%, rgba(110,168,254,.12), transparent 60%);
+      border-radius: 18px;
       padding: 24px;
-      border-right: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
     }
-
-    .matrix-row:nth-child(2n) { border-right: 0; }
-    .matrix-row:nth-last-child(-n + 2) { border-bottom: 0; }
-
-    .matrix-row h3 {
-      margin: 0 0 12px;
-      font-size: 20px;
-      color: var(--text);
-    }
-
-    .matrix-row p {
-      margin: 0;
-      font-size: 14px;
-      color: var(--muted);
-    }
-
-    .routes {
-      display: grid;
-      gap: 10px;
+    .hero-proof .proof-kicker {
+      color: var(--brass-2);
       font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .hero-proof h2 {
+      margin: 18px 0 10px;
+      font-family: var(--serif);
+      font-size: clamp(2rem, 4vw, 3.3rem);
+      line-height: .98;
+      letter-spacing: -.035em;
+    }
+    .proof-lines {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+      border-top: 1px solid var(--rule);
+      padding-top: 18px;
+    }
+    .proof-line {
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      color: var(--bone-2);
       font-size: 13px;
     }
+    .proof-index {
+      color: var(--brass-2);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .proof-state {
+      color: var(--moss);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
 
-    .route {
+    /* ------------ THEATER ------------ */
+    .theater-wrap { padding: 22px 0 80px; }
+    .theater {
+      position: relative;
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(800px 300px at 80% -20%, rgba(110,168,254,0.08), transparent 60%),
+        radial-gradient(600px 300px at 10% 110%, rgba(196,146,91,0.06), transparent 55%),
+        linear-gradient(180deg, rgba(16,19,30,0.9), rgba(11,13,22,0.9));
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    .theater-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--rule);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    }
+    .theater-head .left { display: flex; align-items: center; gap: 14px; }
+    .theater-head .title { font-size: 13px; color: var(--bone-2); letter-spacing: .06em; text-transform: uppercase; font-family: "JetBrains Mono", monospace; }
+    .theater-head .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 5px 10px; border-radius: 999px; border: 1px solid var(--rule-2);
+      background: rgba(255,255,255,0.02); color: var(--bone-2);
+      font-size: 11px; font-family: "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+    .chip.ok .dot    { background: var(--moss);    box-shadow: 0 0 10px var(--moss-glow); }
+    .chip.warn .dot  { background: var(--amber);   box-shadow: 0 0 10px rgba(240,179,64,.45); }
+    .chip.err .dot   { background: var(--crimson); box-shadow: 0 0 10px rgba(255,107,107,.45); }
+
+    .mode-toggle { display: inline-flex; border: 1px solid var(--rule-2); border-radius: 999px; padding: 3px; background: rgba(0,0,0,0.3); }
+    .mode-toggle button {
+      border: 0; background: transparent; color: var(--muted);
+      padding: 7px 14px; border-radius: 999px; font-size: 12px;
+      font-family: "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase;
+      transition: background .2s, color .2s;
+    }
+    .mode-toggle button.active { background: var(--ink-3); color: var(--bone); box-shadow: inset 0 0 0 1px var(--rule-2); }
+
+    .theater-body {
       display: grid;
-      grid-template-columns: 160px 1fr auto;
-      gap: 18px;
-      align-items: center;
-      padding: 14px 0;
-      border-bottom: 1px solid var(--line);
-      color: #c8d3cf;
+      grid-template-columns: 320px minmax(0, 1fr) 380px;
+      gap: 0;
+      min-height: 640px;
+    }
+    .pane { padding: 22px; border-right: 1px solid var(--rule); }
+    .pane:last-child { border-right: 0; }
+    .pane-title { font-size: 11px; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; font-family: "JetBrains Mono", monospace; margin-bottom: 12px; }
+
+    /* ---- CONTROLS PANE ---- */
+    .verticals { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .vertical {
+      border: 1px solid var(--rule-2); background: rgba(255,255,255,0.02);
+      color: var(--bone-2); padding: 6px 10px; border-radius: 999px;
+      font-size: 11px; font-family: "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase;
+      transition: all .15s;
+    }
+    .vertical:hover { border-color: var(--brass); color: var(--brass-2); }
+    .vertical.active { border-color: var(--brass); color: #1a1203; background: linear-gradient(180deg, var(--brass-2), var(--brass)); font-weight: 600; }
+
+    textarea.prompt {
+      width: 100%; min-height: 118px; resize: vertical;
+      background: var(--ink); color: var(--bone);
+      border: 1px solid var(--rule-2); border-radius: var(--radius);
+      padding: 12px 14px; font-size: 14px; line-height: 1.5;
+      font-family: "JetBrains Mono", monospace;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    textarea.prompt:focus { outline: none; border-color: var(--brass); box-shadow: 0 0 0 4px rgba(196,146,91,0.12); }
+    .prompt-meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; font-family: "JetBrains Mono", monospace; margin-top: 6px; }
+
+    .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    .scenario-btn {
+      position: relative;
+      text-align: left;
+      border: 1px solid var(--rule-2); background: rgba(255,255,255,0.02);
+      color: var(--bone); padding: 12px 12px; border-radius: var(--radius);
+      display: flex; flex-direction: column; gap: 4px;
+      transition: all .15s;
+    }
+    .scenario-btn:hover { border-color: var(--brass); transform: translateY(-1px); }
+    .scenario-btn.selected { border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.35); }
+    .scenario-btn .sb-title { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+    .scenario-btn .sb-sub { font-size: 10px; color: var(--muted); font-family: "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; }
+    .scenario-btn.primary { background: linear-gradient(180deg, rgba(229,177,110,0.15), rgba(196,146,91,0.08)); border-color: var(--brass); }
+    .scenario-btn.danger  { background: linear-gradient(180deg, rgba(255,107,107,0.10), rgba(255,107,107,0.03)); border-color: rgba(255,107,107,0.4); }
+    .scenario-btn[disabled] { opacity: .5; pointer-events: none; }
+
+    .run-btn {
+      margin-top: 14px; width: 100%;
+      background: linear-gradient(180deg, var(--brass-2), var(--brass));
+      color: #1a1203; font-weight: 700;
+      padding: 13px 16px; border: 0; border-radius: var(--radius);
+      font-size: 14px; letter-spacing: .02em;
+      box-shadow: 0 14px 30px -12px var(--brass-glow), inset 0 1px 0 rgba(255,255,255,.35);
+      transition: transform .15s, box-shadow .2s;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .run-btn:hover { transform: translateY(-1px); }
+    .run-btn:active { transform: translateY(0); }
+    .run-btn[disabled] { opacity: .6; pointer-events: none; }
+    .run-btn .spinner {
+      width: 12px; height: 12px; border: 2px solid rgba(26,18,3,0.25); border-top-color: #1a1203;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .control-note {
+      margin-top: 14px; padding: 10px 12px; border-left: 2px solid var(--rule-2);
+      font-size: 11px; color: var(--muted); line-height: 1.55; font-family: "JetBrains Mono", monospace;
     }
 
-    .route span:first-child { color: var(--cyan); }
-    .route span:last-child { color: var(--green); }
+    /* ---- CANVAS PANE ---- */
+    .canvas-pane { padding: 0; overflow: hidden; position: relative; background:
+      radial-gradient(600px 400px at 50% 50%, rgba(110,168,254,0.04), transparent 70%); }
+    .canvas-wrap { position: relative; width: 100%; height: 100%; min-height: 640px; }
+    svg.pipeline { width: 100%; height: 100%; display: block; }
 
-    .final {
-      min-height: 380px;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      border-top: 1px solid var(--line);
-      background: radial-gradient(circle at center, rgba(136,240,186,0.08), transparent 38rem);
+    /* metrics overlay (bottom of canvas) */
+    .metric-strip {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+      border-top: 1px solid var(--rule);
+      background: rgba(7,8,16,0.6);
+      backdrop-filter: blur(8px);
+    }
+    .metric { padding: 10px 14px; border-right: 1px solid var(--rule); }
+    .metric:last-child { border-right: 0; }
+    .metric .m-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-family: "JetBrains Mono", monospace; }
+    .metric .m-value { font-size: 18px; margin-top: 2px; font-family: "JetBrains Mono", monospace; color: var(--bone); font-weight: 600; }
+    .metric .m-value.ok { color: var(--moss); }
+    .metric .m-value.warn { color: var(--amber); }
+    .metric .m-value.err { color: var(--crimson); }
+
+    /* ---- TERMINAL PANE ---- */
+    .terminal {
+      background: #05060b; border: 1px solid var(--rule);
+      border-radius: var(--radius); padding: 0;
+      font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+      line-height: 1.6; color: #d9e1f2;
+      height: 290px; overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    }
+    .term-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-bottom: 1px solid var(--rule);
+      background: rgba(255,255,255,0.015);
+      color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .term-bar .tb-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .term-body { padding: 12px 14px; overflow-y: auto; flex: 1; }
+    .term-body::-webkit-scrollbar { width: 6px; }
+    .term-body::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 999px; }
+    .term-line { white-space: pre-wrap; word-break: break-word; }
+    .term-line .t-time { color: var(--muted-2); margin-right: 10px; }
+    .term-line .t-evt  { color: var(--electric); margin-right: 8px; font-weight: 600; }
+    .term-line .t-evt.ok   { color: var(--moss); }
+    .term-line .t-evt.warn { color: var(--amber); }
+    .term-line .t-evt.err  { color: var(--crimson); }
+    .term-line .t-txt  { color: #b6c0d6; }
+    .term-stream { color: var(--bone); white-space: pre-wrap; word-break: break-word; }
+    .term-stream .caret { display: inline-block; width: 8px; height: 14px; background: var(--brass-2); vertical-align: -2px; animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .audit-card, .cost-card {
+      margin-top: 14px; border: 1px solid var(--rule);
+      border-radius: var(--radius); padding: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    }
+    .protocol-card {
+      margin-top: 14px; border: 1px solid var(--rule);
+      border-radius: var(--radius); padding: 14px;
+      background: linear-gradient(180deg, rgba(196,146,91,0.04), rgba(255,255,255,0.02));
+    }
+    .protocol-card.locked { border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.12), 0 0 32px -10px var(--brass-glow); }
+    .protocol-meta { margin-top: 6px; font-size: 11px; color: var(--muted); font-family: "JetBrains Mono", monospace; }
+    .protocol-list { margin-top: 12px; display: grid; gap: 8px; }
+    .protocol-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; background: rgba(255,255,255,0.02); }
+    .protocol-row .name { font-family: "JetBrains Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--bone-2); }
+    .protocol-row .status { font-family: "JetBrains Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; }
+    .protocol-row .status.ok { color: var(--moss); }
+    .protocol-row .status.warn { color: var(--amber); }
+    .protocol-row .status.err { color: #ff8c8c; }
+    .protocol-card .h-right.ok { color: var(--moss); }
+    .protocol-card .h-right.warn { color: var(--amber); }
+    .protocol-card .h-right.err { color: #ff8c8c; }
+    .protocol-proof { margin-top: 12px; font-size: 11px; color: var(--bone-2); font-family: "JetBrains Mono", monospace; line-height: 1.6; }
+    .audit-card.locked { border-color: var(--moss); box-shadow: 0 0 0 1px rgba(93,216,165,0.15), 0 0 32px -10px var(--moss-glow); }
+    .cost-card.locked  { border-color: var(--brass); box-shadow: 0 0 0 1px rgba(196,146,91,0.18), 0 0 32px -10px var(--brass-glow); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .card-head .h-left { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .14em; font-family: "JetBrains Mono", monospace; }
+    .card-head .h-right { font-size: 11px; color: var(--muted); font-family: "JetBrains Mono", monospace; }
+    .hash-row { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--bone-2); word-break: break-all; }
+    .hash-row .glow { color: var(--moss); }
+    .kv { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: var(--bone-2); font-family: "JetBrains Mono", monospace; }
+    .kv .v { color: var(--bone); }
+    .kv .v.ok { color: var(--moss); }
+    .kv .v.warn { color: var(--amber); }
+    .kv .v.err { color: var(--crimson); }
+
+    /* ---- SVG NODE STYLING ---- */
+    .pnode .node-box {
+      fill: url(#nodeGradIdle);
+      stroke: var(--rule-2); stroke-width: 1;
+      transition: fill .3s, stroke .3s;
+    }
+    .pnode .node-title {
+      fill: var(--bone-2); font: 600 11px "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase;
+    }
+    .pnode .node-sub {
+      fill: var(--muted); font: 500 10px "JetBrains Mono", monospace; letter-spacing: .04em;
+    }
+    .pnode.active .node-box {
+      fill: url(#nodeGradActive);
+      stroke: var(--brass-2);
+      filter: url(#glowBrass);
+    }
+    .pnode.active .node-title { fill: var(--brass-2); }
+    .pnode.done .node-box   { fill: url(#nodeGradDone); stroke: var(--moss); }
+    .pnode.done .node-title { fill: var(--moss); }
+    .pnode.warn .node-box   { fill: url(#nodeGradWarn); stroke: var(--amber); }
+    .pnode.warn .node-title { fill: var(--amber); }
+    .pnode.err .node-box    { fill: url(#nodeGradErr);  stroke: var(--crimson); filter: url(#glowCrimson); }
+    .pnode.err .node-title  { fill: var(--crimson); }
+
+    .pnode.active .node-pulse { opacity: 1; animation: ring-pulse 1.4s ease-out infinite; }
+    .pnode .node-pulse { opacity: 0; fill: none; stroke: var(--brass-2); stroke-width: 1.5; }
+    @keyframes ring-pulse { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.25); opacity: 0; } }
+
+    .edge-line { fill: none; stroke: var(--rule-2); stroke-width: 1.5; }
+    .edge-line.active { stroke: var(--brass-2); stroke-dasharray: 6 6; animation: flow 1.2s linear infinite; }
+    .edge-line.done   { stroke: var(--moss); }
+    .edge-line.err    { stroke: var(--crimson); }
+    @keyframes flow { to { stroke-dashoffset: -24; } }
+
+    .particle { fill: var(--brass-2); filter: url(#glowBrass); }
+
+    .lane-label { fill: var(--muted); font: 600 10px "JetBrains Mono", monospace; letter-spacing: .18em; text-transform: uppercase; }
+
+    /* ---- SECTIONS ---- */
+    .section { padding: 90px 0; position: relative; }
+    .section + .section { border-top: 1px solid var(--rule); }
+    .section-eyebrow { color: var(--brass-2); font-size: 12px; text-transform: uppercase; letter-spacing: .18em; font-family: "JetBrains Mono", monospace; }
+    .section-title { font-size: clamp(1.8rem, 3.4vw, 2.6rem); margin: 14px 0 12px; letter-spacing: -0.01em; font-weight: 700; }
+    .section-copy { color: var(--bone-2); max-width: 820px; line-height: 1.6; font-size: 17px; }
+
+    .pillars { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin-top: 32px; }
+    .pill {
+      position: relative;
+      padding: 26px; border: 1px solid var(--rule); border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+      transition: border-color .2s, transform .2s;
+    }
+    .pill:hover { border-color: var(--rule-2); transform: translateY(-2px); }
+    .pill .p-ico { width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(180deg, rgba(229,177,110,0.2), rgba(196,146,91,0.05));
+      border: 1px solid rgba(196,146,91,0.3); display: inline-flex; align-items: center; justify-content: center;
+      color: var(--brass-2); margin-bottom: 16px; }
+    .pill h3 { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+    .pill p { color: var(--bone-2); line-height: 1.55; margin: 0; font-size: 14.5px; }
+
+    /* pricing */
+    .pricing-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin-top: 32px; }
+    .plan {
+      padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--rule);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .plan.highlight {
+      border-color: var(--brass);
+      background: linear-gradient(180deg, rgba(229,177,110,0.08), rgba(196,146,91,0.02));
+      box-shadow: 0 24px 60px -30px var(--brass-glow);
+    }
+    .plan .tier { font-family: "JetBrains Mono", monospace; text-transform: uppercase; font-size: 11px; color: var(--muted); letter-spacing: .12em; }
+    .plan.highlight .tier { color: var(--brass-2); }
+    .plan h4 { margin: 4px 0 2px; font-size: 20px; }
+    .plan .value { font-size: 32px; font-weight: 700; letter-spacing: -0.01em; margin: 10px 0 2px; }
+    .muted-small { color: var(--muted); font-size: 12px; font-family: "JetBrains Mono", monospace; }
+    .plan ul { margin: 14px 0 0; padding: 0; list-style: none; color: var(--bone-2); font-size: 13px; }
+    .plan ul li { padding: 6px 0; border-top: 1px dashed var(--rule); display: flex; gap: 8px; }
+    .plan ul li::before { content: "→"; color: var(--brass-2); }
+
+    /* detailed pricing table */
+    .price-table-wrap { margin-top: 32px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
+    .price-table-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+    .price-table-head h4 { margin: 0; font-size: 14px; letter-spacing: .04em; }
+    .price-table-head .eyebrow { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .price-table th, .price-table td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--rule); }
+    .price-table thead th { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 500; background: rgba(255,255,255,0.015); }
+    .price-table tbody tr:last-child td { border-bottom: 0; }
+    .price-table tbody tr:hover { background: rgba(255,255,255,0.015); }
+    .price-table td.num { font-family: "JetBrains Mono", monospace; color: var(--bone); }
+    .price-table td.event { color: var(--bone-2); }
+    .price-table .col-founding { color: var(--brass-2); }
+    .access-wrap { margin-top: 26px; border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; background: rgba(255,255,255,0.01); }
+    .access-wrap h4 { margin: 0; font-size: 14px; letter-spacing: .04em; }
+    .access-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+    .access-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .access-table th, .access-table td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    .access-table thead th { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 500; background: rgba(255,255,255,0.015); }
+    .access-table tbody tr:last-child td { border-bottom: 0; }
+    .locked-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule-2); border-radius: 999px; padding: 5px 10px; font-size: 11px; font-family: "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .warn-copy { margin-top: 16px; border: 1px solid rgba(229,177,110,.25); background: rgba(229,177,110,.06); color: var(--bone-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; line-height: 1.6; }
+    @media (max-width: 860px) {
+      .price-table-wrap { overflow-x: auto; }
+      .price-table { min-width: 640px; }
+      .access-wrap { overflow-x: auto; }
+      .access-table { min-width: 760px; }
     }
 
-    .final h2 {
-      max-width: 920px;
-      margin-inline: auto;
+    /* cta band */
+    .cta-band {
+      margin-top: 40px;
+      border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: 34px;
+      background:
+        radial-gradient(500px 250px at 10% 0%, rgba(196,146,91,0.12), transparent 60%),
+        radial-gradient(500px 250px at 100% 100%, rgba(110,168,254,0.08), transparent 60%),
+        linear-gradient(180deg, rgba(16,19,30,0.9), rgba(11,13,22,0.9));
+      display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
     }
+    .cta-band h3 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+    .cta-band p { margin: 4px 0 0; color: var(--bone-2); }
 
-    .final .cta-row {
-      justify-content: center;
+    /* footer */
+    .footer { border-top: 1px solid var(--rule); padding: 40px 0; color: var(--muted); font-size: 12px; font-family: "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+    .footer .f-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+    .footer a { margin-right: 18px; }
+    .footer a:hover { color: var(--bone); }
+
+    /* responsive */
+    @media (max-width: 1180px) {
+      .theater-body { grid-template-columns: 280px minmax(0,1fr) 340px; }
     }
-
-    @media (max-width: 980px) {
-      .shell { width: min(100% - 28px, 1480px); }
-      .links a:not(.link-strong) { display: none; }
-      .hero { grid-template-columns: 1fr; }
-      .hero-copy { border-right: 0; padding: 52px 24px; }
-      .section-grid { grid-template-columns: 1fr; gap: 28px; }
-      .matrix { grid-template-columns: 1fr; }
-      .matrix-row,
-      .matrix-row:nth-child(2n) { border-right: 0; }
-      .matrix-row:nth-last-child(-n + 2) { border-bottom: 1px solid var(--line); }
-      .hero-foot { grid-template-columns: 1fr; }
-      .route { grid-template-columns: 1fr; gap: 5px; }
+    @media (max-width: 1020px) {
+      .hero-grid { grid-template-columns: 1fr; align-items: start; }
+      .theater-body { grid-template-columns: 1fr; }
+      .pane { border-right: 0; border-bottom: 1px solid var(--rule); }
+      .canvas-wrap { min-height: 460px; }
+      .pricing-ledger { grid-template-columns: 1fr 1fr; }
+      .pillars, .pricing-grid { grid-template-columns: 1fr 1fr; }
+      .links { display: none; }
+    }
+    @media (max-width: 640px) {
+      .pricing-ledger { grid-template-columns: 1fr; }
+      .pillars, .pricing-grid { grid-template-columns: 1fr; }
+      .metric-strip { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(5) { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pnode .node-pulse { animation: none !important; }
+      .edge-line.active { animation: none !important; }
+      body::before, body::after { animation: none !important; }
     }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <nav class="shell nav" aria-label="Primary navigation">
-      <a class="brand" href="/" aria-label="Veklom Developer Platform">
-        <span class="mark">VK</span>
-        <span>Veklom.dev / backend proof</span>
-      </a>
-      <div class="links">
-        <a href="#runtime">Runtime</a>
-        <a href="#contract">Contract</a>
-        <a href="#routes">Routes</a>
-        <a class="link-strong" href="https://veklom.com/">Buyer site</a>
-      </div>
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="/" aria-label="Veklom home">
+      <img src="/logo.svg" alt="" />
+      <span>Veklom</span>
+      <span class="pulse-dot" title="Live control plane"></span>
+      <span class="badge" id="navStatus">Sovereign Control Node</span>
+    </a>
+    <nav class="links" aria-label="Primary">
+      <a href="#theater">Live backend demo</a>
+      <a href="/platform/">Developer platform</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/workspace-app#/marketplace">Tools</a>
+      <a href="/workspace-app#/overview">Workspace</a>
+      <a class="cta-ghost" href="/login/">Sign in</a>
+      <a class="cta-primary" href="/signup/">Start free trial</a>
     </nav>
-  </header>
+  </div>
+</header>
 
-  <main>
-    <section class="shell hero">
-      <div class="hero-copy">
+<main>
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow">Veklom Live Backend Demo · Live Backend Execution</span>
+        <h1><span class="grad">Turn AI intent into governed infrastructure.</span><br /><span class="soft">Then run it, prove it, and deploy it.</span></h1>
+        <p class="lead">
+          Veklom is the tenant-scoped workspace for private AI teams: Playground, Live Backend, Models, Tools, Pipelines, Governance, Deployments, Monitoring, Billing, Evidence, and Vault.
+        </p>
+        <div class="actions">
+          <a class="cta-primary" href="#theater">Run live backend demo</a>
+          <a class="cta-ghost" href="/signup/">Start Free Evaluation</a>
+          <a class="cta-ghost" href="#pricing">View pricing</a>
+        </div>
+        <div class="hub-flow" aria-label="Veklom product flow">
+          <span class="hub-step">Playground</span>
+          <span class="hub-step">Backend</span>
+          <span class="hub-step">Models</span>
+          <span class="hub-step">Tools</span>
+          <span class="hub-step">Pipelines</span>
+          <span class="hub-step">Governance</span>
+          <span class="hub-step">Deployments</span>
+          <span class="hub-step">Monitoring</span>
+        </div>
+      </div>
+      <div class="hero-proof" aria-label="Live backend proof panel">
+        <div class="proof-kicker">Flagship feature · V2/Live Backend</div>
+        <h2>Raw intent does not touch production first.</h2>
+        <p class="lead" style="font-size:15px;">
+          Live Backend compiles business or AI intent into a governed plan: policy, route, model, tools, reserve impact, evidence path, and deployable pipeline contract.
+        </p>
+        <div class="proof-lines">
+          <div class="proof-line"><span class="proof-index">01</span><span>Intent captured from Playground or operator input</span><span class="proof-state">scoped</span></div>
+          <div class="proof-line"><span class="proof-index">02</span><span>Policy, model, tools, reserve, and evidence gates resolved</span><span class="proof-state">governed</span></div>
+          <div class="proof-line"><span class="proof-index">03</span><span>Pipeline, endpoint, monitoring, and audit path prepared</span><span class="proof-state">deployable</span></div>
+        </div>
+        <div class="actions" style="margin-top:22px;">
+          <a class="cta-primary" href="/demo/">Run demo</a>
+          <a class="cta-ghost" href="#theater">Watch hub flow</a>
+        </div>
+      </div>
+      <div class="trust-row" role="status" aria-live="polite">
+        <span class="live-tag" id="heroLive">Live backend connected</span>
+        <span class="sep"></span>
+        <span>SOC2-ready · HIPAA-aware · EU-sovereign</span>
+        <span class="sep"></span>
+        <span>Zero key exposure in this demo</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIVE PIPELINE THEATER ============ -->
+  <section class="theater-wrap" id="theater">
+    <div class="container">
+      <div class="theater" aria-label="Veklom Live Pipeline Theater">
+        <div class="theater-head">
+          <div class="left">
+            <span class="title">Live Backend · Live Backend Execution</span>
+            <span class="chip ok" id="chipBackend"><span class="dot"></span>Backend: live</span>
+            <span class="chip" id="chipProvider"><span class="dot"></span>Provider: idle</span>
+            <span class="chip" id="chipCB"><span class="dot"></span>Circuit: closed</span>
+          </div>
+          <div class="mode-toggle" role="tablist" aria-label="Theater mode">
+            <button role="tab" class="active" data-mode="ai">Plan Compiler</button>
+            <button role="tab" data-mode="edge">Infrastructure</button>
+          </div>
+        </div>
+
+        <div class="theater-body">
+          <!-- ---- CONTROLS ---- -->
+          <aside class="pane controls-pane" aria-label="Controls">
+            <div class="pane-title" id="ctrlTitle">Live Backend · Intent</div>
+
+            <div class="verticals" id="verticals" role="tablist" data-visible="ai">
+              <button class="vertical active" data-vertical="default">Default</button>
+              <button class="vertical" data-vertical="legal">Legal</button>
+              <button class="vertical" data-vertical="medical">Medical</button>
+              <button class="vertical" data-vertical="finance">Finance</button>
+              <button class="vertical" data-vertical="agency">Agency</button>
+              <button class="vertical" data-vertical="infrastructure">Infrastructure</button>
+            </div>
+
+            <div id="aiControls">
+              <textarea
+                id="promptInput"
+                class="prompt"
+                maxlength="800"
+                spellcheck="false"
+                aria-label="Prompt"
+              >Draft a one-paragraph response to a client asking how our AI handles their regulated data. Keep it confident, specific, and reference the controls that would fire.</textarea>
+              <div class="prompt-meta">
+                <span id="promptCount">153 / 800</span>
+                <span>Public demo · 250 token cap</span>
+              </div>
+
+              <div class="scenario-grid">
+                <button class="scenario-btn primary" id="btnAI">
+                  <span class="sb-title">Compile Plan</span>
+                  <span class="sb-sub">Ollama → Groq fallback</span>
+                </button>
+                <button class="scenario-btn danger" id="btnChaos">
+                  <span class="sb-title">Break It Safely</span>
+                  <span class="sb-sub">Simulate provider outage</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="edgeControls" hidden>
+              <div class="scenario-grid" style="grid-template-columns: 1fr;">
+                <button class="scenario-btn" id="btnNetwork">
+                  <span class="sb-title">Network Instability</span>
+                  <span class="sb-sub">SNMP · retrans 16 · loss 18%</span>
+                </button>
+                <button class="scenario-btn" id="btnMachine">
+                  <span class="sb-title">Machine Overheat</span>
+                  <span class="sb-sub">Modbus · 92°C · vibration 71</span>
+                </button>
+              </div>
+            </div>
+
+            <button class="run-btn" id="btnRun">
+              <span id="runLabel">Compile governed plan</span>
+            </button>
+
+            <div class="control-note">
+              The request in front of you is <strong style="color:var(--bone);">real</strong>.
+              It flows through Veklom's public demo endpoint, rate-limited to 5/min per IP,
+              output capped at 250 tokens, no key exposure.
+            </div>
+
+            <div class="protocol-card" id="protocolCard">
+              <div class="card-head">
+                <span class="h-left">Protocol validation</span>
+                <span class="h-right" id="protocolStatus">cached</span>
+              </div>
+              <div class="protocol-meta" id="protocolLastChecked">Last checked: —</div>
+              <div class="protocol-list" id="protocolRows"></div>
+              <div class="protocol-proof" id="protocolProof">connect → normalize → decision → audit → cost control</div>
+            </div>
+          </aside>
+
+          <!-- ---- CANVAS ---- -->
+          <div class="pane canvas-pane" aria-label="Pipeline visualization">
+            <div class="canvas-wrap">
+              <svg class="pipeline" id="pipeSvg" viewBox="0 0 900 600" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Live pipeline">
+                <defs>
+                  <linearGradient id="nodeGradIdle" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#161a28" />
+                    <stop offset="100%" stop-color="#0e111a" />
+                  </linearGradient>
+                  <linearGradient id="nodeGradActive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#3a2a14" />
+                    <stop offset="100%" stop-color="#1a1203" />
+                  </linearGradient>
+                  <linearGradient id="nodeGradDone" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#14382a" />
+                    <stop offset="100%" stop-color="#0a1d17" />
+                  </linearGradient>
+                  <linearGradient id="nodeGradWarn" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#3a2e14" />
+                    <stop offset="100%" stop-color="#1d1708" />
+                  </linearGradient>
+                  <linearGradient id="nodeGradErr" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#3a1414" />
+                    <stop offset="100%" stop-color="#1a0707" />
+                  </linearGradient>
+                  <filter id="glowBrass" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3.5" result="b" />
+                    <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  <filter id="glowMoss" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="b" />
+                    <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  <filter id="glowCrimson" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="4" result="b" />
+                    <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+
+                <!-- Lane label -->
+                <text class="lane-label" id="laneLabel" x="28" y="36">Live Backend Execution</text>
+
+                <!-- Pipeline edges + nodes injected here -->
+                <g id="edgesLayer"></g>
+                <g id="nodesLayer"></g>
+                <g id="particlesLayer"></g>
+              </svg>
+
+              <div class="metric-strip" aria-label="Live metrics">
+                <div class="metric"><div class="m-label">Latency</div><div class="m-value" id="metLatency">—</div></div>
+                <div class="metric"><div class="m-label">Tokens</div><div class="m-value" id="metTokens">—</div></div>
+                <div class="metric"><div class="m-label">Provider</div><div class="m-value" id="metProvider">—</div></div>
+                <div class="metric"><div class="m-label">Policy</div><div class="m-value ok" id="metPolicy">passed</div></div>
+                <div class="metric"><div class="m-label">Billable</div><div class="m-value ok" id="metBillable">no</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ---- TERMINAL + AUDIT + COST ---- -->
+          <aside class="pane terminal-pane" aria-label="Live terminal and audit">
+            <div class="pane-title">Live stream</div>
+            <div class="terminal" aria-live="polite" aria-atomic="false">
+              <div class="term-bar">
+                <span class="tb-dot" style="background:#ff5f57;"></span>
+                <span class="tb-dot" style="background:#febc2e;"></span>
+                <span class="tb-dot" style="background:#28c840;"></span>
+                <span style="margin-left:6px;">veklom · live-pipeline</span>
+                <span style="margin-left:auto;" id="termTraceId">trace: —</span>
+              </div>
+              <div class="term-body" id="termBody">
+                <div class="term-line"><span class="t-time">--:--:--</span><span class="t-evt">ready</span><span class="t-txt">awaiting request.</span></div>
+              </div>
+            </div>
+
+            <div class="audit-card" id="auditCard">
+              <div class="card-head">
+                <span class="h-left">Audit artifact</span>
+                <span class="h-right" id="auditStatus">pending</span>
+              </div>
+              <div class="hash-row" id="auditHash">—</div>
+            </div>
+
+            <div class="cost-card" id="costCard">
+              <div class="card-head">
+                <span class="h-left">Cost control</span>
+                <span class="h-right" id="costStatus">pending</span>
+              </div>
+              <div class="kv"><span>public_demo</span><span class="v" id="kvDemo">—</span></div>
+              <div class="kv"><span>billable</span><span class="v" id="kvBillable">—</span></div>
+              <div class="kv"><span>governance_runs</span><span class="v" id="kvCredits">—</span></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHY / PILLARS ============ -->
+  <section class="section" id="why">
+    <div class="container">
+      <span class="section-eyebrow">The hub for governed private AI</span>
+      <h2 class="section-title">Policy, route, fallback, memory, response, audit, and cost control.</h2>
+      <p class="section-copy">Veklom gives teams one tenant-scoped workspace to test intent, compile governed plans, route models, attach tools, deploy endpoints, monitor runtime health, and preserve evidence.</p>
+      <div class="pillars">
+        <div class="pill">
+          <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg></div>
+          <h3>Sovereign execution</h3>
+          <p>Run on your keys, your perimeter, your region. Local-first via Ollama; fallback only when you explicitly allow it.</p>
+        </div>
+        <div class="pill">
+          <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2.2"/></svg></div>
+          <h3>Policy before provider</h3>
+          <p>Per-tenant routing, budgets, redaction, and kill-switches evaluated <em>before</em> any model is called — on prompts and on edge signals.</p>
+        </div>
+        <div class="pill">
+          <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg></div>
+          <h3>Audit that holds up</h3>
+          <p>Every request emits a signed artifact: inputs, decisions, provider, tokens, cost. Procurement-ready, legally defensible.</p>
+        </div>
+        <div class="pill">
+          <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Self-healing</h3>
+          <p>Circuit breakers, health probes, and automatic failover between local and hosted providers. No manual reruns.</p>
+        </div>
+        <div class="pill">
+          <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9 5 9-5M3 7v10l9 5 9-5V7"/></svg></div>
+          <h3>Tools as governed modules</h3>
+          <p>Tools are governed modules inside the hub: source-verified actions, connectors, and services wrapped by policy and audit.</p>
+        </div>
+        <div class="pill">
+          <div class="p-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg></div>
+          <h3>Cost-intelligent</h3>
+          <p>Token budgets, per-tenant spend caps, and real-time meters that hard-stop at your limit — not after the bill lands.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section class="section" id="pricing">
+    <div class="container">
+      <span class="section-eyebrow">Pricing</span>
+      <h2 class="section-title">Activate once. Fund your reserve. Pay for governed execution.</h2>
+      <p class="section-copy">No subscriptions. No token fiction. No surprise invoices. Free Evaluation has no reserve and no production routing. Paid workspaces activate once, fund a USD Operating Reserve, and debit that reserve only when governed work happens.</p>
+      <div class="pricing-ledger" aria-label="Pricing model">
+        <div class="ledger-cell">
+          <div class="label">Free Evaluation</div>
+          <div class="value">$0 reserve</div>
+          <div class="note">15 governed Playground runs, 3 compare runs, 20 policy tests, 2 watermarked exports.</div>
+        </div>
+        <div class="ledger-cell">
+          <div class="label">Activation</div>
+          <div class="value">$395 / $795 / $2,500+</div>
+          <div class="note">One-time activation by tier: Founding, Standard, or Regulated.</div>
+        </div>
+        <div class="ledger-cell">
+          <div class="label">Operating Reserve</div>
+          <div class="value">$150 / $300 / $2,500</div>
+          <div class="note">Minimum reserve required after activation. USD-denominated and non-expiring.</div>
+        </div>
+        <div class="ledger-cell">
+          <div class="label">Debit rule</div>
+          <div class="value">Per governed event</div>
+          <div class="note">Playground, compare, governance calls, exports, evidence packages, and auditor bundles.</div>
+        </div>
+      </div>
+      <div class="pricing-grid">
+        <article class="plan">
+          <span class="tier">Free Evaluation</span><h4>Evaluate</h4>
+          <div class="value">$0</div>
+          <div class="muted-small">No production routing</div>
+          <ul>
+            <li>15 governed Playground runs</li>
+            <li>3 compare runs · 20 policy tests</li>
+            <li>2 watermarked exports</li>
+            <li>BYOK provider testing</li>
+            <li>Tools browsing</li>
+          </ul>
+        </article>
+        <article class="plan highlight">
+          <span class="tier">Founding · most chosen</span><h4>Founding Activation</h4>
+          <div class="value">$395 <span class="muted-small">one-time</span></div>
+          <div class="muted-small">+ $150 minimum Operating Reserve</div>
+          <ul>
+            <li>Playground run — $0.25</li>
+            <li>Compare run — $0.75</li>
+            <li>BYOK Governance Calls — $6 / 1,000</li>
+            <li>Managed Governance Calls — $12 / 1,000</li>
+          </ul>
+        </article>
+        <article class="plan">
+          <span class="tier">Standard</span><h4>Standard</h4>
+          <div class="value">$795 <span class="muted-small">one-time</span></div>
+          <div class="muted-small">+ $300 minimum Operating Reserve</div>
+          <ul>
+            <li>Playground run — $0.40</li>
+            <li>Compare run — $1.20</li>
+            <li>BYOK Governance Calls — $8 / 1,000</li>
+            <li>Managed Governance Calls — $16 / 1,000</li>
+          </ul>
+        </article>
+        <article class="plan">
+          <span class="tier">Regulated / Enterprise</span><h4>Regulated</h4>
+          <div class="value">From $2,500 <span class="muted-small">activation</span></div>
+          <div class="muted-small">+ $2,500 minimum reserve · private terms</div>
+          <ul>
+            <li>BYOK Governance Calls — $10 / 1,000</li>
+            <li>Managed Governance Calls — $20 / 1,000</li>
+            <li>Private deployment</li>
+            <li>Procurement & security review</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="price-table-wrap" aria-label="Detailed pricing ladder">
+        <div class="price-table-head">
+          <h4>Full pricing ladder</h4>
+          <span class="eyebrow">Per event · versioned · v1_public</span>
+        </div>
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th class="col-founding">Founding</th>
+              <th>Standard</th>
+              <th>Regulated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="event">Playground governed run</td>
+              <td class="num col-founding">$0.25</td>
+              <td class="num">$0.40</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">Compare run</td>
+              <td class="num col-founding">$0.75</td>
+              <td class="num">$1.20</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">Signed Playground export</td>
+              <td class="num col-founding">$3</td>
+              <td class="num">$4</td>
+              <td class="num">contact</td>
+            </tr>
+            <tr>
+              <td class="event">BYOK Governance Calls (per 1,000)</td>
+              <td class="num col-founding">$6</td>
+              <td class="num">$8</td>
+              <td class="num">$10</td>
+            </tr>
+            <tr>
+              <td class="event">Managed Governance Calls (per 1,000)</td>
+              <td class="num col-founding">$12</td>
+              <td class="num">$16</td>
+              <td class="num">$20</td>
+            </tr>
+            <tr>
+              <td class="event">Signed Evidence Package</td>
+              <td class="num col-founding">$99</td>
+              <td class="num">$149</td>
+              <td class="num">$199</td>
+            </tr>
+            <tr>
+              <td class="event">Auditor Bundle</td>
+              <td class="num col-founding">$249</td>
+              <td class="num">$349</td>
+              <td class="num">$499</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="access-wrap" aria-label="Playground versus activated workspace">
+        <div class="access-head">
+          <h4>Playground vs Activated Workspace</h4>
+          <span class="eyebrow">Access model · evidence is paywalled</span>
+        </div>
+        <table class="access-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Playground</th>
+              <th>Activated Workspace</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Governed runs</td>
+              <td>Limited evaluation runs in shared/demo context.</td>
+              <td>Production-oriented governed execution in your own workspace.</td>
+            </tr>
+            <tr>
+              <td>Retention</td>
+              <td>Short-lived only; not for compliance recordkeeping.</td>
+              <td>Durable retention under workspace policy and controls.</td>
+            </tr>
+            <tr>
+              <td>Signed artifacts</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Signed, exportable artifacts for governed runs.</td>
+            </tr>
+            <tr>
+              <td>Evidence packs</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Generate/export evidence packs for audits, incidents, and procurement.</td>
+            </tr>
+            <tr>
+              <td>Auditor bundles</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Structured auditor handoff bundles with export controls.</td>
+            </tr>
+            <tr>
+              <td>Bulk export + retention controls</td>
+              <td><span class="locked-pill">Activation required</span></td>
+              <td>Case/time-window export and retention policy management.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="warn-copy">
+        The Playground is for evaluation only and is not suitable for compliance evidence, long-term
+        recordkeeping, or regulatory audit use. Free lets you see governed AI. Paid lets you prove it.
+      </div>
+
+      <p class="section-copy" style="margin-top:24px; font-size:13px; color:var(--muted);">Tools providers monetize through a 12% standard take (8% for preferred partners). Founding providers keep 100% of their first $2,500 GMV. Payouts NET-14.</p>
+
+      <div class="cta-band">
         <div>
-          <div class="eyebrow">Developer Platform / BYOS Backend</div>
-          <h1>Verify governed AI before you install it.</h1>
-          <p class="lead">Veklom.dev is the technical proof site: backend health, license flow, tenant isolation, policy routing, fallback posture, evidence, archive, and replay.</p>
-          <div class="cta-row">
-            <a class="btn primary" href="/demo/">Run live backend demo</a>
-            <a class="btn" href="https://api.veklom.com/status">Open status JSON</a>
-            <a class="btn" href="https://veklom.com/gpc/">View GPC on .com</a>
-          </div>
+          <h3>You just watched it work. Now run it on your data.</h3>
+          <p>Free Evaluation — 15 governed runs, no card, no key exposure. Keep every audit artifact you generate.</p>
         </div>
-        <div class="hero-foot" aria-label="Platform proof points">
-          <div>
-            <strong>BYOS</strong>
-            <span>Private deployment path, license verification, and self-hosted runtime posture.</span>
-          </div>
-          <div>
-            <strong>UACP</strong>
-            <span>Policy, route, reserve, audit, evidence, and replay boundaries.</span>
-          </div>
-          <div>
-            <strong>Live</strong>
-            <span>This page reads public health endpoints instead of decorative claims.</span>
-          </div>
+        <div style="display:flex; gap:12px;">
+          <a class="cta-primary" href="/signup/">Start Free Evaluation</a>
+          <a class="cta-ghost" href="mailto:founder@veklom.com">Talk to sales</a>
         </div>
       </div>
+    </div>
+  </section>
+</main>
 
-      <div class="console" id="runtime">
-        <div class="console-frame">
-          <div class="console-head">
-            <span>runtime inspection</span>
-            <span class="status-dot" id="overallStatus">checking</span>
-          </div>
-          <div class="terminal" aria-live="polite">
-            <div><span class="cmd">$ curl https://api.veklom.com/status</span></div>
-            <div>db: <span id="dbStatus" class="muted">checking</span></div>
-            <div>redis: <span id="redisStatus" class="muted">checking</span></div>
-            <div>llm: <span id="llmStatus" class="muted">checking</span></div>
-            <div>model: <span id="modelStatus" class="muted">pending</span></div>
-            <div>fallback: <span id="fallbackStatus" class="muted">pending</span></div>
-            <br />
-            <div><span class="cmd">$ curl https://license.veklom.com/health</span></div>
-            <div>license: <span id="licenseStatus" class="muted">checking</span></div>
-          </div>
-          <div class="proof-grid">
-            <div class="proof">
-              <div class="label">API</div>
-              <span class="value" id="apiProof">pending</span>
-            </div>
-            <div class="proof">
-              <div class="label">License</div>
-              <span class="value" id="licenseProof">pending</span>
-            </div>
-            <div class="proof">
-              <div class="label">Runtime</div>
-              <span class="value" id="runtimeProof">pending</span>
-            </div>
-            <div class="proof">
-              <div class="label">Updated</div>
-              <span class="value" id="updatedProof">now</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+<footer class="footer">
+  <div class="container f-inner">
+    <div>
+      <a href="/status.html">Status</a>
+      <a href="/workspace-app#/marketplace">Tools</a>
+      <a href="/legal/terms">Terms</a>
+      <a href="/legal/privacy">Privacy</a>
+      <a href="/login/">Sign In</a>
+    </div>
+    <div>© Veklom · Sovereign Control Node</div>
+  </div>
+</footer>
 
-    <section class="section" id="contract">
-      <div class="shell section-grid">
-        <div>
-          <div class="eyebrow">Technical contract</div>
-          <h2>Not the buyer homepage. Not the GPC demo.</h2>
-          <p>This surface exists for engineers, security reviewers, and deployment owners who need proof that the backend can be integrated, verified, and operated without mixing customer marketing with runtime evidence.</p>
-        </div>
-        <div class="matrix">
-          <article class="matrix-row">
-            <h3>License and access flow</h3>
-            <p>Issue, verify, download, and version backend access through explicit license service boundaries.</p>
-          </article>
-          <article class="matrix-row">
-            <h3>Tenant isolation</h3>
-            <p>Workspace, user, run, audit, evidence, and reserve records stay scoped by tenant identity.</p>
-          </article>
-          <article class="matrix-row">
-            <h3>Policy routing</h3>
-            <p>Requests pass through policy, budget, provider, fallback, and audit gates before execution.</p>
-          </article>
-          <article class="matrix-row">
-            <h3>Replayable evidence</h3>
-            <p>Important decisions produce evidence trails that can be inspected, exported, and replayed.</p>
-          </article>
-        </div>
-      </div>
-    </section>
+<script src="/app/auth.js"></script>
+<script>
+/* ==============================================================
+   VEKLOM LIVE PIPELINE THEATER
+   - SSE-driven: /api/v1/demo/pipeline/stream  (AI mode)
+   - REST    : /api/v1/edge/demo/infrastructure (Edge mode)
+   - All animation state derives from real server events.
+   ============================================================== */
+(function () {
+  // Buyer site routes public demo traffic to the production API.
+  // Allow override via window.VEKLOM_API for local dev.
+  const API_BASE = (function () {
+    if (typeof window !== "undefined" && window.VEKLOM_API) return window.VEKLOM_API.replace(/\/+$/, "");
+    const h = (typeof location !== "undefined" && location.hostname) || "";
+    if (/^localhost$|^127\.|^0\.0\.0\.0$/.test(h)) return "/api/v1"; // same-origin when served by backend
+    return "https://api.veklom.com/api/v1";
+  })();
 
-    <section class="section" id="routes">
-      <div class="shell section-grid">
-        <div>
-          <div class="eyebrow">Integration routes</div>
-          <h2>Backend surfaces that have to stay honest.</h2>
-          <p>The developer site points directly at technical surfaces. The buyer journey and pricing stay on .com; BYOS proof and backend state live here.</p>
-        </div>
-        <div class="routes">
-          <a class="route" href="https://api.veklom.com/health"><span>/health</span><span>API liveness and service identity</span><span>open</span></a>
-          <a class="route" href="https://api.veklom.com/status"><span>/status</span><span>DB, Redis, LLM, fallback, and circuit breaker posture</span><span>open</span></a>
-          <a class="route" href="https://license.veklom.com/health"><span>license health</span><span>License service liveness and uptime</span><span>open</span></a>
-          <a class="route" href="https://veklom.com/gpc/"><span>.com /gpc</span><span>Buyer-facing Governed Plan Compiler flagship demo</span><span>open</span></a>
-        </div>
-      </div>
-    </section>
+  // Pipeline definitions (the shape of the control plane)
+  const PIPELINES = {
+    ai: {
+      label: "Live Backend Execution",
+      nodes: [
+        { id: "request_received",    title: "Request",        sub: "inbound" },
+        { id: "zero_trust_check",    title: "Zero-Trust",     sub: "auth · policy" },
+        { id: "rate_limit_check",    title: "Rate Limit",     sub: "per tenant / ip" },
+        { id: "token_budget_check",  title: "Token Budget",   sub: "per workspace" },
+        { id: "circuit_breaker_check", title: "Circuit Breaker", sub: "self-heal" },
+        { id: "provider_selected",   title: "Provider Route", sub: "ollama · groq" },
+        { id: "redis_memory_check",  title: "Memory",         sub: "redis · scoped" },
+        { id: "response_complete",   title: "Response",       sub: "streamed" },
+        { id: "audit_cost",          title: "Audit + Cost",   sub: "signed artifact" },
+      ],
+      // map server events → node ids they "own"
+      eventMap: {
+        request_received:       "request_received",
+        zero_trust_check:       "zero_trust_check",
+        rate_limit_check:       "rate_limit_check",
+        token_budget_check:     "token_budget_check",
+        circuit_breaker_check:  "circuit_breaker_check",
+        provider_selected:      "provider_selected",
+        ollama_attempt:         "provider_selected",
+        ollama_unavailable:     "provider_selected",
+        circuit_breaker_opened: "circuit_breaker_check",
+        redis_memory_check:     "redis_memory_check",
+        token_delta:            "response_complete",
+        response_complete:      "response_complete",
+        audit_written:          "audit_cost",
+        cost_recorded:          "audit_cost",
+      },
+    },
+    edge: {
+      label: "Infrastructure Control Plane",
+      nodes: [
+        { id: "legacy_signal",    title: "Legacy Signal",   sub: "snmp · modbus" },
+        { id: "protocol_ingest",  title: "Protocol Ingest", sub: "adapters" },
+        { id: "normalize",        title: "Normalize",       sub: "canonical schema" },
+        { id: "policy_control",   title: "Policy Control",  sub: "rules engine" },
+        { id: "ai_decision",      title: "AI Decision",     sub: "governed" },
+        { id: "audit_cost",       title: "Audit + Cost",    sub: "signed artifact" },
+      ],
+    },
+  };
 
-    <section class="final">
-      <div class="shell">
-        <div class="eyebrow">Deployment proof path</div>
-        <h2>Use .com to understand the hub. Use .dev to prove the backend.</h2>
-        <div class="cta-row">
-          <a class="btn primary" href="/demo/">Run live backend demo</a>
-          <a class="btn" href="https://api.veklom.com/status">Inspect runtime JSON</a>
-        </div>
-      </div>
-    </section>
-  </main>
+  // ---- DOM refs ----
+  const $ = (id) => document.getElementById(id);
+  const svg           = $("pipeSvg");
+  const edgesLayer    = $("edgesLayer");
+  const nodesLayer    = $("nodesLayer");
+  const particlesLayer= $("particlesLayer");
+  const laneLabel     = $("laneLabel");
+  const termBody      = $("termBody");
+  const termTraceId   = $("termTraceId");
+  const promptInput   = $("promptInput");
+  const promptCount   = $("promptCount");
+  const runBtn        = $("btnRun");
+  const runLabel      = $("runLabel");
+  const metLatency    = $("metLatency");
+  const metTokens     = $("metTokens");
+  const metProvider   = $("metProvider");
+  const metPolicy     = $("metPolicy");
+  const metBillable   = $("metBillable");
+  const chipBackend   = $("chipBackend");
+  const chipProvider  = $("chipProvider");
+  const chipCB        = $("chipCB");
+  const auditCard     = $("auditCard");
+  const auditStatus   = $("auditStatus");
+  const auditHash     = $("auditHash");
+  const costCard      = $("costCard");
+  const costStatus    = $("costStatus");
+  const kvDemo        = $("kvDemo");
+  const kvBillable    = $("kvBillable");
+  const kvCredits     = $("kvCredits");
+  const protocolCard  = $("protocolCard");
+  const protocolStatus = $("protocolStatus");
+  const protocolLastChecked = $("protocolLastChecked");
+  const protocolRows  = $("protocolRows");
+  const protocolProof = $("protocolProof");
+  const aiControls    = $("aiControls");
+  const edgeControls  = $("edgeControls");
+  const verticalsBar  = $("verticals");
+  const ctrlTitle     = $("ctrlTitle");
 
-  <script>
-    const $ = (id) => document.getElementById(id);
-    const set = (id, value, cls = "ok") => {
-      const el = $(id);
-      if (!el) return;
-      el.textContent = value;
-      el.className = cls;
+  let mode = "ai";
+  let selectedEdgeScenario = "network";
+  let selectedVertical = "default";
+  let currentES = null;
+  let nodeEls = new Map();
+  let edgeEls = [];
+  let streamText = "";
+  let streamLine = null;
+  let latencyStart = 0;
+  let latencyTimer = null;
+
+  // ---- Pipeline render ----
+  const NS = "http://www.w3.org/2000/svg";
+  function clearLayer(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+  function renderPipeline() {
+    clearLayer(edgesLayer); clearLayer(nodesLayer); clearLayer(particlesLayer);
+    nodeEls.clear(); edgeEls = [];
+    const def = PIPELINES[mode];
+    laneLabel.textContent = def.label;
+
+    const nodes = def.nodes;
+    const W = 900, H = 600;
+    const padX = 60, padTop = 70, padBot = 70;
+    const usableH = H - padTop - padBot;
+
+    // Layout: vertical cascade for cinematic feel
+    const positions = nodes.map((n, i) => {
+      const t = nodes.length === 1 ? 0 : i / (nodes.length - 1);
+      const y = padTop + t * usableH;
+      // gentle S-curve x for visual rhythm
+      const x = (W / 2) + Math.sin(t * Math.PI * 1.4) * 120;
+      return { x, y };
+    });
+
+    // Edges first (so nodes draw on top)
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = positions[i], b = positions[i + 1];
+      const mx = (a.x + b.x) / 2;
+      const d = `M ${a.x} ${a.y + 26} C ${mx} ${a.y + 60}, ${mx} ${b.y - 60}, ${b.x} ${b.y - 26}`;
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("class", "edge-line");
+      path.dataset.fromIdx = i;
+      path.dataset.toIdx = i + 1;
+      edgesLayer.appendChild(path);
+      edgeEls.push(path);
+    }
+
+    // Nodes
+    nodes.forEach((n, i) => {
+      const { x, y } = positions[i];
+      const g = document.createElementNS(NS, "g");
+      g.setAttribute("class", "pnode idle");
+      g.setAttribute("transform", `translate(${x - 110}, ${y - 26})`);
+      g.dataset.id = n.id; g.dataset.idx = i;
+
+      const pulse = document.createElementNS(NS, "rect");
+      pulse.setAttribute("class", "node-pulse");
+      pulse.setAttribute("x", "-4"); pulse.setAttribute("y", "-4");
+      pulse.setAttribute("width", "228"); pulse.setAttribute("height", "60");
+      pulse.setAttribute("rx", "10");
+      g.appendChild(pulse);
+
+      const box = document.createElementNS(NS, "rect");
+      box.setAttribute("class", "node-box");
+      box.setAttribute("width", "220"); box.setAttribute("height", "52");
+      box.setAttribute("rx", "8");
+      g.appendChild(box);
+
+      const idx = document.createElementNS(NS, "text");
+      idx.setAttribute("x", "12"); idx.setAttribute("y", "20");
+      idx.setAttribute("class", "node-sub");
+      idx.textContent = String(i + 1).padStart(2, "0");
+      g.appendChild(idx);
+
+      const title = document.createElementNS(NS, "text");
+      title.setAttribute("x", "36"); title.setAttribute("y", "22");
+      title.setAttribute("class", "node-title");
+      title.textContent = n.title;
+      g.appendChild(title);
+
+      const sub = document.createElementNS(NS, "text");
+      sub.setAttribute("x", "36"); sub.setAttribute("y", "40");
+      sub.setAttribute("class", "node-sub");
+      sub.textContent = n.sub;
+      g.appendChild(sub);
+
+      // status dot on the right
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", "204"); dot.setAttribute("cy", "26");
+      dot.setAttribute("r", "3.5");
+      dot.setAttribute("fill", "#3a4055");
+      dot.dataset.role = "dot";
+      g.appendChild(dot);
+
+      nodesLayer.appendChild(g);
+      nodeEls.set(n.id, { g, dot, pos: positions[i] });
+    });
+  }
+
+  function setNodeState(id, state) {
+    const e = nodeEls.get(id);
+    if (!e) return;
+    e.g.classList.remove("idle", "active", "done", "warn", "err");
+    e.g.classList.add(state);
+    const dotColor = { active: "#e5b16e", done: "#5dd8a5", warn: "#f0b340", err: "#ff6b6b", idle: "#3a4055" }[state] || "#3a4055";
+    e.dot.setAttribute("fill", dotColor);
+  }
+  function setEdgeState(fromIdx, state) {
+    edgeEls.forEach(p => {
+      if (parseInt(p.dataset.fromIdx, 10) === fromIdx) {
+        p.classList.remove("active", "done", "err");
+        if (state) p.classList.add(state);
+      }
+    });
+  }
+  function advanceTo(nodeId) {
+    const def = PIPELINES[mode];
+    const idxs = def.nodes.map(n => n.id);
+    const target = idxs.indexOf(nodeId);
+    if (target < 0) return;
+    for (let i = 0; i < target; i++) { setNodeState(idxs[i], "done"); setEdgeState(i, "done"); }
+    setNodeState(idxs[target], "active");
+    if (target < idxs.length - 1) setEdgeState(target, "active");
+    launchParticle(target);
+  }
+
+  function launchParticle(fromIdx) {
+    const def = PIPELINES[mode];
+    if (fromIdx >= def.nodes.length - 1) return;
+    const edge = edgeEls[fromIdx];
+    if (!edge) return;
+    const len = edge.getTotalLength();
+    const p = document.createElementNS(NS, "circle");
+    p.setAttribute("r", "3");
+    p.setAttribute("class", "particle");
+    particlesLayer.appendChild(p);
+    const start = performance.now();
+    const dur = 900;
+    function step(t) {
+      const k = Math.min(1, (t - start) / dur);
+      const pt = edge.getPointAtLength(len * k);
+      p.setAttribute("cx", pt.x);
+      p.setAttribute("cy", pt.y);
+      if (k < 1) requestAnimationFrame(step);
+      else p.remove();
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---- Terminal ----
+  function tstamp() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+  function termPush(event, text, cls) {
+    const line = document.createElement("div");
+    line.className = "term-line";
+    line.innerHTML =
+      `<span class="t-time">${tstamp()}</span>` +
+      `<span class="t-evt ${cls || ''}">${event}</span>` +
+      `<span class="t-txt"></span>`;
+    line.querySelector(".t-txt").textContent = text;
+    termBody.appendChild(line);
+    termBody.scrollTop = termBody.scrollHeight;
+    return line;
+  }
+  function termStreamStart() {
+    streamText = "";
+    const line = document.createElement("div");
+    line.className = "term-line";
+    line.innerHTML =
+      `<span class="t-time">${tstamp()}</span>` +
+      `<span class="t-evt ok">response</span>` +
+      `<span class="term-stream"></span><span class="caret"></span>`;
+    termBody.appendChild(line);
+    streamLine = line.querySelector(".term-stream");
+    termBody.scrollTop = termBody.scrollHeight;
+  }
+  function termStreamDelta(d) {
+    if (!streamLine) termStreamStart();
+    streamText += d;
+    streamLine.textContent = streamText;
+    termBody.scrollTop = termBody.scrollHeight;
+  }
+  function termStreamEnd() {
+    if (!streamLine) return;
+    const caret = streamLine.parentElement.querySelector(".caret");
+    if (caret) caret.remove();
+    streamLine = null;
+  }
+  function resetTerm() {
+    termBody.innerHTML =
+      `<div class="term-line"><span class="t-time">${tstamp()}</span>` +
+      `<span class="t-evt">boot</span><span class="t-txt">connecting to veklom control plane…</span></div>`;
+  }
+
+  // ---- Live latency meter ----
+  function startLatency() {
+    latencyStart = performance.now();
+    clearInterval(latencyTimer);
+    latencyTimer = setInterval(() => {
+      const ms = Math.round(performance.now() - latencyStart);
+      metLatency.textContent = `${ms} ms`;
+    }, 33);
+  }
+  function stopLatency(finalMs) {
+    clearInterval(latencyTimer); latencyTimer = null;
+    if (typeof finalMs === "number") metLatency.textContent = `${finalMs} ms`;
+  }
+
+  // ---- Reset state before each run ----
+  function resetPipelineState() {
+    renderPipeline();
+    resetTerm();
+    streamText = ""; streamLine = null;
+    metLatency.textContent = "—";
+    metTokens.textContent = "—";
+    metProvider.textContent = "—";
+    metPolicy.textContent = "—"; metPolicy.className = "m-value";
+    metBillable.textContent = "—"; metBillable.className = "m-value";
+    chipProvider.className = "chip";
+    chipProvider.innerHTML = mode === "edge"
+      ? '<span class="dot"></span>Provider: awaiting protocol'
+      : '<span class="dot"></span>Provider: awaiting model';
+    chipCB.className = "chip"; chipCB.innerHTML = '<span class="dot"></span>Circuit: —';
+    auditCard.classList.remove("locked");
+    auditStatus.textContent = "pending"; auditHash.textContent = "—";
+    costCard.classList.remove("locked");
+    costStatus.textContent = "pending";
+    kvDemo.textContent = "—"; kvBillable.textContent = "—"; kvCredits.textContent = "—";
+  }
+
+  function renderProtocolCanary(summary) {
+    if (!protocolCard) return;
+    const rows = summary?.checks || {};
+    const status = String(summary?.status || "unavailable");
+    protocolCard.classList.toggle("locked", status === "ok");
+    protocolStatus.textContent = status;
+    protocolStatus.className = "h-right " + (
+      status === "ok" ? "ok" :
+      status === "degraded" ? "warn" :
+      status === "not_run" ? "warn" :
+      "err"
+    );
+    protocolLastChecked.textContent = "Last checked: " + (summary?.last_checked_at || "—");
+    protocolRows.innerHTML = [
+      ["SNMP", rows.snmp],
+      ["Modbus TCP", rows.modbus_tcp],
+      ["MQTT", rows.mqtt],
+      ["Webhook", rows.webhook],
+    ].map(([label, value]) => {
+      const state = String(value || "unavailable");
+      const cls = state === "passed" ? "ok" : state === "degraded" || state === "not_run" ? "warn" : "err";
+      return `<div class="protocol-row"><span class="name">${label}</span><span class="status ${cls}">${state}</span></div>`;
+    }).join("");
+    const proof = summary?.proof || {};
+    if (status === "unavailable") {
+      protocolProof.textContent = "Protocol proof endpoint unavailable in this deployment.";
+      return;
+    }
+    protocolProof.textContent = [
+      `normalized=${proof.normalized ? "true" : "false"}`,
+      `decision=${proof.decision ? "true" : "false"}`,
+      `audit=${proof.audit ? "true" : "false"}`,
+      `cost_control=${proof.cost_control ? "true" : "false"}`,
+    ].join(" · ");
+  }
+
+  function setRunning(on, label) {
+    runBtn.disabled = on;
+    runLabel.innerHTML = on
+      ? `<span class="spinner"></span> ${label || "Streaming…"}`
+      : (label || "Run pipeline");
+  }
+
+  // ---- AI mode: SSE ----
+  function runAI({ forceFallback = false } = {}) {
+    if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
+    const prompt = (promptInput.value || "").trim();
+    if (!prompt) { promptInput.focus(); return; }
+    mode = "ai"; renderPipeline();
+    resetPipelineState();
+    setRunning(true, forceFallback ? "Breaking it safely…" : "Streaming…");
+    startLatency();
+
+    const url = new URL(API_BASE + "/demo/pipeline/stream");
+    url.searchParams.set("prompt", prompt.slice(0, 800));
+    url.searchParams.set("vertical", selectedVertical);
+    if (forceFallback) url.searchParams.set("force_fallback", "true");
+
+    const es = new EventSource(url.toString());
+    currentES = es;
+
+    function eventOn(name, handler) { es.addEventListener(name, (e) => { try { handler(JSON.parse(e.data)); } catch(err) { console.warn(name, err); } }); }
+
+    eventOn("request_received", (d) => {
+      termTraceId.textContent = "trace: " + d.trace_id;
+      termPush("request", `inbound · ${d.prompt_len} chars · vertical=${d.vertical}${d.force_fallback ? " · chaos=on" : ""}`);
+      advanceTo("request_received");
+    });
+    eventOn("zero_trust_check", (d) => {
+      termPush("zero-trust", `policy=${d.policy} · demo_mode=${d.demo_mode}`, "ok");
+      metPolicy.textContent = "passed"; metPolicy.className = "m-value ok";
+      advanceTo("zero_trust_check");
+    });
+    eventOn("rate_limit_check", (d) => {
+      termPush("rate-limit", `hits=${d.hits}/${d.limit} · remaining=${d.remaining}`, "ok");
+      advanceTo("rate_limit_check");
+    });
+    eventOn("token_budget_check", (d) => {
+      termPush("token-budget", `cap=${d.output_cap} · billable=${d.billable}`, "ok");
+      metBillable.textContent = d.billable ? "yes" : "no";
+      metBillable.className = d.billable ? "m-value warn" : "m-value ok";
+      advanceTo("token_budget_check");
+    });
+    eventOn("circuit_breaker_check", (d) => {
+      const cls = d.state === "open" ? "err" : d.state === "half_open" ? "warn" : "ok";
+      termPush("circuit-breaker", `state=${d.state} · failures=${d.failures}/${d.threshold}${d.forced ? " · FORCED" : ""}`, cls);
+      chipCB.className = "chip " + (cls === "err" ? "err" : cls === "warn" ? "warn" : "ok");
+      chipCB.innerHTML = `<span class="dot"></span>Circuit: ${d.state}`;
+      advanceTo("circuit_breaker_check");
+    });
+    eventOn("hot_cache_check", (d) => {
+      const cls = d.status === "hit" || d.status === "mirror_hit" ? "ok" : d.status === "mirror_wait" ? "warn" : "";
+      const mirror = d.mirror ? ` · mirror=${d.mirror}` : "";
+      const model = d.model ? ` · ${d.model}` : "";
+      termPush("cache", `status=${d.status} · store=${d.store}${mirror}${model}`, cls);
+    });
+    eventOn("provider_selected", (d) => {
+      termPush("provider", `${d.provider} · ${d.model} · reason=${d.reason}${d.sovereign ? " · sovereign" : ""}`, d.sovereign ? "ok" : "warn");
+      chipProvider.className = "chip " + (d.sovereign ? "ok" : "warn");
+      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${d.provider}`;
+      metProvider.textContent = d.provider;
+      metProvider.className = "m-value " + (d.sovereign ? "ok" : "warn");
+      advanceTo("provider_selected");
+    });
+    eventOn("ollama_attempt", (d) => {
+      termPush("ollama", `model=${d.model} · host=${d.base_url} · stream=${d.stream}`);
+    });
+    eventOn("ollama_unavailable", (d) => {
+      termPush("ollama·fail", `${d.simulated ? "simulated outage" : d.reason}`, "err");
+      setNodeState("circuit_breaker_check", "err");
+    });
+    eventOn("circuit_breaker_opened", (d) => {
+      termPush("circuit·open", `${d.simulated ? "SIMULATED" : "opened"} — routing to fallback`, "warn");
+      chipCB.className = "chip warn"; chipCB.innerHTML = '<span class="dot"></span>Circuit: open';
+    });
+    eventOn("redis_memory_check", (d) => {
+      termPush("memory", `tenant=${d.tenant_scope} · ttl=${d.ttl_sec}s · ephemeral=${d.demo_ephemeral}`, "ok");
+      advanceTo("redis_memory_check");
+    });
+    eventOn("token_delta", (d) => {
+      if (!streamLine) { advanceTo("response_complete"); termStreamStart(); }
+      termStreamDelta(d.delta);
+    });
+    eventOn("response_complete", (d) => {
+      termStreamEnd();
+      termPush("complete", `tokens=${d.total_tokens} · latency=${d.latency_ms}ms · ${d.model}`, "ok");
+      metTokens.textContent = d.total_tokens;
+      stopLatency(d.latency_ms);
+      setNodeState("response_complete", "done");
+      setEdgeState(7, "done");
+    });
+    eventOn("audit_written", (d) => {
+      termPush("audit", `hash=${d.audit_hash.slice(0, 18)}… · store=${d.store}`, "ok");
+      auditCard.classList.add("locked");
+      auditStatus.textContent = "locked";
+      revealHash(d.audit_hash);
+      setNodeState("audit_cost", "active");
+    });
+    eventOn("cost_recorded", (d) => {
+      const runs = d.governance_runs_charged ?? d.credits_charged ?? 0;
+      termPush("cost", `billable=${d.billable} · governance_runs=${runs}`, "ok");
+      costCard.classList.add("locked");
+      costStatus.textContent = "locked";
+      kvDemo.textContent = String(d.public_demo); kvDemo.className = "v ok";
+      kvBillable.textContent = String(d.billable); kvBillable.className = "v " + (d.billable ? "warn" : "ok");
+      kvCredits.textContent = runs;
+      setNodeState("audit_cost", "done");
+    });
+    eventOn("error", (d) => {
+      termPush("error", d.message || "stream error", "err");
+    });
+    eventOn("done", (d) => {
+      termPush("done", `total=${d.total_latency_ms}ms · trace=${d.trace_id}`, "ok");
+      try { es.close(); } catch(e){}
+      currentES = null;
+      setRunning(false);
+      stopLatency();
+    });
+    es.onerror = (err) => {
+      console.warn("SSE error", err);
+      termPush("stream", "connection closed", "warn");
+      try { es.close(); } catch(e){}
+      currentES = null;
+      setRunning(false);
+      stopLatency();
     };
+  }
 
-    async function readJson(url) {
-      const started = performance.now();
-      const response = await fetch(url, { cache: "no-store" });
-      const elapsed = Math.round(performance.now() - started);
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      return { data: await response.json(), elapsed };
-    }
+  function revealHash(hash) {
+    auditHash.textContent = "";
+    const span = document.createElement("span");
+    span.className = "glow";
+    auditHash.appendChild(span);
+    let i = 0;
+    (function type() {
+      if (i >= hash.length) return;
+      span.textContent += hash[i++];
+      setTimeout(type, 14);
+    })();
+  }
 
-    async function inspectRuntime() {
-      const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      $("updatedProof").textContent = timestamp;
-      try {
-        const api = await readJson("https://api.veklom.com/status");
-        set("dbStatus", api.data.db_ok ? "ok" : "failed", api.data.db_ok ? "ok" : "warn");
-        set("redisStatus", api.data.redis_ok ? "ok" : "failed", api.data.redis_ok ? "ok" : "warn");
-        set("llmStatus", api.data.llm_ok ? "ok" : "failed", api.data.llm_ok ? "ok" : "warn");
-        set("modelStatus", api.data.llm_model || "not reported");
-        set("fallbackStatus", api.data.groq_fallback_enabled ? "enabled" : "disabled", api.data.groq_fallback_enabled ? "ok" : "warn");
-        $("apiProof").textContent = `${api.elapsed}ms`;
-        $("runtimeProof").textContent = api.data.circuit_breaker?.state || "reported";
-      } catch (error) {
-        set("dbStatus", "unavailable", "warn");
-        set("redisStatus", "unavailable", "warn");
-        set("llmStatus", "unavailable", "warn");
-        $("apiProof").textContent = "failed";
-        $("runtimeProof").textContent = error.message;
+  // ---- Edge mode: one-shot REST ----
+  async function runEdge(scenario) {
+    if (currentES) { try { currentES.close(); } catch(e){} currentES = null; }
+    mode = "edge"; renderPipeline();
+    resetPipelineState();
+    setRunning(true, scenario === "network" ? "Ingesting SNMP…" : "Ingesting Modbus…");
+    startLatency();
+
+    const order = ["legacy_signal", "protocol_ingest", "normalize", "policy_control", "ai_decision", "audit_cost"];
+    // animate the first 2 nodes optimistically while the fetch is in flight
+    advanceTo("legacy_signal");
+    termPush("ingest", `scenario=${scenario} · awaiting backend state`);
+    setTimeout(() => advanceTo("protocol_ingest"), 180);
+
+    try {
+      const res = await fetch(`${API_BASE}/edge/demo/infrastructure?scenario=${scenario}&live=true`, {
+        headers: { "Accept": "application/json" }, cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json();
+
+      const source = payload.normalized_event?.source || payload.source || "demo";
+      const isFallback = payload.fallback === true;
+      const isLive = payload.live === true && !isFallback;
+      const protocolCls = isLive ? "ok" : isFallback ? "warn" : "err";
+      termPush("protocol", `${payload.protocol || "?"} · src=${source} · ${isLive ? "live" : isFallback ? "fallback" : "offline"}`, protocolCls);
+      chipProvider.className = "chip " + (isLive ? "ok" : isFallback ? "warn" : "err");
+      chipProvider.innerHTML = `<span class="dot"></span>Provider: ${payload.protocol || "unknown"}${isFallback ? " fallback" : ""}`;
+      advanceTo("normalize");
+      await sleep(220);
+
+      const decision = payload.decision || {};
+      const severity = decision.severity || "info";
+      termPush("policy", `severity=${severity} · ${decision.summary || "—"}`, severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
+      // Paint policy_control node severity-tinted
+      advanceTo("policy_control");
+      if (severity === "critical") setNodeState("policy_control", "err");
+      else if (severity === "warning") setNodeState("policy_control", "warn");
+      await sleep(220);
+
+      const actions = decision.recommended_actions || [];
+      termPush("decision", actions[0] || "review trace", "ok");
+      advanceTo("ai_decision");
+      metProvider.textContent = payload.protocol || "edge";
+      metProvider.className = "m-value ok";
+      metTokens.textContent = "—";
+      metPolicy.textContent = severity; metPolicy.className = "m-value " + (severity === "critical" ? "err" : severity === "warning" ? "warn" : "ok");
+      metBillable.textContent = payload.cost_control?.billable ? "yes" : "no";
+      metBillable.className = payload.cost_control?.billable ? "m-value warn" : "m-value ok";
+
+      await sleep(180);
+      advanceTo("audit_cost");
+      const audit = payload.audit || {};
+      if (audit.proof_hash) {
+        auditCard.classList.add("locked");
+        auditStatus.textContent = "locked";
+        revealHash(audit.proof_hash);
       }
-
-      try {
-        const license = await readJson("https://license.veklom.com/health");
-        set("licenseStatus", license.data.status || "reported");
-        $("licenseProof").textContent = `${license.elapsed}ms`;
-      } catch (error) {
-        set("licenseStatus", "unavailable", "warn");
-        $("licenseProof").textContent = "failed";
-      }
-
-      const failed = ["dbStatus", "redisStatus", "llmStatus", "licenseStatus"].some((id) => $(id).textContent === "failed" || $(id).textContent === "unavailable");
-      $("overallStatus").textContent = failed ? "degraded" : "live";
+      const cost = payload.cost_control || {};
+      costCard.classList.add("locked");
+      costStatus.textContent = "locked";
+      kvDemo.textContent = String(cost.public_demo ?? true); kvDemo.className = "v ok";
+      kvBillable.textContent = String(cost.billable ?? false); kvBillable.className = "v " + (cost.billable ? "warn" : "ok");
+      kvCredits.textContent = cost.governance_runs_charged ?? cost.customer_route_cost_credits ?? 0;
+      setNodeState("audit_cost", "done");
+      termPush("done", `trace=${payload.trace_id?.slice(0,8) || "—"}… · ${(payload.trace || []).join(" → ")}`, "ok");
+    } catch (err) {
+      termPush("edge·fail", String(err.message || err), "err");
+      setNodeState("protocol_ingest", "err");
+    } finally {
+      stopLatency();
+      setRunning(false);
     }
+  }
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-    inspectRuntime();
-    window.setInterval(inspectRuntime, 30000);
-  </script>
+  // ---- Mode toggle ----
+  document.querySelectorAll(".mode-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".mode-toggle button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      mode = btn.dataset.mode;
+      renderPipeline();
+      resetPipelineState();
+      if (mode === "ai") {
+        aiControls.hidden = false; edgeControls.hidden = true;
+        verticalsBar.dataset.visible = "ai"; verticalsBar.style.display = "";
+        ctrlTitle.textContent = "Live Backend · Intent";
+        runLabel.textContent = "Compile governed plan";
+      } else {
+        aiControls.hidden = true; edgeControls.hidden = false;
+        verticalsBar.style.display = "none";
+        ctrlTitle.textContent = "Infrastructure scenario";
+        setSelectedEdgeScenario(selectedEdgeScenario);
+      }
+    });
+  });
+
+  // ---- Vertical presets ----
+  const presetPrompts = {
+    default: "Draft a one-paragraph response to a client asking how our AI handles their regulated data. Keep it confident, specific, and reference the controls that would fire.",
+    legal: "Summarize this NDA for a legal ops reviewer: '[sample clause] — Confidential Information shall not be disclosed except to affiliates bound by equivalent obligations.' Flag redaction points and required audit fields.",
+    medical: "A clinician asks for a discharge-plan summary for a 62-year-old post-op cardiac patient. Note which PHI fields Veklom would redact and which audit events fire before the model responds.",
+    finance: "Explain, for a SOC2 reviewer, how a customer-support LLM answering an account-balance question stays inside PCI scope. Reference the policy gates that must evaluate before generation.",
+    agency: "A marketing agency operates 40 client tenants. Describe how tenant isolation, per-client budgets, and audit artifacts work when one client's creative team sends a brand-voice prompt.",
+    infrastructure: "A Modbus sensor reports 92°C and rising vibration on a mission-critical pump. Show how Veklom normalizes the signal, runs policy, produces a governed AI decision, and records the audit.",
+  };
+  verticalsBar.addEventListener("click", (e) => {
+    const b = e.target.closest(".vertical"); if (!b) return;
+    verticalsBar.querySelectorAll(".vertical").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    selectedVertical = b.dataset.vertical;
+    promptInput.value = presetPrompts[selectedVertical] || promptInput.value;
+    updatePromptCount();
+  });
+  function updatePromptCount() { promptCount.textContent = `${promptInput.value.length} / 800`; }
+  promptInput.addEventListener("input", updatePromptCount);
+
+  function setSelectedEdgeScenario(scenario) {
+    if (!edgeControls || !scenario) return;
+    selectedEdgeScenario = scenario;
+    const buttonMap = {
+      network: $("btnNetwork"),
+      machine: $("btnMachine"),
+    };
+    Object.entries(buttonMap).forEach(([key, btn]) => {
+      if (!btn) return;
+      btn.classList.toggle("selected", key === scenario);
+      btn.setAttribute("aria-pressed", String(key === scenario));
+    });
+    runLabel.textContent = scenario === "network" ? "Run network scenario" : "Run machine scenario";
+  }
+
+  // ---- Button wiring ----
+  $("btnAI").addEventListener("click", () => runAI({ forceFallback: false }));
+  $("btnChaos").addEventListener("click", () => runAI({ forceFallback: true }));
+  $("btnNetwork").addEventListener("click", () => setSelectedEdgeScenario("network"));
+  $("btnMachine").addEventListener("click", () => setSelectedEdgeScenario("machine"));
+  runBtn.addEventListener("click", () => {
+    if (mode === "ai") runAI({ forceFallback: false });
+    else runEdge(selectedEdgeScenario);
+  });
+
+  // ---- Backend health pill (hero + nav chip) ----
+  async function probeBackend() {
+    try {
+      const r = await fetch(API_BASE + "/demo/pipeline/health", { cache: "no-store" });
+      if (!r.ok) throw new Error("down");
+      const d = await r.json();
+      chipBackend.className = "chip ok";
+      chipBackend.innerHTML = '<span class="dot"></span>Backend: connected';
+      chipProvider.className = "chip";
+      chipProvider.innerHTML = '<span class="dot"></span>Provider: idle';
+      const cb = d.circuit_breaker || {};
+      chipCB.className = "chip " + (cb.state === "open" ? "err" : cb.state === "half_open" ? "warn" : "ok");
+      chipCB.innerHTML = `<span class="dot"></span>Circuit: ${cb.state || "closed"}`;
+      $("heroLive").textContent = "Live backend connected";
+    } catch (err) {
+      chipBackend.className = "chip warn";
+      chipBackend.innerHTML = '<span class="dot"></span>Backend: reconnecting';
+      $("heroLive").textContent = "Reconnecting…";
+    }
+  }
+
+  async function probeProtocolValidation() {
+    try {
+      const r = await fetch(API_BASE + "/edge/canary/public", { cache: "no-store" });
+      if (!r.ok) throw new Error("down");
+      const summary = await r.json();
+      renderProtocolCanary(summary);
+    } catch (err) {
+      renderProtocolCanary({
+        status: "unavailable",
+        last_checked_at: null,
+        checks: { snmp: "unavailable", modbus_tcp: "unavailable", mqtt: "unavailable", webhook: "unavailable" },
+        proof: { normalized: false, decision: false, audit: false, cost_control: false },
+      });
+    }
+  }
+
+  // ---- Init ----
+  const edgeTab = document.querySelector(".mode-toggle button[data-mode='edge']");
+  if (edgeTab) edgeTab.hidden = true;
+  renderPipeline();
+  updatePromptCount();
+  if (mode === "edge") {
+    setSelectedEdgeScenario(selectedEdgeScenario);
+  } else {
+    runLabel.textContent = "Compile governed plan";
+  }
+  probeBackend();
+  probeProtocolValidation();
+  setInterval(probeBackend, 15000);
+  setInterval(probeProtocolValidation, 60000);
+})();
+</script>
 </body>
 </html>

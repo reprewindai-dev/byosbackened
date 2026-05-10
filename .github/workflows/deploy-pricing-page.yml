@@ -29,6 +29,9 @@ jobs:
           npm ci
           npm run export:landing
 
+      - name: Verify frozen .com landing artifact
+        run: python backend/scripts/verify_com_landing_freeze.py
+
       - name: Install Wrangler
         run: npm install -g wrangler
 

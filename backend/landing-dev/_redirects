@@ -4,14 +4,16 @@ http://veklom.dev/*  https://veklom.dev/:splat  301
 http://www.veklom.dev/*  https://veklom.dev/:splat  301
 https://www.veklom.dev/*  https://veklom.dev/:splat  301
 
-/backend          /#runtime      302
-/backend/         /#runtime      302
-/runtime          /#runtime      302
-/runtime/         /#runtime      302
-/contract         /#contract     302
-/contract/        /#contract     302
-/routes           /#routes       302
-/routes/          /#routes       302
+/backend          /platform/#runtime      302
+/backend/         /platform/#runtime      302
+/runtime          /platform/#runtime      302
+/runtime/         /platform/#runtime      302
+/contract         /platform/#contract     302
+/contract/        /platform/#contract     302
+/routes           /platform/#routes       302
+/routes/          /platform/#routes       302
+/platform         /platform/index.html  200
+/platform/        /platform/index.html  200
 /demo             /demo/index.html  200
 /demo/            /demo/index.html  200
 

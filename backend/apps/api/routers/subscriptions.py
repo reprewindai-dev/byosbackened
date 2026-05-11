@@ -191,7 +191,7 @@ def _reset_legacy_non_cash_reserve_before_activation(
 
 PLANS = {
     "starter": {
-        "name": "Founding Activation",
+        "name": "Founding",
         "tier": "starter",
         "activation_cents": 39_500,
         "minimum_reserve_cents": 15_000,
@@ -217,7 +217,7 @@ PLANS = {
         },
     },
     "pro": {
-        "name": "Standard Activation",
+        "name": "Standard",
         "tier": "pro",
         "activation_cents": 79_500,
         "minimum_reserve_cents": 30_000,
@@ -245,7 +245,7 @@ PLANS = {
         },
     },
     "sovereign": {
-        "name": "Regulated Activation",
+        "name": "Regulated",
         "tier": "sovereign",
         "activation_cents": 250_000,
         "minimum_reserve_cents": 250_000,

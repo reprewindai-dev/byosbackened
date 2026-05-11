@@ -10,12 +10,11 @@ from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
 from db.models import Subscription, Workspace, PlanTier, SubscriptionStatus
+from db.models.subscription import PLAN_HIERARCHY, PLAN_DISPLAY_NAMES
 from core.redis_pool import get_redis
 
 logger = logging.getLogger(__name__)
 
-# Plan hierarchy (higher index = higher tier)
-PLAN_HIERARCHY = ["starter", "pro", "sovereign"]
 
 # Public endpoints that don't require entitlement checks
 PUBLIC_ENDPOINTS = {
@@ -293,9 +292,11 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=403,
                 content={
-                    "detail": f"This endpoint requires {required_plan} plan or higher",
+                    "detail": f"This endpoint requires {PLAN_DISPLAY_NAMES.get(required_plan, required_plan)} plan or higher",
                     "current_plan": current_plan,
+                    "current_plan_display": PLAN_DISPLAY_NAMES.get(current_plan, current_plan),
                     "required_plan": required_plan,
+                    "required_plan_display": PLAN_DISPLAY_NAMES.get(required_plan, required_plan),
                     "upgrade_url": "/api/v1/subscriptions/plans"
                 },
                 headers={

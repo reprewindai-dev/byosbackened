@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import require_admin, require_superuser
 from core.security import get_password_hash
+from core.services.financial_analytics import platform_financial_overview
 from core.services.status_updates import notify_status_subscribers
 from db.session import get_db
 from db.models import (
@@ -362,3 +363,14 @@ async def system_overview(
         "subscriptions": {"by_plan": by_plan},
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+# Platform Financials (superuser)
+
+@router.get("/financials")
+async def get_platform_financials(
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    """Platform financial KPIs: MRR, ARR, churn, cost, usage — superuser only."""
+    return platform_financial_overview(db=db)

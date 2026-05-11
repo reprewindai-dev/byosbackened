@@ -15,7 +15,7 @@ from core.redis_pool import get_redis
 logger = logging.getLogger(__name__)
 
 # Plan hierarchy (higher index = higher tier)
-PLAN_HIERARCHY = ["starter", "pro", "sovereign", "enterprise"]
+PLAN_HIERARCHY = ["starter", "pro", "sovereign"]
 
 # Public endpoints that don't require entitlement checks
 PUBLIC_ENDPOINTS = {
@@ -39,6 +39,9 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/edge/demo/infrastructure",
     "/api/v1/demo/pipeline/stream",
     "/api/v1/demo/pipeline/health",
+    # Internal operator/UACP endpoints — have their own auth, never gated by subscription
+    "/api/v1/internal/operators",
+    "/api/v1/internal/uacp",
 }
 
 # Endpoint to plan tier mapping
@@ -161,6 +164,9 @@ class EntitlementCheckMiddleware(BaseHTTPMiddleware):
             if path.startswith(endpoint_path):
                 return plan
         
+        # Internal operator endpoints are never gated — they have require_internal_operator auth
+        if path.startswith("/api/v1/internal/"):
+            return None
         # Default: starter tier required
         return "starter"
     

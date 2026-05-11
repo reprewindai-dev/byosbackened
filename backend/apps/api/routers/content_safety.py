@@ -1,4 +1,4 @@
-"""Content Safety: age verification, content classification, PII-first privacy for adult platforms."""
+"""Content Safety: age verification, content classification, and prohibited-content detection."""
 import hashlib
 import secrets
 from datetime import datetime, timedelta

@@ -11,7 +11,7 @@
         if (query.indexOf("?token=") === 0) {
           query = "?invite_secret=" + encodeURIComponent(new URLSearchParams(query).get("token") || "");
         }
-        window.location.replace("/workspace-app#/accept-invite" + query);
+        window.location.replace("/accept-invite" + query);
       })();
     </script>
   </head>

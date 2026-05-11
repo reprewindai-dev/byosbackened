@@ -630,7 +630,7 @@ export function MarketplacePage() {
                 selected.price_cents > 0
                   ? { label: checkoutMut.isPending ? "Opening checkout" : "Purchase", onClick: () => checkoutMut.mutate(selected.id), disabled: checkoutMut.isPending, primary: true }
                   : { label: "Open product", href: selected.use_url ?? selected.source_url ?? "#", disabled: !selected.use_url && !selected.source_url, primary: true },
-                { label: "View billing", href: "#/billing" },
+                { label: "View billing", href: "/billing" },
               ]}
             />
 

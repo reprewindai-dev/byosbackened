@@ -29,7 +29,9 @@ interface WalletBalance {
 
 const JUMP_ROUTES = [
   { label: "overview", to: "/overview" },
-  { label: "dashboard", to: "/overview" },
+  { label: "dashboard", to: "/control-center" },
+  { label: "control center", to: "/control-center" },
+  { label: "owner console", to: "/control-center" },
   { label: "playground", to: "/playground" },
   { label: "marketplace", to: "/marketplace" },
   { label: "models", to: "/models" },
@@ -77,6 +79,7 @@ export function TopBar() {
   }, []);
 
   const displayName = user?.full_name ?? user?.name ?? user?.email ?? "Veklom";
+  const isSuperuser = Boolean(user?.is_superuser);
   const initials = displayName
     .split(/[\s@]/)
     .filter(Boolean)
@@ -345,6 +348,18 @@ export function TopBar() {
                   <span>{planLabel}</span>
                 </div>
               </div>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-bone-2 hover:bg-white/5 hover:text-bone"
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/control-center");
+                }}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {isSuperuser ? "Owner console" : "Workspace overview"}
+              </button>
               <button
                 type="button"
                 role="menuitem"

@@ -51,6 +51,43 @@ export interface PlatformPulse {
   superuser?: PlatformPulseSuperuser;
 }
 
+export interface LiveOpsOccupant {
+  user_id: string;
+  email: string;
+  full_name?: string | null;
+  role: string;
+  is_superuser: boolean;
+  session_id: string;
+  last_accessed: string;
+  expires_at: string;
+  ip_address?: string | null;
+}
+
+export interface LiveOpsWorkspace {
+  workspace_id: string;
+  workspace_name: string;
+  workspace_slug: string;
+  is_active: boolean;
+  active_session_count: number;
+  active_user_count: number;
+  recent_requests_15m: number;
+  failed_requests_15m: number;
+  last_request_at?: string | null;
+  last_error_at?: string | null;
+  current_status: string;
+  occupants: LiveOpsOccupant[];
+}
+
+export interface LiveOpsSummary {
+  generated_at: string;
+  active_tenants: number;
+  open_rooms: number;
+  live_users: number;
+  live_sessions: number;
+  degraded_workspaces: number;
+  workspaces: LiveOpsWorkspace[];
+}
+
 export interface Workspace {
   id: string;
   name: string;

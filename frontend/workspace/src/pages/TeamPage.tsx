@@ -110,7 +110,7 @@ const ROLE_STYLE: Record<string, string> = {
 
 function buildInviteLink(invite: Invite): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "https://veklom.com";
-  return `${origin}/workspace-app#/accept-invite?invite_secret=${encodeURIComponent(invite.token ?? "")}`;
+  return `${origin}/accept-invite?invite_secret=${encodeURIComponent(invite.token ?? "")}`;
 }
 
 async function setupMfa(): Promise<MfaSetup> {
@@ -292,7 +292,7 @@ export function TeamPage() {
             disabled: currentMfaEnabled || mfaSetupMut.isPending,
           },
           { label: "Refresh team", onClick: () => void refetch(), disabled: isLoading },
-          { label: "View evidence", href: "#/compliance" },
+          { label: "View evidence", href: "/compliance" },
         ]}
       />
 

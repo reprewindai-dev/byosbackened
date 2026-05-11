@@ -124,7 +124,7 @@ export function CompliancePage() {
             error={check.error}
             actions={[
               { label: "Run selected check", onClick: () => selectedReg && check.mutate(selectedReg.id), disabled: !selectedReg || check.isPending, primary: true },
-              { label: "Open monitoring", href: evidenceFocus ? `#/monitoring?audit=${encodeURIComponent(evidenceFocus)}` : "#/monitoring" },
+              { label: "Open monitoring", href: evidenceFocus ? `/monitoring?audit=${encodeURIComponent(evidenceFocus)}` : "/monitoring" },
             ]}
           />
         </div>

@@ -25,6 +25,16 @@ function SuperuserOnly({ children }: { children: ReactNode }) {
   return user?.is_superuser ? <>{children}</> : <Navigate to="/overview" replace />;
 }
 
+function HomeRoute() {
+  const user = useAuthStore((s) => s.user);
+  return <Navigate to={user?.is_superuser ? "/control-center" : "/overview"} replace />;
+}
+
+function OverviewRoute() {
+  const user = useAuthStore((s) => s.user);
+  return user?.is_superuser ? <Navigate to="/control-center" replace /> : <OverviewPage />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -33,10 +43,10 @@ export function AppRoutes() {
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/overview" replace />} />
+        <Route index element={<HomeRoute />} />
         <Route path="/dashboard" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
         <Route path="/control-center" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
-        <Route path="/overview" element={<OverviewPage />} />
+        <Route path="/overview" element={<OverviewRoute />} />
         <Route path="/uacp" element={<UacpPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
@@ -52,7 +62,7 @@ export function AppRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/overview" replace />} />
+      <Route path="*" element={<HomeRoute />} />
     </Routes>
   );
 }

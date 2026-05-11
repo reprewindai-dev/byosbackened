@@ -1161,7 +1161,7 @@ export function PlaygroundPage() {
       : eventCount || hasRunOutput
         ? "succeeded"
         : "idle";
-  const traceHref = `#/monitoring${stats.request_id ? `?run=${encodeURIComponent(stats.request_id)}` : ""}`;
+  const traceHref = `/monitoring${stats.request_id ? `?run=${encodeURIComponent(stats.request_id)}` : ""}`;
   const proofAudit = stats.audit_hash ?? stats.request_id ?? (hasCompareOutput ? "compare results returned" : "not created yet");
 
   return (
@@ -1245,7 +1245,7 @@ export function PlaygroundPage() {
         actions={[
           { label: running ? "Running" : "Send", onClick: () => void run(), disabled: !canRun || running, primary: true },
           { label: "Save as Pipeline", onClick: () => void saveAsPipeline(), disabled: !hasRunOutput || running || savingPipeline },
-          { label: "Open pipeline", href: "#/pipelines", disabled: !savedPipelineSlug },
+          { label: "Open pipeline", href: "/pipelines", disabled: !savedPipelineSlug },
           { label: "View trace", href: traceHref, disabled: !stats.request_id && !stats.audit_hash && !hasCompareOutput },
         ]}
       />
@@ -1499,7 +1499,7 @@ export function PlaygroundPage() {
               <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Saved as pipeline <span className="font-mono">{savedPipelineSlug}</span>.
-                <a href="#/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
+                <a href="/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
                   Open Pipelines <GitBranch className="h-3 w-3" />
                 </a>
               </div>
@@ -2038,7 +2038,7 @@ export function PlaygroundPage() {
               <div className="mt-3 flex items-center gap-2 rounded-md border border-moss/30 bg-moss/5 px-3 py-2 text-[12px] text-moss">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Saved as pipeline <span className="font-mono">{savedPipelineSlug}</span>.
-                <a href="#/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
+                <a href="/pipelines" className="ml-auto inline-flex items-center gap-1 text-moss underline-offset-4 hover:underline">
                   Open Pipelines <GitBranch className="h-3 w-3" />
                 </a>
               </div>

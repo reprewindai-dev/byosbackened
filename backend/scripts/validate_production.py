@@ -33,6 +33,8 @@ import httpx
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
+from core.services.migration_state import audit_migration_state
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Validation Results
@@ -173,25 +175,44 @@ class ProductionValidator:
                 # Test basic query
                 result = conn.execute(text("SELECT 1"))
                 assert result.scalar() == 1
-                
-                # Check migrations
-                result = conn.execute(text(
-                    "SELECT COUNT(*) FROM alembic_version"
-                ))
-                version_count = result.scalar()
-                
+
                 # Check if tables exist
                 result = conn.execute(text(
                     "SELECT COUNT(*) FROM information_schema.tables "
                     "WHERE table_schema = 'public'"
                 ))
                 table_count = result.scalar()
-            
+
+            migration_state = audit_migration_state(engine)
+            details = {
+                "tables": table_count,
+                "current_revisions": migration_state.current_revisions,
+                "head_revisions": migration_state.head_revisions,
+            }
+
+            if not migration_state.has_revision_table:
+                self.results.append(ValidationResult(
+                    name="Database Connectivity",
+                    passed=False,
+                    message="Connected successfully, but alembic_version is missing or empty.",
+                    details=details,
+                ))
+                return
+
+            if not migration_state.is_at_head:
+                self.results.append(ValidationResult(
+                    name="Database Connectivity",
+                    passed=False,
+                    message=migration_state.summary(),
+                    details=details,
+                ))
+                return
+
             self.results.append(ValidationResult(
                 name="Database Connectivity",
                 passed=True,
-                message=f"Connected successfully. {table_count} tables found, {version_count} migration versions.",
-                details={"tables": table_count, "migrations": version_count},
+                message=f"Connected successfully. {table_count} tables found. {migration_state.summary()}",
+                details=details,
             ))
             
         except OperationalError as e:

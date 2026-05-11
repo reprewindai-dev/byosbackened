@@ -1,7 +1,7 @@
 # Veklom Handoff Document — Complete Context for Windsurf/Devin
 
 **Status**: Ready for continuation  
-**Last Updated**: 2026-04-30  
+**Last Updated**: 2026-05-11  
 **Agent Rule**: Read this entire file before any work. No exceptions.
 
 ---
@@ -27,7 +27,7 @@
 |--------|--------|--------|-------|
 | `veklom.com` | Cloudflare Pages | **🔴 NEEDS DEPLOY** | pricing.html ready |
 | `api.veklom.com` | 5.78.135.11 | ✅ Live | veklom-api container |
-| `license.veklom.com` | **Not deployed** | 🟡 Pending | Can use Server 2 or new VPS |
+| `license.veklom.com` | 5.78.153.146 | ✅ Live | License service deployed and healthy |
 | `veklom.dev` | Cloudflare Pages | ✅ Live | Acquisition surface |
 | `engine.veklom.com` | 5.78.153.146 | ✅ Live | CO2 Router |
 
@@ -38,7 +38,7 @@
 - **Resources:** PostgreSQL + Redis (both on 5.78.135.11)
 - **Ollama:** `veklom-ollama` container with `qwen2.5:0.5b` model
 
-**⚠️ CRITICAL:** Stray artifact from commit `9493aceb` is restart-looping beside live service. **DO NOT touch live service** — investigate separately.
+**⚠️ CRITICAL:** The old `9493aceb` note was stale. The current non-routed restart-looping artifact is `lcile2sz1wjd6sqsdctlm4rv-033401126260`, built from commit `9636805d`. **DO NOT touch live service** — investigate separately.
 
 ---
 
@@ -130,7 +130,7 @@ wrangler pages deploy . --project-name=veklom-pricing
 **Status:** Known issue, monitored  
 **Action:** **DO NOT touch live service** — investigate only
 
-**Details:** Container from commit `9493aceb` is restart-looping beside the routed `veklom-api` container. The live service at `api.veklom.com` is healthy.
+**Details:** The current failed artifact is `lcile2sz1wjd6sqsdctlm4rv-033401126260`, built from commit `9636805d`, and it is restart-looping beside the routed `veklom-api` container. The live service at `api.veklom.com` is healthy.
 
 **Investigation (safe):**
 ```bash
@@ -145,15 +145,15 @@ Do NOT stop, remove, or modify any containers without explicit direction.
 
 ### 🟡 #3: License Server Deploy
 
-**Status:** Code ready, not deployed  
-**Action:** Deploy to `license.veklom.com`
+**Status:** Deployed on 2026-05-10 and healthy  
+**Action:** Keep it healthy; use canonical `/api/licenses/*` URLs in config
 
 **License server file:** `backend/license/server.py`
 
 **Available endpoints:**
-- `POST /issue` — Issue new license (admin only, X-Admin-Token required)
+- `POST /issue` and `POST /api/licenses/issue` — Issue new license (admin only, X-Admin-Token required)
 - `POST /activate` — Activate license on machine
-- `POST /verify` — Verify license validity
+- `POST /verify` and `POST /api/licenses/verify` — Verify license validity
 - `POST /deactivate` — Deactivate license (admin only)
 - `GET /health` — Health check
 - `POST /stripe/webhook` — Stripe payment failure handling
@@ -190,8 +190,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ### 🟡 #4: Trial Key Auto-Issuance
 
-**Status:** Code exists, needs license server deployed first  
-**Action:** Test end-to-end after license server deploy
+**Status:** Fixed and verified live on 2026-05-10  
+**Action:** Backfill any pre-fix workspaces that should have trial metadata
 
 **Current implementation:**
 
@@ -207,7 +207,7 @@ license_payload = await issue_trial_license(
 ```
 
 2. **License client** (`backend/core/services/trial_onboarding.py:53-114`):
-   - POSTs to `LICENSE_SERVER_URL/issue` (default: `https://license.veklom.com/issue`)
+   - POSTs to `LICENSE_ISSUE_URL` (use canonical `https://license.veklom.com/api/licenses/issue`)
    - Requires `X-Admin-Token` header
    - 14-day trial duration
 
@@ -215,7 +215,10 @@ license_payload = await issue_trial_license(
    - Sends license key + download link
    - Uses `buyer_download_base_url` for package URL
 
-**Testing steps (after license server deploy):**
+**Latest proof:**
+- On 2026-05-10, a fresh production `/api/v1/auth/register` signup created workspace `Smoke License 1662` with `license_tier=starter` and a populated `license_key_prefix`.
+
+**Testing steps (for future regression checks):**
 ```bash
 # 1. Register with trial tier
 curl -X POST https://api.veklom.com/api/v1/auth/register \
@@ -227,7 +230,7 @@ curl https://api.veklom.com/api/v1/admin/workspaces \
   -H "Authorization: Bearer <admin_token>"
 
 # 3. Test license verification
-curl -X POST https://license.veklom.com/verify \
+curl -X POST https://license.veklom.com/api/licenses/verify \
   -H "Content-Type: application/json" \
   -d '{"license_key":"vklm_...","machine_fingerprint":"test-fingerprint"}'
 ```
@@ -286,6 +289,8 @@ STRIPE_PUBLISHABLE_KEY=pk_live_...
 
 # License server (main API calls this)
 LICENSE_SERVER_URL=https://license.veklom.com
+LICENSE_ISSUE_URL=https://license.veklom.com/api/licenses/issue
+LICENSE_VERIFY_URL=https://license.veklom.com/api/licenses/verify
 LICENSE_ADMIN_TOKEN=vladmin_...  # Must match license server
 
 # Security

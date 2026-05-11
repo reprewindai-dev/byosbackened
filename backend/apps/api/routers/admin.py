@@ -1,5 +1,5 @@
 """Admin router: workspace management, user management, system-wide controls (superuser/admin only)."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,6 +17,7 @@ from db.models import (
     Workspace, Subscription,
     SecurityEvent, Job, AIAuditLog,
     IncidentLog, IncidentSeverity, IncidentStatus,
+    UserSession, WorkspaceRequestLog,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -74,6 +75,43 @@ class StatusIncidentCreate(BaseModel):
     severity: str = "medium"
     incident_type: str = "system"
     status: str = "investigating"
+
+
+class LiveOccupantResponse(BaseModel):
+    user_id: str
+    email: str
+    full_name: Optional[str]
+    role: str
+    is_superuser: bool
+    session_id: str
+    last_accessed: str
+    expires_at: str
+    ip_address: Optional[str]
+
+
+class LiveWorkspaceResponse(BaseModel):
+    workspace_id: str
+    workspace_name: str
+    workspace_slug: str
+    is_active: bool
+    active_session_count: int
+    active_user_count: int
+    recent_requests_15m: int
+    failed_requests_15m: int
+    last_request_at: Optional[str]
+    last_error_at: Optional[str]
+    current_status: str
+    occupants: List[LiveOccupantResponse]
+
+
+class LiveOpsSummaryResponse(BaseModel):
+    generated_at: str
+    active_tenants: int
+    open_rooms: int
+    live_users: int
+    live_sessions: int
+    degraded_workspaces: int
+    workspaces: List[LiveWorkspaceResponse]
 
 
 # ─── Workspace Management (admin within workspace, superuser global) ───────────
@@ -374,3 +412,128 @@ async def get_platform_financials(
 ):
     """Platform financial KPIs: MRR, ARR, churn, cost, usage — superuser only."""
     return platform_financial_overview(db=db)
+
+
+@router.get("/live-ops", response_model=LiveOpsSummaryResponse)
+async def live_ops_snapshot(
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    """Live owner-only operator snapshot across tenant rooms and sessions."""
+    now = datetime.utcnow()
+    active_since = now - timedelta(minutes=15)
+
+    active_sessions = (
+        db.query(UserSession, User, Workspace)
+        .join(User, User.id == UserSession.user_id)
+        .join(Workspace, Workspace.id == User.workspace_id)
+        .filter(
+            UserSession.is_active.is_(True),
+            UserSession.expires_at > now,
+            UserSession.last_accessed >= active_since,
+            User.is_active.is_(True),
+        )
+        .order_by(UserSession.last_accessed.desc())
+        .all()
+    )
+
+    recent_request_rows = (
+        db.query(
+            WorkspaceRequestLog.workspace_id.label("workspace_id"),
+            func.count(WorkspaceRequestLog.id).label("recent_requests"),
+            func.max(WorkspaceRequestLog.created_at).label("last_request_at"),
+        )
+        .filter(WorkspaceRequestLog.created_at >= active_since)
+        .group_by(WorkspaceRequestLog.workspace_id)
+        .all()
+    )
+    recent_requests_by_workspace = {
+        row.workspace_id: {
+            "recent_requests": int(row.recent_requests or 0),
+            "last_request_at": row.last_request_at,
+        }
+        for row in recent_request_rows
+    }
+
+    failed_request_rows = (
+        db.query(
+            WorkspaceRequestLog.workspace_id.label("workspace_id"),
+            func.count(WorkspaceRequestLog.id).label("failed_requests"),
+            func.max(WorkspaceRequestLog.created_at).label("last_error_at"),
+        )
+        .filter(
+            WorkspaceRequestLog.created_at >= active_since,
+            WorkspaceRequestLog.status.notin_(["success", "ok", "200", "completed", "succeeded"]),
+        )
+        .group_by(WorkspaceRequestLog.workspace_id)
+        .all()
+    )
+    failed_requests_by_workspace = {
+        row.workspace_id: {
+            "failed_requests": int(row.failed_requests or 0),
+            "last_error_at": row.last_error_at,
+        }
+        for row in failed_request_rows
+    }
+
+    workspace_map: dict[str, LiveWorkspaceResponse] = {}
+    for session, user, workspace in active_sessions:
+        entry = workspace_map.get(workspace.id)
+        if entry is None:
+            request_meta = recent_requests_by_workspace.get(workspace.id, {})
+            failure_meta = failed_requests_by_workspace.get(workspace.id, {})
+            entry = LiveWorkspaceResponse(
+                workspace_id=workspace.id,
+                workspace_name=workspace.name,
+                workspace_slug=workspace.slug,
+                is_active=bool(workspace.is_active),
+                active_session_count=0,
+                active_user_count=0,
+                recent_requests_15m=int(request_meta.get("recent_requests", 0)),
+                failed_requests_15m=int(failure_meta.get("failed_requests", 0)),
+                last_request_at=request_meta.get("last_request_at").isoformat() if request_meta.get("last_request_at") else None,
+                last_error_at=failure_meta.get("last_error_at").isoformat() if failure_meta.get("last_error_at") else None,
+                current_status="live",
+                occupants=[],
+            )
+            workspace_map[workspace.id] = entry
+
+        entry.active_session_count += 1
+        entry.occupants.append(
+            LiveOccupantResponse(
+                user_id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                role=user.role.value,
+                is_superuser=bool(user.is_superuser),
+                session_id=session.id,
+                last_accessed=session.last_accessed.isoformat(),
+                expires_at=session.expires_at.isoformat(),
+                ip_address=session.ip_address,
+            )
+        )
+
+    for entry in workspace_map.values():
+        entry.active_user_count = len({occupant.user_id for occupant in entry.occupants})
+        if entry.failed_requests_15m > 0:
+            entry.current_status = "degraded"
+        elif entry.recent_requests_15m == 0:
+            entry.current_status = "idle"
+
+    return LiveOpsSummaryResponse(
+        generated_at=now.isoformat(),
+        active_tenants=len(workspace_map),
+        open_rooms=len(workspace_map),
+        live_users=len({user.id for _, user, _ in active_sessions}),
+        live_sessions=len(active_sessions),
+        degraded_workspaces=sum(1 for entry in workspace_map.values() if entry.current_status == "degraded"),
+        workspaces=sorted(
+            workspace_map.values(),
+            key=lambda entry: (
+                0 if entry.current_status == "degraded" else 1,
+                -entry.active_session_count,
+                -(entry.recent_requests_15m or 0),
+                entry.workspace_name.lower(),
+            ),
+        ),
+    )

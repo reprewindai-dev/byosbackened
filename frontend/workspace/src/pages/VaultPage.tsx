@@ -110,7 +110,7 @@ export function VaultPage() {
         actions={[
           { label: "Issue key", onClick: () => setCreating(true), disabled: create.isPending, primary: true },
           { label: "Refresh inventory", onClick: () => keys.refetch(), disabled: keys.isFetching },
-          { label: "Open monitoring", href: "#/monitoring" },
+          { label: "Open monitoring", href: "/monitoring" },
         ]}
       />
 

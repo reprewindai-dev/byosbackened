@@ -3,8 +3,10 @@
 ## Current Live State
 - `api.veklom.com/health` returns `{"status":"ok","version":"1.0.0","service":"Veklom"}`.
 - The routed Veklom Coolify container is healthy: `zjhp30ys1jlk8yaoxc96h2zd-213941724689`.
+- The license service at `https://license.veklom.com/health` returns `200` after the 2026-05-10 rebuild.
+- Production Alembic state was verified on 2026-05-10 at revision `013`, which matches repo head.
 - AWS runtime vars are present in the live service env: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-east-1`, and `S3_BACKUP_BUCKET=veklom-db-backups`.
-- The latest Coolify build artifact for commit `9493aceb` is still restart-looping beside the routed live container and should be treated as a non-routed deploy artifact until Coolify is reconciled.
+- The stale `9493aceb` note was incorrect. The current non-routed Coolify restart-loop artifact is `lcile2sz1wjd6sqsdctlm4rv-033401126260`, built from commit `9636805d`, and should be treated as a failed deploy artifact until Coolify is reconciled.
 - `veklom.dev` is live on Cloudflare Pages and attached to the acquisition / marketplace entry surface.
 
 ## Infrastructure
@@ -22,8 +24,11 @@
 ## Production Checklist (must pass)
 - Backend app deployed from `/backend` using `infra/docker/Dockerfile.api`.
 - `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, `ENCRYPTION_KEY`, Stripe env vars configured in Coolify.
-- `alembic upgrade head` executed in production container.
+- `alembic upgrade head` executed in production container, and `alembic_version` matches repo head (`013` at last verification).
 - Stripe webhook points to `/api/v1/subscriptions/webhook` with valid signing secret.
+- License env points at canonical endpoints:
+  - `LICENSE_ISSUE_URL=https://license.veklom.com/api/licenses/issue`
+  - `LICENSE_VERIFY_URL=https://license.veklom.com/api/licenses/verify`
 - Smoke tests pass:
   - `GET /health`
   - `GET /status`
@@ -44,7 +49,8 @@
    - Stripe keys and webhook signing secret
    - any license server admin token
 7. Run `alembic upgrade head` once inside the backend container after the first successful start.
-8. Smoke test the live service after migration:
+8. Run `python scripts/validate_production.py` inside the runtime and confirm the database check reports current Alembic revision equals repo head.
+9. Smoke test the live service after migration:
    - `GET /health`
    - `GET /status`
    - `POST /api/v1/auth/register`

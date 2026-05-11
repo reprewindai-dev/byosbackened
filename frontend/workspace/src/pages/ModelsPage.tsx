@@ -426,7 +426,7 @@ function PageHeader({
       </div>
       <div className="flex flex-wrap gap-2">
         <DisabledHeaderButton icon={<Upload className="h-3.5 w-3.5" />} label="Upload model" />
-        <a href="#/deployments" className="v-btn-primary h-8 px-3 text-xs">
+        <a href="/deployments" className="v-btn-primary h-8 px-3 text-xs">
           <Rocket className="h-3.5 w-3.5" /> Deploy from catalog
         </a>
       </div>
@@ -594,7 +594,7 @@ function ModelCard({
           >
             <GitBranch className="h-3.5 w-3.5" /> Versions
           </button>
-          <a href="#/deployments" className="v-btn-primary h-7 px-2.5 text-[11.5px]">
+          <a href="/deployments" className="v-btn-primary h-7 px-2.5 text-[11.5px]">
             Deploy <ArrowRight className="h-3.5 w-3.5" />
           </a>
         </div>
@@ -720,8 +720,8 @@ function ModelTestDrawer({
         )}
         actions={[
           { label: "Run again", onClick: onRunAgain, disabled: pending || !model },
-          { label: "Deploy endpoint", href: "#/deployments", disabled: !model?.enabled || !model.connected, primary: true },
-          { label: "Open Playground", href: "#/playground" },
+          { label: "Deploy endpoint", href: "/deployments", disabled: !model?.enabled || !model.connected, primary: true },
+          { label: "Open Playground", href: "/playground" },
         ]}
       />
     </ResultDrawer>

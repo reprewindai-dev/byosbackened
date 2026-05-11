@@ -13,8 +13,13 @@ const workspaceShell = resolve(landingRoot, "workspace-app.html");
 const assetVersion = process.env.WORKSPACE_ASSET_VERSION || "workspace";
 
 const routeShells = [
+  "login",
+  "register",
+  "accept-invite",
+  "overview",
   "control-center",
   "dashboard",
+  "uacp",
   "playground",
   "marketplace",
   "models",

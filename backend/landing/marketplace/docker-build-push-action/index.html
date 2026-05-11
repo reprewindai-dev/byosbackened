@@ -19,29 +19,29 @@
       (function bootstrapWorkspaceRoute() {
         const path = (window.location.pathname || "/").replace(/\/+$/, "") || "/";
         const routeMap = {
-          "/dashboard": "#/",
-          "/playground": "#/playground",
-          "/marketplace": "#/marketplace",
-          "/models": "#/models",
-          "/pipelines": "#/pipelines",
-          "/deployments": "#/deployments",
-          "/monitoring": "#/monitoring",
-          "/vault": "#/vault",
-          "/compliance": "#/compliance",
-          "/billing": "#/billing",
-          "/team": "#/team",
-          "/settings": "#/settings",
-          "/onboarding": "#/onboarding"
+          "/dashboard": "/overview",
+          "/playground": "/playground",
+          "/marketplace": "/marketplace",
+          "/models": "/models",
+          "/pipelines": "/pipelines",
+          "/deployments": "/deployments",
+          "/monitoring": "/monitoring",
+          "/vault": "/vault",
+          "/compliance": "/compliance",
+          "/billing": "/billing",
+          "/team": "/team",
+          "/settings": "/settings",
+          "/onboarding": "/overview"
         };
         if (path.startsWith("/marketplace/")) {
           const slug = path.slice("/marketplace/".length);
-          const target = slug ? "#/marketplace/" + slug : "#/marketplace";
+          const target = slug ? "/marketplace/" + slug : "/marketplace";
           if (window.location.hash !== target) {
             window.location.hash = target;
           }
           return;
         }
-        const targetHash = routeMap[path] || "#/";
+        const targetHash = routeMap[path] || "/overview";
         if (window.location.hash !== targetHash) {
           window.location.hash = targetHash;
         }

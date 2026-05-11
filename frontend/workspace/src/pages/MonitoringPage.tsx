@@ -133,8 +133,8 @@ export function MonitoringPage() {
               { label: "cost", value: `$${stats.totalCost.toFixed(4)}` },
             ]}
             actions={[
-              { label: "Clear filter", href: "#/monitoring" },
-              { label: "Open evidence", href: `#/compliance?audit=${encodeURIComponent(focusId)}`, primary: true },
+              { label: "Clear filter", href: "/monitoring" },
+              { label: "Open evidence", href: `/compliance?audit=${encodeURIComponent(focusId)}`, primary: true },
             ]}
           />
         )}

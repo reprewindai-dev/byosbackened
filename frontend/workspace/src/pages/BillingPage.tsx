@@ -117,8 +117,8 @@ async function createTopup(pack: string) {
   const origin = window.location.origin;
   const resp = await api.post<{ checkout_url: string; session_id: string }>("/wallet/topup/checkout", {
     pack_name: pack,
-    success_url: `${origin}/workspace-app#/billing?topup=success`,
-    cancel_url: `${origin}/workspace-app#/billing?topup=cancel`,
+    success_url: `${origin}/billing?topup=success`,
+    cancel_url: `${origin}/billing?topup=cancel`,
   });
   return resp.data;
 }
@@ -319,7 +319,7 @@ export function BillingPage() {
           </button>
           <div className="mt-4 rounded-lg border border-rule p-3 text-[11px] text-bone-2">
             <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Burn-rate guard</div>
-            <div>Spend caps, alerts, and auto-throttle live in <a href="#/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
+            <div>Spend caps, alerts, and auto-throttle live in <a href="/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
           </div>
         </div>
       </section>

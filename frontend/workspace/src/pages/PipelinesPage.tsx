@@ -1548,13 +1548,13 @@ function EndpointCreatedPanel({ endpoint, onClose }: { endpoint: PipelineEndpoin
         )}
 
         <div className="grid grid-cols-3 gap-2 border-t border-rule/80 pt-3">
-          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="#/deployments">
+          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="/deployments">
             Deployments
           </a>
-          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="#/monitoring">
+          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="/monitoring">
             View logs
           </a>
-          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="#/compliance">
+          <a className="v-btn-ghost h-8 justify-center px-2 text-xs" href="/compliance">
             View evidence
           </a>
         </div>

@@ -13,7 +13,8 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const from = (location.state as { from?: string } | null)?.from ?? "/overview";
+  const from = (location.state as { from?: string } | null)?.from
+    ?? (currentUser?.is_superuser ? "/control-center" : "/overview");
 
   // If already signed in, don't slam-redirect. Offer an explicit escape
   // hatch so the user can swap accounts (the previous hard <Navigate />
@@ -66,8 +67,8 @@ export function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login({ email, password });
-      navigate(from, { replace: true });
+      const user = await login({ email, password });
+      navigate(user?.is_superuser ? "/control-center" : from, { replace: true });
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??

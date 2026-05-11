@@ -333,28 +333,28 @@ function CommandBridge({
     {
       label: "Run governed decision",
       detail: "Execute through policy, route, reserve, and audit.",
-      to: "#/playground",
+      to: "/playground",
       icon: TerminalSquare,
       value: `${fmtNumber(data?.recent_runs.length ?? 0)} traces`,
     },
     {
       label: "Inspect live pressure",
       detail: "Open telemetry, latency, routing, alerts, and proof.",
-      to: "#/monitoring",
+      to: "/monitoring",
       icon: LineChart,
       value: data ? `${data.kpi.p50_latency_ms}ms p50` : "no signal",
     },
     {
       label: "Build marketplace asset",
       detail: "Move from public pain to governed Veklom-native tools.",
-      to: "#/marketplace",
+      to: "/marketplace",
       icon: ShoppingBag,
       value: pulse ? `${pulse.active_listings.total} listings` : "catalog",
     },
     {
       label: "Tune reserve posture",
       detail: "Review spend, burn rate, billing, and operating reserve.",
-      to: "#/billing",
+      to: "/billing",
       icon: WalletCards,
       value: data ? fmtCents(data.spend.spend_cents) : "$0.00",
     },
@@ -410,7 +410,7 @@ function SurfaceMap({
           value: state ? `${state.convergencePressure}% pressure` : "story layer",
           detail: "Intent, doctrine, and the reason governed autonomy matters.",
           tone: "neutral",
-          to: "#/control-center",
+          to: "/control-center",
         },
         {
           title: "Silicon Valley",
@@ -418,7 +418,7 @@ function SurfaceMap({
           value: state ? `${state.systemCoherence}% coherence` : "syncing",
           detail: "UACP posture, policy stability, escalation pressure, and route authority.",
           tone: state?.tone ?? "neutral",
-          to: "#/overview",
+          to: "/overview",
         },
         {
           title: "Sunnyvale",
@@ -426,7 +426,7 @@ function SurfaceMap({
           value: `${fmtNumber(data?.recent_runs.length ?? 0)} runs`,
           detail: "Agents, queues, workflows, tools, blocked jobs, and intervention paths.",
           tone: data?.recent_runs.length ? "stable" : "neutral",
-          to: "#/playground",
+          to: "/playground",
         },
         {
           title: "Archives",
@@ -434,7 +434,7 @@ function SurfaceMap({
           value: `${fmtNumber(data?.audit_trail.length ?? data?.kpi.audit_entries ?? 0)} records`,
           detail: "Replayable judgment, evidence ledger, provenance, and institutional continuity.",
           tone: data?.audit_trail.length ? "stable" : "watch",
-          to: "#/compliance",
+          to: "/compliance",
         },
         {
           title: "Marketplace",
@@ -442,7 +442,7 @@ function SurfaceMap({
           value: pulse ? `${pulse.active_listings.total} live` : "Builder lane",
           detail: "Sovereign Builder Agents convert public pain into governed sellable tools.",
           tone: "neutral",
-          to: "#/marketplace",
+          to: "/marketplace",
         },
         {
           title: "Control room",
@@ -450,7 +450,7 @@ function SurfaceMap({
           value: data ? `${data.routing.primary_util_pct}% primary` : "no signal",
           detail: "Models, billing, settings, routes, and operational spine controls.",
           tone: "stable",
-          to: "#/settings",
+          to: "/settings",
         },
       ]
     : [
@@ -460,7 +460,7 @@ function SurfaceMap({
           value: state ? `${state.systemCoherence}% health` : "syncing",
           detail: "Tenant-scoped health, runs, route posture, reserve usage, and evidence state.",
           tone: state?.tone ?? "neutral",
-          to: "#/overview",
+          to: "/overview",
         },
         {
           title: "Playground",
@@ -468,7 +468,7 @@ function SurfaceMap({
           value: `${fmtNumber(data?.recent_runs.length ?? 0)} runs`,
           detail: "Run prompts, compare available models, save useful tests into pipelines.",
           tone: data?.recent_runs.length ? "stable" : "neutral",
-          to: "#/playground",
+          to: "/playground",
         },
         {
           title: "Pipelines",
@@ -476,7 +476,7 @@ function SurfaceMap({
           value: `${fmtNumber(data?.policy_events.length ?? 0)} events`,
           detail: "Build, test, prove, and deploy governed workflows.",
           tone: "stable",
-          to: "#/pipelines",
+          to: "/pipelines",
         },
         {
           title: "Deployments",
@@ -484,7 +484,7 @@ function SurfaceMap({
           value: data ? `${data.routing.primary_util_pct}% primary` : "no signal",
           detail: "Create endpoints, run same-page tests, inspect logs, and copy code after proof.",
           tone: "stable",
-          to: "#/deployments",
+          to: "/deployments",
         },
         {
           title: "Evidence",
@@ -492,7 +492,7 @@ function SurfaceMap({
           value: `${fmtNumber(data?.audit_trail.length ?? data?.kpi.audit_entries ?? 0)} records`,
           detail: "View run evidence, policy results, audit hashes, and export availability by plan.",
           tone: data?.audit_trail.length ? "stable" : "watch",
-          to: "#/compliance",
+          to: "/compliance",
         },
         {
           title: "Billing",
@@ -500,7 +500,7 @@ function SurfaceMap({
           value: data ? fmtCents(data.spend.spend_cents) : "$0.00",
           detail: "Track governed usage, reserve impact, plan status, and activation requirements.",
           tone: "neutral",
-          to: "#/billing",
+          to: "/billing",
         },
       ];
 
@@ -653,7 +653,7 @@ function SunnyvaleFloor({ data, state, isLoading }: { data?: OverviewPayload; st
 function ExecutionLanes({ runs, isLoading }: { runs: RecentRun[]; isLoading: boolean }) {
   return (
     <div className="ops-lanes mineral-panel">
-      <PanelChrome label="Active runs and execution traces" icon={Workflow} action={<a href="#/playground">Open Playground <ArrowRight className="h-3 w-3" /></a>} />
+      <PanelChrome label="Active runs and execution traces" icon={Workflow} action={<a href="/playground">Open Playground <ArrowRight className="h-3 w-3" /></a>} />
       <div className="trace-table">
         {runs.slice(0, 7).map((run) => (
           <div key={run.id} className="trace-row">

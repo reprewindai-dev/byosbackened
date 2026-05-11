@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, fmtNumber, relativeTime } from "@/lib/cn";
+import type { LiveOpsSummary } from "@/types/api";
 
 type Room = "overview" | "surgeon" | "growth" | "intelligence";
 type Tone = "stable" | "watch" | "critical" | "neutral";
@@ -189,6 +190,7 @@ interface WorkerRunRow {
 
 interface ControlSnapshot {
   summary: SafeResult<UacpSummary>;
+  liveOps: SafeResult<LiveOpsSummary>;
   events: SafeResult<{ events?: UacpEvent[] }>;
   workspaces: SafeResult<{ workspaces?: WorkspaceRow[] }>;
   runs: SafeResult<{ runs?: RunRow[] }>;
@@ -245,9 +247,10 @@ async function safeGet<T>(path: string, params?: Record<string, unknown>): Promi
 }
 
 async function fetchControlSnapshot(): Promise<ControlSnapshot> {
-  const [summary, events, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns] =
+  const [summary, liveOps, events, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns] =
     await Promise.all([
       safeGet<UacpSummary>("/internal/uacp/summary"),
+      safeGet<LiveOpsSummary>("/admin/live-ops"),
       safeGet<{ events?: UacpEvent[] }>("/internal/uacp/events", { limit: 150 }),
       safeGet<{ workspaces?: WorkspaceRow[] }>("/internal/uacp/workspaces", { limit: 250 }),
       safeGet<{ runs?: RunRow[] }>("/internal/uacp/runs", { limit: 250 }),
@@ -259,7 +262,7 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
       safeGet<{ runs?: WorkerRunRow[]; count?: number }>("/internal/operators/runs", { limit: 150 }),
     ]);
 
-  return { summary, events, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns };
+  return { summary, liveOps, events, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns };
 }
 
 export function ControlCenterPage() {
@@ -302,10 +305,10 @@ export function ControlCenterPage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-px bg-rule">
-            <HeaderMetric label="Active evaluations" value={fmtNumber(model.pulse.activeEvaluations)} />
-            <HeaderMetric label="Serious signals" value={fmtNumber(model.pulse.seriousSignals)} />
-            <HeaderMetric label="Reserve live" value={model.pulse.reserveLive} />
-            <HeaderMetric label="Worker confidence" value={`${model.pulse.workerConfidence}%`} />
+            <HeaderMetric label="Active tenants" value={fmtNumber(model.liveOps?.active_tenants ?? 0)} />
+            <HeaderMetric label="Open rooms" value={fmtNumber(model.liveOps?.open_rooms ?? 0)} />
+            <HeaderMetric label="Live users" value={fmtNumber(model.liveOps?.live_users ?? 0)} />
+            <HeaderMetric label="Degraded rooms" value={fmtNumber(model.liveOps?.degraded_workspaces ?? 0)} />
           </div>
         </div>
         <nav className="flex flex-wrap gap-px border-t border-rule bg-rule">
@@ -354,6 +357,7 @@ function OverviewRoom({ model, loading }: { model: OperatingModel; loading: bool
   const stories = deriveStories(model);
   return (
     <div className="space-y-4">
+      <LiveOpsRoom liveOps={model.liveOps} loading={loading} />
       <section className="border border-rule bg-ink-2/40">
         <PanelHead icon={Gauge} label="UACP Business Pulse" meta={model.generatedAt ? `LIVE / ${relativeTime(model.generatedAt)}` : "LIVE / timestamp unavailable"} />
         <div className="grid gap-px bg-rule md:grid-cols-4">
@@ -518,6 +522,80 @@ function FieldIntelligence({ model, loading }: { model: OperatingModel; loading:
       </div>
       {!reports.length && (
         <EmptyState text={loading ? "Synchronizing field intelligence." : "No intelligence reports can be generated without product events, worker runs, or marketplace signals."} />
+      )}
+    </section>
+  );
+}
+
+function LiveOpsRoom({ liveOps, loading }: { liveOps?: LiveOpsSummary; loading: boolean }) {
+  return (
+    <section className="border border-rule bg-ink-2/40">
+      <PanelHead
+        icon={Users}
+        label="Live Tenant Occupancy"
+        meta={liveOps?.generated_at ? `LIVE / ${relativeTime(liveOps.generated_at)}` : "LIVE / owner only"}
+      />
+      <div className="grid gap-px bg-rule md:grid-cols-4">
+        <PulseCell icon={Users} label="Tenants online" value={fmtNumber(liveOps?.active_tenants ?? 0)} />
+        <PulseCell icon={Workflow} label="Rooms open" value={fmtNumber(liveOps?.open_rooms ?? 0)} />
+        <PulseCell icon={Activity} label="Sessions live" value={fmtNumber(liveOps?.live_sessions ?? 0)} />
+        <PulseCell
+          icon={AlertCircle}
+          label="Rooms degraded"
+          value={fmtNumber(liveOps?.degraded_workspaces ?? 0)}
+          tone={(liveOps?.degraded_workspaces ?? 0) > 0 ? "critical" : "stable"}
+        />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1120px] text-left">
+          <thead className="border-b border-rule bg-white/[0.025] font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+            <tr>
+              <th className="px-4 py-3">Tenant room</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Occupants</th>
+              <th className="px-4 py-3">Sessions</th>
+              <th className="px-4 py-3">Requests 15m</th>
+              <th className="px-4 py-3">Failures 15m</th>
+              <th className="px-4 py-3">Last request</th>
+              <th className="px-4 py-3">Who is in the room</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule">
+            {(liveOps?.workspaces ?? []).slice(0, 12).map((workspace) => (
+              <tr key={workspace.workspace_id} className="align-top hover:bg-white/[0.018]">
+                <td className="px-4 py-4">
+                  <div className="font-semibold text-bone">{workspace.workspace_name}</div>
+                  <div className="mt-1 font-mono text-[10px] text-muted">{workspace.workspace_slug || workspace.workspace_id}</div>
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge
+                    label={workspace.current_status}
+                    tone={workspace.current_status === "degraded" ? "critical" : workspace.current_status === "idle" ? "watch" : "stable"}
+                  />
+                </td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{workspace.active_user_count}</td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{workspace.active_session_count}</td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{workspace.recent_requests_15m}</td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{workspace.failed_requests_15m}</td>
+                <td className="px-4 py-4 text-sm text-muted">
+                  {workspace.last_request_at ? relativeTime(workspace.last_request_at) : "no request"}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {workspace.occupants.map((occupant) => (
+                      <EvidenceChip key={occupant.session_id}>
+                        {(occupant.full_name || occupant.email).slice(0, 36)} · {occupant.role}
+                      </EvidenceChip>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!(liveOps?.workspaces?.length) && (
+        <EmptyState text={loading ? "Loading live room occupancy." : "No live tenant rooms in the last 15 minutes."} />
       )}
     </section>
   );
@@ -731,6 +809,7 @@ function StoryBlock({ title, detail, evidence }: { title: string; detail: string
 
 interface OperatingModel {
   generatedAt?: string;
+  liveOps?: LiveOpsSummary;
   pulse: {
     workspaces: number;
     activeEvaluations: number;
@@ -782,6 +861,7 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
       pipelineRuns24h: product.pipeline_runs_24h ?? 0,
       deployments: product.deployments ?? deployments.length,
     },
+    liveOps: snapshot?.liveOps.data,
     signals,
     accounts,
     workers,

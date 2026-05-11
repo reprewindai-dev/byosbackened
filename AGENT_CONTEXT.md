@@ -82,16 +82,15 @@ Read this entire file before doing anything else. No exceptions.
 - Internal UACP V3 workers: the protected registry is available at `/api/v1/internal/operators/registry` and includes operating workers, Builder Agents, and Experience Assurance workers (`sentinel`, `mirror`, `polish`, `glide`, `pulse`, `sheriff`, `welcome`). Machine-readable export: `python backend/scripts/export_worker_registry.py`. Operating model: `docs/UACP_V3_WORKER_REGISTRY.md`, `docs/BUILDER_AGENTS.md`, and `docs/UPSTASH_OPERATORS.md`.
 
 ### What's NOT Done Yet âš ï¸
-- The newest Coolify build artifact for commit `9493aceb` is still restart-looping beside the live routed API container; keep the routed `veklom-api` service as the source of truth until Coolify is reconciled
-- License server NOT deployed to its own VPS at license.veklom.com yet
-- Trial key auto-issuance on signup not wired end-to-end yet
-- UptimeRobot monitoring not set up yet (instructions are in backend/README.md)
-- `DATABASE_URL` and `REDIS_URL` are present in the live Coolify service env; use bootstrap_prod.sh only when validating a future redeploy
+- The stale `9493aceb` note was wrong. The current non-routed Coolify restart-loop artifact is `lcile2sz1wjd6sqsdctlm4rv-033401126260`, built from commit `9636805d`; keep the routed `veklom-api` service as the source of truth until Coolify is reconciled.
+- Older workspaces created before the 2026-05-10 license server alias fix may still need deliberate trial-license backfill if they should carry trial metadata.
+- UptimeRobot monitoring is still not set up yet (instructions are in `backend/README.md`).
+- `DATABASE_URL` and `REDIS_URL` are present in the live Coolify service env; use `bootstrap_prod.sh` only when validating a future redeploy.
 
 ### Known Issues / Tech Debt
 - Previous agent fabricated 777ms P95 benchmark claims â€” those are false. Real numbers in `backend/HONEST_AUDIT_REPORT.md`
 - `CONSISTENCY_TESTING.md` and old `AUDIT_REPORT.md` contain fabricated numbers â€” do not reference them
-- Coolify has a stray app that built from main but is NOT routed to api.veklom.com â€” do not touch it, it's probably the CO2 router engine app
+- Coolify has a stray app artifact that built from main but is NOT routed to `api.veklom.com`; do not touch the routed `veklom-api` container while investigating it
 - `core/security.py` (file) and `core/redis.py` shadow real implementations â€” dead code, delete when safe
 
 ---
@@ -103,6 +102,7 @@ Read this entire file before doing anything else. No exceptions.
 | `backend/DEPLOY_STATUS.md` | Infra map, SSH access, Coolify setup steps |
 | `backend/HONEST_AUDIT_REPORT.md` | Real benchmark numbers, bug history |
 | `backend/scripts/bootstrap_prod.sh` | Run once to verify/wire Postgres+Redis into Coolify |
+| `backend/scripts/validate_production.py` | Production validator â€” now checks live Alembic revision equals repo head |
 | `backend/scripts/build_buyer_package.py` | Builds buyer zip (excludes server-side files) |
 | `docs/INSTITUTIONAL_COMPUTE_GOVERNANCE.md` | Canonical doctrine and vocabulary for UACP, Sunnyvale, Silicon Valley, Archives, and Builder Agents |
 | `docs/UACP_V3_WORKER_REGISTRY.md` | Runtime worker registry contract, committees, minimum live set, and JSON export command |
@@ -138,9 +138,13 @@ Read this entire file before doing anything else. No exceptions.
 
 ## Next Priorities (in order)
 
-1. Reconcile the stray Coolify restart-looping artifact for commit `9493aceb`
-2. Reconcile Alembic migration state in production
-3. Deploy license server to license.veklom.com (separate Hetzner VPS or subdomain on existing server)
-4. Wire trial key auto-issuance on workspace signup
-5. Set up UptimeRobot (free) for uptime monitoring
-6. Get first paying pilot customer
+1. Reconcile the stray Coolify restart-looping artifact currently tied to commit `9636805d`
+2. Backfill trial-license metadata for any workspaces that signed up before the 2026-05-10 license issuance fix and should be licensed
+3. Set up UptimeRobot (free) for uptime monitoring
+4. Get first paying pilot customer
+
+## Production Truth Snapshot
+
+- `https://license.veklom.com/health` returns `200`, and the license server now serves both legacy `/issue` + `/verify` and canonical `/api/licenses/issue` + `/api/licenses/verify`.
+- Production signup trial issuance is working again as of 2026-05-10; a fresh registration created a workspace with `license_tier=starter` and a populated `license_key_prefix`.
+- Production Alembic state was verified on 2026-05-10 at revision `013`, which matches repo head.

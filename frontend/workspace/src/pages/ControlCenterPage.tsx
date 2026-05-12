@@ -452,7 +452,22 @@ function deriveFailureReasonText({
 }
 
 async function fetchControlSnapshot(): Promise<ControlSnapshot> {
-  const [summary, events, eventStream, evaluationSurgeon, growthOpportunities, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns] =
+  const [
+    summary,
+    liveOps,
+    events,
+    eventStream,
+    evaluationSurgeon,
+    growthOpportunities,
+    workspaces,
+    runs,
+    deployments,
+    billing,
+    evidence,
+    security,
+    registry,
+    workerRuns,
+  ] =
     await Promise.all([
       safeGet<UacpSummary>("/internal/uacp/summary"),
       safeGet<LiveOpsSummary>("/admin/live-ops"),

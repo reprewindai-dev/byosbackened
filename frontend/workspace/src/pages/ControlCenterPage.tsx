@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
+import type { AxiosError } from "axios";
 import {
   Activity,
   AlertCircle,
@@ -12,7 +13,6 @@ import {
   Eye,
   FileCheck2,
   Gauge,
-  GitBranch,
   Landmark,
   Network,
   Radar,
@@ -27,11 +27,25 @@ import type { LiveOpsSummary } from "@/types/api";
 
 type Room = "overview" | "surgeon" | "growth" | "intelligence";
 type Tone = "stable" | "watch" | "critical" | "neutral";
+type RouteStatus =
+  | "live"
+  | "unreachable"
+  | "unauthorized"
+  | "forbidden"
+  | "client_error"
+  | "server_error"
+  | "timeout"
+  | "malformed"
+  | "unavailable";
 
 interface SafeResult<T> {
   ok: boolean;
   data?: T;
   error?: string;
+  source?: string;
+  contractVersion?: string;
+  status?: number | null;
+  reason?: RouteStatus;
 }
 
 interface UacpSummary {
@@ -151,6 +165,85 @@ interface SecurityEventRow {
   created_at?: string;
 }
 
+interface EvaluationSurgeonEntry {
+  workspace_id: string;
+  tenant_id?: string | null;
+  workspace: string;
+  workspace_slug?: string | null;
+  user_id?: string | null;
+  user_handle?: string | null;
+  tier?: string | null;
+  runs_used?: number | null;
+  free_evaluation_limit?: number | null;
+  last_activity?: string | null;
+  endpoint_status?: string | null;
+  evidence_activity?: {
+    audit_entries?: number | null;
+    status?: string | null;
+  } | null;
+  billing_state?: {
+    reserve_units?: number | null;
+    reserve_usd?: string | null;
+    transactions?: number | null;
+    paid_active?: boolean | null;
+  } | null;
+  security_state?: {
+    mfa_enabled_users?: number | null;
+    active_users?: number | null;
+  } | null;
+  risk_score?: number | null;
+  activation_probability?: number | null;
+  top_action?: string | null;
+  assigned_workers?: string[] | null;
+  committee_id?: string | null;
+  pillar_ids?: string[] | null;
+  archive_ref?: string | null;
+  evidence?: Record<string, unknown> | null;
+  status?: string | null;
+}
+
+interface EvaluationSurgeonPayload {
+  queue?: EvaluationSurgeonEntry[] | null;
+  empty_reason?: string | null;
+  required_sources?: string[] | null;
+  source?: string;
+  contract_version?: string;
+}
+
+interface EventStreamPayload {
+  stream?: string | null;
+  events?: UacpEvent[];
+  empty_reason?: string | null;
+  required_sources?: string[] | null;
+  generated_at?: string | null;
+  source?: string;
+  contract_version?: string;
+}
+
+interface GrowthOpportunity {
+  opportunity_id: string;
+  kind?: string | null;
+  title?: string | null;
+  score?: number | null;
+  risk?: number | null;
+  source_event?: string | null;
+  evidence?: Record<string, unknown> | null;
+  recommended_action?: string | null;
+  assigned_workers?: string[] | null;
+  committee_id?: string | null;
+  pillar_ids?: string[] | null;
+  archive_ref?: string | null;
+  status?: string | null;
+}
+
+interface GrowthOpportunityPayload {
+  opportunities?: GrowthOpportunity[] | null;
+  empty_reason?: string | null;
+  required_sources?: string[] | null;
+  source?: string;
+  contract_version?: string;
+}
+
 interface WorkerRow {
   id: string;
   name?: string;
@@ -192,6 +285,9 @@ interface ControlSnapshot {
   summary: SafeResult<UacpSummary>;
   liveOps: SafeResult<LiveOpsSummary>;
   events: SafeResult<{ events?: UacpEvent[] }>;
+  evaluationSurgeon: SafeResult<EvaluationSurgeonPayload>;
+  growthOpportunities: SafeResult<GrowthOpportunityPayload>;
+  eventStream: SafeResult<EventStreamPayload>;
   workspaces: SafeResult<{ workspaces?: WorkspaceRow[] }>;
   runs: SafeResult<{ runs?: RunRow[] }>;
   deployments: SafeResult<{ deployments?: DeploymentRow[] }>;
@@ -236,22 +332,134 @@ interface EvaluationAccount {
   evidence: string[];
 }
 
+interface GrowthOpportunityCard {
+  title: string;
+  meta: string;
+  icon: ComponentType<{ className?: string }>;
+  score: number;
+  tone: Tone;
+  headline: string;
+  detail: string;
+  evidence: string[];
+  action: string;
+  workers: string[];
+  status: string;
+  archiveRef: string;
+}
+
 async function safeGet<T>(path: string, params?: Record<string, unknown>): Promise<SafeResult<T>> {
   try {
     const response = await api.get<T>(path, { params });
-    return { ok: true, data: response.data };
+    const responseData = response.data as Record<string, unknown> & { source?: string; contract_version?: string };
+    return {
+      ok: true,
+      data: response.data,
+      source: responseData.source,
+      contractVersion: responseData.contract_version,
+      status: response.status,
+      reason: "live",
+    };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unavailable";
-    return { ok: false, error: message };
+    const axiosError = error as AxiosError<Record<string, unknown>>;
+    const status = axiosError.response?.status ?? null;
+    const responseData = axiosError.response?.data;
+    const responseError =
+      typeof responseData === "object" && responseData !== null && "detail" in responseData
+        ? String((responseData as Record<string, unknown>).detail)
+        : axiosError.message;
+    const responseSource =
+      typeof responseData === "object" && responseData && "source" in responseData ? responseData.source : undefined;
+    const responseContract =
+      typeof responseData === "object" &&
+      responseData &&
+      "contract_version" in responseData
+        ? responseData.contract_version
+        : undefined;
+    const errorCode = (axiosError as { code?: string }).code;
+    const message = axiosError.message || "Unavailable";
+    const reason: RouteStatus =
+      status === 401
+        ? "unauthorized"
+        : status === 403
+          ? "forbidden"
+          : typeof status === "number" && status >= 500
+            ? "server_error"
+            : typeof status === "number" && status >= 400
+              ? "client_error"
+              : !axiosError.response
+                ? errorCode === "ECONNABORTED" || errorCode === "ETIMEDOUT"
+                  ? "timeout"
+                  : "unreachable"
+                : typeof responseData === "string"
+                  ? "malformed"
+                  : "unavailable";
+    return {
+      ok: false,
+      error: responseError ?? message,
+      source: responseSource as string | undefined,
+      contractVersion: responseContract as string | undefined,
+      status,
+      reason,
+    };
   }
 }
 
+function deriveRouteStatus<T>(result?: SafeResult<T>): RouteStatus {
+  if (result?.reason) return result.reason;
+  const status = result?.status;
+  if (typeof status === "number" && status >= 200 && status < 300) return "live";
+  if (status === 401) return "unauthorized";
+  if (status === 403) return "forbidden";
+  if (typeof status === "number" && status >= 500) return "server_error";
+  if (typeof status === "number" && status >= 400) return "client_error";
+  if (result === undefined || result === null) return "unavailable";
+  return result.ok ? "live" : "unavailable";
+}
+
+function isRouteLive(status: RouteStatus): boolean {
+  return status === "live";
+}
+
+function deriveFailureReasonText({
+  route,
+  status,
+  error,
+  requiredSources,
+  emptyReason,
+}: {
+  route: string;
+  status: RouteStatus;
+  error?: string | null;
+  requiredSources?: string[] | null;
+  emptyReason?: string | null;
+}) {
+  if (status === "live") {
+    return null;
+  }
+  if (status === "unauthorized") return `${route}: owner operator auth missing or expired (401).`;
+  if (status === "forbidden") return `${route}: authenticated but route blocked by role policy (403).`;
+  if (status === "timeout") return `${route}: request timed out.`;
+  if (status === "unreachable") return `${route}: backend transport unavailable from this client surface.`;
+  if (status === "malformed") return `${route}: backend returned malformed payload.`;
+  if (status === "client_error") {
+    const reasonSuffix = requiredSources?.length ? ` required sources: ${requiredSources.join(", ")}` : "";
+    return `${route}: request rejected (4xx).${reasonSuffix}`;
+  }
+  if (status === "server_error") return `${route}: backend returned 5xx.`;
+  if (status === "unavailable")
+    return `${route}: ${error ?? emptyReason ?? "no data response available."}${requiredSources?.length ? ` required sources: ${requiredSources.join(", ")}` : ""}`;
+  return `${route}: route unavailable.`;
+}
+
 async function fetchControlSnapshot(): Promise<ControlSnapshot> {
-  const [summary, liveOps, events, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns] =
+  const [summary, events, eventStream, evaluationSurgeon, growthOpportunities, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns] =
     await Promise.all([
       safeGet<UacpSummary>("/internal/uacp/summary"),
       safeGet<LiveOpsSummary>("/admin/live-ops"),
       safeGet<{ events?: UacpEvent[] }>("/internal/uacp/events", { limit: 150 }),
+      safeGet<EventStreamPayload>("/internal/uacp/event-stream", { limit: 150 }),
+      safeGet<EvaluationSurgeonPayload>("/internal/uacp/evaluation-surgeon", { limit: 150 }),
+      safeGet<GrowthOpportunityPayload>("/internal/uacp/growth-opportunities", { limit: 150 }),
       safeGet<{ workspaces?: WorkspaceRow[] }>("/internal/uacp/workspaces", { limit: 250 }),
       safeGet<{ runs?: RunRow[] }>("/internal/uacp/runs", { limit: 250 }),
       safeGet<{ deployments?: DeploymentRow[] }>("/internal/uacp/deployments", { limit: 250 }),
@@ -262,7 +470,22 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
       safeGet<{ runs?: WorkerRunRow[]; count?: number }>("/internal/operators/runs", { limit: 150 }),
     ]);
 
-  return { summary, liveOps, events, workspaces, runs, deployments, billing, evidence, security, registry, workerRuns };
+  return {
+    summary,
+    events,
+    liveOps,
+    eventStream,
+    evaluationSurgeon,
+    growthOpportunities,
+    workspaces,
+    runs,
+    deployments,
+    billing,
+    evidence,
+    security,
+    registry,
+    workerRuns,
+  };
 }
 
 export function ControlCenterPage() {
@@ -339,8 +562,29 @@ export function ControlCenterPage() {
             <LiveErrorBox title="Sunnyvale failed to load" detail={(snapshot.error as Error)?.message ?? "Unknown error"} />
           )}
           {room === "overview" && <OverviewRoom model={model} loading={snapshot.isLoading} />}
-          {room === "surgeon" && <EvaluationSurgeon accounts={model.accounts} loading={snapshot.isLoading} />}
-          {room === "growth" && <GrowthNavigator model={model} loading={snapshot.isLoading} />}
+          {room === "surgeon" && (
+            <EvaluationSurgeon
+              accounts={model.accounts}
+              loading={snapshot.isLoading}
+              routeStatus={model.evaluationSurgeonStatus}
+              emptyReason={model.evaluationSurgeonUnavailableReason}
+              requiredSources={model.evaluationSurgeonRequiredSources}
+              routeSource={model.evaluationSurgeonSource}
+              contractVersion={model.evaluationSurgeonContractVersion}
+            />
+          )}
+          {room === "growth" && (
+            <GrowthNavigator
+              opportunities={model.growthQueue}
+              loading={snapshot.isLoading}
+              routeUnavailable={model.growthOpportunitiesUnavailable}
+              routeStatus={model.growthOpportunitiesStatus}
+              unavailableReason={model.growthOpportunitiesUnavailableReason}
+              requiredSources={model.growthOpportunitiesRequiredSources}
+              routeSource={model.growthOpportunitiesSource}
+              contractVersion={model.growthOpportunitiesContractVersion}
+            />
+          )}
           {room === "intelligence" && <FieldIntelligence model={model} loading={snapshot.isLoading} />}
         </section>
         <aside className="space-y-4">
@@ -355,6 +599,7 @@ export function ControlCenterPage() {
 
 function OverviewRoom({ model, loading }: { model: OperatingModel; loading: boolean }) {
   const stories = deriveStories(model);
+  const eventStreamMeta = `source: ${model.eventStreamSource ?? "unknown-source"} / contract: ${model.eventStreamContractVersion ?? "unknown-contract"}`;
   return (
     <div className="space-y-4">
       <LiveOpsRoom liveOps={model.liveOps} loading={loading} />
@@ -380,7 +625,20 @@ function OverviewRoom({ model, loading }: { model: OperatingModel; loading: bool
               <SignalRow key={signal.id} signal={signal} />
             ))}
             {!model.signals.length && (
-              <EmptyState text={loading ? "Synchronizing backend event stream." : "No backend events available from `/internal/uacp/events`."} />
+              <EmptyState
+                text={
+                  loading
+                    ? "Synchronizing backend event stream."
+                    : isRouteLive(model.eventStreamRouteStatus)
+                      ? `No backend events available from /internal/uacp/events. ${eventStreamMeta}`
+                      : `Events unavailable from /internal/uacp/events and /internal/uacp/event-stream: ${deriveFailureReasonText({
+                          route: "/internal/uacp/event-stream",
+                          status: model.eventStreamRouteStatus,
+                          error: model.eventStreamUnavailableReason ?? null,
+                          emptyReason: model.eventStreamUnavailableReason ?? null,
+                        })}`
+                }
+              />
             )}
           </div>
         </div>
@@ -397,10 +655,42 @@ function OverviewRoom({ model, loading }: { model: OperatingModel; loading: bool
   );
 }
 
-function EvaluationSurgeon({ accounts, loading }: { accounts: EvaluationAccount[]; loading: boolean }) {
+function EvaluationSurgeon({
+  accounts,
+  loading,
+  routeStatus,
+  emptyReason,
+  requiredSources,
+  routeSource,
+  contractVersion,
+}: {
+  accounts: EvaluationAccount[];
+  loading: boolean;
+  routeStatus: RouteStatus;
+  emptyReason?: string | null;
+  requiredSources?: string[] | null;
+  routeSource?: string | null;
+  contractVersion?: string | null;
+}) {
+  const dataUnavailable = !isRouteLive(routeStatus);
+  const routeUnavailableReason =
+    isRouteLive(routeStatus)
+      ? undefined
+      : deriveFailureReasonText({
+          route: "/internal/uacp/evaluation-surgeon",
+          status: routeStatus,
+          error: emptyReason ?? null,
+          requiredSources,
+          emptyReason,
+        });
+  const routeMeta = `source: ${routeSource ?? "unknown-source"} / contract: ${contractVersion ?? "unknown-contract"}`;
   return (
     <section className="border border-rule bg-ink-2/40">
-      <PanelHead icon={BriefcaseBusiness} label="Evaluation Surgeon Queue" meta={`${accounts.length} workspace account${accounts.length === 1 ? "" : "s"}`} />
+      <PanelHead
+        icon={BriefcaseBusiness}
+        label="Evaluation Surgeon Queue"
+        meta={`${accounts.length} workspace account${accounts.length === 1 ? "" : "s"} / ${routeMeta}`}
+      />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left">
           <thead className="border-b border-rule bg-white/[0.025] font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
@@ -448,14 +738,52 @@ function EvaluationSurgeon({ accounts, loading }: { accounts: EvaluationAccount[
         </table>
       </div>
       {!accounts.length && (
-        <EmptyState text={loading ? "Loading workspaces and run history." : "No workspace records returned from `/internal/uacp/workspaces`."} />
+        <EmptyState
+          text={
+            dataUnavailable
+              ? `${routeUnavailableReason || `Route unavailable: /internal/uacp/evaluation-surgeon ${routeMeta}`}`
+                : loading
+                  ? "Loading canonical evaluation surgeon queue from `/internal/uacp/evaluation-surgeon`."
+                  : requiredSources?.length
+                  ? `No qualifying entries from /internal/uacp/evaluation-surgeon; required sources not yet observed: ${requiredSources.join(", ")}.`
+                  : "No workspace queue entries from `/internal/uacp/evaluation-surgeon`."
+          }
+        />
       )}
     </section>
   );
 }
 
-function GrowthNavigator({ model, loading }: { model: OperatingModel; loading: boolean }) {
-  const opportunities = deriveGrowthOpportunities(model);
+function GrowthNavigator({
+  opportunities,
+  loading,
+  routeUnavailable,
+  routeStatus,
+  unavailableReason,
+  requiredSources,
+  routeSource,
+  contractVersion,
+}: {
+  opportunities: GrowthOpportunityCard[];
+  loading: boolean;
+  routeUnavailable: boolean;
+  routeStatus: RouteStatus;
+  unavailableReason?: string | null;
+  requiredSources?: string[] | null;
+  routeSource?: string | null;
+  contractVersion?: string | null;
+}) {
+  const routeUnavailableReason =
+    isRouteLive(routeStatus)
+      ? null
+      : deriveFailureReasonText({
+          route: "/internal/uacp/growth-opportunities",
+          status: routeStatus,
+          error: unavailableReason ?? null,
+          requiredSources,
+          emptyReason: unavailableReason,
+        });
+  const routeMeta = `source: ${routeSource ?? "unknown-source"} / contract: ${contractVersion ?? "unknown-contract"}`;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {opportunities.map((item) => (
@@ -471,9 +799,9 @@ function GrowthNavigator({ model, loading }: { model: OperatingModel; loading: b
                   {item.evidence.map((line) => <EvidenceChip key={line}>{line}</EvidenceChip>)}
                 </div>
                 <div className="mt-4 border-t border-rule pt-4">
-                  <div className="text-eyebrow">Recommended action</div>
-                  <div className="mt-1 text-sm font-semibold text-bone">{item.action}</div>
-                  <div className="mt-3"><WorkerChips workers={item.workers} /></div>
+                <div className="text-eyebrow">Recommended action</div>
+                <div className="mt-1 text-sm font-semibold text-bone">{item.action}</div>
+                <div className="mt-3"><WorkerChips workers={item.workers} /></div>
                 </div>
               </div>
             </div>
@@ -482,7 +810,19 @@ function GrowthNavigator({ model, loading }: { model: OperatingModel; loading: b
       ))}
       {!opportunities.length && (
         <div className="lg:col-span-2">
-          <EmptyState text={loading ? "Building opportunity map from live data." : "No growth opportunities can be ranked until live buyer/vendor/tool signals exist."} />
+          <EmptyState
+            text={
+              routeUnavailable
+              ? `Route unavailable: /internal/uacp/growth-opportunities ${routeMeta}${unavailableReason ? ` - ${unavailableReason}` : ""}`
+                : isRouteLive(routeStatus)
+                  ? loading
+                    ? "Loading growth opportunities from `/internal/uacp/growth-opportunities`."
+                    : requiredSources?.length
+                      ? `No qualified opportunities from /internal/uacp/growth-opportunities; required sources not yet observed: ${requiredSources.join(", ")}.`
+                      : "No growth opportunities from `/internal/uacp/growth-opportunities`."
+                  : `${routeUnavailableReason || `Route unavailable: /internal/uacp/growth-opportunities ${routeMeta}`}`
+            }
+          />
         </div>
       )}
     </div>
@@ -491,6 +831,15 @@ function GrowthNavigator({ model, loading }: { model: OperatingModel; loading: b
 
 function FieldIntelligence({ model, loading }: { model: OperatingModel; loading: boolean }) {
   const reports = deriveFieldReports(model);
+  const eventStreamHealthy = isRouteLive(model.eventStreamRouteStatus);
+  const eventStreamFailure = isRouteLive(model.eventStreamRouteStatus)
+    ? null
+    : deriveFailureReasonText({
+        route: "/internal/uacp/event-stream",
+        status: model.eventStreamRouteStatus,
+        error: model.eventStreamUnavailableReason ?? null,
+        emptyReason: model.eventStreamUnavailableReason ?? null,
+      });
   return (
     <section className="border border-rule bg-ink-2/40">
       <PanelHead icon={Eye} label="Market / Competitor Intelligence" meta="patterns with evidence only" />
@@ -521,7 +870,15 @@ function FieldIntelligence({ model, loading }: { model: OperatingModel; loading:
         ))}
       </div>
       {!reports.length && (
-        <EmptyState text={loading ? "Synchronizing field intelligence." : "No intelligence reports can be generated without product events, worker runs, or marketplace signals."} />
+        <EmptyState
+          text={
+            loading
+              ? "Synchronizing field intelligence."
+              : eventStreamHealthy
+                ? "No intelligence reports can be generated without product events, worker runs, or marketplace signals."
+                : eventStreamFailure ?? "No field intelligence stream available from `/internal/uacp/event-stream`."
+          }
+        />
       )}
     </section>
   );
@@ -810,6 +1167,23 @@ function StoryBlock({ title, detail, evidence }: { title: string; detail: string
 interface OperatingModel {
   generatedAt?: string;
   liveOps?: LiveOpsSummary;
+  eventStreamUnavailable: boolean;
+  eventStreamUnavailableReason: string | null;
+  eventStreamRouteStatus: RouteStatus;
+  eventStreamSource: string | null;
+  eventStreamContractVersion: string | null;
+  evaluationSurgeonUnavailable: boolean;
+  evaluationSurgeonUnavailableReason: string | null;
+  evaluationSurgeonRequiredSources: string[] | null;
+  evaluationSurgeonSource: string | null;
+  evaluationSurgeonContractVersion: string | null;
+  evaluationSurgeonStatus: RouteStatus;
+  growthOpportunitiesUnavailable: boolean;
+  growthOpportunitiesUnavailableReason: string | null;
+  growthOpportunitiesRequiredSources: string[] | null;
+  growthOpportunitiesSource: string | null;
+  growthOpportunitiesContractVersion: string | null;
+  growthOpportunitiesStatus: RouteStatus;
   pulse: {
     workspaces: number;
     activeEvaluations: number;
@@ -824,11 +1198,15 @@ interface OperatingModel {
   };
   signals: OperatingSignal[];
   accounts: EvaluationAccount[];
+  growthQueue: GrowthOpportunityCard[];
   workers: WorkerRow[];
   committees: CommitteeRow[];
   workerRuns: WorkerRunRow[];
   raw: ControlSnapshot | undefined;
 }
+
+const ROUTE_SOURCE_UNKNOWN = "unknown-source";
+const ROUTE_CONTRACT_UNKNOWN = "unknown-contract";
 
 function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const summary = snapshot?.summary.data;
@@ -836,19 +1214,76 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const workers = snapshot?.registry.data?.workers ?? [];
   const committees = snapshot?.registry.data?.committees ?? [];
   const workerRuns = snapshot?.workerRuns.data?.runs ?? [];
+  const eventStream = snapshot?.eventStream;
   const events = snapshot?.events.data?.events ?? [];
+  const streamedEvents = eventStream?.data?.events ?? [];
+  const eventStreamStatus = deriveRouteStatus(eventStream);
+  const eventsForSignals =
+    snapshot?.events.ok && events.length > 0
+      ? events
+      : eventStreamStatus === "live" && streamedEvents.length > 0
+          ? streamedEvents
+          : snapshot?.events.ok
+            ? events
+          : [];
   const workspaces = snapshot?.workspaces.data?.workspaces ?? [];
   const runs = snapshot?.runs.data?.runs ?? [];
   const deployments = snapshot?.deployments.data?.deployments ?? [];
-  const billing = snapshot?.billing.data?.transactions ?? [];
   const evidence = snapshot?.evidence.data?.evidence ?? [];
-  const security = snapshot?.security.data?.security_events ?? [];
-  const signals = events.map(toOperatingSignal).sort((a, b) => (b.score + b.risk) - (a.score + a.risk));
-  const accounts = buildEvaluationAccounts({ workspaces, runs, deployments, billing, evidence, security });
+  const signals = eventsForSignals.map(toOperatingSignal).sort((a, b) => (b.score + b.risk) - (a.score + a.risk));
+  const surgeon = snapshot?.evaluationSurgeon;
+  const opportunities = snapshot?.growthOpportunities;
+  const hasSnapshotData = Boolean(snapshot);
+  const evaluationSurgeonStatus = deriveRouteStatus(surgeon);
+  const growthOpportunitiesStatus = deriveRouteStatus(opportunities);
+  const evaluationQueueUnavailable = hasSnapshotData ? !isRouteLive(evaluationSurgeonStatus) : false;
+  const growthQueueUnavailable = hasSnapshotData ? !isRouteLive(growthOpportunitiesStatus) : false;
+  const evaluationSurgeonRequiredSources = surgeon?.data?.required_sources ?? null;
+  const growthOpportunitiesRequiredSources = opportunities?.data?.required_sources ?? null;
+  const evaluationSurgeonSource = surgeon?.data?.source ?? surgeon?.source ?? ROUTE_SOURCE_UNKNOWN;
+  const evaluationSurgeonContractVersion =
+    surgeon?.data?.contract_version ?? surgeon?.contractVersion ?? ROUTE_CONTRACT_UNKNOWN;
+  const growthOpportunitiesSource = opportunities?.data?.source ?? opportunities?.source ?? ROUTE_SOURCE_UNKNOWN;
+  const growthOpportunitiesContractVersion =
+    opportunities?.data?.contract_version ?? opportunities?.contractVersion ?? ROUTE_CONTRACT_UNKNOWN;
+  const eventStreamUnavailable = hasSnapshotData ? !isRouteLive(eventStreamStatus) : false;
+  const eventStreamUnavailableReason = hasSnapshotData
+    ? (eventStream?.error ?? eventStream?.data?.empty_reason ?? null)
+    : null;
+  const eventStreamSource = eventStream?.data?.source ?? eventStream?.source ?? ROUTE_SOURCE_UNKNOWN;
+  const eventStreamContractVersion =
+    eventStream?.data?.contract_version ?? eventStream?.contractVersion ?? ROUTE_CONTRACT_UNKNOWN;
+  const evaluationSurgeonUnavailableReason = hasSnapshotData ? (surgeon?.error ?? surgeon?.data?.empty_reason ?? null) : null;
+  const growthOpportunitiesUnavailableReason = hasSnapshotData ? (opportunities?.error ?? opportunities?.data?.empty_reason ?? null) : null;
+  const surgeonAvailable = Boolean(surgeon?.ok);
+  const opportunitiesAvailable = Boolean(opportunities?.ok);
+  const accounts = surgeonAvailable
+    ? surgeon?.data?.queue?.map(convertSurgeonEntryToAccount).filter((entry): entry is EvaluationAccount => Boolean(entry)) ?? []
+    : [];
+  const growthQueue = opportunitiesAvailable
+    ? opportunities?.data?.opportunities?.map(convertGrowthOpportunityToCard) ?? []
+    : [];
   const readyWorkers = workers.filter((worker) => worker.status === "ready").length;
 
   return {
     generatedAt: summary?.generated_at,
+    eventStreamUnavailable,
+    eventStreamUnavailableReason,
+    eventStreamRouteStatus: eventStreamStatus,
+    eventStreamSource,
+    eventStreamContractVersion,
+    evaluationSurgeonUnavailable: evaluationQueueUnavailable,
+    evaluationSurgeonUnavailableReason,
+    evaluationSurgeonRequiredSources,
+    evaluationSurgeonSource,
+    evaluationSurgeonContractVersion,
+    evaluationSurgeonStatus,
+    growthOpportunitiesUnavailable: growthQueueUnavailable,
+    growthOpportunitiesUnavailableReason,
+    growthOpportunitiesRequiredSources,
+    growthOpportunitiesSource,
+    growthOpportunitiesContractVersion,
+    growthOpportunitiesStatus,
     pulse: {
       workspaces: product.workspaces ?? workspaces.length,
       activeEvaluations: accounts.filter((account) => account.tier.toLowerCase().includes("free") || account.billingState === "no reserve").length,
@@ -864,11 +1299,95 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
     liveOps: snapshot?.liveOps.data,
     signals,
     accounts,
+    growthQueue,
     workers,
     committees,
     workerRuns,
     raw: snapshot,
   };
+}
+
+function convertSurgeonEntryToAccount(entry: EvaluationSurgeonEntry): EvaluationAccount {
+  const runsUsed = entry.runs_used ?? 0;
+  const evidenceEntries = entry.evidence_activity?.audit_entries ?? 0;
+  const reserveUnits = entry.billing_state?.reserve_units ?? 0;
+  const reserveUsd = entry.billing_state?.reserve_usd ? Number(entry.billing_state.reserve_usd) : 0;
+  const riskScore = clampPercent(entry.risk_score ?? 0);
+  const activationProbability = clampPercent(entry.activation_probability ?? 0);
+  const endpointStatus = entry.endpoint_status ?? "none";
+  const workers = entry.assigned_workers ?? [];
+  const evidenceStatus = entry.evidence_activity?.status ?? (evidenceEntries > 0 ? "present" : "none");
+  const evidenceLines = [
+    `${runsUsed} run${runsUsed === 1 ? "" : "s"}`,
+    `${evidenceStatus} evidence activity`,
+    entry.billing_state?.paid_active ? "paid active" : "not paid",
+    `reserve ${reserveUnits} unit${reserveUnits === 1 ? "" : "s"} (${fmtCurrency(reserveUsd)})`,
+    `${entry.security_state?.mfa_enabled_users ?? 0} MFA-enabled user(s)`,
+  ].filter(Boolean);
+
+  return {
+    workspaceId: entry.workspace_id,
+    name: entry.workspace || entry.workspace_slug || entry.workspace_id,
+    tier: entry.tier || "free",
+    runsUsed,
+    lastActivity: entry.last_activity ?? undefined,
+    endpointStatus: endpointStatus === "tested" ? "active endpoint" : endpointStatus === "created" ? "created endpoint" : "none",
+    evidenceActivity: `${evidenceEntries} evidence entr${evidenceEntries === 1 ? "y" : "ies"}`,
+    billingState: reserveUnits > 0 || entry.billing_state?.paid_active ? "reserve live" : "no reserve",
+    riskScore,
+    activationProbability,
+    topAction: entry.top_action || "Wait for next backend signal.",
+    workers,
+    evidence: evidenceLines,
+  };
+}
+
+function convertGrowthOpportunityToCard(opportunity: GrowthOpportunity): GrowthOpportunityCard {
+  const score = clampPercent(opportunity.score ?? 0);
+  const risk = clampPercent(opportunity.risk ?? score);
+  const rawTone = risk >= 70 || score >= 85 ? "critical" : score >= 62 || risk >= 55 ? "watch" : "stable";
+  const evidenceObject = opportunity.evidence ?? {};
+  const evidence = Object.entries(evidenceObject).length
+    ? Object.entries(evidenceObject).map(([key, value]) => `${toSentenceCase(key)}: ${String(value)}`)
+    : ["no supporting evidence payload yet"];
+
+  return {
+    title: opportunity.title || `Growth opportunity ${opportunity.opportunity_id}`,
+    meta: `${opportunity.kind || "market signal"} - ${score}%`,
+    icon: iconForOpportunity(opportunity.kind ?? "marketplace_order"),
+    score,
+    tone: rawTone,
+    headline: toSentenceCase(opportunity.source_event || "opportunity detected"),
+    detail: opportunity.recommended_action || "Review and assign to the owner worker set.",
+    evidence,
+    action: opportunity.recommended_action || "Review and assign to the owner worker set.",
+    workers: opportunity.assigned_workers ?? [],
+    status: opportunity.status || "queued",
+    archiveRef: opportunity.archive_ref || `growth:${opportunity.opportunity_id}`,
+  };
+}
+
+function iconForOpportunity(kind: string) {
+  if (kind === "failed_route") return AlertCircle;
+  if (kind === "listing_signal") return Target;
+  if (kind === "marketplace_order") return FileCheck2;
+  return Radar;
+}
+
+function toSentenceCase(input: string): string {
+  if (!input) return "";
+  const normalized = input.replace(/[_-]/g, " ");
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function fmtCurrency(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
+function clampPercent(value: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(100, Math.round(parsed)));
 }
 
 function toOperatingSignal(event: UacpEvent): OperatingSignal {
@@ -938,77 +1457,6 @@ function actionForEvent(event: UacpEvent): string {
   return "Classify signal, assign worker, and write archive reference.";
 }
 
-function buildEvaluationAccounts(input: {
-  workspaces: WorkspaceRow[];
-  runs: RunRow[];
-  deployments: DeploymentRow[];
-  billing: BillingRow[];
-  evidence: EvidenceRow[];
-  security: SecurityEventRow[];
-}): EvaluationAccount[] {
-  return input.workspaces.map((workspace) => {
-    const workspaceId = workspace.workspace_id;
-    const runs = input.runs.filter((run) => run.workspace_id === workspaceId);
-    const failedRuns = runs.filter((run) => isFailure(run.status));
-    const deployments = input.deployments.filter((deployment) => deployment.workspace_id === workspaceId);
-    const evidence = input.evidence.filter((row) => row.workspace_id === workspaceId);
-    const txs = input.billing.filter((tx) => tx.workspace_id === workspaceId);
-    const reserveLast = txs[0]?.balance_after_units ?? 0;
-    const hasReserve = reserveLast > 0 || txs.some((tx) => (tx.amount_units ?? 0) > 0);
-    const lastActivity = latestDate([
-      ...runs.map((run) => run.created_at),
-      ...deployments.map((deployment) => deployment.updated_at ?? deployment.last_health_check ?? undefined),
-      ...evidence.map((row) => row.created_at),
-      ...txs.map((tx) => tx.created_at),
-    ]);
-    const endpointActive = deployments.some((deployment) => deployment.status === "active");
-    const riskScore = Math.min(99, Math.round((failedRuns.length * 18) + (!hasReserve && runs.length >= 10 ? 32 : 0) + (!lastActivity ? 20 : 0)));
-    const activationProbability = Math.min(99, Math.round(
-      runs.length * 4 +
-      (endpointActive ? 24 : 0) +
-      (evidence.length ? 18 : 0) +
-      (txs.length ? 12 : 0) -
-      failedRuns.length * 8,
-    ));
-    return {
-      workspaceId,
-      name: workspace.name || workspace.slug || workspaceId,
-      tier: workspace.license_tier || "free evaluation",
-      runsUsed: runs.length,
-      lastActivity,
-      endpointStatus: endpointActive ? "active endpoint" : deployments.length ? "created" : "none",
-      evidenceActivity: evidence.length ? `${evidence.length} audit record${evidence.length === 1 ? "" : "s"}` : "no evidence",
-      billingState: hasReserve ? "reserve live" : "no reserve",
-      riskScore,
-      activationProbability: Math.max(0, activationProbability),
-      topAction: topActionForAccount({ runs: runs.length, endpointActive, evidenceCount: evidence.length, hasReserve, failedRuns: failedRuns.length }),
-      workers: workersForAccount({ endpointActive, evidenceCount: evidence.length, hasReserve, failedRuns: failedRuns.length }),
-      evidence: [
-        `${runs.length} run${runs.length === 1 ? "" : "s"}`,
-        endpointActive ? "endpoint active" : "endpoint not active",
-        evidence.length ? "evidence viewed/created" : "no evidence yet",
-        hasReserve ? "cash reserve present" : "no reserve",
-      ],
-    };
-  }).sort((a, b) => (b.activationProbability + b.riskScore) - (a.activationProbability + a.riskScore));
-}
-
-function topActionForAccount(input: { runs: number; endpointActive: boolean; evidenceCount: number; hasReserve: boolean; failedRuns: number }) {
-  if (input.failedRuns) return "Ask what broke and route Sentinel/Sheriff before selling.";
-  if (input.runs >= 15 && !input.hasReserve) return "Explain activation and reserve requirement.";
-  if (input.endpointActive && input.evidenceCount && !input.hasReserve) return "Send activation note with evidence/proof framing.";
-  if (input.endpointActive && !input.evidenceCount) return "Guide user to evidence trace and audit proof.";
-  if (input.runs > 0 && !input.endpointActive) return "Move from Playground/Pipeline into endpoint verification.";
-  return "Welcome sequence: get first governed run completed.";
-}
-
-function workersForAccount(input: { endpointActive: boolean; evidenceCount: number; hasReserve: boolean; failedRuns: number }) {
-  if (input.failedRuns) return ["sentinel", "sheriff", "mirror"];
-  if (!input.hasReserve) return ["welcome", "mint", "ledger"];
-  if (input.endpointActive && input.evidenceCount) return ["gauge", "ledger", "herald"];
-  return ["welcome", "glide", "pulse"];
-}
-
 function deriveStories(model: OperatingModel) {
   return [
     {
@@ -1032,75 +1480,6 @@ function deriveStories(model: OperatingModel) {
       evidence: `${model.pulse.failedRoutes} failed request(s) in the current backend window`,
     },
   ];
-}
-
-function deriveGrowthOpportunities(model: OperatingModel) {
-  const seriousAccounts = model.accounts.filter((account) => account.activationProbability >= 55 || account.riskScore >= 60);
-  const failedSignals = model.signals.filter((signal) => signal.tone === "critical");
-  const evidenceAccounts = model.accounts.filter((account) => account.evidenceActivity !== "no evidence");
-  const opportunities = [];
-
-  if (seriousAccounts.length) {
-    opportunities.push({
-      title: "Buyer Opportunity",
-      meta: `${seriousAccounts.length} ranked account${seriousAccounts.length === 1 ? "" : "s"}`,
-      icon: Target,
-      score: Math.min(99, 50 + seriousAccounts.length * 10),
-      tone: "stable" as Tone,
-      headline: "Evaluation accounts are showing activation intent.",
-      detail: "Prioritize accounts with runs, endpoint movement, billing page interest, evidence activity, or limit pressure.",
-      evidence: seriousAccounts.slice(0, 4).map((account) => `${account.name}: ${account.activationProbability}% activation`),
-      action: "Route Welcome + Mint + Ledger to explain activation, reserve, and proof.",
-      workers: ["welcome", "mint", "ledger"],
-    });
-  }
-
-  if (failedSignals.length) {
-    opportunities.push({
-      title: "Product Friction",
-      meta: `${failedSignals.length} critical signal${failedSignals.length === 1 ? "" : "s"}`,
-      icon: AlertCircle,
-      score: Math.min(99, 60 + failedSignals.length * 8),
-      tone: "critical" as Tone,
-      headline: "Broken routes are creating sales drag.",
-      detail: "Any Network Error, timeout, QR failure, billing timeout, or compliance timeout must become a worker-owned queue item.",
-      evidence: failedSignals.slice(0, 4).map((signal) => signal.title),
-      action: "Assign Sentinel/Sheriff/Mirror and keep the signal open until live proof clears.",
-      workers: ["sentinel", "sheriff", "mirror"],
-    });
-  }
-
-  if (evidenceAccounts.length) {
-    opportunities.push({
-      title: "Regulated Access",
-      meta: `${evidenceAccounts.length} proof-seeking account${evidenceAccounts.length === 1 ? "" : "s"}`,
-      icon: FileCheck2,
-      score: Math.min(99, 58 + evidenceAccounts.length * 7),
-      tone: "watch" as Tone,
-      headline: "Evidence interest should trigger regulated-path guidance.",
-      detail: "Buyers opening evidence are likely asking whether Veklom can prove governed operation, not whether it can chat.",
-      evidence: evidenceAccounts.slice(0, 4).map((account) => `${account.name}: ${account.evidenceActivity}`),
-      action: "Attach evidence explanation and offer regulated/private deployment path.",
-      workers: ["ledger", "oracle", "herald"],
-    });
-  }
-
-  opportunities.push({
-    title: "Tool Asset Pipeline",
-    meta: "builder lane",
-    icon: GitBranch,
-    score: model.workers.some((worker) => worker.id === "builder-scout") ? 52 : 0,
-    tone: "neutral" as Tone,
-    headline: "Builder workers are registered, but opportunity ingestion must stay evidence-led.",
-    detail: "Use public-source pain only when provenance, no-copy rules, and release gates are recorded.",
-    evidence: ["builder-scout registered", "builder-forge registered", "builder-arbiter registered"].filter((line) =>
-      model.workers.some((worker) => line.startsWith(worker.id ?? "")),
-    ),
-    action: "Start with read-only opportunity dossiers before autonomous build/write actions.",
-    workers: ["builder-scout", "builder-arbiter", "builder-forge"],
-  });
-
-  return opportunities;
 }
 
 function deriveFieldReports(model: OperatingModel) {
@@ -1153,13 +1532,6 @@ function deriveFieldReports(model: OperatingModel) {
     });
   }
   return reports;
-}
-
-function latestDate(values: Array<string | null | undefined>): string | undefined {
-  const sorted = values
-    .filter((value): value is string => Boolean(value))
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  return sorted[0];
 }
 
 function isFailure(status: unknown): boolean {

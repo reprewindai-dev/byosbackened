@@ -35,6 +35,7 @@ from db.models import (
     TokenWallet,
     User,
     Workspace,
+    VeklomRun,
     WorkspaceRequestLog,
 )
 from db.session import get_db
@@ -42,6 +43,16 @@ from db.session import get_db
 
 router = APIRouter(prefix="/internal/uacp", tags=["internal-uacp"])
 RESERVE_UNITS_PER_USD = Decimal("1000")
+UACP_SOURCE_TAG = "veklom_backend"
+UACP_CONTRACT_VERSION = "uacp_backend_information_contract_v1"
+
+
+def _uacp_response(payload: dict[str, Any], source: str | None = None) -> dict[str, Any]:
+    return {
+        "source": source or UACP_SOURCE_TAG,
+        "contract_version": UACP_CONTRACT_VERSION,
+        **payload,
+    }
 
 
 EVENT_OWNERS: dict[str, dict[str, Any]] = {
@@ -722,8 +733,7 @@ def _growth_opportunities(db: Session, limit: int) -> list[dict[str, Any]]:
     return opportunities[:limit]
 
 
-@router.get("/summary")
-async def uacp_summary(
+async def _uacp_summary_payload(
     _: OperatorPrincipal = Depends(require_internal_operator),
     db: Session = Depends(get_db),
 ):
@@ -740,8 +750,6 @@ async def uacp_summary(
     evaluation_queue = _evaluation_surgeon_queue(db, 25)
     growth_opportunities = _growth_opportunities(db, 25)
     return {
-        "source": "veklom_backend",
-        "contract_version": "uacp_backend_information_contract_v1",
         "generated_at": _iso(now),
         "product_truth": {
             "workspaces": _count(db, Workspace),
@@ -792,17 +800,21 @@ async def uacp_summary(
     }
 
 
+@router.get("/summary")
+async def uacp_summary(
+    _: OperatorPrincipal = Depends(require_internal_operator),
+    db: Session = Depends(get_db),
+):
+    return _uacp_response(await _uacp_summary_payload(_, db))
+
+
 @router.get("/events")
 async def uacp_events(
     _: OperatorPrincipal = Depends(require_internal_operator),
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
 ):
-    return {
-        "source": "veklom_backend",
-        "contract_version": "uacp_backend_information_contract_v1",
-        "events": _recent_events(db, limit),
-    }
+    return _uacp_response({"events": _recent_events(db, limit)})
 
 
 @router.get("/event-stream")
@@ -811,12 +823,10 @@ async def uacp_event_stream(
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
 ):
-    return {
+    return _uacp_response({
         "stream": "snapshot",
-        "source": "veklom_backend",
-        "contract_version": "uacp_backend_information_contract_v1",
         "events": _recent_events(db, limit),
-    }
+    })
 
 
 @router.get("/evaluation-surgeon")
@@ -826,9 +836,7 @@ async def uacp_evaluation_surgeon(
     limit: int = Query(100, ge=1, le=500),
 ):
     queue = _evaluation_surgeon_queue(db, limit)
-    return {
-        "source": "veklom_backend",
-        "contract_version": "uacp_backend_information_contract_v1",
+    return _uacp_response({
         "queue": queue,
         "empty_reason": (
             "No live evaluation queue yet. Backend has no eligible workspace events to rank."
@@ -836,7 +844,7 @@ async def uacp_evaluation_surgeon(
             else None
         ),
         "required_sources": ["workspaces", "runs", "billing", "deployments", "evidence", "security"],
-    }
+    })
 
 
 @router.get("/growth-opportunities")
@@ -846,9 +854,7 @@ async def uacp_growth_opportunities(
     limit: int = Query(100, ge=1, le=500),
 ):
     opportunities = _growth_opportunities(db, limit)
-    return {
-        "source": "veklom_backend",
-        "contract_version": "uacp_backend_information_contract_v1",
+    return _uacp_response({
         "opportunities": opportunities,
         "empty_reason": (
             "No qualified growth opportunities yet. Backend has no marketplace, integration, or failed-route signals to route."
@@ -856,7 +862,7 @@ async def uacp_growth_opportunities(
             else None
         ),
         "required_sources": ["marketplace", "integrations", "failed_routes", "orders", "listings"],
-    }
+    })
 
 
 @router.get("/workspaces")
@@ -866,7 +872,7 @@ async def uacp_workspaces(
     limit: int = Query(100, ge=1, le=500),
 ):
     rows = db.query(Workspace).order_by(desc(Workspace.created_at)).limit(limit).all()
-    return {
+    return _uacp_response({
         "workspaces": [
             {
                 "workspace_id": row.id,
@@ -880,7 +886,7 @@ async def uacp_workspaces(
             }
             for row in rows
         ]
-    }
+    })
 
 
 @router.get("/runs")
@@ -889,27 +895,66 @@ async def uacp_runs(
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
 ):
-    rows = db.query(WorkspaceRequestLog).order_by(desc(WorkspaceRequestLog.created_at)).limit(limit).all()
-    return {
-        "runs": [
+    runs = db.query(VeklomRun).order_by(desc(VeklomRun.created_at)).limit(limit).all()
+    if not runs:
+        rows = db.query(WorkspaceRequestLog).order_by(desc(WorkspaceRequestLog.created_at)).limit(limit).all()
+        return _uacp_response(
             {
-                "run_id": row.id,
-                "workspace_id": row.workspace_id,
-                "user_id": row.user_id,
-                "request_kind": row.request_kind,
-                "request_path": row.request_path,
-                "status": row.status,
-                "provider": row.provider,
-                "model": row.model,
-                "latency_ms": row.latency_ms,
-                "cost_usd": str(row.cost_usd),
-                "tokens_in": row.tokens_in,
-                "tokens_out": row.tokens_out,
-                "created_at": _iso(row.created_at),
-            }
-            for row in rows
-        ]
-    }
+                "runs": [
+                    {
+                    "run_id": row.id,
+                    "workspace_id": row.workspace_id,
+                    "tenant_id": row.workspace_id,
+                    "actor_id": row.user_id,
+                    "request_kind": row.request_kind,
+                    "request_path": row.request_path,
+                    "status": row.status,
+                    "provider": row.provider,
+                    "model": row.model,
+                    "latency_ms": row.latency_ms,
+                    "cost_usd": str(row.cost_usd),
+                    "tokens_in": row.tokens_in,
+                    "tokens_out": row.tokens_out,
+                    "created_at": _iso(row.created_at),
+                    "source": "workspace_request_logs",
+                    }
+                    for row in rows
+                ],
+                "count": len(rows),
+                "source": "workspace_request_logs",
+            },
+            source="workspace_request_logs",
+        )
+    return _uacp_response(
+        {
+            "runs": [
+                {
+                    "run_id": row.id,
+                    "workspace_id": row.workspace_id,
+                    "tenant_id": row.tenant_id,
+                    "actor_id": row.actor_id,
+                    "request_kind": row.request_kind,
+                    "request_path": row.request_path,
+                    "status": row.status.value if hasattr(row.status, "value") else row.status,
+                    "risk_tier": row.risk_tier,
+                    "provider": row.provider,
+                    "model": row.model,
+                    "latency_ms": row.latency_ms,
+                    "cost_usd": str(row.cost_usd),
+                    "tokens_in": row.tokens_in,
+                    "tokens_out": row.tokens_out,
+                    "created_at": _iso(row.created_at),
+                    "source_table": row.source_table,
+                    "source_id": row.source_id,
+                    "source": "veklom_runs",
+                }
+                for row in runs
+            ],
+            "count": len(runs),
+            "source": "veklom_runs",
+        },
+        source="veklom_runs",
+    )
 
 
 @router.get("/deployments")
@@ -919,7 +964,7 @@ async def uacp_deployments(
     limit: int = Query(100, ge=1, le=500),
 ):
     rows = db.query(Deployment).order_by(desc(Deployment.updated_at), desc(Deployment.deployed_at)).limit(limit).all()
-    return {
+    return _uacp_response({
         "deployments": [
             {
                 "deployment_id": row.id,
@@ -937,7 +982,7 @@ async def uacp_deployments(
             }
             for row in rows
         ]
-    }
+    })
 
 
 @router.get("/billing")
@@ -947,7 +992,7 @@ async def uacp_billing(
     limit: int = Query(100, ge=1, le=500),
 ):
     txs = db.query(TokenTransaction).order_by(desc(TokenTransaction.created_at)).limit(limit).all()
-    return {
+    return _uacp_response({
         "reserve_units_total": int(db.query(func.coalesce(func.sum(TokenWallet.balance), 0)).scalar() or 0),
         "transactions": [
             {
@@ -963,7 +1008,7 @@ async def uacp_billing(
             }
             for row in txs
         ],
-    }
+    })
 
 
 @router.get("/evidence")
@@ -973,7 +1018,7 @@ async def uacp_evidence(
     limit: int = Query(100, ge=1, le=500),
 ):
     rows = db.query(AIAuditLog).order_by(desc(AIAuditLog.created_at)).limit(limit).all()
-    return {
+    return _uacp_response({
         "evidence": [
             {
                 "audit_id": row.id,
@@ -989,7 +1034,7 @@ async def uacp_evidence(
             }
             for row in rows
         ]
-    }
+    })
 
 
 @router.get("/monitoring")
@@ -997,7 +1042,19 @@ async def uacp_monitoring(
     _: OperatorPrincipal = Depends(require_internal_operator),
     db: Session = Depends(get_db),
 ):
-    return await uacp_summary(_, db)
+    monitoring_payload = await _uacp_summary_payload(_, db)
+    return _uacp_response(
+        {
+            "monitoring": {
+                "generated_at": monitoring_payload.get("generated_at"),
+                "product_truth": monitoring_payload.get("product_truth", {}),
+                "uacp_truth": monitoring_payload.get("uacp_truth", {}),
+                "permission_boundary": monitoring_payload.get("permission_boundary", {}),
+                "healthy": monitoring_payload.get("permission_boundary") is not None,
+            },
+            "generated_at": monitoring_payload.get("generated_at"),
+        }
+    )
 
 
 @router.get("/security")
@@ -1007,7 +1064,7 @@ async def uacp_security(
     limit: int = Query(100, ge=1, le=500),
 ):
     rows = db.query(SecurityAuditLog).order_by(desc(SecurityAuditLog.created_at)).limit(limit).all()
-    return {
+    return _uacp_response({
         "security_events": [
             {
                 "event_id": row.id,
@@ -1022,4 +1079,4 @@ async def uacp_security(
             }
             for row in rows
         ]
-    }
+    })

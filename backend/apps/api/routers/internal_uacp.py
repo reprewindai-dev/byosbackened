@@ -35,7 +35,6 @@ from db.models import (
     TokenWallet,
     User,
     Workspace,
-    VeklomRun,
     WorkspaceRequestLog,
 )
 from db.session import get_db
@@ -45,6 +44,11 @@ router = APIRouter(prefix="/internal/uacp", tags=["internal-uacp"])
 RESERVE_UNITS_PER_USD = Decimal("1000")
 UACP_SOURCE_TAG = "veklom_backend"
 UACP_CONTRACT_VERSION = "uacp_backend_information_contract_v1"
+
+try:
+    from db.models.veklom_run import VeklomRun
+except ImportError:
+    VeklomRun = None
 
 
 def _uacp_response(payload: dict[str, Any], source: str | None = None) -> dict[str, Any]:
@@ -895,7 +899,9 @@ async def uacp_runs(
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
 ):
-    runs = db.query(VeklomRun).order_by(desc(VeklomRun.created_at)).limit(limit).all()
+    runs = []
+    if VeklomRun is not None:
+        runs = db.query(VeklomRun).order_by(desc(VeklomRun.created_at)).limit(limit).all()
     if not runs:
         rows = db.query(WorkspaceRequestLog).order_by(desc(WorkspaceRequestLog.created_at)).limit(limit).all()
         return _uacp_response(

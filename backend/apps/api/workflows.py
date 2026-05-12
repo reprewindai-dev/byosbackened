@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import FastAPI
 from sqlalchemy import desc
 
+from core.config import get_settings
 from core.operations.operator_watch import evaluate_operator_watch
 from core.services.upstash_search_index import index_veklom_run
 from db.models import VeklomRun, WorkspaceRequestLog
@@ -52,6 +53,10 @@ def _persist_operator_watch() -> dict[str, Any]:
 
 def register_workflows(app: FastAPI) -> None:
     """Register Upstash Workflow routes against the existing FastAPI app."""
+    settings = get_settings()
+    if not settings.qstash_token:
+        logger.info("upstash_workflow_registration_skipped: QSTASH_TOKEN is not configured")
+        return
     try:
         from upstash_workflow import AsyncWorkflowContext
         from upstash_workflow.fastapi import Serve

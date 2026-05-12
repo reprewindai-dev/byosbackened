@@ -46,6 +46,7 @@ _MODEL_SETTING_CACHE_TTL_SECONDS = 10
 _model_setting_cache: dict[str, tuple[float, "ResolvedModelSetting"]] = {}
 _UACP_REDIS_SIGNAL_TTL_SECONDS = 86400
 _UACP_REDIS_EVENT_STREAM_KEY = "uacp:v5:event-stream"
+_UACP_REDIS_REALTIME_CHANNEL = "uacp:v5:realtime"
 
 
 def _sha256_json(payload: object) -> str:
@@ -148,6 +149,7 @@ def _publish_veklom_run_signal(
         redis_client.lpush(_UACP_REDIS_EVENT_STREAM_KEY, event_json)
         redis_client.ltrim(_UACP_REDIS_EVENT_STREAM_KEY, 0, 199)
         redis_client.expire(_UACP_REDIS_EVENT_STREAM_KEY, _UACP_REDIS_SIGNAL_TTL_SECONDS)
+        redis_client.publish(_UACP_REDIS_REALTIME_CHANNEL, event_json)
     except Exception:
         logger.debug("VeklomRun Redis signal publish skipped", exc_info=True)
 

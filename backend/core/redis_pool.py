@@ -16,6 +16,92 @@ settings = get_settings()
 
 # Global connection pool - shared across all modules
 _redis_pool: redis.Redis = None
+_upstash_rest_pool = None
+
+
+class RestRedisPipeline:
+    """Small pipeline adapter for Upstash Redis REST clients."""
+
+    def __init__(self, client):
+        self.client = client
+        self.operations = []
+
+    def incr(self, key: str):
+        self.operations.append(("incr", (key,), {}))
+        return self
+
+    def expire(self, key: str, seconds: int):
+        self.operations.append(("expire", (key, seconds), {}))
+        return self
+
+    def execute(self):
+        results = []
+        for method, args, kwargs in self.operations:
+            results.append(getattr(self.client, method)(*args, **kwargs))
+        self.operations = []
+        return results
+
+
+class RestRedisAdapter:
+    """Compatibility wrapper for the subset of Redis APIs this app uses."""
+
+    def __init__(self, client):
+        self.client = client
+
+    def pipeline(self):
+        return RestRedisPipeline(self.client)
+
+    def incr(self, key: str):
+        return self.client.incr(key)
+
+    def expire(self, key: str, seconds: int):
+        return self.client.expire(key, seconds)
+
+    def setex(self, key: str, seconds: int, value: str):
+        return self.client.set(key, value, ex=seconds)
+
+    def set(self, key: str, value: str, ex: int | None = None):
+        return self.client.set(key, value, ex=ex)
+
+    def get(self, key: str):
+        return self.client.get(key)
+
+    def lpush(self, key: str, value: str):
+        return self.client.lpush(key, value)
+
+    def ltrim(self, key: str, start: int, stop: int):
+        return self.client.ltrim(key, start, stop)
+
+    def lrange(self, key: str, start: int, stop: int):
+        return self.client.lrange(key, start, stop)
+
+    def publish(self, key: str, value: str):
+        logger.debug("Upstash Redis REST publish skipped for channel=%s", key)
+        return 0
+
+    def ping(self):
+        result = self.client.ping()
+        return bool(result)
+
+    def close(self):
+        return None
+
+
+def get_upstash_rest_redis():
+    """Get an Upstash Redis REST client adapter."""
+    global _upstash_rest_pool
+    if _upstash_rest_pool is None:
+        if not settings.upstash_redis_rest_url or not settings.upstash_redis_rest_token:
+            raise redis.ConnectionError("Upstash Redis REST credentials are not configured")
+        try:
+            from upstash_redis import Redis
+        except Exception as exc:
+            raise redis.ConnectionError("upstash-redis package is not installed") from exc
+        _upstash_rest_pool = RestRedisAdapter(
+            Redis(url=settings.upstash_redis_rest_url, token=settings.upstash_redis_rest_token)
+        )
+        logger.info("[RedisPool] Initialized Upstash Redis REST fallback")
+    return _upstash_rest_pool
 
 
 def get_redis() -> redis.Redis:
@@ -31,7 +117,7 @@ def get_redis() -> redis.Redis:
         parsed = urlparse(settings.redis_url or "")
         inside_docker = Path("/.dockerenv").exists() or os.getenv("DOCKER_CONTAINER") == "true"
         if parsed.hostname == "redis" and not inside_docker:
-            raise redis.ConnectionError("Redis service hostname is only resolvable inside the container network")
+            return get_upstash_rest_redis()
         _redis_pool = redis.from_url(
             settings.redis_url,
             decode_responses=True,
@@ -52,6 +138,10 @@ def close_redis_pool():
     if _redis_pool:
         _redis_pool.close()
         _redis_pool = None
+    global _upstash_rest_pool
+    if _upstash_rest_pool:
+        _upstash_rest_pool.close()
+        _upstash_rest_pool = None
         logger.info("[RedisPool] Connection pool closed")
 
 

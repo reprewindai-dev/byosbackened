@@ -34,6 +34,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/subscriptions/plans",
     "/api/v1/subscriptions/webhook",
     "/api/v1/webhooks/resend",
+    "/api/v1/webhooks/qstash/uacp-job",
+    "/api/v1/workflows/uacp-maintenance",
     "/api/v1/edge/demo/summary",
     "/api/v1/edge/demo/infrastructure",
     "/api/v1/demo/pipeline/stream",

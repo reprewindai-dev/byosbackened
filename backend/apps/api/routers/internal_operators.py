@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from core.config import get_settings
 from core.operations.operator_watch import evaluate_operator_watch
+from core.services.qstash_dispatch import dispatch_uacp_job, trigger_uacp_workflow
 from db.models import APIKey, SecurityAuditLog, User, UserStatus
 from db.session import get_db
 
@@ -48,6 +49,19 @@ class WorkerHeartbeatIn(BaseModel):
     summary: str = Field("heartbeat received", max_length=500)
     source: str = Field("operator-center", max_length=120)
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class QStashJobIn(BaseModel):
+    job_type: str = Field(..., min_length=2, max_length=120)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    delay: str | None = Field(None, max_length=32)
+    retries: int = Field(3, ge=0, le=10)
+
+
+class WorkflowTriggerIn(BaseModel):
+    proof_backfill_limit: int = Field(250, ge=1, le=1000)
+    target_url: str | None = Field(None, max_length=500)
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 WORKER_REGISTRY: dict[str, dict[str, Any]] = {
@@ -653,6 +667,45 @@ async def operator_watch(
 ):
     """Run the operator watch loop and persist actionable alerts."""
     return evaluate_operator_watch(db, workspace_id=None, persist=True)
+
+
+@router.post("/qstash/enqueue")
+async def enqueue_qstash_job(
+    payload: QStashJobIn,
+    principal: OperatorPrincipal = Depends(require_internal_operator),
+):
+    details = _redact_details(payload.payload)
+    result = dispatch_uacp_job(
+        job_type=payload.job_type,
+        payload={
+            "requested_by": principal.model_dump(),
+            "details": details,
+        },
+        delay=payload.delay,
+        retries=payload.retries,
+    )
+    if not result.get("queued"):
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=result)
+    return result
+
+
+@router.post("/workflows/uacp-maintenance/trigger")
+async def trigger_uacp_maintenance_workflow(
+    payload: WorkflowTriggerIn,
+    principal: OperatorPrincipal = Depends(require_internal_operator),
+):
+    workflow_payload = {
+        "proof_backfill_limit": payload.proof_backfill_limit,
+        "requested_by": principal.model_dump(),
+        "details": _redact_details(payload.payload),
+    }
+    result = trigger_uacp_workflow(
+        payload=workflow_payload,
+        workflow_target_url=payload.target_url,
+    )
+    if not result.get("triggered"):
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=result)
+    return result
 
 
 @router.get("/workers")

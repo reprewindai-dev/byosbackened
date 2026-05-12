@@ -64,6 +64,7 @@ from apps.api.routers.workspace import public_router as public_status_router
 from apps.api.routers.marketplace_v1 import router as marketplace_v1_router
 from apps.api.routers.edge_canary import router as edge_canary_router
 from apps.api.routers.resend_webhooks import router as resend_webhooks_router
+from apps.api.routers.qstash_webhooks import router as qstash_webhooks_router
 from apps.api.routers.pipelines import router as pipelines_router
 from apps.api.routers.deployments import router as deployments_router
 from apps.api.routers.marketplace_automation import router as marketplace_automation_router
@@ -71,6 +72,7 @@ from apps.api.routers.platform_pulse import router as platform_pulse_router
 from apps.api.routers.internal_operators import router as internal_operators_router
 from apps.api.routers.internal_uacp import router as internal_uacp_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
+from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
 from edge.routers.mqtt import router as edge_mqtt_router
 from edge.routers.control import router as edge_control_router
@@ -101,6 +103,8 @@ app = FastAPI(
     # Security hardening
     max_request_size=10 * 1024 * 1024,  # 10MB limit per request
 )
+
+register_workflows(app)
 
 
 @app.on_event("startup")
@@ -217,6 +221,7 @@ app.include_router(edge_modbus_router, prefix=settings.api_prefix)
 app.include_router(edge_snmp_router, prefix=settings.api_prefix)
 app.include_router(edge_canary_router, prefix=settings.api_prefix)
 app.include_router(resend_webhooks_router, prefix=settings.api_prefix)
+app.include_router(qstash_webhooks_router, prefix=settings.api_prefix)
 app.include_router(pipelines_router, prefix=settings.api_prefix)
 app.include_router(deployments_router, prefix=settings.api_prefix)
 app.include_router(marketplace_automation_router, prefix=settings.api_prefix)

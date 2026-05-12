@@ -38,6 +38,7 @@ from db.models import (
     WorkspaceRequestLog,
 )
 from db.session import get_db
+from core.services.upstash_search_index import search_evidence
 
 
 router = APIRouter(prefix="/internal/uacp", tags=["internal-uacp"])
@@ -1008,6 +1009,40 @@ async def uacp_runs(
             "source": "veklom_runs",
         },
         source="veklom_runs",
+    )
+
+
+@router.get("/search")
+async def uacp_search(
+    _: OperatorPrincipal = Depends(require_internal_operator),
+    query: str = Query(..., min_length=1, max_length=500),
+    limit: int = Query(10, ge=1, le=50),
+    filter: str | None = Query(None, max_length=500),
+    reranking: bool = Query(True),
+    semantic_weight: float = Query(0.7, ge=0, le=1),
+    input_enrichment: bool = Query(True),
+):
+    payload = search_evidence(
+        query=query,
+        limit=limit,
+        filter=filter,
+        reranking=reranking,
+        semantic_weight=semantic_weight,
+        input_enrichment=input_enrichment,
+    )
+    return _uacp_response(
+        {
+            "query": query,
+            "provider": "upstash_search",
+            "search_options": {
+                "filter": filter,
+                "reranking": reranking,
+                "semantic_weight": semantic_weight,
+                "input_enrichment": input_enrichment,
+            },
+            **payload,
+        },
+        source="upstash_search" if payload.get("configured") else "local-fallback",
     )
 
 

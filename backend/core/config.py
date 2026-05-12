@@ -50,6 +50,24 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://redis:6379/0"
 
+    # Upstash QStash - optional durable HTTP job dispatch.
+    qstash_url: str = "https://qstash-us-east-1.upstash.io"
+    qstash_token: str = ""
+    qstash_current_signing_key: str = ""
+    qstash_next_signing_key: str = ""
+    qstash_callback_base_url: str = ""
+    upstash_workflow_url: str = ""
+
+    # Upstash Redis REST fallback - used when TCP Redis is unavailable.
+    upstash_redis_rest_url: str = ""
+    upstash_redis_rest_token: str = ""
+
+    # Upstash Search - optional governed evidence/search index.
+    upstash_search_rest_url: str = ""
+    upstash_search_rest_token: str = ""
+    upstash_search_index: str = "default"
+    upstash_search_timeout_seconds: float = 2.0
+
     # S3/MinIO
     s3_endpoint_url: str = "http://minio:9000"
     s3_access_key_id: str = "minioadmin"
@@ -216,6 +234,13 @@ class Settings(BaseSettings):
             self.gemini_api_key = self.ai_integrations_gemini_api_key
         self.openai_base_url = _normalize_provider_base_url(self.openai_base_url)
         self.gemini_base_url = _normalize_provider_base_url(self.gemini_base_url)
+        self.qstash_url = _normalize_provider_base_url(self.qstash_url)
+        self.qstash_callback_base_url = _normalize_provider_base_url(
+            self.qstash_callback_base_url or os.getenv("BACKEND_URL", "")
+        )
+        self.upstash_workflow_url = _normalize_provider_base_url(
+            self.upstash_workflow_url or os.getenv("UPSTASH_WORKFLOW_URL", "")
+        )
         return self
 
 

@@ -266,6 +266,18 @@ def _record_veklom_run_from_request_log(
         output_hash=output_hash,
         genome_hash=genome_hash,
     )
+    try:
+        from core.services.upstash_search_index import index_veklom_run
+
+        index_veklom_run(
+            run=run,
+            row=row,
+            input_hash=input_hash,
+            output_hash=output_hash,
+            genome_hash=genome_hash,
+        )
+    except Exception:
+        logger.debug("VeklomRun Upstash Search indexing skipped", exc_info=True)
 
 
 def _workspace_token_cost_per_1k_output_tokens() -> Decimal:

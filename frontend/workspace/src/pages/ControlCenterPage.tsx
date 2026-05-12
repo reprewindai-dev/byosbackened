@@ -237,6 +237,34 @@ interface EventStreamPayload {
   contract_version?: string;
 }
 
+interface UacpSearchResult {
+  position: number;
+  id?: string | null;
+  score?: number | null;
+  kind?: string | null;
+  title?: string | null;
+  summary?: string | null;
+  content?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+interface UacpSearchPayload {
+  query?: string;
+  provider?: string;
+  configured?: boolean;
+  index?: string;
+  results?: UacpSearchResult[];
+  empty_reason?: string | null;
+  search_options?: {
+    filter?: string | null;
+    reranking?: boolean;
+    semantic_weight?: number;
+    input_enrichment?: boolean;
+  };
+  source?: string;
+  contract_version?: string;
+}
+
 interface GrowthOpportunity {
   opportunity_id: string;
   kind?: string | null;
@@ -304,6 +332,7 @@ interface ControlSnapshot {
   events: SafeResult<{ events?: UacpEvent[] }>;
   evaluationSurgeon: SafeResult<EvaluationSurgeonPayload>;
   growthOpportunities: SafeResult<GrowthOpportunityPayload>;
+  evidenceSearch: SafeResult<UacpSearchPayload>;
   eventStream: SafeResult<EventStreamPayload>;
   workspaces: SafeResult<{ workspaces?: WorkspaceRow[] }>;
   runs: SafeResult<{ runs?: RunRow[] }>;
@@ -476,6 +505,7 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
     eventStream,
     evaluationSurgeon,
     growthOpportunities,
+    evidenceSearch,
     workspaces,
     runs,
     deployments,
@@ -492,6 +522,13 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
       safeGet<EventStreamPayload>("/internal/uacp/event-stream", { limit: 150 }),
       safeGet<EvaluationSurgeonPayload>("/internal/uacp/evaluation-surgeon", { limit: 150 }),
       safeGet<GrowthOpportunityPayload>("/internal/uacp/growth-opportunities", { limit: 150 }),
+      safeGet<UacpSearchPayload>("/internal/uacp/search", {
+        query: "veklom run proof governance evidence",
+        limit: 8,
+        reranking: true,
+        semantic_weight: 0.7,
+        input_enrichment: true,
+      }),
       safeGet<{ workspaces?: WorkspaceRow[] }>("/internal/uacp/workspaces", { limit: 250 }),
       safeGet<{ runs?: RunRow[] }>("/internal/uacp/runs", { limit: 250 }),
       safeGet<{ deployments?: DeploymentRow[] }>("/internal/uacp/deployments", { limit: 250 }),
@@ -509,6 +546,7 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
     eventStream,
     evaluationSurgeon,
     growthOpportunities,
+    evidenceSearch,
     workspaces,
     runs,
     deployments,
@@ -646,6 +684,7 @@ export function ControlCenterPage() {
             redisBacked={model.eventStreamRedisBacked}
             routeStatus={model.eventStreamRouteStatus}
           />
+          <EvidenceSearchPanel initialResults={model.evidenceSearchResults} initialQuery="veklom run proof governance evidence" />
           <ArchivePanel signals={model.signals} />
         </aside>
       </main>
@@ -1124,6 +1163,98 @@ function RunProofPanel({
   );
 }
 
+function EvidenceSearchPanel({ initialResults, initialQuery }: { initialResults: UacpSearchResult[]; initialQuery: string }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
+  const search = useQuery({
+    queryKey: ["uacp-evidence-search", submittedQuery],
+    queryFn: () =>
+      safeGet<UacpSearchPayload>("/internal/uacp/search", {
+        query: submittedQuery,
+        limit: 8,
+        reranking: true,
+        semantic_weight: 0.7,
+        input_enrichment: true,
+      }),
+    enabled: submittedQuery.trim().length > 0,
+    staleTime: 20_000,
+  });
+  const payload = search.data?.data;
+  const results = payload?.results?.length ? payload.results : initialResults;
+  const configured = Boolean(payload?.configured);
+  const index = payload?.index ?? "default";
+  const source = payload?.source ?? search.data?.source ?? ROUTE_SOURCE_UNKNOWN;
+  const emptyReason = search.data?.error ?? payload?.empty_reason ?? null;
+  const routeStatus = deriveRouteStatus(search.data);
+
+  return (
+    <section className="border border-rule bg-ink-2/40">
+      <PanelHead
+        icon={Radar}
+        label="Upstash Evidence Search"
+        meta={`${search.isFetching ? "searching" : configured ? "configured" : routeStatus} / ${index}`}
+      />
+      <form
+        className="border-b border-rule p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const nextQuery = query.trim();
+          if (nextQuery) setSubmittedQuery(nextQuery);
+        }}
+      >
+        <label className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Search governed proof</label>
+        <div className="mt-2 flex gap-2">
+          <input
+            className="min-w-0 flex-1 border border-rule bg-[#06080d] px-3 py-2 text-xs text-bone outline-none transition placeholder:text-muted focus:border-electric"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search runs, hashes, providers, governance decisions..."
+          />
+          <button type="submit" className="v-btn-primary h-9 px-3 text-xs" disabled={search.isFetching}>
+            Search
+          </button>
+        </div>
+      </form>
+      <div className="border-b border-rule bg-white/[0.015] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge label={configured ? "token server-side" : "not configured"} tone={configured ? "stable" : "watch"} />
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+            source: {source}
+          </span>
+        </div>
+      </div>
+      <div className="divide-y divide-rule">
+        {results.map((result) => (
+          <div key={result.id ?? `${result.position}-${result.title}`} className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate font-mono text-[11px] uppercase tracking-[0.14em] text-electric">
+                  {result.kind ?? "evidence"} · {result.id ?? `result-${result.position}`}
+                </div>
+                <div className="mt-1 text-sm font-semibold text-bone">{result.title ?? "Indexed proof document"}</div>
+              </div>
+              {typeof result.score === "number" && <StatusBadge label={result.score.toFixed(3)} tone="neutral" />}
+            </div>
+            {result.summary && <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted">{result.summary}</p>}
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              {String(result.metadata?.run_id ?? result.metadata?.workspace_id ?? "metadata pending")}
+            </div>
+          </div>
+        ))}
+        {!results.length && (
+          <EmptyState
+            text={
+              configured
+                ? emptyReason ?? "No indexed proof documents matched the default governance query yet."
+                : "Set UPSTASH_SEARCH_REST_URL and UPSTASH_SEARCH_REST_TOKEN in the backend runtime to enable evidence search."
+            }
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
 function ProofHash({ label, value }: { label: string; value: string }) {
   return (
     <div className="border border-rule bg-[#06080d] p-2">
@@ -1324,6 +1455,12 @@ interface OperatingModel {
   growthOpportunitiesSource: string | null;
   growthOpportunitiesContractVersion: string | null;
   growthOpportunitiesStatus: RouteStatus;
+  evidenceSearchStatus: RouteStatus;
+  evidenceSearchConfigured: boolean;
+  evidenceSearchUnavailableReason: string | null;
+  evidenceSearchSource: string | null;
+  evidenceSearchIndex: string;
+  evidenceSearchResults: UacpSearchResult[];
   pulse: {
     workspaces: number;
     activeEvaluations: number;
@@ -1374,9 +1511,11 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const signals = eventsForSignals.map(toOperatingSignal).sort((a, b) => (b.score + b.risk) - (a.score + a.risk));
   const surgeon = snapshot?.evaluationSurgeon;
   const opportunities = snapshot?.growthOpportunities;
+  const evidenceSearch = snapshot?.evidenceSearch;
   const hasSnapshotData = Boolean(snapshot);
   const evaluationSurgeonStatus = deriveRouteStatus(surgeon);
   const growthOpportunitiesStatus = deriveRouteStatus(opportunities);
+  const evidenceSearchStatus = deriveRouteStatus(evidenceSearch);
   const evaluationQueueUnavailable = hasSnapshotData ? !isRouteLive(evaluationSurgeonStatus) : false;
   const growthQueueUnavailable = hasSnapshotData ? !isRouteLive(growthOpportunitiesStatus) : false;
   const evaluationSurgeonRequiredSources = surgeon?.data?.required_sources ?? null;
@@ -1387,6 +1526,13 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const growthOpportunitiesSource = opportunities?.data?.source ?? opportunities?.source ?? ROUTE_SOURCE_UNKNOWN;
   const growthOpportunitiesContractVersion =
     opportunities?.data?.contract_version ?? opportunities?.contractVersion ?? ROUTE_CONTRACT_UNKNOWN;
+  const evidenceSearchSource = evidenceSearch?.data?.source ?? evidenceSearch?.source ?? ROUTE_SOURCE_UNKNOWN;
+  const evidenceSearchConfigured = Boolean(evidenceSearch?.data?.configured);
+  const evidenceSearchIndex = evidenceSearch?.data?.index ?? "default";
+  const evidenceSearchResults = evidenceSearch?.data?.results ?? [];
+  const evidenceSearchUnavailableReason = hasSnapshotData
+    ? (evidenceSearch?.error ?? evidenceSearch?.data?.empty_reason ?? null)
+    : null;
   const eventStreamUnavailable = hasSnapshotData ? !isRouteLive(eventStreamStatus) : false;
   const eventStreamUnavailableReason = hasSnapshotData
     ? (eventStream?.error ?? eventStream?.data?.empty_reason ?? null)
@@ -1428,6 +1574,12 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
     growthOpportunitiesSource,
     growthOpportunitiesContractVersion,
     growthOpportunitiesStatus,
+    evidenceSearchStatus,
+    evidenceSearchConfigured,
+    evidenceSearchUnavailableReason,
+    evidenceSearchSource,
+    evidenceSearchIndex,
+    evidenceSearchResults,
     pulse: {
       workspaces: product.workspaces ?? workspaces.length,
       activeEvaluations: accounts.filter((account) => account.tier.toLowerCase().includes("free") || account.billingState === "no reserve").length,

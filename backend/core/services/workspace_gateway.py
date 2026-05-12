@@ -4,13 +4,15 @@ from __future__ import annotations
 import json
 import logging
 import time
+import hashlib
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Iterable, Optional
 
 import httpx
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, inspect
 from sqlalchemy.orm import Session
 
 from core.config import get_settings
@@ -22,6 +24,7 @@ from db.models import (
     Budget,
     ExecutionLog,
     IncidentLog,
+    VeklomRun,
     WorkspaceModelSetting,
     WorkspaceRequestLog,
 )
@@ -41,6 +44,226 @@ _OLLAMA_PROBE_TTL_SECONDS = 15
 _ollama_probe_cache: tuple[float, bool] | None = None
 _MODEL_SETTING_CACHE_TTL_SECONDS = 10
 _model_setting_cache: dict[str, tuple[float, "ResolvedModelSetting"]] = {}
+_UACP_REDIS_SIGNAL_TTL_SECONDS = 86400
+_UACP_REDIS_EVENT_STREAM_KEY = "uacp:v5:event-stream"
+
+
+def _sha256_json(payload: object) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _veklom_runs_table_exists(db: Session) -> bool:
+    try:
+        return inspect(db.connection()).has_table("veklom_runs")
+    except Exception:
+        return False
+
+
+def _redis_setex(redis_client: object, key: str, ttl_seconds: int, value: str) -> None:
+    try:
+        redis_client.setex(key, ttl_seconds, value)  # type: ignore[attr-defined]
+    except AttributeError:
+        redis_client.set(key, value, ex=ttl_seconds)  # type: ignore[attr-defined]
+
+
+def _publish_veklom_run_signal(
+    *,
+    run: VeklomRun,
+    row: WorkspaceRequestLog,
+    input_hash: str,
+    output_hash: str,
+    genome_hash: str,
+) -> None:
+    """Publish short-lived UACP V5 run state for operator surfaces.
+
+    Postgres remains authoritative. Redis/Upstash is a fail-open acceleration
+    layer for live control-center panels, event-stream polling, and latest-run
+    visibility.
+    """
+    try:
+        from core.redis_pool import get_redis
+
+        redis_client = get_redis()
+        if redis_client is None:
+            return
+
+        created_at = run.created_at or datetime.utcnow()
+        event = {
+            "event_id": f"veklom_run:{run.run_id}",
+            "event_type": "veklom.run",
+            "source": "veklom_runs",
+            "workspace_id": run.workspace_id,
+            "tenant_id": run.tenant_id,
+            "user_id": row.user_id,
+            "entity_type": "veklom_run",
+            "entity_id": run.run_id,
+            "severity": "info" if run.status == "SEALED" else "warning",
+            "status": run.status,
+            "timestamp": created_at.isoformat() + "Z",
+            "payload": {
+                "request_log_id": row.id,
+                "request_kind": row.request_kind,
+                "request_path": row.request_path,
+                "provider": row.provider,
+                "model": row.model,
+                "governance_decision": run.governance_decision,
+                "risk_tier": run.risk_tier,
+                "genome_hash": genome_hash,
+                "input_hash": input_hash,
+                "output_hash": output_hash,
+            },
+            "uacp": {
+                "pillar_ids": ["execution", "governance", "archives"],
+                "committee_ids": ["governance-evidence", "experience-assurance"],
+                "worker_ids": ["ledger", "gauge", "sentinel"],
+            },
+        }
+        run_snapshot = {
+            "run_id": run.run_id,
+            "workspace_id": run.workspace_id,
+            "tenant_id": run.tenant_id,
+            "actor_id": run.actor_id,
+            "status": run.status,
+            "source_table": run.source_table,
+            "source_id": run.source_id,
+            "request_log_id": run.request_log_id,
+            "governance_decision": run.governance_decision,
+            "risk_tier": run.risk_tier,
+            "provider": run.provider,
+            "model": run.model,
+            "genome_hash": genome_hash,
+            "input_hash": input_hash,
+            "output_hash": output_hash,
+            "created_at": created_at.isoformat() + "Z",
+        }
+        run_json = json.dumps(run_snapshot, sort_keys=True, default=str, ensure_ascii=False)
+        event_json = json.dumps(event, sort_keys=True, default=str, ensure_ascii=False)
+        _redis_setex(redis_client, f"uacp:v5:run:{run.run_id}", _UACP_REDIS_SIGNAL_TTL_SECONDS, run_json)
+        _redis_setex(
+            redis_client,
+            f"uacp:v5:workspace:{run.workspace_id}:latest_run",
+            _UACP_REDIS_SIGNAL_TTL_SECONDS,
+            run_json,
+        )
+        redis_client.lpush(_UACP_REDIS_EVENT_STREAM_KEY, event_json)
+        redis_client.ltrim(_UACP_REDIS_EVENT_STREAM_KEY, 0, 199)
+        redis_client.expire(_UACP_REDIS_EVENT_STREAM_KEY, _UACP_REDIS_SIGNAL_TTL_SECONDS)
+    except Exception:
+        logger.debug("VeklomRun Redis signal publish skipped", exc_info=True)
+
+
+def _status_to_veklom_status(status: str) -> str:
+    normalized = (status or "").lower()
+    if normalized in {"success", "ok", "200", "completed", "succeeded"}:
+        return "SEALED"
+    if normalized in {"blocked", "held", "hold"}:
+        return "HELD"
+    if normalized in {"denied", "deny"}:
+        return "DENIED"
+    return "FAILED"
+
+
+def _record_veklom_run_from_request_log(
+    db: Session,
+    row: WorkspaceRequestLog,
+    *,
+    request_json: dict | None,
+    response_json: dict | None,
+) -> None:
+    if not _veklom_runs_table_exists(db):
+        return
+
+    input_payload = {
+        "workspace_id": row.workspace_id,
+        "request_kind": row.request_kind,
+        "request_path": row.request_path,
+        "source_table": row.source_table,
+        "source_id": row.source_id,
+        "request": request_json,
+    }
+    output_payload = {
+        "status": row.status,
+        "source_table": row.source_table,
+        "source_id": row.source_id,
+        "response": response_json,
+        "error_message": row.error_message,
+    }
+    input_hash = _sha256_json(input_payload)
+    output_hash = _sha256_json(output_payload)
+    genome_hash = _sha256_json({
+        "contract": "uacp-v5",
+        "workspace_id": row.workspace_id,
+        "source_table": row.source_table,
+        "source_id": row.source_id,
+        "input_hash": input_hash,
+    })
+    status_value = _status_to_veklom_status(row.status)
+    created_at = row.created_at or datetime.utcnow()
+    run = VeklomRun(
+            workspace_id=row.workspace_id,
+            tenant_id=row.workspace_id,
+            actor_id=row.user_id or row.api_key_id,
+            raw_intent=row.prompt_preview or row.request_path,
+            human_attestation_json=json.dumps({"status": "not_collected", "source": "legacy_request_bridge"}),
+            ai_attestation_json=json.dumps({
+                "schema_validated": True,
+                "taint_clean": row.status in {"success", "ok", "200", "completed", "succeeded"},
+                "arbiter_decision": "ALLOW" if status_value == "SEALED" else "HOLD",
+            }),
+            execution_attestation_json=json.dumps({
+                "convergence_score": 1 if status_value == "SEALED" else 0,
+                "retry_count": 0,
+                "quality_threshold_met": status_value == "SEALED",
+                "output_bounded": True,
+            }),
+            governance_decision="ALLOW" if status_value == "SEALED" else "HOLD",
+            risk_tier="LOW" if status_value == "SEALED" else "MEDIUM",
+            genome_hash=genome_hash,
+            input_hash=input_hash,
+            output_hash=output_hash,
+            decision_frame_hash=_sha256_json({"input_hash": input_hash, "output_hash": output_hash, "status": status_value}),
+            provenance_json=json.dumps({
+                "lineage_parent_hashes": [],
+                "source_table": row.source_table,
+                "source_id": row.source_id,
+                "request_log_id": row.id,
+            }),
+            provider=row.provider,
+            model=row.model,
+            route_json=json.dumps({
+                "provider": row.provider,
+                "model": row.model,
+                "policy_passed": status_value == "SEALED",
+                "fallback_used": bool(response_json and response_json.get("fallback_triggered")),
+            }),
+            debit_cents=(Decimal(row.cost_usd or 0) * Decimal("100")).quantize(Decimal("0.000001")),
+            evidence_json=json.dumps({
+                "decision_frame_hash": _sha256_json({"input_hash": input_hash, "output_hash": output_hash}),
+                "replay_available": True,
+                "rollback_available": False,
+            }),
+            feedback_json=json.dumps({
+                "outcome_quality": 1 if status_value == "SEALED" else 0,
+                "routing_signal": row.provider or "unknown",
+                "governance_signal": status_value.lower(),
+            }),
+            source_table=row.source_table,
+            source_id=row.source_id,
+            request_log_id=row.id,
+            status=status_value,
+            created_at=created_at,
+            updated_at=datetime.utcnow(),
+            sealed_at=datetime.utcnow() if status_value == "SEALED" else None,
+        )
+    db.add(run)
+    db.flush()
+    _publish_veklom_run_signal(
+        run=run,
+        row=row,
+        input_hash=input_hash,
+        output_hash=output_hash,
+        genome_hash=genome_hash,
+    )
 
 
 def _workspace_token_cost_per_1k_output_tokens() -> Decimal:
@@ -574,6 +797,7 @@ def record_request_log(
     error_message: str | None = None,
 ) -> WorkspaceRequestLog:
     row = WorkspaceRequestLog(
+        id=str(uuid.uuid4()),
         workspace_id=workspace_id,
         user_id=user_id,
         api_key_id=api_key_id,
@@ -595,9 +819,19 @@ def record_request_log(
         cost_usd=cost_usd,
     )
     db.add(row)
+    db.flush()
+    _record_veklom_run_from_request_log(
+        db,
+        row,
+        request_json=request_json,
+        response_json=response_json,
+    )
     db.commit()
     if hasattr(db, "refresh"):
-        db.refresh(row)
+        try:
+            db.refresh(row)
+        except Exception:
+            logger.debug("Workspace request log refresh skipped after commit", exc_info=True)
     return row
 
 

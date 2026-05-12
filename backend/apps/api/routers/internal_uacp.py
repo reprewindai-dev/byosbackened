@@ -44,6 +44,7 @@ router = APIRouter(prefix="/internal/uacp", tags=["internal-uacp"])
 RESERVE_UNITS_PER_USD = Decimal("1000")
 UACP_SOURCE_TAG = "veklom_backend"
 UACP_CONTRACT_VERSION = "uacp_backend_information_contract_v1"
+UACP_REDIS_EVENT_STREAM_KEY = "uacp:v5:event-stream"
 
 try:
     from db.models.veklom_run import VeklomRun
@@ -465,6 +466,45 @@ def _recent_events(db: Session, limit: int) -> list[dict[str, Any]]:
     return events[:limit]
 
 
+def _recent_redis_uacp_events(limit: int) -> list[dict[str, Any]]:
+    try:
+        from core.redis_pool import get_redis
+
+        redis_client = get_redis()
+        if redis_client is None:
+            return []
+        raw_events = redis_client.lrange(UACP_REDIS_EVENT_STREAM_KEY, 0, max(0, limit - 1))
+    except Exception:
+        return []
+
+    events: list[dict[str, Any]] = []
+    for raw_event in raw_events or []:
+        try:
+            if isinstance(raw_event, bytes):
+                raw_event = raw_event.decode("utf-8")
+            parsed = json.loads(raw_event)
+        except (TypeError, ValueError, UnicodeDecodeError):
+            continue
+        if isinstance(parsed, dict):
+            events.append(parsed)
+    return events[:limit]
+
+
+def _merge_events(primary: list[dict[str, Any]], secondary: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for event in [*primary, *secondary]:
+        event_id = str(event.get("event_id") or "")
+        if event_id and event_id in seen:
+            continue
+        if event_id:
+            seen.add(event_id)
+        merged.append(event)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
 def _evaluation_surgeon_queue(db: Session, limit: int) -> list[dict[str, Any]]:
     rows = db.query(Workspace).order_by(desc(Workspace.created_at)).limit(limit).all()
     queue: list[dict[str, Any]] = []
@@ -827,9 +867,12 @@ async def uacp_event_stream(
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
 ):
+    redis_events = _recent_redis_uacp_events(limit)
+    events = _merge_events(redis_events, _recent_events(db, limit), limit)
     return _uacp_response({
-        "stream": "snapshot",
-        "events": _recent_events(db, limit),
+        "stream": "redis_snapshot" if redis_events else "snapshot",
+        "redis_backed": bool(redis_events),
+        "events": events,
     })
 
 

@@ -22,12 +22,12 @@ def _seed_revision(engine, revisions: list[str]) -> None:
 
 def test_audit_migration_state_passes_when_current_matches_head():
     engine = create_engine("sqlite+pysqlite:///:memory:")
-    _seed_revision(engine, ["013"])
+    _seed_revision(engine, ["014"])
 
     result = audit_migration_state(engine, alembic_ini_path=ALEMBIC_INI)
 
-    assert result.current_revisions == ["013"]
-    assert result.head_revisions == ["013"]
+    assert result.current_revisions == ["014"]
+    assert result.head_revisions == ["014"]
     assert result.is_at_head is True
 
 
@@ -38,7 +38,7 @@ def test_audit_migration_state_flags_drift():
     result = audit_migration_state(engine, alembic_ini_path=ALEMBIC_INI)
 
     assert result.current_revisions == ["012"]
-    assert result.head_revisions == ["013"]
+    assert result.head_revisions == ["014"]
     assert result.is_at_head is False
     assert "drift detected" in result.summary().lower()
 
@@ -49,5 +49,5 @@ def test_audit_migration_state_handles_missing_revision_table():
     result = audit_migration_state(engine, alembic_ini_path=ALEMBIC_INI)
 
     assert result.current_revisions == []
-    assert result.head_revisions == ["013"]
+    assert result.head_revisions == ["014"]
     assert result.has_revision_table is False

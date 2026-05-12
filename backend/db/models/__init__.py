@@ -32,6 +32,7 @@ from db.models.security_event import SecurityEvent, ThreatType, SecurityLevel
 from db.models.user_session import UserSession
 from db.models.api_key import APIKey
 from db.models.workspace_request_log import WorkspaceRequestLog
+from db.models.veklom_run import VeklomRun
 from db.models.workspace_model_setting import WorkspaceModelSetting
 from db.models.subscription import Subscription, PlanTier, SubscriptionStatus
 from license.tier import LicenseTier
@@ -94,6 +95,7 @@ __all__ = [
     "UserSession",
     "APIKey",
     "WorkspaceRequestLog",
+    "VeklomRun",
     "WorkspaceModelSetting",
     "Subscription", "PlanTier", "SubscriptionStatus",
     "LicenseTier",

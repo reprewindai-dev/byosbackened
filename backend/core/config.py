@@ -196,6 +196,12 @@ class Settings(BaseSettings):
 
     # Observability
     sentry_dsn: str = ""
+    sentry_environment: str = ""
+    sentry_release: str = ""
+    sentry_send_default_pii: bool = False
+    sentry_enable_logs: bool = True
+    sentry_traces_sample_rate: float = 0.1
+    sentry_profile_session_sample_rate: float = 0.0
     log_format: str = "json"
     metrics_enabled: bool = True
     prometheus_port: int = 9090

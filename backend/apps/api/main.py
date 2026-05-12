@@ -12,6 +12,7 @@ from core.config import get_settings
 from core.auth import get_current_workspace
 from db.session import SessionLocal
 from core.logging import setup_logging
+from core.observability.sentry import configure_sentry
 from core.security.zero_trust import ZeroTrustMiddleware
 from apps.api.middleware.metrics import MetricsMiddleware
 from apps.api.middleware.intelligent_routing import IntelligentRoutingMiddleware
@@ -85,6 +86,7 @@ import logging
 logger = logging.getLogger(__name__)
 settings = get_settings()
 setup_logging()
+configure_sentry()
 
 # Initialize providers
 from core.providers.init import initialize_providers

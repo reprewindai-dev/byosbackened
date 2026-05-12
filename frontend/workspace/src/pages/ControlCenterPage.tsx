@@ -10,6 +10,7 @@ import {
   BriefcaseBusiness,
   CircleDollarSign,
   CircuitBoard,
+  Download,
   Eye,
   FileCheck2,
   Gauge,
@@ -114,7 +115,22 @@ interface RunRow {
   cost_usd?: string;
   tokens_in?: number;
   tokens_out?: number;
+  tenant_id?: string;
+  actor_id?: string;
+  risk_tier?: string;
+  governance_decision?: string;
+  debit_cents?: string;
+  genome_hash?: string;
+  input_hash?: string;
+  output_hash?: string;
+  decision_frame_hash?: string;
+  request_log_id?: string | null;
+  source_table?: string;
+  source_id?: string;
+  source?: string;
   created_at?: string;
+  updated_at?: string;
+  sealed_at?: string | null;
 }
 
 interface DeploymentRow {
@@ -212,6 +228,7 @@ interface EvaluationSurgeonPayload {
 
 interface EventStreamPayload {
   stream?: string | null;
+  redis_backed?: boolean | null;
   events?: UacpEvent[];
   empty_reason?: string | null;
   required_sources?: string[] | null;
@@ -503,6 +520,25 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
   };
 }
 
+interface RunProof {
+  runId: string;
+  workspaceId: string;
+  status: string;
+  provider: string;
+  model: string;
+  governanceDecision: string;
+  riskTier: string;
+  genomeHash: string;
+  inputHash: string;
+  outputHash: string;
+  decisionFrameHash: string;
+  source: string;
+  sourceId: string;
+  requestLogId?: string | null;
+  createdAt?: string;
+  sealedAt?: string | null;
+}
+
 export function ControlCenterPage() {
   const [room, setRoom] = useState<Room>("overview");
   const snapshot = useQuery({
@@ -605,6 +641,11 @@ export function ControlCenterPage() {
         <aside className="space-y-4">
           <WorkerQueue workers={model.workers} workerRuns={model.workerRuns} />
           <DoctrinePanel />
+          <RunProofPanel
+            proofs={model.runProofs}
+            redisBacked={model.eventStreamRedisBacked}
+            routeStatus={model.eventStreamRouteStatus}
+          />
           <ArchivePanel signals={model.signals} />
         </aside>
       </main>
@@ -614,7 +655,7 @@ export function ControlCenterPage() {
 
 function OverviewRoom({ model, loading }: { model: OperatingModel; loading: boolean }) {
   const stories = deriveStories(model);
-  const eventStreamMeta = `source: ${model.eventStreamSource ?? "unknown-source"} / contract: ${model.eventStreamContractVersion ?? "unknown-contract"}`;
+  const eventStreamMeta = `source: ${model.eventStreamSource ?? "unknown-source"} / contract: ${model.eventStreamContractVersion ?? "unknown-contract"} / redis: ${model.eventStreamRedisBacked ? "backed" : "db snapshot"}`;
   return (
     <div className="space-y-4">
       <LiveOpsRoom liveOps={model.liveOps} loading={loading} />
@@ -635,6 +676,17 @@ function OverviewRoom({ model, loading }: { model: OperatingModel; loading: bool
       <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="border border-rule bg-ink-2/40">
           <PanelHead icon={Radar} label="Operating Signals" meta={`${model.signals.length} ranked`} />
+          <div className="border-b border-rule bg-white/[0.015] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge
+                label={model.eventStreamRedisBacked ? "redis backed" : "database snapshot"}
+                tone={model.eventStreamRedisBacked ? "stable" : "watch"}
+              />
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+                /internal/uacp/event-stream - {eventStreamMeta}
+              </span>
+            </div>
+          </div>
           <div className="divide-y divide-rule">
             {model.signals.slice(0, 8).map((signal) => (
               <SignalRow key={signal.id} signal={signal} />
@@ -645,7 +697,7 @@ function OverviewRoom({ model, loading }: { model: OperatingModel; loading: bool
                   loading
                     ? "Synchronizing backend event stream."
                     : isRouteLive(model.eventStreamRouteStatus)
-                      ? `No backend events available from /internal/uacp/events. ${eventStreamMeta}`
+                      ? `No backend events available from /internal/uacp/event-stream. ${eventStreamMeta}`
                       : `Events unavailable from /internal/uacp/events and /internal/uacp/event-stream: ${deriveFailureReasonText({
                           route: "/internal/uacp/event-stream",
                           status: model.eventStreamRouteStatus,
@@ -1026,6 +1078,78 @@ function DoctrinePanel() {
   );
 }
 
+function RunProofPanel({
+  proofs,
+  redisBacked,
+  routeStatus,
+}: {
+  proofs: RunProof[];
+  redisBacked: boolean;
+  routeStatus: RouteStatus;
+}) {
+  const latestProof = proofs[0];
+  return (
+    <section className="border border-rule bg-ink-2/40">
+      <PanelHead
+        icon={FileCheck2}
+        label="VeklomRun Proof"
+        meta={`${proofs.length} exportable / stream ${redisBacked ? "redis" : routeStatus}`}
+      />
+      {latestProof ? (
+        <div className="space-y-3 p-4">
+          <div className="border border-rule bg-white/[0.015] p-3">
+            <div className="font-mono text-[11px] text-electric">{latestProof.runId}</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <StatusBadge label={latestProof.status} tone={latestProof.status === "SEALED" ? "stable" : "watch"} />
+              <StatusBadge label={latestProof.governanceDecision} tone={latestProof.governanceDecision === "ALLOW" ? "stable" : "watch"} />
+              <StatusBadge label={latestProof.riskTier} tone={latestProof.riskTier === "LOW" ? "stable" : "watch"} />
+            </div>
+            <div className="mt-3 text-sm text-bone">{latestProof.provider} / {latestProof.model}</div>
+            <div className="mt-1 text-xs text-muted">{latestProof.workspaceId}</div>
+          </div>
+          <div className="grid gap-2">
+            <ProofHash label="genome" value={latestProof.genomeHash} />
+            <ProofHash label="input" value={latestProof.inputHash} />
+            <ProofHash label="output" value={latestProof.outputHash} />
+            <ProofHash label="frame" value={latestProof.decisionFrameHash} />
+          </div>
+          <button type="button" className="v-btn-primary h-9 w-full text-xs" onClick={() => exportRunProof(latestProof)}>
+            <Download className="h-3.5 w-3.5" /> Export latest proof
+          </button>
+        </div>
+      ) : (
+        <EmptyState text="No canonical VeklomRun proof yet. Run traffic through governed endpoints to create input/output/genome/frame hashes." />
+      )}
+    </section>
+  );
+}
+
+function ProofHash({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border border-rule bg-[#06080d] p-2">
+      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted">{label}</div>
+      <div className="mt-1 break-all font-mono text-[10px] text-bone">{value}</div>
+    </div>
+  );
+}
+
+function exportRunProof(proof: RunProof) {
+  const payload = {
+    exported_at: new Date().toISOString(),
+    contract: "uacp-v5-run-proof",
+    proof,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `veklom-run-proof-${proof.runId}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 function ArchivePanel({ signals }: { signals: OperatingSignal[] }) {
   return (
     <section className="border border-rule bg-ink-2/40">
@@ -1187,6 +1311,7 @@ interface OperatingModel {
   eventStreamRouteStatus: RouteStatus;
   eventStreamSource: string | null;
   eventStreamContractVersion: string | null;
+  eventStreamRedisBacked: boolean;
   evaluationSurgeonUnavailable: boolean;
   evaluationSurgeonUnavailableReason: string | null;
   evaluationSurgeonRequiredSources: string[] | null;
@@ -1214,6 +1339,7 @@ interface OperatingModel {
   signals: OperatingSignal[];
   accounts: EvaluationAccount[];
   growthQueue: GrowthOpportunityCard[];
+  runProofs: RunProof[];
   workers: WorkerRow[];
   committees: CommitteeRow[];
   workerRuns: WorkerRunRow[];
@@ -1268,6 +1394,7 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const eventStreamSource = eventStream?.data?.source ?? eventStream?.source ?? ROUTE_SOURCE_UNKNOWN;
   const eventStreamContractVersion =
     eventStream?.data?.contract_version ?? eventStream?.contractVersion ?? ROUTE_CONTRACT_UNKNOWN;
+  const eventStreamRedisBacked = Boolean(eventStream?.data?.redis_backed);
   const evaluationSurgeonUnavailableReason = hasSnapshotData ? (surgeon?.error ?? surgeon?.data?.empty_reason ?? null) : null;
   const growthOpportunitiesUnavailableReason = hasSnapshotData ? (opportunities?.error ?? opportunities?.data?.empty_reason ?? null) : null;
   const surgeonAvailable = Boolean(surgeon?.ok);
@@ -1278,6 +1405,7 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const growthQueue = opportunitiesAvailable
     ? opportunities?.data?.opportunities?.map(convertGrowthOpportunityToCard) ?? []
     : [];
+  const runProofs = runs.map(convertRunToProof).filter((proof): proof is RunProof => Boolean(proof));
   const readyWorkers = workers.filter((worker) => worker.status === "ready").length;
 
   return {
@@ -1287,6 +1415,7 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
     eventStreamRouteStatus: eventStreamStatus,
     eventStreamSource,
     eventStreamContractVersion,
+    eventStreamRedisBacked,
     evaluationSurgeonUnavailable: evaluationQueueUnavailable,
     evaluationSurgeonUnavailableReason,
     evaluationSurgeonRequiredSources,
@@ -1315,10 +1444,35 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
     signals,
     accounts,
     growthQueue,
+    runProofs,
     workers,
     committees,
     workerRuns,
     raw: snapshot,
+  };
+}
+
+function convertRunToProof(run: RunRow): RunProof | null {
+  if (!run.run_id || !run.input_hash || !run.genome_hash || !run.decision_frame_hash) {
+    return null;
+  }
+  return {
+    runId: run.run_id,
+    workspaceId: run.workspace_id ?? run.tenant_id ?? "unknown-workspace",
+    status: run.status ?? "unknown",
+    provider: run.provider ?? "unknown-provider",
+    model: run.model ?? "unknown-model",
+    governanceDecision: run.governance_decision ?? "unknown",
+    riskTier: run.risk_tier ?? "unknown",
+    genomeHash: run.genome_hash,
+    inputHash: run.input_hash,
+    outputHash: run.output_hash ?? "pending",
+    decisionFrameHash: run.decision_frame_hash,
+    source: run.source_table ?? run.source ?? "veklom_runs",
+    sourceId: run.source_id ?? run.run_id,
+    requestLogId: run.request_log_id,
+    createdAt: run.created_at,
+    sealedAt: run.sealed_at,
   };
 }
 

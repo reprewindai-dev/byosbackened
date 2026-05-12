@@ -33,6 +33,11 @@ Frontend auth/billing calls are handled by `app/auth.js`:
 
 You can override at runtime with `window.VEKLOM_API`.
 
+The React workspace shell reads `workspace-config.js` before boot. That file sets
+both `window.__UACP_BACKEND_BASE_URL__` and `window.__VEKLOM_API_BASE__` so
+Sunnyvale, Evaluation Surgeon, Hub Growth Navigator, Field Intelligence, and the
+other protected UACP operator surfaces resolve the same backend bridge.
+
 ## Deploy model
 
 - Static assets deploy from this folder to Cloudflare Pages.

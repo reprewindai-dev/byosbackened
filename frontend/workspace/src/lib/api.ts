@@ -4,17 +4,25 @@ import { useAuthStore } from "@/store/auth-store";
 declare global {
   interface Window {
     __VEKLOM_API_BASE__?: string;
+    __UACP_BACKEND_BASE_URL__?: string;
     __VEKLOM_ENV__?: string;
     __VEKLOM_STRIPE_PK__?: string;
   }
 }
 
+function normalizeBaseUrl(value?: string | null): string {
+  return value ? value.replace(/\/+$/, "") : "";
+}
+
 export function resolveApiBase(): string {
-  if (typeof window !== "undefined" && window.__VEKLOM_API_BASE__) {
-    return window.__VEKLOM_API_BASE__.replace(/\/+$/, "");
+  if (typeof window !== "undefined") {
+    const runtimeBase = window.__UACP_BACKEND_BASE_URL__ || window.__VEKLOM_API_BASE__;
+    if (runtimeBase) return normalizeBaseUrl(runtimeBase);
   }
-  const buildTime = import.meta.env.VITE_VEKLOM_API_BASE as string | undefined;
-  if (buildTime) return buildTime.replace(/\/+$/, "");
+  const buildTime =
+    (import.meta.env.VITE_UACP_BACKEND_BASE_URL as string | undefined) ||
+    (import.meta.env.VITE_VEKLOM_API_BASE as string | undefined);
+  if (buildTime) return normalizeBaseUrl(buildTime);
   if (typeof location !== "undefined") {
     const h = location.hostname;
     if (/^localhost$|^127\.|^0\.0\.0\.0$/.test(h)) return "";

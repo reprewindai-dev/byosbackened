@@ -29,10 +29,12 @@ npm run preview
 
 | Variable | When | Notes |
 |---|---|---|
+| `VITE_UACP_BACKEND_BASE_URL` | build-time | Canonical backend base for UACP owner/operator routes. Takes precedence over legacy `VITE_VEKLOM_API_BASE`. |
 | `VITE_VEKLOM_API_BASE` | build-time | Baked into bundle. e.g. `https://api.veklom.com` |
 | `VITE_VEKLOM_API_BASE_DEV` | dev-only | Dev-server proxy target. Defaults to `http://localhost:8000` |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | build-time | Stripe.js publishable key |
 | `window.__VEKLOM_API_BASE__` | runtime | Overrides `VITE_VEKLOM_API_BASE` at runtime via `public/config.js` — rewrite at deploy time for multi-env |
+| `window.__UACP_BACKEND_BASE_URL__` | runtime | Canonical runtime override for the protected backend bridge. Takes precedence over `window.__VEKLOM_API_BASE__`. |
 | `window.__VEKLOM_STRIPE_PK__` | runtime | Overrides Stripe PK at runtime |
 
 The runtime-override pattern (`config.js`) allows one build artifact to ship to staging + production without rebuilding.
@@ -44,7 +46,7 @@ The runtime-override pattern (`config.js`) allows one build artifact to ship to 
 ```
 Build command:   npm run build
 Build output:    dist
-Environment:     VITE_VEKLOM_API_BASE=https://api.veklom.com
+Environment:     VITE_UACP_BACKEND_BASE_URL=https://api.veklom.com
 Rewrites:        handled by public/_redirects (SPA fallback)
 Headers:         handled by public/_headers
 ```
@@ -56,7 +58,7 @@ At deploy time, replace `dist/config.js` to inject per-environment runtime value
 1. Add a new "Static Site" resource in Coolify pointing at `frontend/workspace`
 2. Build command: `npm install && npm run build`
 3. Publish directory: `dist`
-4. Set `VITE_VEKLOM_API_BASE=https://api.veklom.com` in Coolify env
+4. Set `VITE_UACP_BACKEND_BASE_URL=https://api.veklom.com` in Coolify env
 5. Add a Caddyfile or nginx config serving `index.html` as SPA fallback
 
 ## Folder layout

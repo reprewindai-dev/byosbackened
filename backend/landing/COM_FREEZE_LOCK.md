@@ -4,9 +4,9 @@ The buyer-facing `.com` landing page is frozen at this artifact:
 
 ```text
 path: backend/landing/index.html
-sha256: 768e51de55a7c3f82b55336399e81a83f4f5476c3c2ddb6501b071b34d5cca41
+sha256: 019bc4e1669edc412160903d8515a83c37700fe4fac0da5f8f88aeb803b5ab1d
 hashing: CRLF/LF-normalized
-state: Veklom Sovereign AI Hub with UACP black-box demo, system-font performance path, valid robots directives
+state: Veklom Sovereign AI Hub buyer landing with GPC-first plan framing, BYOS backend CTA, and generated workspace shell routes
 ```
 
 Rules:

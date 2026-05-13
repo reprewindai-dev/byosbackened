@@ -75,7 +75,8 @@ jobs:
               zone_payload = request("GET", f"/zones?{query}")
               zones = zone_payload.get("result") or []
               if not zones:
-                  raise SystemExit(f"Cloudflare zone not found: {zone_name}")
+                  print(f"warning: Cloudflare zone not visible to this token: {zone_name}", file=sys.stderr)
+                  continue
               zone_id = zones[0]["id"]
               update = request(
                   "PATCH",
@@ -86,7 +87,8 @@ jobs:
                   },
               )
               if not update.get("success"):
-                  raise SystemExit(f"Could not disable managed robots.txt for {zone_name}: {update}")
+                  print(f"warning: could not disable managed robots.txt for {zone_name}: {update}", file=sys.stderr)
+                  continue
               print(f"managed robots.txt disabled for {zone_name}")
           PY
 

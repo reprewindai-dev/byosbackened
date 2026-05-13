@@ -138,14 +138,14 @@ export function ControlCenterPage() {
   }, [data?.module_intelligence, filter]);
 
   return (
-    <div className="command-wall">
-      <header className="command-header mb-5">
+    <div>
+      <header className="mb-6 flex flex-col justify-between gap-4 border-b border-rule pb-6 xl:flex-row xl:items-end">
         <div>
-          <div className="text-eyebrow">Founder / Superuser Command Center</div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-bone">Veklom operating intelligence</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-bone-2">
-            Internal control surface for tenant activity, module usage, conversion signals, risk posture, and founder next actions.
-            Raw prompts and repo contents stay redacted by default.
+          <div className="text-eyebrow">Founder / Command Center</div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-bone">Internal operating intelligence</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-bone-2">
+            Superuser-only view of tenant activity, module usage, conversion signals, risk posture, and founder next actions.
+            It mirrors the real Veklom workspace modules and redacts raw prompts/repo contents by default.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <StatusChip tone="ok">superuser only</StatusChip>
@@ -156,11 +156,11 @@ export function ControlCenterPage() {
             ))}
           </div>
         </div>
-        <div className="frame p-4">
+        <div className="frame w-full p-4 xl:max-w-xl">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-eyebrow">Locked tenant spine</div>
-              <div className="mt-2 text-sm text-bone">Overview Center / Playground / GPC</div>
+              <div className="mt-2 text-sm font-semibold text-bone">Overview Center / Playground / GPC</div>
               <div className="mt-1 text-xs leading-5 text-muted">
                 {data?.workspace_spine.policy ??
                   "Hetzner-first policy evaluation. Approved fallback only when tenant rules allow it."}

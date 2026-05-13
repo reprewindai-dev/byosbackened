@@ -33,7 +33,21 @@ class TelemetryBatch(BaseModel):
 
 def _safe_metadata(metadata: dict[str, Any]) -> str:
     allowed: dict[str, Any] = {}
-    for key in ("referrer", "viewport", "source", "campaign", "tab_visible"):
+    for key in (
+        "referrer",
+        "viewport",
+        "source",
+        "campaign",
+        "tab_visible",
+        "scenario_id",
+        "industry",
+        "playground_profile",
+        "artifact_id",
+        "founder_review_status",
+        "claim_level",
+        "risk_tier",
+        "conversation_id",
+    ):
         value = metadata.get(key)
         if isinstance(value, (str, int, float, bool)) or value is None:
             allowed[key] = value

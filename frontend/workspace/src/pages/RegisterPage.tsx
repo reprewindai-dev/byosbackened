@@ -10,6 +10,7 @@ export function RegisterPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
+  const [industry, setIndustry] = useState("generic");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -30,6 +31,7 @@ export function RegisterPage() {
         full_name: name || undefined,
         workspace_name: workspaceName || undefined,
         signup_type: "workspace_register",
+        industry,
         utm_source: params.get("utm_source") || undefined,
         utm_campaign: params.get("utm_campaign") || undefined,
       });
@@ -81,6 +83,23 @@ export function RegisterPage() {
               className="v-input"
               placeholder="Acme Production"
             />
+          </div>
+          <div className="mb-4">
+            <label className="v-label" htmlFor="reg-industry">What kind of team are you?</label>
+            <select
+              id="reg-industry"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              className="v-input"
+            >
+              <option value="banking_fintech">Bank / fintech</option>
+              <option value="healthcare_hospital">Hospital / healthcare</option>
+              <option value="insurance">Insurance</option>
+              <option value="legal_compliance">Legal / compliance</option>
+              <option value="government_public_sector">Government / public sector</option>
+              <option value="enterprise_operations">Enterprise operations</option>
+              <option value="generic">Other</option>
+            </select>
           </div>
           <div className="mb-4">
             <label className="v-label" htmlFor="reg-email">Work email</label>

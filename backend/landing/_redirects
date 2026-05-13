@@ -20,9 +20,9 @@ https://www.veklom.com/*  https://veklom.com/:splat  301
 /control-center/   /control-center/index.html    200
 /overview          /overview/index.html          200
 /overview/         /overview/index.html          200
-/gpc               /uacp/      301
-/gpc/              /uacp/      301
-/gpc/*             /uacp/      301
+/gpc               /#theater      302
+/gpc/              /#theater      302
+/gpc/*             /#theater      302
 /uacp              /uacp/index.html              200
 /uacp/             /uacp/index.html              200
 /playground        /playground/index.html        200

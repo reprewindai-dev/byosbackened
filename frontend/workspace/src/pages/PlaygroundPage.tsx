@@ -93,7 +93,14 @@ interface PreflightState {
   error?: string;
 }
 
-type Vertical = "default" | "legal" | "medical" | "finance" | "agency" | "infrastructure";
+type Vertical =
+  | "banking_fintech"
+  | "healthcare_hospital"
+  | "insurance"
+  | "legal_compliance"
+  | "government_public_sector"
+  | "enterprise_operations"
+  | "generic";
 type ResponseFormat = "text" | "json" | "json-schema";
 type SessionTag = "Standard" | "PHI" | "PII" | "HIPAA" | "PCI" | "SOC2";
 
@@ -176,26 +183,92 @@ interface CompareRunResult {
   auditHash?: string;
 }
 
+interface PlaygroundScenario {
+  scenario_id: string;
+  title: string;
+  prompt: string;
+  suggested_workflow: string[];
+  suggested_models_tools: string[];
+  evidence_emphasis: string[];
+}
+
+interface PlaygroundProfile {
+  workspaceId: string;
+  tenantId: string;
+  industry: Vertical;
+  playground_profile: Vertical;
+  profileName: string;
+  risk_tier: string;
+  policy_pack: string;
+  suggested_demo_prompts: string[];
+  sample_workflows: string[];
+  policy_checks: string[];
+  evidence_requirements: string[];
+  gpc_templates: string[];
+  restricted_actions: string[];
+  recommended_model_tool_constraints: string[];
+  default_demo_scenarios: PlaygroundScenario[];
+  default_blocking_rules: string[];
+  regulated_defaults: {
+    external_fallback_default: boolean;
+    human_review_required_for_high_risk: boolean;
+    evidence_capture_required: boolean;
+    audit_replay_required: boolean;
+    sensitive_data_warning_visible: boolean;
+    founder_review_required_for_regulated_claims: boolean;
+  };
+}
+
+interface GpcHandoff {
+  workspaceId: string;
+  tenantId: string;
+  industry: Vertical;
+  playground_profile: Vertical;
+  scenario_id: string;
+  scenario_title: string;
+  user_input: string;
+  risk_tier: string;
+  policy_pack: string;
+  evidence_requirements: string[];
+  blocking_rules: string[];
+  suggested_workflow: string[];
+  suggested_models_tools: string[];
+  handoff_status: "prepared";
+  claim_level: "draft";
+}
+
+interface CommercialArtifactDraft {
+  id: string;
+  artifact_type: string;
+  title: string;
+  founderReviewStatus: string;
+  archiveRecordId?: string | null;
+  outcome: string;
+  artifact: Record<string, unknown>;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const VERTICALS: { value: Vertical; label: string; hint: string }[] = [
-  { value: "default", label: "General", hint: "Broad control-plane request" },
-  { value: "legal", label: "Legal", hint: "Privacy-first legal ops" },
-  { value: "medical", label: "Medical", hint: "HIPAA-aware clinical ops" },
-  { value: "finance", label: "Finance", hint: "SOC2 / PCI-aware" },
-  { value: "agency", label: "Agency", hint: "Multi-tenant copilot" },
-  { value: "infrastructure", label: "Infrastructure", hint: "SNMP / Modbus bridge" },
+  { value: "banking_fintech", label: "Banking / Fintech", hint: "Approval-heavy financial operations" },
+  { value: "healthcare_hospital", label: "Healthcare / Hospital", hint: "PHI-aware clinical workflows" },
+  { value: "insurance", label: "Insurance", hint: "Claims and fraud support workflows" },
+  { value: "legal_compliance", label: "Legal / Compliance", hint: "Source-backed review and approvals" },
+  { value: "government_public_sector", label: "Government / Public Sector", hint: "Sensitive records and routing controls" },
+  { value: "enterprise_operations", label: "Enterprise Operations", hint: "Support, policy, and incident workflows" },
+  { value: "generic", label: "Generic", hint: "Cross-industry governed workflow design" },
 ];
 
 const SAMPLE_PROMPTS: Record<Vertical, string> = {
-  default: "Summarize why sovereignty matters for regulated AI workloads in three bullets.",
-  legal: "Draft a privacy-first intake workflow for handling PII in client matters.",
-  medical: "Explain the PHI controls you would enforce on an intake chatbot.",
-  finance: "Outline the SOC2 audit artifacts you would generate for each AI decision.",
-  agency: "Describe tenant isolation for a 50-client agency running shared models.",
-  infrastructure: "Translate a stream of SNMP traps into a governed AI incident triage.",
+  banking_fintech: "We want AI to triage suspicious transactions, explain risk basis, and route urgent cases for approval.",
+  healthcare_hospital: "We want AI to summarize patient intake while redacting PHI and requiring human review.",
+  insurance: "We want AI to triage claims, flag fraud risk, and support adjusters without making final claim decisions.",
+  legal_compliance: "We want AI to review contract clauses, surface risk, and route sensitive matters for human approval.",
+  government_public_sector: "We want AI to triage public-sector intake, screen record sensitivity, and preserve replay evidence.",
+  enterprise_operations: "We want AI to triage support tickets, detect urgent issues, and route them with evidence and cost controls.",
+  generic: "We want to use AI to triage support tickets, summarize the case, route it to the right team, and keep an audit trail.",
 };
 
 const EVENT_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -227,28 +300,28 @@ const QUICK_PROMPTS: { label: string; prompt: string; tag?: SessionTag; vertical
   {
     label: "PHI-safe summarization",
     tag: "PHI",
-    vertical: "medical",
+    vertical: "healthcare_hospital",
     prompt:
       "Summarize this clinical intake note for an operations lead. Preserve clinical intent, redact PHI/PII, include risk flags, and explain which Veklom governance controls fired.",
   },
   {
-    label: "Multi-step function call",
-    vertical: "infrastructure",
+    label: "Banking risk triage",
+    vertical: "banking_fintech",
     prompt:
-      "Build a governed multi-step workflow that validates an incoming webhook, checks budget policy, calls a compliance lookup tool, and writes a signed audit artifact.",
+      "Triage suspicious transactions, explain the risk basis, route urgent cases to the right team, and create replayable evidence.",
   },
   {
     label: "Policy-bound rewrite",
     tag: "SOC2",
-    vertical: "legal",
+    vertical: "legal_compliance",
     prompt:
       "Rewrite this customer-facing AI response so it follows outbound.public.v3, avoids unsupported claims, and includes an audit-ready explanation of the policy decision.",
   },
   {
-    label: "Code repair (FIM)",
-    vertical: "default",
+    label: "Support workflow planning",
+    vertical: "enterprise_operations",
     prompt:
-      "Repair this incomplete function using fill-in-the-middle reasoning. Keep the patch minimal, explain the test case, and mark any security-sensitive assumptions.",
+      "Turn our support ticket triage idea into a governed workflow with approvals, evidence requirements, and cost controls.",
   },
 ];
 
@@ -288,6 +361,52 @@ async function fetchWorkspaceModels(): Promise<WorkspaceModel[]> {
   return raw.map(normalizeModel).filter((model) => Boolean(model.slug));
 }
 
+async function fetchWorkspacePlaygroundProfile(): Promise<PlaygroundProfile> {
+  const resp = await api.get<PlaygroundProfile>("/workspace/playground/profile");
+  return resp.data;
+}
+
+async function recordFeatureUse(feature: string, metadata: Record<string, unknown> = {}) {
+  await api.post("/telemetry/events", {
+    events: [
+      {
+        event_type: "feature_use",
+        surface: "playground",
+        route: "/playground",
+        feature,
+        metadata,
+      },
+    ],
+  });
+}
+
+function normalizeStoredVertical(value: unknown): Vertical {
+  switch (value) {
+    case "default":
+      return "generic";
+    case "medical":
+      return "healthcare_hospital";
+    case "finance":
+      return "banking_fintech";
+    case "legal":
+      return "legal_compliance";
+    case "agency":
+      return "enterprise_operations";
+    case "infrastructure":
+      return "government_public_sector";
+    case "banking_fintech":
+    case "healthcare_hospital":
+    case "insurance":
+    case "legal_compliance":
+    case "government_public_sector":
+    case "enterprise_operations":
+    case "generic":
+      return value;
+    default:
+      return "generic";
+  }
+}
+
 function readStoredPlaygroundState() {
   if (typeof window === "undefined") return null;
   try {
@@ -295,7 +414,7 @@ function readStoredPlaygroundState() {
     return raw
       ? (JSON.parse(raw) as {
           prompt?: string;
-          vertical?: Vertical;
+          vertical?: string;
           selectedModelSlug?: string;
           maxTokens?: number;
           conversation?: ConversationTurn[];
@@ -326,8 +445,9 @@ function readStoredPlaygroundState() {
 
 export function PlaygroundPage() {
   const stored = useMemo(() => readStoredPlaygroundState(), []);
-  const [vertical, setVertical] = useState<Vertical>(stored?.vertical ?? "default");
-  const [prompt, setPrompt] = useState(stored?.prompt ?? SAMPLE_PROMPTS[stored?.vertical ?? "default"]);
+  const storedVertical = normalizeStoredVertical(stored?.vertical);
+  const [vertical, setVertical] = useState<Vertical>(storedVertical);
+  const [prompt, setPrompt] = useState(stored?.prompt ?? SAMPLE_PROMPTS[storedVertical]);
   const [maxTokens, setMaxTokens] = useState(stored?.maxTokens ?? DEFAULT_MAX_TOKENS);
   const [selectedModelSlug, setSelectedModelSlug] = useState(stored?.selectedModelSlug ?? "");
   const [systemPrompt, setSystemPrompt] = useState(stored?.systemPrompt ?? "");
@@ -355,6 +475,12 @@ export function PlaygroundPage() {
   const [secondaryModelSlug, setSecondaryModelSlug] = useState("");
   const [comparePrompt, setComparePrompt] = useState("");
   const [compareResults, setCompareResults] = useState<Record<string, CompareRunResult>>({});
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>("");
+  const [handoffPreview, setHandoffPreview] = useState<GpcHandoff | null>(null);
+  const [artifactDraft, setArtifactDraft] = useState<CommercialArtifactDraft | null>(null);
+  const [compileSubmitting, setCompileSubmitting] = useState(false);
+  const [artifactSubmitting, setArtifactSubmitting] = useState(false);
+  const [markingEvaluation, setMarkingEvaluation] = useState(false);
 
   // -------------------------------------------------------------------------
   // Multi-turn conversation history (added 2026-05-04 — see note at top)
@@ -435,6 +561,23 @@ export function PlaygroundPage() {
     queryFn: fetchWorkspaceModels,
     refetchInterval: 30_000,
   });
+  const profileQuery = useQuery({
+    queryKey: ["workspace-playground-profile"],
+    queryFn: fetchWorkspacePlaygroundProfile,
+    staleTime: 60_000,
+  });
+  const playgroundProfile = profileQuery.data;
+  const activeScenarios = playgroundProfile?.default_demo_scenarios ?? [];
+
+  useEffect(() => {
+    if (!playgroundProfile) return;
+    setVertical(playgroundProfile.playground_profile);
+    const firstScenario = playgroundProfile.default_demo_scenarios[0];
+    setSelectedScenarioId((current) => current || firstScenario?.scenario_id || "");
+    if (!stored?.prompt && firstScenario?.prompt) {
+      setPrompt(firstScenario.prompt);
+    }
+  }, [playgroundProfile, stored?.prompt]);
 
   const runnableModels = useMemo(
     () =>
@@ -568,10 +711,100 @@ export function PlaygroundPage() {
     setPrompt(priorUserTurn.content);
   }, [conversation]);
 
+  const selectedScenario = useMemo(
+    () => activeScenarios.find((scenario) => scenario.scenario_id === selectedScenarioId) ?? activeScenarios[0],
+    [activeScenarios, selectedScenarioId],
+  );
+
   const handleVerticalChange = (v: Vertical) => {
     setVertical(v);
     if (prompt === SAMPLE_PROMPTS[vertical]) setPrompt(SAMPLE_PROMPTS[v]);
   };
+
+  const applyScenario = useCallback(async (scenario: PlaygroundScenario) => {
+    setSelectedScenarioId(scenario.scenario_id);
+    setPrompt(scenario.prompt);
+    setHandoffPreview(null);
+    setArtifactDraft(null);
+    try {
+      await recordFeatureUse("vertical_demo_generated", {
+        scenario_id: scenario.scenario_id,
+        industry: playgroundProfile?.industry ?? vertical,
+        playground_profile: playgroundProfile?.playground_profile ?? vertical,
+        risk_tier: playgroundProfile?.risk_tier ?? "generic",
+      });
+    } catch {
+      // best-effort telemetry only
+    }
+  }, [playgroundProfile, vertical]);
+
+  const compileWithGpc = useCallback(async () => {
+    if (!selectedScenario) return;
+    setCompileSubmitting(true);
+    setArtifactDraft(null);
+    try {
+      const resp = await api.post<GpcHandoff>("/workspace/playground/handoff", {
+        scenario_id: selectedScenario.scenario_id,
+        scenario_title: selectedScenario.title,
+        user_input: prompt,
+      });
+      setHandoffPreview(resp.data);
+    } catch (err) {
+      setError(responseDetail(err));
+    } finally {
+      setCompileSubmitting(false);
+    }
+  }, [prompt, selectedScenario]);
+
+  const createFounderReviewArtifact = useCallback(async () => {
+    if (!handoffPreview || !selectedScenario) return;
+    setArtifactSubmitting(true);
+    try {
+      const resp = await api.post<CommercialArtifactDraft>("/workspace/commercial/community-awareness-run", {
+        title: `${selectedScenario.title} founder-review draft`,
+        handoff: handoffPreview,
+        community_or_source: `${handoffPreview.industry} / vertical playground`,
+        audience_type: "ai_platform_ops_compliance",
+        pain_signal: "AI demo works but team lacks governed deployment path.",
+        why_veklom_fits: "Veklom turns the tested workflow into a governed tenant-scoped plan with evidence and private runtime options.",
+        suggested_reply_or_post: `Teams in ${handoffPreview.industry.replace(/_/g, " ")} usually stall after the demo. The missing piece is a governed workflow with approvals, evidence, policy checks, and a private runtime path.`,
+        cta: "Try the GPC demo",
+      });
+      setArtifactDraft(resp.data);
+    } catch (err) {
+      setError(responseDetail(err));
+    } finally {
+      setArtifactSubmitting(false);
+    }
+  }, [handoffPreview, selectedScenario]);
+
+  const founderReviewArtifact = useCallback(async (status: "approved_by_founder" | "blocked_by_founder") => {
+    if (!artifactDraft) return;
+    try {
+      const resp = await api.patch(`/workspace/commercial/artifacts/${artifactDraft.id}`, {
+        founder_review_status: status,
+        outcome: status === "approved_by_founder" ? "founder_review_complete" : "blocked",
+      });
+      setArtifactDraft((current) => current ? { ...current, founderReviewStatus: resp.data.founderReviewStatus, outcome: resp.data.outcome } : current);
+    } catch (err) {
+      setError(responseDetail(err));
+    }
+  }, [artifactDraft]);
+
+  const markEvaluationConversation = useCallback(async () => {
+    if (!handoffPreview || !selectedScenario) return;
+    setMarkingEvaluation(true);
+    try {
+      await recordFeatureUse("evaluation_conversation_influenced_by_vertical_demo", {
+        scenario_id: selectedScenario.scenario_id,
+        industry: handoffPreview.industry,
+        playground_profile: handoffPreview.playground_profile,
+        risk_tier: handoffPreview.risk_tier,
+      });
+    } finally {
+      setMarkingEvaluation(false);
+    }
+  }, [handoffPreview, selectedScenario]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -592,10 +825,11 @@ export function PlaygroundPage() {
       `Session tag: ${sessionTag}. Apply Veklom policy controls before provider execution.`,
       protectedSession ? "PHI/HIPAA session: keep execution on Hetzner/on-prem runtime only, auto-redact PHI/PII, and keep signed audit export pinned on." : "",
       responseFormat !== "text" ? `Response format requested: ${responseFormat}.` : "",
-      vertical !== "default" ? `Session vertical: ${vertical}. Apply the matching Veklom governance posture before answering.` : "",
+      vertical !== "generic" ? `Session vertical: ${vertical}. Apply the matching Veklom governance posture before answering.` : "",
+      playgroundProfile?.policy_pack ? `Tenant policy pack: ${playgroundProfile.policy_pack}.` : "",
       systemPrompt.trim(),
     ].filter(Boolean).join("\n\n")
-  ), [autoRedact, protectedSession, responseFormat, sessionTag, systemPrompt, vertical]);
+  ), [autoRedact, playgroundProfile?.policy_pack, protectedSession, responseFormat, sessionTag, systemPrompt, vertical]);
 
   const executeCompletion = useCallback(async (
     model: WorkspaceModel,
@@ -1171,8 +1405,8 @@ export function PlaygroundPage() {
           <div className="text-eyebrow">Workspace · Playground</div>
           <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">Playground</h1>
           <p className="mt-2 max-w-2xl text-sm text-bone-2">
-            Production-grade prompt theater. Every call is policed, routed, costed, and audit-stamped before a single
-            output unit is generated.
+            Test an industry-specific AI workflow, then turn it into a governed GPC-ready handoff with policy,
+            evidence, cost, and private runtime controls attached.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="chip border-brass/40 bg-brass/10 text-brass-2">
@@ -1182,6 +1416,9 @@ export function PlaygroundPage() {
             <span className="chip border-rule bg-ink/40 text-bone-2">{latestLatency} p50</span>
             <span className="chip border-rule bg-ink/40 text-bone-2">{sessionCostLabel} session · {sessionUnits} out</span>
             <span className="chip border-brass/40 bg-brass/10 text-brass-2">{complianceTag}</span>
+            <span className="chip border-rule bg-ink/40 text-bone-2">
+              {playgroundProfile?.profileName ?? "Loading workspace profile"}
+            </span>
             <span className={cn("chip", autoRedact ? "border-brass/40 bg-brass/10 text-brass-2" : "border-rule bg-ink/40 text-muted")}>
               <Shield className="h-3 w-3" />
               {autoRedact ? "Auto-redact" : "Redact off"}
@@ -1285,25 +1522,68 @@ export function PlaygroundPage() {
           <div className="frame">
             <SideHeader icon={<Sparkles className="h-3.5 w-3.5" />} label="Prompt Library" />
             <div className="space-y-1 px-2 py-2">
-              {VERTICALS.map((item) => (
+              {profileQuery.isLoading && (
+                <div className="px-2 py-2 font-mono text-[11px] text-muted">
+                  Loading vertical profile…
+                </div>
+              )}
+              {profileQuery.isError && (
+                <div className="rounded-md border border-crimson/30 bg-crimson/10 px-3 py-2 text-[11px] text-crimson">
+                  {responseDetail(profileQuery.error)}
+                </div>
+              )}
+              {activeScenarios.map((scenario) => (
                 <button
-                  key={item.value}
-                  onClick={() => {
-                    handleVerticalChange(item.value);
-                    setPrompt(SAMPLE_PROMPTS[item.value]);
-                  }}
+                  key={scenario.scenario_id}
+                  onClick={() => void applyScenario(scenario)}
                   className={cn(
                     "hover-elevate flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left",
-                    vertical === item.value && "bg-brass/10 text-brass-2",
+                    selectedScenarioId === scenario.scenario_id && "bg-brass/10 text-brass-2",
                   )}
+                  type="button"
                 >
-                  <span className="truncate font-mono text-[11.5px]">{item.label.toLowerCase()}.starter</span>
-                  <span className="font-mono text-[10px] text-muted">v1</span>
+                  <span className="truncate font-mono text-[11.5px]">{scenario.title}</span>
+                  <span className="font-mono text-[10px] text-muted">{playgroundProfile?.risk_tier ?? "draft"}</span>
                 </button>
               ))}
             </div>
             <div className="border-t border-rule px-3 py-2 text-[10.5px] text-muted">
-              Versioned · diffable · JSON / YAML import-export
+              Workspace profile drives scenarios, evidence, blocking rules, and GPC templates.
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<Shield className="h-3.5 w-3.5" />} label="Vertical Profile" />
+            <div className="space-y-3 px-3 py-3 text-[11px] text-bone-2">
+              <div>
+                <div className="text-eyebrow">Workspace profile</div>
+                <div className="mt-1 text-sm text-bone">{playgroundProfile?.profileName ?? "Loading profile"}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <ModelFact label="Industry" value={(playgroundProfile?.industry ?? vertical).replace(/_/g, " ")} />
+                <ModelFact label="Risk" value={playgroundProfile?.risk_tier ?? "generic"} />
+              </div>
+              <div>
+                <div className="mb-1 text-eyebrow">Policy checks</div>
+                <ul className="space-y-1 text-[11px] text-muted">
+                  {(playgroundProfile?.policy_checks ?? []).slice(0, 3).map((item) => (
+                    <li key={item}>+ {item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="mb-1 text-eyebrow">Evidence emphasis</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedScenario?.evidence_emphasis ?? playgroundProfile?.evidence_requirements ?? []).slice(0, 5).map((item) => (
+                    <span key={item} className="chip border-rule bg-ink/40 text-muted">{item}</span>
+                  ))}
+                </div>
+              </div>
+              {playgroundProfile?.regulated_defaults?.sensitive_data_warning_visible && (
+                <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[11px] text-brass-2">
+                  Sensitive-data and regulated-claim warnings are active. No public regulated claims publish without founder approval.
+                </div>
+              )}
             </div>
           </div>
 
@@ -1415,6 +1695,46 @@ export function PlaygroundPage() {
                 ))}
               </div>
             )}
+            {selectedScenario && (
+              <div className="mb-3 rounded-lg border border-rule bg-ink/40 px-3 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-eyebrow">Selected scenario</div>
+                    <div className="mt-1 text-sm text-bone">{selectedScenario.title}</div>
+                    <p className="mt-1 text-[11px] leading-5 text-muted">
+                      {(playgroundProfile?.industry ?? vertical).replace(/_/g, " ")} · {playgroundProfile?.policy_pack ?? "policy pack pending"} · risk {playgroundProfile?.risk_tier ?? "generic"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="v-btn-ghost h-8 px-3 text-xs"
+                    onClick={() => void compileWithGpc()}
+                    disabled={!prompt.trim() || compileSubmitting}
+                  >
+                    <GitBranch className="h-3.5 w-3.5" />
+                    {compileSubmitting ? "Preparing..." : "Compile with GPC"}
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-eyebrow">Suggested workflow</div>
+                    <ul className="space-y-1 text-[11px] text-muted">
+                      {selectedScenario.suggested_workflow.map((item) => (
+                        <li key={item}>+ {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-eyebrow">Models and tools</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedScenario.suggested_models_tools.map((item) => (
+                        <span key={item} className="chip border-rule bg-ink/40 text-muted">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="rounded-lg border border-rule bg-ink/40 focus-within:border-brass/50 focus-within:ring-1 focus-within:ring-brass/30">
               <textarea
                 id="prompt"
@@ -1441,6 +1761,9 @@ export function PlaygroundPage() {
                   <span className="hidden font-mono md:inline">~{inputEstimate} tok in</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button className="v-btn-ghost h-7 px-2 text-xs" type="button" onClick={() => void compileWithGpc()} disabled={!prompt.trim() || compileSubmitting}>
+                    <GitBranch className="h-3.5 w-3.5" /> {compileSubmitting ? "Preparing" : "GPC"}
+                  </button>
                   <button className="v-btn-ghost h-7 px-2 text-xs" type="button" onClick={() => setToolMenuOpen((prev) => !prev)} title="Show available governed tools">
                     <SlidersHorizontal className="h-3.5 w-3.5" /> Tools
                   </button>
@@ -1651,6 +1974,93 @@ export function PlaygroundPage() {
             </div>
             <div className="border-t border-rule px-3 py-2 text-[10.5px] text-muted">
               SHA-256 manifest emitted per session · evidence ready
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<GitBranch className="h-3.5 w-3.5" />} label="GPC Handoff" />
+            <div className="space-y-3 px-3 py-3 text-[11px] text-bone-2">
+              {handoffPreview ? (
+                <>
+                  <div>
+                    <div className="text-eyebrow">Prepared handoff</div>
+                    <div className="mt-1 text-sm text-bone">{handoffPreview.scenario_title}</div>
+                    <div className="mt-1 font-mono text-[10px] text-muted">
+                      {handoffPreview.handoff_status} · {handoffPreview.claim_level} · {handoffPreview.policy_pack}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-eyebrow">Evidence requirements</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {handoffPreview.evidence_requirements.map((item) => (
+                        <span key={item} className="chip border-rule bg-ink/40 text-muted">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-eyebrow">Blocking rules</div>
+                    <ul className="space-y-1 text-[11px] text-muted">
+                      {handoffPreview.blocking_rules.map((item) => (
+                        <li key={item}>+ {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    className="v-btn-primary h-9 w-full px-3 text-xs"
+                    onClick={() => void createFounderReviewArtifact()}
+                    disabled={artifactSubmitting}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {artifactSubmitting ? "Drafting..." : "Create founder-review artifact"}
+                  </button>
+                </>
+              ) : (
+                <div className="rounded-md border border-rule bg-ink/40 px-3 py-3 text-muted">
+                  Compile a selected scenario with GPC to prepare the governed handoff object.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="frame">
+            <SideHeader icon={<MessageSquare className="h-3.5 w-3.5" />} label="Commercial Review" />
+            <div className="space-y-3 px-3 py-3 text-[11px] text-bone-2">
+              {artifactDraft ? (
+                <>
+                  <div>
+                    <div className="text-eyebrow">Community Awareness Run</div>
+                    <div className="mt-1 text-sm text-bone">{artifactDraft.title}</div>
+                    <div className="mt-1 font-mono text-[10px] text-muted">
+                      founder review: {artifactDraft.founderReviewStatus} · outcome: {artifactDraft.outcome}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[11px] text-brass-2">
+                    No auto-posting. Public-facing copy stays draft until founder approval.
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" className="v-btn-ghost h-8 px-3 text-xs" onClick={() => void founderReviewArtifact("approved_by_founder")}>
+                      Approve draft
+                    </button>
+                    <button type="button" className="v-btn-ghost h-8 px-3 text-xs" onClick={() => void founderReviewArtifact("blocked_by_founder")}>
+                      Block draft
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-md border border-rule bg-ink/40 px-3 py-3 text-muted">
+                  Prepared handoffs can become founder-review-gated public or community artifacts from here.
+                </div>
+              )}
+              <button
+                type="button"
+                className="v-btn-ghost h-8 w-full px-3 text-xs"
+                onClick={() => void markEvaluationConversation()}
+                disabled={!handoffPreview || markingEvaluation}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                {markingEvaluation ? "Recording..." : "Mark evaluation conversation influenced"}
+              </button>
             </div>
           </div>
 

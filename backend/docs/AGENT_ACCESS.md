@@ -30,7 +30,9 @@ If SSH fails on Windows because of local `~/.ssh/config` permissions, bypass the
 
 - Veklom project: `veklom`
 - Veklom API app: `veklom-api`
-- Veklom live backend container: `zjhp30ys1jlk8yaoxc96h2zd-213941724689`
+- Veklom routed backend resource UUID: `zjhp30ys1jlk8yaoxc96h2zd`
+- Veklom live backend container names rotate; on 2026-05-13 the healthy container was `zjhp30ys1jlk8yaoxc96h2zd-060712658284`
+- Stray non-routed Coolify app: application `9`, resource `byosbackenedmain-lcile2sz1wjd6sqsdctlm4rv`, container `lcile2sz1wjd6sqsdctlm4rv-071005337769`
 - Veklom Ollama container: `veklom-ollama`
 - CO2 Router / ECOBE project: `ecobe`
 - CO2 Router database resource: `ecobe-postgres`
@@ -40,6 +42,7 @@ If SSH fails on Windows because of local `~/.ssh/config` permissions, bypass the
 Before changing runtime config, check the live app container env:
 
 ```bash
+docker ps --format '{{.Names}} {{.Status}}' | grep '^zjhp30ys1jlk8yaoxc96h2zd'
 docker exec <veklom-api-container> env | awk -F= '$1=="DATABASE_URL" || $1=="REDIS_URL" {print}'
 ```
 
@@ -63,4 +66,3 @@ docker logs --tail 80 <container_name>
 - Do not assume a restart-looping container is the live one.
 - Verify the Coolify resource name before changing anything.
 - Keep secrets out of the repository.
-

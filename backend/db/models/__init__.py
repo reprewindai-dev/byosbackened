@@ -49,6 +49,7 @@ from db.models.token_wallet import TokenWallet, TokenTransaction
 from db.models.status_subscription import StatusSubscription
 from db.models.signup_lead import SignupLead
 from db.models.product_usage_event import ProductUsageEvent
+from db.models.commercial_artifact import CommercialArtifact
 
 
 def _optional_import(path: str, names: tuple[str, ...]) -> tuple[object, ...]:
@@ -110,6 +111,7 @@ __all__ = [
     "StatusSubscription",
     "SignupLead",
     "ProductUsageEvent",
+    "CommercialArtifact",
     "Vendor",
     "Listing",
     "MarketplaceFile",

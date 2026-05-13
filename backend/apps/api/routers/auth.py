@@ -38,6 +38,7 @@ from db.models import (
 )
 from apps.api.deps import get_current_user
 from core.services.trial_onboarding import issue_trial_license, send_trial_welcome
+from core.services.workspace_profiles import ensure_workspace_profile_defaults, normalize_industry
 from onboarding.trial import post_signup_onboarding
 
 settings = get_settings()
@@ -63,6 +64,7 @@ class RegisterRequest(BaseModel):
     invite_code: Optional[str] = None
     trial_tier: Optional[str] = None
     signup_type: str = "general"
+    industry: Optional[str] = None
     utm_source: Optional[str] = None
     utm_campaign: Optional[str] = None
 
@@ -262,6 +264,7 @@ async def register(payload: RegisterRequest, request: Request, db: Session = Dep
         name=payload.workspace_name,
         slug=payload.workspace_name.lower().replace(" ", "-") + "-" + secrets.token_hex(4),
     )
+    ensure_workspace_profile_defaults(workspace, normalize_industry(payload.industry))
     db.add(workspace)
     db.flush()
 
@@ -551,6 +554,10 @@ async def me(current_user: User = Depends(get_current_user), db: Session = Depen
         "workspace_id": current_user.workspace_id,
         "workspace_name": workspace.name if workspace else None,
         "workspace_slug": workspace.slug if workspace else None,
+        "industry": workspace.industry if workspace else "generic",
+        "playground_profile": workspace.playground_profile if workspace else "generic",
+        "risk_tier": workspace.risk_tier if workspace else "generic",
+        "default_policy_pack": workspace.default_policy_pack if workspace else "generic_foundation_v1",
         "license_tier": workspace.license_tier if workspace else None,
         "license_expires_at": workspace.license_expires_at.isoformat() if workspace and workspace.license_expires_at else None,
         "license_download_url": workspace.license_download_url if workspace else None,
@@ -852,6 +859,7 @@ async def github_callback(
             name=f"{github_username}",
             slug=f"{github_username.lower()}-{secrets.token_hex(4)}",
         )
+        ensure_workspace_profile_defaults(workspace, "generic")
         db.add(workspace)
         db.flush()
 

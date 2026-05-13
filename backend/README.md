@@ -160,6 +160,7 @@ Use UptimeRobot to watch the public web surface, the routed API, and the license
 13. Create a third `HTTP(s)` monitor named `Veklom License Primary` for `https://license.veklom.com/health`.
 14. Set the optional keyword to `"status":"ok"`.
 15. Create a fourth `HTTP(s)` monitor named `Veklom License Backup` for `https://license2.veklom.com/health` only if the backup host is actually live.
+16. If you are using UptimeRobot Status Pages, show the `status`, `uptime_seconds`, and `timestamp` fields from the health response.
 
 ### Alerting Rules
 

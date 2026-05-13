@@ -17,7 +17,7 @@ from db.models import (
     Workspace, Subscription,
     SecurityEvent, Job, AIAuditLog,
     IncidentLog, IncidentSeverity, IncidentStatus,
-    ProductUsageEvent, SignupLead, UserSession, WorkspaceRequestLog,
+    CommercialArtifact, ProductUsageEvent, SignupLead, UserSession, WorkspaceRequestLog,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -151,6 +151,17 @@ class AcquisitionUsageSummary(BaseModel):
     converted_in_window: int
     conversion_rate_pct: float
     leads: List[AcquisitionUsageRow]
+
+
+class CommercialScorecardSummary(BaseModel):
+    generated_at: str
+    window_days: int
+    vertical_demos_generated: int
+    gpc_handoffs_prepared: int
+    founder_reviewed_vertical_artifacts: int
+    evaluation_conversations_influenced_by_vertical_demo: int
+    targets_14d: dict
+    over_the_bar: dict
 
 
 # ─── Workspace Management (admin within workspace, superuser global) ───────────
@@ -740,4 +751,54 @@ async def acquisition_usage_snapshot(
         converted_in_window=len(converted_rows),
         conversion_rate_pct=round(conversion_rate, 2),
         leads=rows,
+    )
+
+
+@router.get("/commercial-scorecard", response_model=CommercialScorecardSummary)
+async def commercial_scorecard_snapshot(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+    usage_query = db.query(ProductUsageEvent).filter(
+        ProductUsageEvent.created_at >= start,
+        ProductUsageEvent.created_at <= now,
+    )
+    artifact_query = db.query(CommercialArtifact).filter(
+        CommercialArtifact.created_at >= start,
+        CommercialArtifact.created_at <= now,
+    )
+    return CommercialScorecardSummary(
+        generated_at=now.isoformat(),
+        window_days=days,
+        vertical_demos_generated=usage_query.filter(
+            ProductUsageEvent.event_type == "feature_use",
+            ProductUsageEvent.feature == "vertical_demo_generated",
+        ).count(),
+        gpc_handoffs_prepared=usage_query.filter(
+            ProductUsageEvent.event_type == "feature_use",
+            ProductUsageEvent.feature == "gpc_handoff_prepared",
+        ).count(),
+        founder_reviewed_vertical_artifacts=artifact_query.filter(
+            CommercialArtifact.founder_review_status != "pending_founder_review"
+        ).count(),
+        evaluation_conversations_influenced_by_vertical_demo=usage_query.filter(
+            ProductUsageEvent.event_type == "feature_use",
+            ProductUsageEvent.feature == "evaluation_conversation_influenced_by_vertical_demo",
+        ).count(),
+        targets_14d={
+            "qualified_evaluation_conversations": 3,
+            "serious_byos_private_backend_access_requests": 1,
+            "credible_vendor_tool_conversations": 1,
+            "approved_package_concepts": 3,
+            "founder_approved_public_community_interactions": 10,
+        },
+        over_the_bar={
+            "signed_evaluation_agreements": 1,
+            "paid_pilot_or_operating_reserve_funded": 1,
+            "technical_procurement_processes_started": 1,
+            "credible_vendor_tool_committed": 1,
+        },
     )

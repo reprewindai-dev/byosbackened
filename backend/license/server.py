@@ -130,7 +130,8 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-@app.post("/issue", response_model=IssueResponse)
+@app.post("/issue", response_model=IssueResponse, include_in_schema=False)
+@app.post("/api/licenses/issue", response_model=IssueResponse)
 async def issue_license(
     payload: IssueRequest,
     x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
@@ -210,7 +211,8 @@ def _signed_verify_envelope(record: LicenseKey, status: str, machine_fingerprint
     return sign_license_payload(payload)
 
 
-@app.post("/verify")
+@app.post("/verify", include_in_schema=False)
+@app.post("/api/licenses/verify")
 async def verify_license(payload: VerifyRequest, db: Session = Depends(get_db)):
     raw_key = _normalize_key(payload.license_key)
     record = db.query(LicenseKey).filter(LicenseKey.key_hash == _key_hash(raw_key)).first()

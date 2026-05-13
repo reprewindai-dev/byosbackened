@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import html
 import ipaddress
+import json
 from pathlib import Path
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
@@ -13,14 +14,31 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
 from core.config import get_settings
 from core.notifications.emailer import send_email
 from core.security.encryption import encrypt_field
-from db.models import InviteStatus, StatusSubscription, User, UserRole, WorkspaceInvite
+from core.services.workspace_profiles import (
+    build_static_gpc_handoff,
+    dumps_payload,
+    ensure_workspace_profile_defaults,
+    normalize_industry,
+    resolve_workspace_profile,
+)
+from db.models import (
+    CommercialArtifact,
+    InviteStatus,
+    ProductUsageEvent,
+    StatusSubscription,
+    User,
+    UserRole,
+    Workspace,
+    WorkspaceInvite,
+)
 from db.session import get_db
 from core.services.financial_analytics import (
     fetch_workspace_request_metrics,
@@ -56,6 +74,35 @@ class BudgetUpdateRequest(BaseModel):
 class StatusSubscribeRequest(BaseModel):
     channel: str
     target: str
+
+
+class WorkspaceProfileUpdateRequest(BaseModel):
+    industry: Optional[str] = None
+
+
+class PlaygroundHandoffRequest(BaseModel):
+    scenario_id: str
+    scenario_title: Optional[str] = None
+    user_input: str = Field(default="", max_length=12000)
+
+
+class CommercialArtifactCreateRequest(BaseModel):
+    title: str
+    handoff: dict
+    community_or_source: Optional[str] = None
+    url: Optional[str] = None
+    audience_type: Optional[str] = None
+    pain_signal: Optional[str] = None
+    why_veklom_fits: Optional[str] = None
+    suggested_reply_or_post: Optional[str] = None
+    cta: Optional[str] = None
+    archive_record_id: Optional[str] = None
+
+
+class CommercialArtifactUpdateRequest(BaseModel):
+    founder_review_status: Optional[str] = None
+    outcome: Optional[str] = None
+    archive_record_id: Optional[str] = None
 
 
 def _parse_datetime_param(value: Optional[str], field: str) -> Optional[datetime]:
@@ -257,6 +304,245 @@ async def workspace_overview(
     db: Session = Depends(get_db),
 ):
     return fetch_overview(db, workspace_id=current_user.workspace_id)
+
+
+@router.get("/playground/profile")
+async def workspace_playground_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    ensure_workspace_profile_defaults(workspace)
+    db.commit()
+    db.refresh(workspace)
+    return resolve_workspace_profile(workspace)
+
+
+@router.patch("/profile")
+async def workspace_profile_update(
+    payload: WorkspaceProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if payload.industry is not None:
+        normalized = normalize_industry(payload.industry)
+        workspace.industry = normalized
+        workspace.playground_profile = normalized
+        workspace.risk_tier = None
+        workspace.default_policy_pack = None
+        workspace.default_demo_scenarios = None
+        workspace.default_evidence_requirements = None
+        workspace.default_blocking_rules = None
+    ensure_workspace_profile_defaults(workspace)
+    db.commit()
+    db.refresh(workspace)
+    return resolve_workspace_profile(workspace)
+
+
+@router.post("/playground/handoff", status_code=201)
+async def create_playground_handoff(
+    payload: PlaygroundHandoffRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        handoff = build_static_gpc_handoff(
+            workspace,
+            scenario_id=payload.scenario_id,
+            scenario_title=payload.scenario_title,
+            user_input=payload.user_input,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail="Unknown playground scenario") from exc
+    db.add(
+        ProductUsageEvent(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            event_type="feature_use",
+            surface="playground",
+            route="/playground",
+            feature="gpc_handoff_prepared",
+            metadata_json=dumps_payload(
+                {
+                    "scenario_id": handoff["scenario_id"],
+                    "industry": handoff["industry"],
+                    "playground_profile": handoff["playground_profile"],
+                    "claim_level": handoff["claim_level"],
+                    "risk_tier": handoff["risk_tier"],
+                }
+            ),
+        )
+    )
+    db.commit()
+    return handoff
+
+
+@router.post("/commercial/community-awareness-run", status_code=201)
+async def create_community_awareness_artifact(
+    payload: CommercialArtifactCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    handoff = payload.handoff or {}
+    industry = str(handoff.get("industry") or "generic")
+    regulated = industry in {
+        "banking_fintech",
+        "healthcare_hospital",
+        "insurance",
+        "legal_compliance",
+        "government_public_sector",
+    }
+    artifact_payload = {
+        "run_type": "Community Awareness Run",
+        "community/source": payload.community_or_source,
+        "URL": payload.url,
+        "audience type": payload.audience_type,
+        "pain signal": payload.pain_signal,
+        "why Veklom fits": payload.why_veklom_fits,
+        "suggested reply/post": payload.suggested_reply_or_post,
+        "CTA": payload.cta,
+        "spam risk": "medium",
+        "regulated claim risk": "high" if regulated else "medium",
+        "competitor claim risk": "medium",
+        "founderReviewStatus": "pending_founder_review",
+        "archiveRecordId": payload.archive_record_id,
+        "outcome": "draft",
+        "rules": {
+            "auto_posting": False,
+            "spam_allowed": False,
+            "unsupported_competitor_attacks_allowed": False,
+            "regulated_claims_require_founder_approval": True,
+            "fake_urgency_allowed": False,
+        },
+    }
+    artifact = CommercialArtifact(
+        workspace_id=current_user.workspace_id,
+        user_id=current_user.id,
+        artifact_type="community_awareness_run",
+        title=payload.title.strip()[:200] or "Community Awareness Run",
+        source_type="vertical_playground",
+        source_scenario_id=str(handoff.get("scenario_id") or "")[:160] or None,
+        handoff_json=dumps_payload(handoff),
+        artifact_json=dumps_payload(artifact_payload),
+        founder_review_status="pending_founder_review",
+        spam_risk="medium",
+        regulated_claim_risk="high" if regulated else "medium",
+        competitor_claim_risk="medium",
+        archive_record_id=(payload.archive_record_id or "")[:200] or None,
+        outcome="draft",
+    )
+    db.add(artifact)
+    db.commit()
+    db.refresh(artifact)
+    return {
+        "id": artifact.id,
+        "artifact_type": artifact.artifact_type,
+        "title": artifact.title,
+        "founderReviewStatus": artifact.founder_review_status,
+        "archiveRecordId": artifact.archive_record_id,
+        "outcome": artifact.outcome,
+        "artifact": json.loads(artifact.artifact_json),
+    }
+
+
+@router.patch("/commercial/artifacts/{artifact_id}")
+async def update_commercial_artifact(
+    artifact_id: str,
+    payload: CommercialArtifactUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    artifact = (
+        db.query(CommercialArtifact)
+        .filter(
+            CommercialArtifact.id == artifact_id,
+            CommercialArtifact.workspace_id == current_user.workspace_id,
+        )
+        .first()
+    )
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Commercial artifact not found")
+    artifact_payload = json.loads(artifact.artifact_json)
+    if payload.founder_review_status is not None:
+        artifact.founder_review_status = payload.founder_review_status.strip()[:80] or artifact.founder_review_status
+        artifact_payload["founderReviewStatus"] = artifact.founder_review_status
+    if payload.outcome is not None:
+        artifact.outcome = payload.outcome.strip()[:120] or artifact.outcome
+        artifact_payload["outcome"] = artifact.outcome
+    if payload.archive_record_id is not None:
+        artifact.archive_record_id = payload.archive_record_id.strip()[:200] or None
+        artifact_payload["archiveRecordId"] = artifact.archive_record_id
+    artifact.artifact_json = dumps_payload(artifact_payload)
+    db.commit()
+    db.refresh(artifact)
+    return {
+        "id": artifact.id,
+        "founderReviewStatus": artifact.founder_review_status,
+        "archiveRecordId": artifact.archive_record_id,
+        "outcome": artifact.outcome,
+    }
+
+
+@router.get("/commercial/scorecard")
+async def workspace_commercial_scorecard(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+    usage_query = db.query(ProductUsageEvent).filter(
+        ProductUsageEvent.workspace_id == current_user.workspace_id,
+        ProductUsageEvent.created_at >= start,
+        ProductUsageEvent.created_at <= now,
+    )
+    artifact_query = db.query(CommercialArtifact).filter(
+        CommercialArtifact.workspace_id == current_user.workspace_id,
+        CommercialArtifact.created_at >= start,
+        CommercialArtifact.created_at <= now,
+    )
+    return {
+        "generated_at": now.isoformat(),
+        "window_days": days,
+        "counters": {
+            "vertical_demos_generated": usage_query.filter(
+                ProductUsageEvent.event_type == "feature_use",
+                ProductUsageEvent.feature == "vertical_demo_generated",
+            ).count(),
+            "gpc_handoffs_prepared": usage_query.filter(
+                ProductUsageEvent.event_type == "feature_use",
+                ProductUsageEvent.feature == "gpc_handoff_prepared",
+            ).count(),
+            "founder_reviewed_vertical_artifacts": artifact_query.filter(
+                CommercialArtifact.founder_review_status != "pending_founder_review"
+            ).count(),
+            "evaluation_conversations_influenced_by_vertical_demo": usage_query.filter(
+                ProductUsageEvent.event_type == "feature_use",
+                ProductUsageEvent.feature == "evaluation_conversation_influenced_by_vertical_demo",
+            ).count(),
+        },
+        "targets_14d": {
+            "qualified_evaluation_conversations": 3,
+            "serious_byos_private_backend_access_requests": 1,
+            "credible_vendor_tool_conversations": 1,
+            "approved_package_concepts": 3,
+            "founder_approved_public_community_interactions": 10,
+        },
+        "over_the_bar": {
+            "signed_evaluation_agreements": 1,
+            "paid_pilot_or_operating_reserve_funded": 1,
+            "technical_procurement_processes_started": 1,
+            "credible_vendor_tool_committed": 1,
+        },
+    }
 
 
 @router.get("/observability")

@@ -2,11 +2,11 @@
 
 ## Current Live State
 - `api.veklom.com/health` returns `{"status":"ok","version":"1.0.0","service":"Veklom"}`.
-- The routed Veklom Coolify container is healthy: `zjhp30ys1jlk8yaoxc96h2zd-213941724689`.
+- The routed Veklom Coolify app is `veklom-api` (`coolify.applicationId=1`); the healthy container verified on 2026-05-13 was `zjhp30ys1jlk8yaoxc96h2zd-060712658284`.
 - The license service at `https://license.veklom.com/health` returns `200` after the 2026-05-10 rebuild.
-- Production Alembic state was verified on 2026-05-10 at revision `013`, which matches repo head.
+- Production Alembic state was re-verified on 2026-05-13 at revision `014`, which matched repo head before revision `015` was added for workspace vertical profiles and commercial artifacts.
 - AWS runtime vars are present in the live service env: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-east-1`, and `S3_BACKUP_BUCKET=veklom-db-backups`.
-- The stale `9493aceb` note was incorrect. The current non-routed Coolify restart-loop artifact is `lcile2sz1wjd6sqsdctlm4rv-033401126260`, built from commit `9636805d`, and should be treated as a failed deploy artifact until Coolify is reconciled.
+- The stale `9493aceb` note was incorrect. The non-routed Coolify stray app `byosbackenedmain-lcile2sz1wjd6sqsdctlm4rv` was removed on 2026-05-13 from both the Coolify `applications` table and `/data/coolify/applications/lcile2sz1wjd6sqsdctlm4rv`. It is no longer present or restartable.
 - `veklom.dev` is live on Cloudflare Pages and attached to the acquisition / marketplace entry surface.
 
 ## Infrastructure
@@ -24,7 +24,7 @@
 ## Production Checklist (must pass)
 - Backend app deployed from `/backend` using `infra/docker/Dockerfile.api`.
 - `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, `ENCRYPTION_KEY`, Stripe env vars configured in Coolify.
-- `alembic upgrade head` executed in production container, and `alembic_version` matches repo head (`013` at last verification).
+- `alembic upgrade head` executed in production container, and `alembic_version` matched repo head (`014` at last verification on 2026-05-13, before revision `015` was added).
 - Stripe webhook points to `/api/v1/subscriptions/webhook` with valid signing secret.
 - License env points at canonical endpoints:
   - `LICENSE_ISSUE_URL=https://license.veklom.com/api/licenses/issue`
@@ -64,6 +64,7 @@ Use these exact access paths when the backend needs hands-on runtime work:
 - CO2 Router / ECOBE host: `ssh -F NUL -i ~/.ssh/veklom-deploy root@5.78.153.146`
 - Veklom Coolify app: `veklom-api`
 - Veklom Coolify project: `veklom`
+- Current routed container names rotate. Resolve the active one with `docker ps --format '{{.Names}} {{.Status}}' | grep '^zjhp30ys1jlk8yaoxc96h2zd'` before running `docker exec`.
 - Veklom server resources: PostgreSQL + Redis are already running on `5.78.135.11`
 - CO2 Router server resources: PostgreSQL + Redis are already running on `5.78.153.146`
 - Coolify dashboard listens on port `8000` on each host when the server is up

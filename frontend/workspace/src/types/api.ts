@@ -9,6 +9,11 @@ export interface User {
   avatar_url?: string | null;
   workspace_id?: string;
   workspace_name?: string;
+  workspace_slug?: string;
+  industry?: string;
+  playground_profile?: string;
+  risk_tier?: string;
+  default_policy_pack?: string;
   plan?: string;
   region?: string;
   last_login_at?: string | null;
@@ -121,8 +126,55 @@ export interface RegisterRequest {
   name?: string;
   workspace_name?: string;
   signup_type?: string;
+  industry?: string;
   utm_source?: string;
   utm_campaign?: string;
+}
+
+export interface PlaygroundScenario {
+  scenario_id: string;
+  title: string;
+  prompt: string;
+  suggested_workflow: string[];
+  suggested_models_tools: string[];
+  evidence_emphasis: string[];
+}
+
+export interface PlaygroundProfile {
+  workspaceId: string;
+  tenantId: string;
+  industry: string;
+  playground_profile: string;
+  profileName: string;
+  risk_tier: string;
+  policy_pack: string;
+  suggested_demo_prompts: string[];
+  sample_workflows: string[];
+  policy_checks: string[];
+  evidence_requirements: string[];
+  gpc_templates: string[];
+  restricted_actions: string[];
+  recommended_model_tool_constraints: string[];
+  default_demo_scenarios: PlaygroundScenario[];
+  default_blocking_rules: string[];
+}
+
+export interface GpcHandoff {
+  workspaceId: string;
+  tenantId: string;
+  industry: string;
+  playground_profile: string;
+  scenario_id: string;
+  scenario_title: string;
+  user_input: string;
+  risk_tier: string;
+  policy_pack: string;
+  evidence_requirements: string[];
+  blocking_rules: string[];
+  suggested_workflow: string[];
+  suggested_models_tools: string[];
+  handoff_status: "prepared";
+  claim_level: "draft";
 }
 
 export interface AcceptInviteRequest {

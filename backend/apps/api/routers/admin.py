@@ -1,6 +1,7 @@
 """Admin router: workspace management, user management, system-wide controls (superuser/admin only)."""
+import json
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
@@ -15,9 +16,11 @@ from db.session import get_db
 from db.models import (
     User, UserRole, UserStatus,
     Workspace, Subscription,
-    SecurityEvent, Job, AIAuditLog,
+    SecurityEvent, SecurityAuditLog, Job, AIAuditLog,
     IncidentLog, IncidentSeverity, IncidentStatus,
     CommercialArtifact, ProductUsageEvent, SignupLead, UserSession, WorkspaceRequestLog,
+    APIKey, Deployment, Export, Pipeline, PipelineRun,
+    WorkspaceGithubRepoSelection, WorkspaceInvite,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -802,3 +805,847 @@ async def commercial_scorecard_snapshot(
             "credible_vendor_tool_committed": 1,
         },
     )
+
+
+# --- Founder Command Center -------------------------------------------------
+
+COMMAND_CENTER_MODULES: Dict[str, Dict[str, Any]] = {
+    "overview": {
+        "title": "Overview",
+        "route": "/overview",
+        "events": ["overview_view", "overview_center_view"],
+    },
+    "playground": {
+        "title": "Playground Intelligence",
+        "route": "/playground",
+        "events": [
+            "playground_session",
+            "scenario_selected",
+            "compile_with_gpc_clicked",
+            "audit_export_clicked",
+            "github_repo_context_used",
+        ],
+    },
+    "gpc": {
+        "title": "GPC Intelligence",
+        "route": "/uacp",
+        "events": [
+            "gpc_view",
+            "gpc_paid_gate_hit",
+            "gpc_handoff_prepared",
+            "handoff_preview_opened",
+            "handoff_exported",
+            "handoff_abandoned",
+        ],
+    },
+    "marketplace": {
+        "title": "Marketplace Intelligence",
+        "route": "/marketplace",
+        "events": [
+            "marketplace_view",
+            "listing_viewed",
+            "listing_clicked",
+            "listing_purchased",
+            "marketplace_search",
+            "empty_marketplace_search",
+            "vendor_listing_clicked",
+        ],
+    },
+    "models": {
+        "title": "Models Intelligence",
+        "route": "/models",
+        "events": ["model_viewed", "model_deploy_clicked", "model_selected_in_playground", "model_deploy_failed"],
+    },
+    "pipelines": {
+        "title": "Pipelines Intelligence",
+        "route": "/pipelines",
+        "events": [
+            "pipeline_created",
+            "pipeline_template_used",
+            "pipeline_node_added",
+            "policy_gate_node_used",
+            "retrieval_node_used",
+            "tool_node_used",
+            "pipeline_test_run",
+            "deploy_as_endpoint_clicked",
+            "pipeline_test_failed",
+        ],
+    },
+    "deployments": {
+        "title": "Deployments Intelligence",
+        "route": "/deployments",
+        "events": [
+            "endpoint_created",
+            "endpoint_view",
+            "sdk_copy_clicked",
+            "api_key_created",
+            "webhook_setup",
+            "rate_limit_hit",
+            "endpoint_error",
+        ],
+    },
+    "vault": {
+        "title": "Vault Intelligence",
+        "route": "/vault",
+        "events": [
+            "secret_created",
+            "secret_rotated",
+            "runtime_injection_enabled",
+            "hsm_seal_status_viewed",
+            "egress_allowlist_status_viewed",
+            "dangerous_secret_event",
+        ],
+    },
+    "compliance": {
+        "title": "Compliance Intelligence",
+        "route": "/compliance",
+        "events": [
+            "compliance_view",
+            "framework_viewed",
+            "evidence_exported",
+            "auditor_package_downloaded",
+            "control_inspected",
+            "control_failed",
+            "scheduled_export_configured",
+        ],
+    },
+    "monitoring": {
+        "title": "Monitoring Intelligence",
+        "route": "/monitoring",
+        "events": [
+            "monitoring_view",
+            "alert_configured",
+            "logs_searched",
+            "latency_panel_viewed",
+            "audit_chain_viewed",
+            "error_spike",
+        ],
+    },
+    "billing": {
+        "title": "Billing Intelligence",
+        "route": "/billing",
+        "events": [
+            "billing_view",
+            "upgrade_clicked",
+            "invoice_downloaded",
+            "plan_changed",
+            "reserve_funded",
+            "failed_payment",
+            "cap_hit",
+        ],
+    },
+    "team_access": {
+        "title": "Team / Access Intelligence",
+        "route": "/team",
+        "events": [
+            "team_invite_sent",
+            "role_created",
+            "mfa_enabled",
+            "mfa_disabled",
+            "sso_configured",
+            "scim_configured",
+            "github_oauth_enabled",
+            "session_timeout_changed",
+            "access_changed",
+        ],
+    },
+    "settings_integrations": {
+        "title": "Settings / Integrations Intelligence",
+        "route": "/settings",
+        "events": [
+            "routing_changed",
+            "security_changed",
+            "data_residency_changed",
+            "integration_enabled",
+            "github_enabled",
+            "slack_enabled",
+            "pagerduty_enabled",
+            "datadog_enabled",
+            "dangerous_action",
+            "workspace_region_changed",
+        ],
+    },
+    "github": {
+        "title": "GitHub Intelligence",
+        "route": "/settings",
+        "events": [
+            "github_connect",
+            "github_disconnect",
+            "github_repos_fetched",
+            "github_repo_selected",
+            "github_repo_context_used",
+            "github_context_sent_to_gpc",
+            "github_oauth_failure",
+            "github_permission_error",
+        ],
+    },
+    "risk_trust": {
+        "title": "Risk & Trust",
+        "route": "/monitoring",
+        "events": [
+            "policy_block",
+            "unsafe_claim_attempt",
+            "external_fallback_block",
+            "phi_redaction",
+            "pii_redaction",
+            "evidence_exported",
+            "github_token_error",
+            "vault_rotation",
+            "tenant_isolation_warning",
+        ],
+    },
+}
+
+COMMAND_CENTER_FUNNEL = [
+    ("visit", "Product visit", {"event_types": ["page_view"]}),
+    ("signup", "Signup", {"model": "users"}),
+    ("workspace_created", "Workspace created", {"model": "workspaces"}),
+    ("playground_used", "Playground used", {"routes": ["/playground"], "surfaces": ["playground"]}),
+    ("gpc_handoff_prepared", "GPC handoff prepared", {"features": ["gpc_handoff_prepared"]}),
+    ("pipeline_created", "Pipeline created", {"model": "pipelines"}),
+    ("deployment_attempted", "Deployment attempted", {"features": ["model_deploy_clicked", "deploy_as_endpoint_clicked"]}),
+    ("evidence_exported", "Evidence exported", {"features": ["evidence_exported", "audit_export_clicked"]}),
+    ("billing_viewed", "Billing viewed", {"routes": ["/billing"], "surfaces": ["billing"]}),
+    ("trial_started", "Trial started", {"subscription_statuses": ["trialing"]}),
+    ("backend_access_requested", "Backend/private access requested", {"features": ["backend_access_requested", "private_backend_access_requested"]}),
+    ("paid_or_reserve_funded", "Paid/reserve funded", {"features": ["reserve_funded"], "subscription_statuses": ["active"]}),
+]
+
+
+def _enum_value(value: Any) -> Any:
+    return getattr(value, "value", value)
+
+
+def _iso(value: Any) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
+def _json_loads(value: Any, fallback: Any = None) -> Any:
+    if value in (None, ""):
+        return fallback
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _not_wired(metric: str, route_or_event: str) -> Dict[str, Any]:
+    return {"metric": metric, "value": None, "status": "not_wired", "needs": route_or_event}
+
+
+def _metric(metric: str, value: Any, status: str = "wired", detail: Optional[str] = None) -> Dict[str, Any]:
+    row: Dict[str, Any] = {"metric": metric, "value": value, "status": status}
+    if detail:
+        row["detail"] = detail
+    return row
+
+
+def _usage_query(db: Session, start: datetime, end: datetime):
+    return db.query(ProductUsageEvent).filter(
+        ProductUsageEvent.created_at >= start,
+        ProductUsageEvent.created_at <= end,
+    )
+
+
+def _usage_count(
+    db: Session,
+    start: datetime,
+    end: datetime,
+    *,
+    event_types: Optional[List[str]] = None,
+    surfaces: Optional[List[str]] = None,
+    routes: Optional[List[str]] = None,
+    features: Optional[List[str]] = None,
+) -> int:
+    query = _usage_query(db, start, end)
+    if event_types:
+        query = query.filter(ProductUsageEvent.event_type.in_(event_types))
+    if surfaces:
+        query = query.filter(ProductUsageEvent.surface.in_(surfaces))
+    if routes:
+        query = query.filter(ProductUsageEvent.route.in_(routes))
+    if features:
+        query = query.filter(ProductUsageEvent.feature.in_(features))
+    return query.count()
+
+
+def _feature_count(db: Session, start: datetime, end: datetime, features: List[str]) -> int:
+    return _usage_count(db, start, end, features=features)
+
+
+def _record_command_center_access(
+    db: Session,
+    current_user: User,
+    route: str,
+) -> None:
+    db.add(
+        SecurityAuditLog(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            event_type="command_center_access",
+            event_category="superuser_control",
+            success=True,
+            details=json.dumps({"route": route, "redaction": "raw_prompts_and_repo_contents_omitted"}),
+        )
+    )
+    db.commit()
+
+
+def _workspace_label(workspaces: Dict[str, Workspace], workspace_id: Optional[str]) -> str:
+    if not workspace_id or workspace_id not in workspaces:
+        return "unknown"
+    return workspaces[workspace_id].name
+
+
+def _build_usage_section(db: Session, start: datetime, end: datetime) -> Dict[str, Any]:
+    rows = [
+        _metric("Overview views", _usage_count(db, start, end, routes=["/overview"], surfaces=["overview"])),
+        _metric("Playground sessions", _usage_count(db, start, end, routes=["/playground"], surfaces=["playground"])),
+        _metric("GPC clicks", _feature_count(db, start, end, ["compile_with_gpc_clicked", "gpc_view", "gpc_paid_gate_hit"])),
+        _metric("GPC handoffs prepared", _feature_count(db, start, end, ["gpc_handoff_prepared"])),
+        _metric("Marketplace views", _usage_count(db, start, end, routes=["/marketplace"], surfaces=["marketplace"])),
+        _metric("Model deploy clicks", _feature_count(db, start, end, ["model_deploy_clicked"])),
+        _metric("Pipeline builds", db.query(Pipeline).filter(Pipeline.created_at >= start, Pipeline.created_at <= end).count()),
+        _metric("Deployment attempts", _feature_count(db, start, end, ["model_deploy_clicked", "deploy_as_endpoint_clicked"])),
+        _metric("Vault secrets created", _feature_count(db, start, end, ["secret_created"])),
+        _metric("Compliance exports", _feature_count(db, start, end, ["evidence_exported", "auditor_package_downloaded"])),
+        _metric("Monitoring views", _usage_count(db, start, end, routes=["/monitoring"], surfaces=["monitoring"])),
+        _metric("Billing views", _usage_count(db, start, end, routes=["/billing"], surfaces=["billing"])),
+        _metric("Team invites", db.query(WorkspaceInvite).filter(WorkspaceInvite.created_at >= start, WorkspaceInvite.created_at <= end).count()),
+        _metric("Settings changes", _feature_count(db, start, end, ["routing_changed", "security_changed", "data_residency_changed", "integration_enabled"])),
+    ]
+    return {"title": "Usage", "window": {"start": start.isoformat(), "end": end.isoformat()}, "metrics": rows}
+
+
+def _build_funnel_section(db: Session, start: datetime, end: datetime) -> Dict[str, Any]:
+    counts: List[Dict[str, Any]] = []
+    previous: Optional[int] = None
+    for key, label, spec in COMMAND_CENTER_FUNNEL:
+        if spec.get("model") == "users":
+            value = db.query(User).filter(User.created_at >= start, User.created_at <= end).count()
+        elif spec.get("model") == "workspaces":
+            value = db.query(Workspace).filter(Workspace.created_at >= start, Workspace.created_at <= end).count()
+        elif spec.get("model") == "pipelines":
+            value = db.query(Pipeline).filter(Pipeline.created_at >= start, Pipeline.created_at <= end).count()
+        else:
+            value = _usage_count(
+                db,
+                start,
+                end,
+                event_types=spec.get("event_types"),
+                surfaces=spec.get("surfaces"),
+                routes=spec.get("routes"),
+                features=spec.get("features"),
+            )
+            statuses = spec.get("subscription_statuses")
+            if statuses:
+                sub_count = db.query(Subscription).filter(Subscription.status.in_(statuses)).count()
+                value = max(value, sub_count)
+        conversion = round((value / previous * 100), 2) if previous and previous > 0 else None
+        counts.append({"key": key, "label": label, "value": value, "conversion_from_prior_pct": conversion})
+        previous = value
+    return {"title": "Funnel", "steps": counts}
+
+
+def _build_verticals_section(db: Session, start: datetime, end: datetime) -> Dict[str, Any]:
+    workspace_rows = db.query(Workspace).all()
+    rows: List[Dict[str, Any]] = []
+    for industry in [
+        "banking_fintech",
+        "healthcare_hospital",
+        "insurance",
+        "legal_compliance",
+        "government_public_sector",
+        "enterprise_operations",
+        "generic",
+    ]:
+        ids = [workspace.id for workspace in workspace_rows if (workspace.industry or "generic") == industry]
+        usage = _usage_query(db, start, end).filter(ProductUsageEvent.workspace_id.in_(ids)) if ids else None
+        top_scenarios = []
+        common_evidence = []
+        common_blocks = []
+        if usage is not None:
+            scenario_counts: Dict[str, int] = {}
+            evidence_counts: Dict[str, int] = {}
+            block_counts: Dict[str, int] = {}
+            for event in usage.all():
+                meta = _json_loads(event.metadata_json, {}) or {}
+                scenario = meta.get("scenario_title") or meta.get("scenario_id")
+                if scenario:
+                    scenario_counts[str(scenario)] = scenario_counts.get(str(scenario), 0) + 1
+                for item in meta.get("evidence_requirements") or []:
+                    evidence_counts[str(item)] = evidence_counts.get(str(item), 0) + 1
+                for item in meta.get("blocking_rules") or []:
+                    block_counts[str(item)] = block_counts.get(str(item), 0) + 1
+            top_scenarios = sorted(scenario_counts.items(), key=lambda item: item[1], reverse=True)[:5]
+            common_evidence = sorted(evidence_counts.items(), key=lambda item: item[1], reverse=True)[:5]
+            common_blocks = sorted(block_counts.items(), key=lambda item: item[1], reverse=True)[:5]
+        handoffs = (
+            _usage_query(db, start, end)
+            .filter(ProductUsageEvent.workspace_id.in_(ids), ProductUsageEvent.feature == "gpc_handoff_prepared")
+            .count()
+            if ids
+            else 0
+        )
+        sessions = (
+            _usage_query(db, start, end)
+            .filter(ProductUsageEvent.workspace_id.in_(ids))
+            .with_entities(func.count(func.distinct(ProductUsageEvent.session_id)))
+            .scalar()
+            if ids
+            else 0
+        ) or 0
+        duration = (
+            _usage_query(db, start, end)
+            .filter(ProductUsageEvent.workspace_id.in_(ids))
+            .with_entities(func.coalesce(func.sum(ProductUsageEvent.duration_ms), 0))
+            .scalar()
+            if ids
+            else 0
+        ) or 0
+        paid = (
+            db.query(Subscription)
+            .filter(Subscription.workspace_id.in_(ids), Subscription.status == "active")
+            .count()
+            if ids
+            else 0
+        )
+        rows.append(
+            {
+                "industry": industry,
+                "workspaces": len(ids),
+                "most_used_scenarios": [{"label": label, "count": count} for label, count in top_scenarios],
+                "ignored_scenarios": _not_wired("ignored scenarios", "scenario impression + selection events"),
+                "gpc_handoff_rate_pct": round((handoffs / sessions * 100), 2) if sessions else 0,
+                "average_session_duration_min": round((duration / max(sessions, 1)) / 60000, 2) if sessions else 0,
+                "common_evidence_requirements": [{"label": label, "count": count} for label, count in common_evidence],
+                "common_policy_blocks": [{"label": label, "count": count} for label, count in common_blocks],
+                "conversion_rate_pct": round((paid / len(ids) * 100), 2) if ids else 0,
+            }
+        )
+    return {"title": "Verticals", "rows": rows}
+
+
+def _build_module_intelligence(db: Session, start: datetime, end: datetime) -> List[Dict[str, Any]]:
+    sections: List[Dict[str, Any]] = []
+    for key, config in COMMAND_CENTER_MODULES.items():
+        events = config["events"]
+        metrics = [
+            _metric("Telemetry events", _feature_count(db, start, end, events)),
+            _metric("Page views", _usage_count(db, start, end, routes=[config["route"]], surfaces=[key])),
+        ]
+        if key == "models":
+            metrics.extend(
+                [
+                    _metric("Models deployed", db.query(Deployment).filter(Deployment.deployed_at >= start, Deployment.deployed_at <= end).count()),
+                    _not_wired("latency by model", "workspace_request_logs.model latency rollup by model"),
+                ]
+            )
+        elif key == "pipelines":
+            metrics.extend(
+                [
+                    _metric("Pipelines created", db.query(Pipeline).filter(Pipeline.created_at >= start, Pipeline.created_at <= end).count()),
+                    _metric("Test runs", db.query(PipelineRun).filter(PipelineRun.created_at >= start, PipelineRun.created_at <= end).count()),
+                ]
+            )
+        elif key == "deployments":
+            metrics.extend(
+                [
+                    _metric("Live endpoints", db.query(Deployment).filter(Deployment.status == "ACTIVE").count()),
+                    _metric("API keys created", db.query(APIKey).filter(APIKey.created_at >= start, APIKey.created_at <= end).count()),
+                ]
+            )
+        elif key == "github":
+            metrics.extend(
+                [
+                    _metric("Repos connected", db.query(WorkspaceGithubRepoSelection).count()),
+                    _metric("Repo selections", db.query(WorkspaceGithubRepoSelection).filter(WorkspaceGithubRepoSelection.selected_at >= start).count()),
+                ]
+            )
+        elif key == "billing":
+            metrics.extend(
+                [
+                    _metric("Reserve funded", _feature_count(db, start, end, ["reserve_funded"])),
+                    _metric("Paid workspaces", db.query(Subscription).filter(Subscription.status == "active").count()),
+                ]
+            )
+        elif key == "compliance":
+            metrics.append(_metric("Evidence exports", db.query(Export).filter(Export.created_at >= start, Export.created_at <= end).count()))
+        elif key == "risk_trust":
+            metrics.extend(
+                [
+                    _metric("PII audit flags", db.query(AIAuditLog).filter(AIAuditLog.created_at >= start, AIAuditLog.pii_detected.is_(True)).count()),
+                    _metric("Admin users without MFA", db.query(User).filter(User.role.in_([UserRole.ADMIN, UserRole.OWNER]), User.mfa_enabled.is_(False)).count()),
+                ]
+            )
+        sections.append({"key": key, "title": config["title"], "route": config["route"], "metrics": metrics})
+    return sections
+
+
+def _score_workspace(
+    workspace: Workspace,
+    signals: Dict[str, int],
+    paid: bool,
+    github_connected: bool,
+) -> Dict[str, Any]:
+    score = 0
+    score += min(signals.get("sessions", 0), 5) * 4
+    score += min(signals.get("duration_min", 0), 120) // 10
+    score += signals.get("playground", 0) * 5
+    score += signals.get("gpc_handoffs", 0) * 12
+    score += signals.get("billing", 0) * 8
+    score += signals.get("compliance_exports", 0) * 10
+    score += signals.get("backend_access", 0) * 18
+    score += signals.get("team_invites", 0) * 6
+    score += 10 if github_connected else 0
+    score += signals.get("pipeline_deploy", 0) * 12
+    score -= min(signals.get("errors", 0), 8) * 2
+    if paid or signals.get("backend_access", 0) or (signals.get("billing", 0) and signals.get("gpc_handoffs", 0)):
+        state = "commercially_serious"
+    elif signals.get("gpc_handoffs", 0) or signals.get("compliance_exports", 0) or signals.get("pipeline_deploy", 0):
+        state = "evaluation_ready"
+    elif signals.get("sessions", 0) or signals.get("playground", 0):
+        state = "active"
+    elif score > 0:
+        state = "curious"
+    else:
+        state = "cold"
+    if signals.get("errors", 0) >= 5 and signals.get("sessions", 0) <= 1:
+        state = "at_risk"
+    return {"score": int(score), "state": state}
+
+
+def _build_heatmap_section(db: Session, start: datetime, end: datetime) -> Dict[str, Any]:
+    workspaces = db.query(Workspace).all()
+    subscriptions = {row.workspace_id: row for row in db.query(Subscription).all()}
+    github_counts = {
+        row.workspace_id: row.count
+        for row in db.query(WorkspaceGithubRepoSelection.workspace_id, func.count(WorkspaceGithubRepoSelection.id).label("count"))
+        .group_by(WorkspaceGithubRepoSelection.workspace_id)
+        .all()
+    }
+    rows: List[Dict[str, Any]] = []
+    for workspace in workspaces:
+        events = _usage_query(db, start, end).filter(ProductUsageEvent.workspace_id == workspace.id).all()
+        sessions = len({event.session_id for event in events if event.session_id})
+        duration_min = round(sum(event.duration_ms or 0 for event in events) / 60000)
+        signals = {
+            "sessions": sessions,
+            "duration_min": duration_min,
+            "playground": sum(1 for event in events if event.surface == "playground" or event.route == "/playground"),
+            "gpc_handoffs": sum(1 for event in events if event.feature == "gpc_handoff_prepared"),
+            "billing": sum(1 for event in events if event.surface == "billing" or event.route == "/billing"),
+            "compliance_exports": sum(1 for event in events if event.feature in {"evidence_exported", "audit_export_clicked", "auditor_package_downloaded"}),
+            "backend_access": sum(1 for event in events if event.feature in {"backend_access_requested", "private_backend_access_requested"}),
+            "team_invites": db.query(WorkspaceInvite).filter(WorkspaceInvite.workspace_id == workspace.id, WorkspaceInvite.created_at >= start).count(),
+            "pipeline_deploy": sum(1 for event in events if event.feature in {"pipeline_created", "model_deploy_clicked", "deploy_as_endpoint_clicked"}),
+            "errors": db.query(WorkspaceRequestLog).filter(
+                WorkspaceRequestLog.workspace_id == workspace.id,
+                WorkspaceRequestLog.created_at >= start,
+                WorkspaceRequestLog.status != "success",
+            ).count(),
+        }
+        sub = subscriptions.get(workspace.id)
+        paid = bool(sub and _enum_value(sub.status) == "active")
+        github_connected = bool(github_counts.get(workspace.id))
+        score = _score_workspace(workspace, signals, paid, github_connected)
+        rows.append(
+            {
+                "workspace_id": workspace.id,
+                "workspace_name": workspace.name,
+                "tenant": workspace.slug,
+                "industry": workspace.industry or "generic",
+                "plan": _enum_value(sub.plan) if sub else workspace.license_tier or "not_wired",
+                "status": score["state"],
+                "score": score["score"],
+                "signals": signals,
+                "github_connected": github_connected,
+                "paid": paid,
+            }
+        )
+    return {"title": "Customer Heat Map", "rows": sorted(rows, key=lambda row: row["score"], reverse=True)}
+
+
+def _build_live_tenants_section(db: Session, now: datetime) -> Dict[str, Any]:
+    active_since = now - timedelta(minutes=30)
+    sessions = (
+        db.query(UserSession, User, Workspace)
+        .join(User, UserSession.user_id == User.id)
+        .join(Workspace, User.workspace_id == Workspace.id)
+        .filter(UserSession.is_active.is_(True), UserSession.last_accessed >= active_since)
+        .order_by(UserSession.last_accessed.desc())
+        .all()
+    )
+    subscriptions = {row.workspace_id: row for row in db.query(Subscription).all()}
+    github_counts = {
+        row.workspace_id: row.count
+        for row in db.query(WorkspaceGithubRepoSelection.workspace_id, func.count(WorkspaceGithubRepoSelection.id).label("count"))
+        .group_by(WorkspaceGithubRepoSelection.workspace_id)
+        .all()
+    }
+    rows: List[Dict[str, Any]] = []
+    for session, user, workspace in sessions:
+        latest_event = (
+            db.query(ProductUsageEvent)
+            .filter(ProductUsageEvent.user_id == user.id)
+            .order_by(ProductUsageEvent.created_at.desc())
+            .first()
+        )
+        sub = subscriptions.get(workspace.id)
+        rows.append(
+            {
+                "workspace_name": workspace.name,
+                "tenant": workspace.slug,
+                "industry": workspace.industry or "generic",
+                "profile": workspace.playground_profile or "generic",
+                "current_page": latest_event.route if latest_event else "not wired",
+                "last_action": latest_event.feature or latest_event.event_type if latest_event else "no telemetry event",
+                "session_duration_min": round((now - session.created_at).total_seconds() / 60, 1),
+                "plan": _enum_value(sub.plan) if sub else workspace.license_tier or "not wired",
+                "region": "tenant policy",
+                "sovereign_mode": "on-prem",
+                "github_connected": bool(github_counts.get(workspace.id)),
+                "mfa_status": "enabled" if user.mfa_enabled else "disabled",
+                "byos_private_runtime_status": "not wired",
+                "last_seen": _iso(session.last_accessed),
+            }
+        )
+    return {"title": "Live Tenants", "rows": rows}
+
+
+def _build_founder_tasks(heatmap: Dict[str, Any], module_sections: List[Dict[str, Any]]) -> Dict[str, Any]:
+    tasks: List[Dict[str, Any]] = []
+    for row in heatmap.get("rows", [])[:12]:
+        if row["status"] in {"commercially_serious", "evaluation_ready"}:
+            tasks.append(
+                {
+                    "priority": "high" if row["status"] == "commercially_serious" else "medium",
+                    "workspace": row["workspace_name"],
+                    "action": "Founder follow-up",
+                    "reason": f"{row['status']} from Playground/GPC/billing/compliance signals",
+                }
+            )
+        if row["signals"].get("errors", 0) >= 5:
+            tasks.append(
+                {
+                    "priority": "high",
+                    "workspace": row["workspace_name"],
+                    "action": "Investigate auth/runtime failures",
+                    "reason": f"{row['signals']['errors']} backend errors in the scoring window",
+                }
+            )
+    for section in module_sections:
+        if section["key"] in {"gpc", "github", "billing"}:
+            missing = [metric for metric in section["metrics"] if metric.get("status") == "not_wired"]
+            if missing:
+                tasks.append(
+                    {
+                        "priority": "medium",
+                        "workspace": "platform",
+                        "action": f"Wire {section['title']} metric",
+                        "reason": missing[0]["needs"],
+                    }
+                )
+    return {"title": "Founder Tasks", "rows": tasks[:20]}
+
+
+def _build_system_health(db: Session, start: datetime, end: datetime) -> Dict[str, Any]:
+    api_errors = (
+        db.query(WorkspaceRequestLog)
+        .filter(WorkspaceRequestLog.created_at >= start, WorkspaceRequestLog.created_at <= end, WorkspaceRequestLog.status != "success")
+        .count()
+    )
+    return {
+        "title": "System Health",
+        "metrics": [
+            _metric("API health", "healthy" if api_errors == 0 else "degraded", "wired", f"{api_errors} request errors in window"),
+            _not_wired("license health", "license server health endpoint"),
+            _not_wired("provider readiness", "provider readiness heartbeat event"),
+            _not_wired("local runtime/vLLM status", "BYOS runtime health event"),
+            _not_wired("queue/latency status", "queue worker heartbeat + latency rollup"),
+            _not_wired("background workers", "worker heartbeat event"),
+            _not_wired("database/migration status", "migration status check"),
+            _not_wired("Cloudflare/cache/redirect status", "Cloudflare Pages/Workers health probe"),
+        ],
+    }
+
+
+def _build_audit_section(db: Session, workspaces: Dict[str, Workspace]) -> Dict[str, Any]:
+    rows = (
+        db.query(SecurityAuditLog)
+        .order_by(SecurityAuditLog.created_at.desc())
+        .limit(80)
+        .all()
+    )
+    return {
+        "title": "Audit Log",
+        "rows": [
+            {
+                "id": row.id,
+                "workspace": _workspace_label(workspaces, row.workspace_id),
+                "user_id": row.user_id,
+                "event_type": row.event_type,
+                "event_category": row.event_category,
+                "success": row.success,
+                "created_at": _iso(row.created_at),
+                "details": _json_loads(row.details, {"redacted": True}),
+            }
+            for row in rows
+        ],
+    }
+
+
+def _build_command_center_payload(db: Session, current_user: User, days: int = 14) -> Dict[str, Any]:
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+    today = datetime(now.year, now.month, now.day)
+    workspaces = {row.id: row for row in db.query(Workspace).all()}
+    active_sessions_now = (
+        db.query(UserSession)
+        .filter(UserSession.is_active.is_(True), UserSession.last_accessed >= now - timedelta(minutes=30))
+        .count()
+    )
+    active_users_now = (
+        db.query(UserSession.user_id)
+        .filter(UserSession.is_active.is_(True), UserSession.last_accessed >= now - timedelta(minutes=30))
+        .distinct()
+        .count()
+    )
+    gpc_today = _usage_count(db, today, now, features=["gpc_handoff_prepared"])
+    heatmap = _build_heatmap_section(db, start, now)
+    evaluation_ready = sum(1 for row in heatmap["rows"] if row["status"] == "evaluation_ready")
+    serious = sum(1 for row in heatmap["rows"] if row["status"] == "commercially_serious")
+    backend_requests = _feature_count(db, start, now, ["backend_access_requested", "private_backend_access_requested"])
+    active_subs = db.query(Subscription).filter(Subscription.status == "active").count()
+    reserve_funded = _feature_count(db, start, now, ["reserve_funded"])
+    policy_blocks = _feature_count(db, start, now, ["policy_block", "external_fallback_block"])
+    system_health = _build_system_health(db, start, now)
+    module_sections = _build_module_intelligence(db, start, now)
+    overview = {
+        "title": "Overview",
+        "metrics": [
+            _metric("active workspaces", db.query(Workspace).filter(Workspace.is_active.is_(True)).count()),
+            _metric("active users now", active_users_now),
+            _metric("GPC handoffs today", gpc_today),
+            _metric("evaluation-ready accounts", evaluation_ready),
+            _metric("commercially serious accounts", serious),
+            _metric("backend/private access requests", backend_requests),
+            _metric("MRR / reserve funded", {"active_subscriptions": active_subs, "reserve_funded_events": reserve_funded}),
+            _metric("policy blocks", policy_blocks),
+            _metric("system health", "healthy" if all(m["status"] == "wired" and m["value"] != "degraded" for m in system_health["metrics"][:1]) else "degraded"),
+        ],
+    }
+    return {
+        "generated_at": now.isoformat(),
+        "window_days": days,
+        "redaction": "raw prompts and repo contents are omitted by default",
+        "workspace_spine": {
+            "workspace": ["Overview Center", "Playground", "GPC"],
+            "infrastructure": ["Models", "Marketplace", "Pipelines", "Deployments"],
+            "governance": ["Vault", "Compliance"],
+            "operations": ["Monitoring", "Billing"],
+            "access": ["Team", "Settings"],
+            "sovereign_mode": "ON-PREM",
+            "policy": "Hetzner-first policy evaluation. Approved fallback only when tenant rules allow it.",
+            "badges": ["Hetzner", "Fallback", "Tenant-scoped"],
+        },
+        "overview": overview,
+        "live_tenants": _build_live_tenants_section(db, now),
+        "usage": _build_usage_section(db, start, now),
+        "funnel": _build_funnel_section(db, start, now),
+        "verticals": _build_verticals_section(db, start, now),
+        "module_intelligence": module_sections,
+        "heatmap": heatmap,
+        "founder_tasks": _build_founder_tasks(heatmap, module_sections),
+        "system_health": system_health,
+        "audit": _build_audit_section(db, workspaces),
+    }
+
+
+@router.get("/command-center")
+async def command_center_snapshot(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center")
+    return _build_command_center_payload(db, current_user, days)
+
+
+@router.get("/command-center/live-tenants")
+async def command_center_live_tenants(
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/live-tenants")
+    return _build_live_tenants_section(db, datetime.utcnow())
+
+
+@router.get("/command-center/usage")
+async def command_center_usage(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/usage")
+    now = datetime.utcnow()
+    return _build_usage_section(db, now - timedelta(days=days), now)
+
+
+@router.get("/command-center/funnel")
+async def command_center_funnel(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/funnel")
+    now = datetime.utcnow()
+    return _build_funnel_section(db, now - timedelta(days=days), now)
+
+
+@router.get("/command-center/verticals")
+async def command_center_verticals(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/verticals")
+    now = datetime.utcnow()
+    return _build_verticals_section(db, now - timedelta(days=days), now)
+
+
+@router.get("/command-center/heatmap")
+async def command_center_heatmap(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/heatmap")
+    now = datetime.utcnow()
+    return _build_heatmap_section(db, now - timedelta(days=days), now)
+
+
+@router.get("/command-center/tasks")
+async def command_center_tasks(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/tasks")
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+    heatmap = _build_heatmap_section(db, start, now)
+    modules = _build_module_intelligence(db, start, now)
+    return _build_founder_tasks(heatmap, modules)
+
+
+@router.get("/command-center/audit")
+async def command_center_audit(
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    _record_command_center_access(db, current_user, "/api/v1/admin/command-center/audit")
+    workspaces = {row.id: row for row in db.query(Workspace).all()}
+    return _build_audit_section(db, workspaces)

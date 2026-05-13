@@ -35,6 +35,61 @@ jobs:
       - name: Install Wrangler
         run: npm install -g wrangler
 
+      - name: Disable Cloudflare managed robots.txt
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("CLOUDFLARE_API_TOKEN is missing")
+
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json",
+          }
+
+          def request(method: str, path: str, body: dict | None = None) -> dict:
+              data = None if body is None else json.dumps(body).encode("utf-8")
+              req = urllib.request.Request(
+                  f"https://api.cloudflare.com/client/v4{path}",
+                  data=data,
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as res:
+                      return json.loads(res.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  payload = exc.read().decode("utf-8", errors="replace")
+                  raise SystemExit(f"Cloudflare API {method} {path} failed: {exc.code} {payload}") from exc
+
+          for zone_name in ("veklom.com", "veklom.dev"):
+              query = urllib.parse.urlencode({"name": zone_name})
+              zone_payload = request("GET", f"/zones?{query}")
+              zones = zone_payload.get("result") or []
+              if not zones:
+                  raise SystemExit(f"Cloudflare zone not found: {zone_name}")
+              zone_id = zones[0]["id"]
+              update = request(
+                  "PATCH",
+                  f"/zones/{zone_id}/bot_management",
+                  {
+                      "is_robots_txt_managed": False,
+                      "cf_robots_variant": "off",
+                  },
+              )
+              if not update.get("success"):
+                  raise SystemExit(f"Could not disable managed robots.txt for {zone_name}: {update}")
+              print(f"managed robots.txt disabled for {zone_name}")
+          PY
+
       - name: Sync Cloudflare Pages environment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -134,34 +134,37 @@ pytest tests/test_exec_endpoints.py -v
 
 ## License Server Monitoring
 
-Use UptimeRobot to watch the public license endpoints and the status endpoint.
+Use UptimeRobot to watch the public web surface, the routed API, and the license server.
 
 ### Monitored URLs
 
+- Marketing site: `https://veklom.com`
+- Routed API health: `https://api.veklom.com/health`
 - Primary license server: `https://license.veklom.com/health`
-- Backup license server: `https://license2.veklom.com/health`
-- Status page endpoint: `https://status.veklom.com/health`
+- Backup license server (optional): `https://license2.veklom.com/health`
 
 ### UptimeRobot Setup
 
 1. Create a free account at `https://uptimerobot.com/`.
 2. In the dashboard, click `Add New Monitor`.
 3. Set `Monitor Type` to `HTTP(s)`.
-4. Set `Friendly Name` to `Veklom License Primary`.
-5. Set `URL (or IP)` to `https://license.veklom.com/health`.
+4. Set `Friendly Name` to `Veklom Marketing Site`.
+5. Set `URL (or IP)` to `https://veklom.com`.
 6. Set `Monitoring Interval` to `5 minutes`.
 7. Leave the request method as `GET`.
-8. Under `Alert Contacts`, enable your email contact and your SMS contact.
-9. Save the monitor.
-10. Create a second `HTTP(s)` monitor named `Veklom License Backup` for `https://license2.veklom.com/health`.
-11. Use the same `5 minutes` interval and the same email + SMS alert contacts.
-12. Create a third `HTTP(s)` monitor named `Veklom Status Endpoint` for `https://status.veklom.com/health`.
-13. If you are using UptimeRobot Status Pages, show the `status`, `uptime_seconds`, and `timestamp` fields from the health response.
+8. Set the optional keyword to `Veklom`.
+9. Under `Alert Contacts`, enable your email contact and your SMS contact.
+10. Save the monitor.
+11. Create a second `HTTP(s)` monitor named `Veklom API Health` for `https://api.veklom.com/health`.
+12. Set the optional keyword to `"status":"ok"`.
+13. Create a third `HTTP(s)` monitor named `Veklom License Primary` for `https://license.veklom.com/health`.
+14. Set the optional keyword to `"status":"ok"`.
+15. Create a fourth `HTTP(s)` monitor named `Veklom License Backup` for `https://license2.veklom.com/health` only if the backup host is actually live.
 
 ### Alerting Rules
 
-- Alert on the first failed check for each license endpoint.
-- Keep primary and backup monitors separate so you can tell which host failed.
+- Alert on the first failed check for each monitor.
+- Keep web, API, and primary / backup license monitors separate so you can tell which surface failed.
 - Keep recovery alerts enabled so you get a clear restore signal after downtime.
 
 ### Response Shape

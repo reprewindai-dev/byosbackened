@@ -46,8 +46,9 @@
 6. Keep all other secrets in Coolify's secret store:
    - `SECRET_KEY`
    - `ENCRYPTION_KEY`
+   - at least one alert channel: `ALERT_EMAIL_TO`, `SLACK_WEBHOOK_URL`, or `PAGERDUTY_INTEGRATION_KEY`
    - Stripe keys and webhook signing secret
-   - any license server admin token
+   - `LICENSE_VERIFY_URL`, `LICENSE_ISSUE_URL`, `LICENSE_ADMIN_TOKEN`, `BUYER_DOWNLOAD_BASE_URL`, and any backup license endpoints
 7. Run `alembic upgrade head` once inside the backend container after the first successful start.
 8. Run `python scripts/validate_production.py` inside the runtime and confirm the database check reports current Alembic revision equals repo head.
 9. Smoke test the live service after migration:
@@ -67,6 +68,7 @@ Use these exact access paths when the backend needs hands-on runtime work:
 - CO2 Router server resources: PostgreSQL + Redis are already running on `5.78.153.146`
 - Coolify dashboard listens on port `8000` on each host when the server is up
 - Canonical handoff doc: `backend/docs/AGENT_ACCESS.md`
+- Read-only runtime reconciliation script: `pwsh ./backend/scripts/inspect_production_reconcile.ps1`
 
 If a future deploy crashes on startup, check the active container logs on the host before assuming the repo is broken. On the Veklom host, the live app container is the `veklom-api` resource; a restart-looping container can exist beside it during a failed deploy.
 

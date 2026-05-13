@@ -34,7 +34,7 @@
 ### Coolify Apps
 
 - **Project:** `veklom`
-- **App:** `veklom-api` (live container: `zjhp30ys1jlk8yaoxc96h2zd-213941724689`)
+- **App:** `veklom-api` (live container: `zjhp30ys1jlk8yaoxc96h2zd-194651611479`)
 - **Resources:** PostgreSQL + Redis (both on 5.78.135.11)
 - **Ollama:** `veklom-ollama` container with `qwen2.5:0.5b` model
 
@@ -127,16 +127,14 @@ wrangler pages deploy . --project-name=veklom-pricing
 
 ### 🟡 #2: Coolify Stray Artifact Restart Loop
 
-**Status:** Known issue, monitored  
+**Status:** Known issue, root cause confirmed  
 **Action:** **DO NOT touch live service** — investigate only
 
 **Details:** The current failed artifact is `lcile2sz1wjd6sqsdctlm4rv-033401126260`, built from commit `9636805d`, and it is restart-looping beside the routed `veklom-api` container. The live service at `api.veklom.com` is healthy.
 
 **Investigation (safe):**
 ```bash
-ssh -i ~/.ssh/veklom-deploy root@5.78.135.11
-docker ps -a | grep veklom
-docker logs <stray_container_id> --tail 50
+pwsh ./backend/scripts/inspect_production_reconcile.ps1
 ```
 
 Do NOT stop, remove, or modify any containers without explicit direction.

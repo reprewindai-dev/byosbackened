@@ -108,7 +108,8 @@ Read this entire file before doing anything else. No exceptions.
 | `docs/UACP_V3_WORKER_REGISTRY.md` | Runtime worker registry contract, committees, minimum live set, and JSON export command |
 | `docs/BUILDER_AGENTS.md` | Clean-room Builder Agent operating model and Upstash Box experiment contract |
 | `docs/UPSTASH_OPERATORS.md` | QStash schedules, Upstash operator guardrails, optional Builder Agent heartbeat |
-| `backend/license/server.py` | License server (needs separate deploy to license.veklom.com) |
+| `backend/license/server.py` | License server code now live at `license.veklom.com` |
+| `backend/scripts/inspect_production_reconcile.ps1` | Read-only production reconciliation script for API, license, Coolify, and Alembic state |
 | `backend/apps/api/middleware/entitlement_check.py` | Admin bypass for plan gates |
 | `backend/core/config.py` | Reads DATABASE_URL, REDIS_URL, all env vars |
 | `backend/db/session.py` | SQLAlchemy engine â€” uses Postgres if URL is postgresql://, SQLite fallback |

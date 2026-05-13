@@ -326,9 +326,49 @@ interface WorkerRunRow {
   created_at?: string;
 }
 
+interface AcquisitionLeadRow {
+  user_id: string;
+  email: string;
+  full_name?: string | null;
+  workspace_id: string;
+  workspace_name: string;
+  workspace_slug: string;
+  signup_type: string;
+  source: string;
+  created_at: string;
+  last_login?: string | null;
+  last_activity?: string | null;
+  requests_14d: number;
+  failed_requests_14d: number;
+  tokens_14d: number;
+  cost_14d_usd: number;
+  last_request_at?: string | null;
+  top_paths: { path: string; requests: number }[];
+  top_models: { model: string; requests: number }[];
+  page_views_14d: number;
+  active_minutes_14d: number;
+  top_surfaces: { surface: string; events: number }[];
+  last_seen_route?: string | null;
+  converted: boolean;
+  conversion_signal: string;
+}
+
+interface AcquisitionPayload {
+  generated_at: string;
+  window_days: number;
+  total_signups: number;
+  signups_in_window: number;
+  active_users_in_window: number;
+  zero_usage_in_window: number;
+  converted_in_window: number;
+  conversion_rate_pct: number;
+  leads: AcquisitionLeadRow[];
+}
+
 interface ControlSnapshot {
   summary: SafeResult<UacpSummary>;
   liveOps: SafeResult<LiveOpsSummary>;
+  acquisition: SafeResult<AcquisitionPayload>;
   events: SafeResult<{ events?: UacpEvent[] }>;
   evaluationSurgeon: SafeResult<EvaluationSurgeonPayload>;
   growthOpportunities: SafeResult<GrowthOpportunityPayload>;
@@ -501,6 +541,7 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
   const [
     summary,
     liveOps,
+    acquisition,
     events,
     eventStream,
     evaluationSurgeon,
@@ -518,6 +559,7 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
     await Promise.all([
       safeGet<UacpSummary>("/internal/uacp/summary"),
       safeGet<LiveOpsSummary>("/admin/live-ops"),
+      safeGet<AcquisitionPayload>("/admin/acquisition", { days: 14, limit: 200 }),
       safeGet<{ events?: UacpEvent[] }>("/internal/uacp/events", { limit: 150 }),
       safeGet<EventStreamPayload>("/internal/uacp/event-stream", { limit: 150 }),
       safeGet<EvaluationSurgeonPayload>("/internal/uacp/evaluation-surgeon", { limit: 150 }),
@@ -543,6 +585,7 @@ async function fetchControlSnapshot(): Promise<ControlSnapshot> {
     summary,
     events,
     liveOps,
+    acquisition,
     eventStream,
     evaluationSurgeon,
     growthOpportunities,
@@ -698,6 +741,7 @@ function OverviewRoom({ model, loading }: { model: OperatingModel; loading: bool
   return (
     <div className="space-y-4">
       <LiveOpsRoom liveOps={model.liveOps} loading={loading} />
+      <AcquisitionLedger payload={model.acquisition} routeStatus={model.acquisitionStatus} loading={loading} />
       <section className="border border-rule bg-ink-2/40">
         <PanelHead icon={Gauge} label="UACP Business Pulse" meta={model.generatedAt ? `LIVE / ${relativeTime(model.generatedAt)}` : "LIVE / timestamp unavailable"} />
         <div className="grid gap-px bg-rule md:grid-cols-4">
@@ -1059,6 +1103,108 @@ function LiveOpsRoom({ liveOps, loading }: { liveOps?: LiveOpsSummary; loading: 
       </div>
       {!(liveOps?.workspaces?.length) && (
         <EmptyState text={loading ? "Loading live room occupancy." : "No live tenant rooms in the last 15 minutes."} />
+      )}
+    </section>
+  );
+}
+
+function AcquisitionLedger({
+  payload,
+  routeStatus,
+  loading,
+}: {
+  payload?: AcquisitionPayload;
+  routeStatus: RouteStatus;
+  loading: boolean;
+}) {
+  const leads = payload?.leads ?? [];
+  return (
+    <section className="border border-rule bg-ink-2/40">
+      <PanelHead
+        icon={Target}
+        label="Signup + Usage Ledger"
+        meta={payload ? `${payload.window_days}d conversion window / owner only` : "/admin/acquisition"}
+      />
+      <div className="grid gap-px bg-rule md:grid-cols-5">
+        <PulseCell icon={Users} label="Total signups" value={fmtNumber(payload?.total_signups ?? 0)} />
+        <PulseCell icon={Activity} label="Signed up 14d" value={fmtNumber(payload?.signups_in_window ?? 0)} />
+        <PulseCell icon={Gauge} label="Active 14d" value={fmtNumber(payload?.active_users_in_window ?? 0)} />
+        <PulseCell
+          icon={AlertCircle}
+          label="Zero usage"
+          value={fmtNumber(payload?.zero_usage_in_window ?? 0)}
+          tone={(payload?.zero_usage_in_window ?? 0) > 0 ? "watch" : "stable"}
+        />
+        <PulseCell icon={CircleDollarSign} label="Conversion" value={`${payload?.conversion_rate_pct ?? 0}%`} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1240px] text-left">
+          <thead className="border-b border-rule bg-white/[0.025] font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+            <tr>
+              <th className="px-4 py-3">Lead</th>
+              <th className="px-4 py-3">Workspace</th>
+              <th className="px-4 py-3">Signed up</th>
+              <th className="px-4 py-3">Usage 14d</th>
+              <th className="px-4 py-3">App time</th>
+              <th className="px-4 py-3">Failures</th>
+              <th className="px-4 py-3">Tokens</th>
+              <th className="px-4 py-3">Cost</th>
+              <th className="px-4 py-3">Top path/model</th>
+              <th className="px-4 py-3">Conversion</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule">
+            {leads.slice(0, 20).map((lead) => (
+              <tr key={lead.user_id} className="align-top hover:bg-white/[0.018]">
+                <td className="px-4 py-4">
+                  <div className="font-semibold text-bone">{lead.full_name || "Unnamed lead"}</div>
+                  <div className="mt-1 font-mono text-[10px] text-muted">{lead.email}</div>
+                  <div className="mt-2">
+                    <StatusBadge label={lead.source} tone="neutral" />
+                  </div>
+                </td>
+                <td className="px-4 py-4">
+                  <div className="text-sm text-bone">{lead.workspace_name}</div>
+                  <div className="mt-1 font-mono text-[10px] text-muted">{lead.workspace_slug}</div>
+                </td>
+                <td className="px-4 py-4 text-sm text-muted">{relativeTime(lead.created_at)}</td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{fmtNumber(lead.requests_14d)}</td>
+                <td className="px-4 py-4 text-xs text-muted">
+                  <div className="font-mono text-sm text-bone">{lead.active_minutes_14d}m</div>
+                  <div>{fmtNumber(lead.page_views_14d)} views</div>
+                  <div className="mt-1 font-mono text-[10px]">{lead.last_seen_route ?? lead.top_surfaces[0]?.surface ?? "not seen"}</div>
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge
+                    label={fmtNumber(lead.failed_requests_14d)}
+                    tone={lead.failed_requests_14d > 0 ? "critical" : "stable"}
+                  />
+                </td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{fmtNumber(lead.tokens_14d)}</td>
+                <td className="px-4 py-4 font-mono text-sm text-bone">{fmtCurrency(lead.cost_14d_usd)}</td>
+                <td className="px-4 py-4 text-xs text-muted">
+                  <div>{lead.top_paths[0]?.path ?? "no route yet"}</div>
+                  <div className="mt-1 font-mono text-[10px]">{lead.top_models[0]?.model ?? "no model yet"}</div>
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge label={lead.converted ? "converted" : "not converted"} tone={lead.converted ? "stable" : "watch"} />
+                  <div className="mt-1 text-xs text-muted">{lead.conversion_signal}</div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!leads.length && (
+        <EmptyState
+          text={
+            loading
+              ? "Loading signup and usage ledger."
+              : isRouteLive(routeStatus)
+                ? "No signups are recorded yet."
+                : deriveFailureReasonText({ route: "/admin/acquisition", status: routeStatus }) ?? "Acquisition route unavailable."
+          }
+        />
       )}
     </section>
   );
@@ -1477,6 +1623,8 @@ interface OperatingModel {
   accounts: EvaluationAccount[];
   growthQueue: GrowthOpportunityCard[];
   runProofs: RunProof[];
+  acquisition?: AcquisitionPayload;
+  acquisitionStatus: RouteStatus;
   workers: WorkerRow[];
   committees: CommitteeRow[];
   workerRuns: WorkerRunRow[];
@@ -1512,10 +1660,12 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
   const surgeon = snapshot?.evaluationSurgeon;
   const opportunities = snapshot?.growthOpportunities;
   const evidenceSearch = snapshot?.evidenceSearch;
+  const acquisition = snapshot?.acquisition;
   const hasSnapshotData = Boolean(snapshot);
   const evaluationSurgeonStatus = deriveRouteStatus(surgeon);
   const growthOpportunitiesStatus = deriveRouteStatus(opportunities);
   const evidenceSearchStatus = deriveRouteStatus(evidenceSearch);
+  const acquisitionStatus = deriveRouteStatus(acquisition);
   const evaluationQueueUnavailable = hasSnapshotData ? !isRouteLive(evaluationSurgeonStatus) : false;
   const growthQueueUnavailable = hasSnapshotData ? !isRouteLive(growthOpportunitiesStatus) : false;
   const evaluationSurgeonRequiredSources = surgeon?.data?.required_sources ?? null;
@@ -1593,6 +1743,8 @@ function buildOperatingModel(snapshot?: ControlSnapshot): OperatingModel {
       deployments: product.deployments ?? deployments.length,
     },
     liveOps: snapshot?.liveOps.data,
+    acquisition: acquisition?.data,
+    acquisitionStatus,
     signals,
     accounts,
     growthQueue,

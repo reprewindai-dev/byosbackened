@@ -66,6 +66,7 @@ from apps.api.routers.marketplace_v1 import router as marketplace_v1_router
 from apps.api.routers.edge_canary import router as edge_canary_router
 from apps.api.routers.resend_webhooks import router as resend_webhooks_router
 from apps.api.routers.qstash_webhooks import router as qstash_webhooks_router
+from apps.api.routers.telemetry import router as telemetry_router
 from apps.api.routers.pipelines import router as pipelines_router
 from apps.api.routers.deployments import router as deployments_router
 from apps.api.routers.marketplace_automation import router as marketplace_automation_router
@@ -224,6 +225,7 @@ app.include_router(edge_snmp_router, prefix=settings.api_prefix)
 app.include_router(edge_canary_router, prefix=settings.api_prefix)
 app.include_router(resend_webhooks_router, prefix=settings.api_prefix)
 app.include_router(qstash_webhooks_router, prefix=settings.api_prefix)
+app.include_router(telemetry_router, prefix=settings.api_prefix)
 app.include_router(pipelines_router, prefix=settings.api_prefix)
 app.include_router(deployments_router, prefix=settings.api_prefix)
 app.include_router(marketplace_automation_router, prefix=settings.api_prefix)

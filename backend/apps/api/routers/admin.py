@@ -17,7 +17,7 @@ from db.models import (
     Workspace, Subscription,
     SecurityEvent, Job, AIAuditLog,
     IncidentLog, IncidentSeverity, IncidentStatus,
-    UserSession, WorkspaceRequestLog,
+    ProductUsageEvent, SignupLead, UserSession, WorkspaceRequestLog,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -112,6 +112,45 @@ class LiveOpsSummaryResponse(BaseModel):
     live_sessions: int
     degraded_workspaces: int
     workspaces: List[LiveWorkspaceResponse]
+
+
+class AcquisitionUsageRow(BaseModel):
+    user_id: str
+    email: str
+    full_name: Optional[str]
+    workspace_id: str
+    workspace_name: str
+    workspace_slug: str
+    signup_type: str
+    source: str
+    created_at: str
+    last_login: Optional[str]
+    last_activity: Optional[str]
+    requests_14d: int
+    failed_requests_14d: int
+    tokens_14d: int
+    cost_14d_usd: float
+    last_request_at: Optional[str]
+    top_paths: list[dict]
+    top_models: list[dict]
+    page_views_14d: int
+    active_minutes_14d: float
+    top_surfaces: list[dict]
+    last_seen_route: Optional[str]
+    converted: bool
+    conversion_signal: str
+
+
+class AcquisitionUsageSummary(BaseModel):
+    generated_at: str
+    window_days: int
+    total_signups: int
+    signups_in_window: int
+    active_users_in_window: int
+    zero_usage_in_window: int
+    converted_in_window: int
+    conversion_rate_pct: float
+    leads: List[AcquisitionUsageRow]
 
 
 # ─── Workspace Management (admin within workspace, superuser global) ───────────
@@ -536,4 +575,169 @@ async def live_ops_snapshot(
                 entry.workspace_name.lower(),
             ),
         ),
+    )
+
+
+@router.get("/acquisition", response_model=AcquisitionUsageSummary)
+async def acquisition_usage_snapshot(
+    days: int = Query(14, ge=1, le=90),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    """Owner-only signup and usage ledger for conversion diagnostics."""
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+
+    users = (
+        db.query(User, Workspace)
+        .join(Workspace, Workspace.id == User.workspace_id)
+        .order_by(User.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    user_ids = [user.id for user, _ in users]
+    workspace_ids = [workspace.id for _, workspace in users]
+
+    leads = {}
+    if user_ids:
+        lead_rows = (
+            db.query(SignupLead)
+            .filter(SignupLead.user_id.in_(user_ids))
+            .order_by(SignupLead.created_at.desc())
+            .all()
+        )
+        for lead in lead_rows:
+            leads.setdefault(lead.user_id, lead)
+
+    subscriptions = {}
+    if workspace_ids:
+        for sub in db.query(Subscription).filter(Subscription.workspace_id.in_(workspace_ids)).all():
+            subscriptions[sub.workspace_id] = sub
+
+    rows: list[AcquisitionUsageRow] = []
+    for user, workspace in users:
+        request_query = db.query(WorkspaceRequestLog).filter(
+            WorkspaceRequestLog.workspace_id == workspace.id,
+            WorkspaceRequestLog.created_at >= start,
+            WorkspaceRequestLog.created_at <= now,
+        )
+        user_request_query = request_query.filter(
+            (WorkspaceRequestLog.user_id == user.id) | (WorkspaceRequestLog.user_id.is_(None))
+        )
+        requests_14d = user_request_query.count()
+        failed_requests_14d = user_request_query.filter(
+            WorkspaceRequestLog.status.notin_(["success", "ok", "200", "completed", "succeeded"])
+        ).count()
+        totals = user_request_query.with_entities(
+            func.coalesce(func.sum(WorkspaceRequestLog.tokens_in + WorkspaceRequestLog.tokens_out), 0),
+            func.coalesce(func.sum(WorkspaceRequestLog.cost_usd), 0),
+            func.max(WorkspaceRequestLog.created_at),
+        ).first()
+        top_paths = [
+            {"path": path or "unknown", "requests": int(count or 0)}
+            for path, count in (
+                user_request_query.with_entities(
+                    WorkspaceRequestLog.request_path,
+                    func.count(WorkspaceRequestLog.id),
+                )
+                .group_by(WorkspaceRequestLog.request_path)
+                .order_by(func.count(WorkspaceRequestLog.id).desc())
+                .limit(5)
+                .all()
+            )
+        ]
+        top_models = [
+            {"model": model or "unknown", "requests": int(count or 0)}
+            for model, count in (
+                user_request_query.with_entities(
+                    WorkspaceRequestLog.model,
+                    func.count(WorkspaceRequestLog.id),
+                )
+                .group_by(WorkspaceRequestLog.model)
+                .order_by(func.count(WorkspaceRequestLog.id).desc())
+                .limit(5)
+                .all()
+            )
+        ]
+        usage_query = db.query(ProductUsageEvent).filter(
+            ProductUsageEvent.user_id == user.id,
+            ProductUsageEvent.created_at >= start,
+            ProductUsageEvent.created_at <= now,
+        )
+        page_views = usage_query.filter(ProductUsageEvent.event_type == "page_view").count()
+        duration_total = usage_query.with_entities(func.coalesce(func.sum(ProductUsageEvent.duration_ms), 0)).scalar() or 0
+        top_surfaces = [
+            {"surface": surface or "unknown", "events": int(count or 0)}
+            for surface, count in (
+                usage_query.with_entities(ProductUsageEvent.surface, func.count(ProductUsageEvent.id))
+                .group_by(ProductUsageEvent.surface)
+                .order_by(func.count(ProductUsageEvent.id).desc())
+                .limit(5)
+                .all()
+            )
+        ]
+        last_usage = usage_query.order_by(ProductUsageEvent.created_at.desc()).first()
+        sub = subscriptions.get(workspace.id)
+        sub_status = getattr(getattr(sub, "status", None), "value", getattr(sub, "status", None))
+        converted = bool(
+            sub_status in {"active", "trialing"}
+            or (workspace.license_tier and workspace.license_tier.lower() not in {"free", "free_evaluation", "trial"})
+        )
+        conversion_signal = (
+            f"subscription:{sub_status}" if sub_status else
+            f"license:{workspace.license_tier}" if workspace.license_tier else
+            "no paid conversion signal"
+        )
+        lead = leads.get(user.id)
+        last_request_at = totals[2] if totals else None
+        rows.append(
+            AcquisitionUsageRow(
+                user_id=user.id,
+                email=user.email,
+                full_name=user.full_name or (lead.full_name if lead else None),
+                workspace_id=workspace.id,
+                workspace_name=workspace.name,
+                workspace_slug=workspace.slug,
+                signup_type=(lead.signup_type if lead else "account"),
+                source=(lead.source if lead else "users_table"),
+                created_at=user.created_at.isoformat(),
+                last_login=user.last_login.isoformat() if user.last_login else None,
+                last_activity=(
+                    max(filter(None, [user.last_activity, last_request_at]), default=None).isoformat()
+                    if any([user.last_activity, last_request_at])
+                    else None
+                ),
+                requests_14d=requests_14d,
+                failed_requests_14d=failed_requests_14d,
+                tokens_14d=int(totals[0] or 0) if totals else 0,
+                cost_14d_usd=float(totals[1] or 0) if totals else 0.0,
+                last_request_at=last_request_at.isoformat() if last_request_at else None,
+                top_paths=top_paths,
+                top_models=top_models,
+                page_views_14d=page_views,
+                active_minutes_14d=round(float(duration_total or 0) / 60000, 2),
+                top_surfaces=top_surfaces,
+                last_seen_route=last_usage.route if last_usage else None,
+                converted=converted,
+                conversion_signal=conversion_signal,
+            )
+        )
+
+    window_rows = [row for row in rows if datetime.fromisoformat(row.created_at) >= start]
+    active_users = [row for row in window_rows if row.requests_14d > 0 or row.last_login]
+    zero_usage = [row for row in window_rows if row.requests_14d == 0]
+    converted_rows = [row for row in window_rows if row.converted]
+    conversion_rate = (len(converted_rows) / len(window_rows) * 100) if window_rows else 0.0
+
+    return AcquisitionUsageSummary(
+        generated_at=now.isoformat(),
+        window_days=days,
+        total_signups=db.query(func.count(User.id)).scalar() or 0,
+        signups_in_window=len(window_rows),
+        active_users_in_window=len(active_users),
+        zero_usage_in_window=len(zero_usage),
+        converted_in_window=len(converted_rows),
+        conversion_rate_pct=round(conversion_rate, 2),
+        leads=rows,
     )

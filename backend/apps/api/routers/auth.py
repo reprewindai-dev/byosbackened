@@ -27,6 +27,7 @@ from db.models import (
     APIKey,
     InviteStatus,
     SecurityAuditLog,
+    SignupLead,
     TokenWallet,
     User,
     UserRole,
@@ -57,10 +58,13 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: Optional[str] = None
+    name: Optional[str] = None
     workspace_name: str
     invite_code: Optional[str] = None
     trial_tier: Optional[str] = None
     signup_type: str = "general"
+    utm_source: Optional[str] = None
+    utm_campaign: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -200,9 +204,43 @@ def _totp_qr_data_uri(provisioning_uri: str) -> str:
     return f"data:image/svg+xml;base64,{payload}"
 
 
+def _record_signup_lead(
+    db: Session,
+    *,
+    email: str,
+    full_name: str | None,
+    workspace_name: str | None,
+    workspace_id: str | None,
+    user_id: str | None,
+    signup_type: str,
+    source: str,
+    request: Request | None,
+    utm_source: str | None = None,
+    utm_campaign: str | None = None,
+) -> None:
+    db.add(
+        SignupLead(
+            email=email,
+            full_name=full_name,
+            workspace_name=workspace_name,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            signup_type=(signup_type or "general")[:80],
+            source=source[:80],
+            ip_address=request.client.host if request and request.client else None,
+            user_agent=request.headers.get("user-agent") if request else None,
+            referer=request.headers.get("referer") if request else None,
+            utm_source=(utm_source or "")[:120] or None,
+            utm_campaign=(utm_campaign or "")[:120] or None,
+            landing_path=str(request.url.path) if request else None,
+        )
+    )
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+async def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """Register a new workspace + owner user."""
+    full_name = (payload.full_name or payload.name or "").strip() or None
     # Password strength enforcement
     if len(payload.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
@@ -230,7 +268,7 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         email=payload.email,
         hashed_password=get_password_hash(payload.password),
-        full_name=payload.full_name,
+        full_name=full_name,
         workspace_id=workspace.id,
         role=UserRole.OWNER,
         is_superuser=False,
@@ -246,13 +284,26 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(wallet)
     db.flush()
+    _record_signup_lead(
+        db,
+        email=payload.email,
+        full_name=full_name,
+        workspace_name=payload.workspace_name,
+        workspace_id=workspace.id,
+        user_id=user.id,
+        signup_type=payload.signup_type,
+        source="password_register",
+        request=request,
+        utm_source=payload.utm_source,
+        utm_campaign=payload.utm_campaign,
+    )
     license_payload = None
     try:
         license_payload = await issue_trial_license(
             db=db,
             workspace=workspace,
             user_email=payload.email,
-            user_name=payload.full_name or payload.workspace_name,
+            user_name=full_name or payload.workspace_name,
             requested_tier=payload.trial_tier,
         )
     except Exception as exc:
@@ -270,7 +321,7 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         onboarding = await post_signup_onboarding(
             user_id=str(user.id),
             email=user.email,
-            first_name=user.full_name or user.email.split("@")[0],
+            first_name=full_name or user.email.split("@")[0],
             workspace_id=str(workspace.id),
             signup_type=payload.signup_type,
             db=db,
@@ -286,7 +337,7 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             await send_trial_welcome(
                 workspace=workspace,
                 user_email=payload.email,
-                user_name=payload.full_name or payload.workspace_name,
+                user_name=full_name or payload.workspace_name,
                 license_payload=license_payload,
             )
         except Exception as exc:
@@ -825,6 +876,17 @@ async def github_callback(
             total_credits_used=0,
         )
         db.add(wallet)
+        _record_signup_lead(
+            db,
+            email=email,
+            full_name=full_name,
+            workspace_name=workspace.name,
+            workspace_id=workspace.id,
+            user_id=user.id,
+            signup_type="github",
+            source="github_oauth",
+            request=request,
+        )
         db.commit()
         db.refresh(user)
     else:

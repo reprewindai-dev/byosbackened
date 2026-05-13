@@ -23,7 +23,16 @@ export function RegisterPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await register({ email, password, name: name || undefined, workspace_name: workspaceName || undefined });
+      const params = new URLSearchParams(window.location.search);
+      await register({
+        email,
+        password,
+        full_name: name || undefined,
+        workspace_name: workspaceName || undefined,
+        signup_type: "workspace_register",
+        utm_source: params.get("utm_source") || undefined,
+        utm_campaign: params.get("utm_campaign") || undefined,
+      });
       navigate("/overview", { replace: true });
     } catch (err: unknown) {
       const detail =

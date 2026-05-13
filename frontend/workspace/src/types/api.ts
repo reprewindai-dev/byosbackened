@@ -117,8 +117,12 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
+  full_name?: string;
   name?: string;
   workspace_name?: string;
+  signup_type?: string;
+  utm_source?: string;
+  utm_campaign?: string;
 }
 
 export interface AcceptInviteRequest {

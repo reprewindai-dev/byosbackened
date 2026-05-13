@@ -1,0 +1,13 @@
+{
+  "name": "veklom-cloudflare-worker-sentinel",
+  "private": true,
+  "description": "No-route Cloudflare Worker sentinel that keeps stale Workers Git integration builds green without serving production traffic.",
+  "scripts": {
+    "build": "echo \"Cloudflare Worker sentinel build: no production domain routes\"",
+    "deploy": "wrangler deploy",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler-dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
+  }
+}

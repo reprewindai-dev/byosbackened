@@ -2,15 +2,12 @@ import { NavLink } from "react-router-dom";
 import {
   Activity,
   Box,
-  BrainCircuit,
   ChevronLeft,
   CircuitBoard,
-  Command,
   CreditCard,
   FileCheck2,
   Gauge,
   KeyRound,
-  LayoutDashboard,
   LineChart,
   Settings2,
   ShieldCheck,
@@ -19,7 +16,6 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { useAuthStore } from "@/store/auth-store";
 
 interface NavItem {
   to: string;
@@ -32,16 +28,15 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: "Workspace",
     items: [
-      { to: "/overview", label: "Overview Center", icon: Command, badge: "LIVE" },
+      { to: "/overview", label: "Overview", icon: Gauge },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
-      { to: "/uacp", label: "GPC", icon: BrainCircuit, badge: "PAID" },
+      { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],
   },
   {
     title: "Infrastructure",
     items: [
       { to: "/models", label: "Models", icon: Box },
-      { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
       { to: "/pipelines", label: "Pipelines", icon: CircuitBoard },
       { to: "/deployments", label: "Deployments", icon: Gauge },
     ],
@@ -58,10 +53,6 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: "/monitoring", label: "Monitoring", icon: LineChart },
       { to: "/billing", label: "Billing", icon: CreditCard },
-    ],
-  },
-  {
-    items: [
       { to: "/team", label: "Team", icon: Users },
       { to: "/settings", label: "Settings", icon: Settings2 },
     ],
@@ -69,21 +60,6 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
 ];
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const isSuperuser = Boolean(useAuthStore((s) => s.user?.is_superuser));
-  const sections = isSuperuser
-    ? CUSTOMER_SECTIONS.map((section) =>
-        section.title === "Workspace"
-          ? {
-              ...section,
-              items: [
-                { to: "/control-center", label: "Command Center", icon: LayoutDashboard, badge: "OWNER" },
-                ...section.items,
-              ],
-            }
-          : section,
-      )
-    : CUSTOMER_SECTIONS;
-
   return (
     <aside
       className={cn(
@@ -92,7 +68,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       )}
     >
       <div className="flex h-14 items-center justify-between border-b border-rule px-3">
-        <NavLink to={isSuperuser ? "/control-center" : "/overview"} className="flex items-center gap-2">
+        <NavLink to="/overview" className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brass/20 font-mono text-[11px] font-bold text-brass-2">
             V
           </div>
@@ -113,7 +89,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
-        {sections.map((section) => (
+        {CUSTOMER_SECTIONS.map((section) => (
           <div key={section.title ?? section.items.map((item) => item.to).join("-")} className="px-2">
             {!collapsed && section.title && <div className="v-sidebar-section">{section.title}</div>}
             {section.items.map(({ to, label, icon: Icon, badge }) => (
@@ -152,14 +128,14 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             </span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
-            Hetzner-first policy evaluation. Approved fallback only when tenant rules allow it.
+            All requests evaluated by policy on Hetzner. AWS burst gated by tenant rule.
           </p>
           <div className="mt-2 flex gap-1.5">
             <span className="rounded border border-brass/30 bg-brass/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-brass-2">
               Hetzner
             </span>
             <span className="rounded border border-electric/30 bg-electric/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-electric">
-              Fallback
+              AWS
             </span>
           </div>
         </div>
@@ -168,7 +144,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       {!collapsed && (
         <div className="border-t border-rule px-3 py-2 text-[10px] text-muted">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
-          Tenant-scoped
+          mTLS internal - v1.42.0
         </div>
       )}
     </aside>

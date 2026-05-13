@@ -27,13 +27,11 @@ function SuperuserOnly({ children }: { children: ReactNode }) {
 }
 
 function HomeRoute() {
-  const user = useAuthStore((s) => s.user);
-  return <Navigate to={user?.is_superuser ? "/control-center" : "/overview"} replace />;
+  return <Navigate to="/overview" replace />;
 }
 
 function OverviewRoute() {
-  const user = useAuthStore((s) => s.user);
-  return user?.is_superuser ? <Navigate to="/control-center" replace /> : <OverviewPage />;
+  return <OverviewPage />;
 }
 
 function MfaProtected({ children }: { children: ReactNode }) {

@@ -34,8 +34,33 @@ export async function fetchMe(): Promise<User> {
   return user;
 }
 
+export async function beginGithubLogin(): Promise<{ auth_url: string; state: string }> {
+  const resp = await api.get<{ auth_url: string; state: string }>("/auth/github/login");
+  return resp.data;
+}
+
+export async function completeGithubCallback(code: string, state: string): Promise<AuthResponse> {
+  const resp = await api.post<AuthResponse>("/auth/github/callback", { code, state });
+  const payload = resp.data;
+  if (payload.access_token && payload.refresh_token && payload.expires_in) {
+    persistAuth(payload);
+  }
+  return payload;
+}
+
+export async function completeGithubMfa(challengeToken: string, mfaCode: string): Promise<User> {
+  const resp = await api.post<AuthResponse>("/auth/github/mfa/complete", {
+    challenge_token: challengeToken,
+    mfa_code: mfaCode,
+  });
+  return persistAuth(resp.data);
+}
+
 function persistAuth(payload: AuthResponse): User {
   const store = useAuthStore.getState();
+  if (!payload.access_token || !payload.refresh_token || !payload.expires_in) {
+    return payload.user ?? ({} as User);
+  }
   store.setTokens({
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token,

@@ -1,5 +1,5 @@
 """User model."""
-from sqlalchemy import Column, String, DateTime, Boolean, Integer, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, String, DateTime, Boolean, Integer, ForeignKey, Enum as SAEnum, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.session import Base
@@ -43,6 +43,7 @@ class User(Base):
 
     mfa_enabled = Column(Boolean, default=False, nullable=False)
     mfa_secret = Column(String, nullable=True)
+    mfa_recovery_codes_json = Column(Text, nullable=True)
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     account_locked_until = Column(DateTime, nullable=True)
     last_login = Column(DateTime, nullable=True)

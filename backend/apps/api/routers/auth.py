@@ -133,15 +133,197 @@ class APIKeyCreateResponse(APIKeyResponse):
 
 
 class ConnectedAccountsResponse(BaseModel):
+    github_configured: bool
     github_connected: bool
     github_username: Optional[str] = None
     github_connected_at: Optional[str] = None
+    github_account_id: Optional[str] = None
+
+
+class MFAEnableResponse(BaseModel):
+    message: str
+    mfa_enabled: bool
+    audit_event: str
+    backup_codes: list[str]
+
+
+class MFARecoveryCodeStatusResponse(BaseModel):
+    backup_codes_remaining: int
+    backup_codes_total: int
+
+
+class MFARegenerateRequest(BaseModel):
+    password: str
+    mfa_code: str
+
+
+class MFAAdminResetRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class MFACompleteGithubLoginRequest(BaseModel):
+    challenge_token: str
+    mfa_code: str
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
 def _hash_api_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def _hash_recovery_code(raw_code: str) -> str:
+    return hmac.new(settings.secret_key.encode(), raw_code.encode(), hashlib.sha256).hexdigest()
+
+
+def _load_recovery_codes(user: User) -> list[dict]:
+    raw = getattr(user, "mfa_recovery_codes_json", None)
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _store_recovery_codes(user: User, codes: list[dict]) -> None:
+    user.mfa_recovery_codes_json = json.dumps(codes, sort_keys=True)
+
+
+def _generate_backup_codes(count: int = 10) -> tuple[list[str], list[dict]]:
+    plain: list[str] = []
+    stored: list[dict] = []
+    for _ in range(count):
+        code = secrets.token_hex(4).upper()
+        plain.append(code)
+        stored.append({"code_hash": _hash_recovery_code(code), "used_at": None})
+    return plain, stored
+
+
+def _remaining_backup_codes(user: User) -> int:
+    return sum(1 for item in _load_recovery_codes(user) if not item.get("used_at"))
+
+
+def _log_security_event(
+    db: Session,
+    *,
+    event_type: str,
+    event_category: str,
+    request: Request | None = None,
+    actor: User | None = None,
+    target_user: User | None = None,
+    success: bool = True,
+    failure_reason: str | None = None,
+    details: dict | None = None,
+) -> None:
+    payload = dict(details or {})
+    if actor:
+        payload.setdefault("actor_email", actor.email)
+        payload.setdefault("actor_role", actor.role.value if hasattr(actor.role, "value") else actor.role)
+    if target_user:
+        payload.setdefault("target_user_id", target_user.id)
+        payload.setdefault("target_user_email", target_user.email)
+    db.add(
+        SecurityAuditLog(
+            workspace_id=(target_user.workspace_id if target_user else actor.workspace_id if actor else None),
+            user_id=actor.id if actor else None,
+            event_type=event_type,
+            event_category=event_category,
+            ip_address=request.client.host if request and request.client else None,
+            user_agent=request.headers.get("user-agent") if request else None,
+            success=success,
+            failure_reason=failure_reason,
+            details=json.dumps(payload, sort_keys=True) if payload else None,
+        )
+    )
+
+
+def _issue_session_tokens(
+    *,
+    user: User,
+    request: Request | None,
+    db: Session,
+) -> dict:
+    tokens = _create_tokens(user)
+    session = UserSession(
+        user_id=user.id,
+        session_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        expires_at=datetime.utcnow() + timedelta(seconds=tokens["expires_in"]),
+    )
+    db.add(session)
+    return tokens
+
+
+def _consume_mfa_code(
+    *,
+    user: User,
+    code: str,
+    db: Session,
+    request: Request | None,
+    audit_context: str,
+) -> str:
+    submitted = str(code or "").strip().replace(" ", "").upper()
+    if not submitted:
+        _log_security_event(
+            db,
+            event_type="mfa_verification_failed",
+            event_category="authentication",
+            request=request,
+            actor=user,
+            target_user=user,
+            success=False,
+            failure_reason="missing_code",
+            details={"context": audit_context},
+        )
+        raise HTTPException(status_code=401, detail="MFA code required")
+
+    if user.mfa_secret:
+        totp = pyotp.TOTP(user.mfa_secret)
+        if totp.verify(submitted, valid_window=1):
+            _log_security_event(
+                db,
+                event_type="mfa_totp_verified",
+                event_category="authentication",
+                request=request,
+                actor=user,
+                target_user=user,
+                details={"context": audit_context, "method": "totp"},
+            )
+            return "totp"
+
+    recovery_codes = _load_recovery_codes(user)
+    hashed = _hash_recovery_code(submitted)
+    for item in recovery_codes:
+        if item.get("code_hash") == hashed and not item.get("used_at"):
+            item["used_at"] = datetime.utcnow().isoformat()
+            _store_recovery_codes(user, recovery_codes)
+            _log_security_event(
+                db,
+                event_type="mfa_backup_code_used",
+                event_category="authentication",
+                request=request,
+                actor=user,
+                target_user=user,
+                details={"context": audit_context, "method": "backup_code"},
+            )
+            return "backup_code"
+
+    _log_security_event(
+        db,
+        event_type="mfa_verification_failed",
+        event_category="authentication",
+        request=request,
+        actor=user,
+        target_user=user,
+        success=False,
+        failure_reason="invalid_code",
+        details={"context": audit_context},
+    )
+    raise HTTPException(status_code=401, detail="Invalid MFA code")
 
 
 def _create_tokens(user: User) -> dict:
@@ -367,6 +549,16 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
     if not user:
         # Constant-time dummy check to prevent user enumeration via timing
         verify_password("dummy_password", "$2b$12$LJ3m4ys3Gz8KBOhGivQn3O4IFCmsfGRDMIMKPGQp0Nv0CGJxFHEV6")
+        _log_security_event(
+            db,
+            event_type="login_failed",
+            event_category="authentication",
+            request=request,
+            success=False,
+            failure_reason="user_not_found",
+            details={"email": payload.email},
+        )
+        db.commit()
         raise credentials_error
 
     if user.status == UserStatus.LOCKED:
@@ -380,31 +572,42 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
         if user.failed_login_attempts >= settings.max_failed_login_attempts:
             user.status = UserStatus.LOCKED
             user.account_locked_until = datetime.utcnow() + timedelta(minutes=settings.account_lockout_minutes)
+        _log_security_event(
+            db,
+            event_type="login_failed",
+            event_category="authentication",
+            request=request,
+            actor=user,
+            target_user=user,
+            success=False,
+            failure_reason="invalid_password",
+        )
         db.commit()
         raise credentials_error
 
     if user.mfa_enabled:
-        if not payload.mfa_code:
-            raise HTTPException(status_code=401, detail="MFA code required")
-        totp = pyotp.TOTP(user.mfa_secret)
-        if not totp.verify(payload.mfa_code, valid_window=1):
-            raise HTTPException(status_code=401, detail="Invalid MFA code")
+        _consume_mfa_code(
+            user=user,
+            code=payload.mfa_code or "",
+            db=db,
+            request=request,
+            audit_context="password_login",
+        )
 
     user.failed_login_attempts = 0
     user.last_login = datetime.utcnow()
     user.last_activity = datetime.utcnow()
 
-    tokens = _create_tokens(user)
-
-    session = UserSession(
-        user_id=user.id,
-        session_token=tokens["access_token"],
-        refresh_token=tokens["refresh_token"],
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        expires_at=datetime.utcnow() + timedelta(seconds=tokens["expires_in"]),
+    tokens = _issue_session_tokens(user=user, request=request, db=db)
+    _log_security_event(
+        db,
+        event_type="login_succeeded",
+        event_category="authentication",
+        request=request,
+        actor=user,
+        target_user=user,
+        details={"mfa_enabled": user.mfa_enabled},
     )
-    db.add(session)
     db.commit()
 
     return TokenResponse(
@@ -562,21 +765,34 @@ async def me(current_user: User = Depends(get_current_user), db: Session = Depen
         "license_expires_at": workspace.license_expires_at.isoformat() if workspace and workspace.license_expires_at else None,
         "license_download_url": workspace.license_download_url if workspace else None,
         "mfa_enabled": current_user.mfa_enabled,
+        "mfa_backup_codes_remaining": _remaining_backup_codes(current_user),
         "is_superuser": current_user.is_superuser,
         "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
         "created_at": current_user.created_at.isoformat(),
+        "github_username": current_user.github_username,
+        "github_connected": bool(current_user.github_id and current_user.github_access_token),
     }
 
 
 # ─── MFA Routes ───────────────────────────────────────────────────────────────
 
 @router.post("/mfa/setup", response_model=MFASetupResponse)
-async def mfa_setup(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def mfa_setup(current_user: User = Depends(get_current_user), db: Session = Depends(get_db), request: Request = None):
     """Generate a new TOTP secret for MFA setup."""
     if current_user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA already enabled")
     secret = pyotp.random_base32()
     current_user.mfa_secret = secret
+    current_user.mfa_recovery_codes_json = None
+    _log_security_event(
+        db,
+        event_type="mfa_setup_started",
+        event_category="authentication",
+        request=request,
+        actor=current_user,
+        target_user=current_user,
+        details={"method": "totp"},
+    )
     db.commit()
     totp = pyotp.TOTP(secret)
     uri = totp.provisioning_uri(name=current_user.email, issuer_name=settings.app_name)
@@ -587,38 +803,55 @@ async def mfa_setup(current_user: User = Depends(get_current_user), db: Session 
     )
 
 
-@router.post("/mfa/verify")
+@router.post("/mfa/verify", response_model=MFAEnableResponse)
 async def mfa_verify(
     code: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """Confirm and activate MFA after scanning QR code."""
     if not current_user.mfa_secret:
         raise HTTPException(status_code=400, detail="Run /auth/mfa/setup first")
     totp = pyotp.TOTP(current_user.mfa_secret)
     if not totp.verify(code, valid_window=1):
-        raise HTTPException(status_code=400, detail="Invalid TOTP code")
-    current_user.mfa_enabled = True
-    db.add(
-        SecurityAuditLog(
-            workspace_id=current_user.workspace_id,
-            user_id=current_user.id,
-            event_type="mfa_enabled",
+        _log_security_event(
+            db,
+            event_type="mfa_verification_failed",
             event_category="authentication",
-            success=True,
-            details=json.dumps(
-                {
-                    "method": "totp",
-                    "issuer": settings.app_name,
-                    "confirmed_state": "enabled",
-                },
-                sort_keys=True,
-            ),
+            request=request,
+            actor=current_user,
+            target_user=current_user,
+            success=False,
+            failure_reason="invalid_totp",
+            details={"context": "mfa_enable"},
         )
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid TOTP code")
+    backup_codes, stored_codes = _generate_backup_codes()
+    current_user.mfa_enabled = True
+    _store_recovery_codes(current_user, stored_codes)
+    _log_security_event(
+        db,
+        event_type="mfa_enabled",
+        event_category="authentication",
+        request=request,
+        actor=current_user,
+        target_user=current_user,
+        details={
+            "method": "totp",
+            "issuer": settings.app_name,
+            "confirmed_state": "enabled",
+            "backup_codes_issued": len(backup_codes),
+        },
     )
     db.commit()
-    return {"message": "MFA enabled successfully", "mfa_enabled": True, "audit_event": "mfa_enabled"}
+    return {
+        "message": "MFA enabled successfully",
+        "mfa_enabled": True,
+        "audit_event": "mfa_enabled",
+        "backup_codes": backup_codes,
+    }
 
 
 @router.delete("/mfa/disable")
@@ -626,17 +859,127 @@ async def mfa_disable(
     code: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """Disable MFA — requires valid code to prevent accidental lockout."""
     if not current_user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is not enabled")
-    totp = pyotp.TOTP(current_user.mfa_secret)
-    if not totp.verify(code, valid_window=1):
-        raise HTTPException(status_code=400, detail="Invalid TOTP code")
+    _consume_mfa_code(
+        user=current_user,
+        code=code,
+        db=db,
+        request=request,
+        audit_context="mfa_disable",
+    )
     current_user.mfa_enabled = False
     current_user.mfa_secret = None
+    current_user.mfa_recovery_codes_json = None
+    _log_security_event(
+        db,
+        event_type="mfa_disabled",
+        event_category="authentication",
+        request=request,
+        actor=current_user,
+        target_user=current_user,
+    )
     db.commit()
     return {"message": "MFA disabled"}
+
+
+@router.get("/mfa/recovery-codes/status", response_model=MFARecoveryCodeStatusResponse)
+async def mfa_recovery_code_status(current_user: User = Depends(get_current_user)):
+    codes = _load_recovery_codes(current_user)
+    return {
+        "backup_codes_remaining": sum(1 for item in codes if not item.get("used_at")),
+        "backup_codes_total": len(codes),
+    }
+
+
+@router.post("/mfa/recovery-codes/regenerate", response_model=MFAEnableResponse)
+async def mfa_regenerate_recovery_codes(
+    payload: MFARegenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    if not current_user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA must be enabled before regeneration")
+    if not verify_password(payload.password, current_user.hashed_password):
+        _log_security_event(
+            db,
+            event_type="mfa_recovery_regeneration_failed",
+            event_category="authentication",
+            request=request,
+            actor=current_user,
+            target_user=current_user,
+            success=False,
+            failure_reason="invalid_password",
+        )
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid password")
+    _consume_mfa_code(
+        user=current_user,
+        code=payload.mfa_code,
+        db=db,
+        request=request,
+        audit_context="mfa_recovery_regeneration",
+    )
+    backup_codes, stored_codes = _generate_backup_codes()
+    _store_recovery_codes(current_user, stored_codes)
+    _log_security_event(
+        db,
+        event_type="mfa_recovery_codes_regenerated",
+        event_category="authentication",
+        request=request,
+        actor=current_user,
+        target_user=current_user,
+        details={"backup_codes_issued": len(backup_codes)},
+    )
+    db.commit()
+    return {
+        "message": "Backup codes regenerated successfully",
+        "mfa_enabled": True,
+        "audit_event": "mfa_recovery_codes_regenerated",
+        "backup_codes": backup_codes,
+    }
+
+
+@router.post("/mfa/admin-reset/{user_id}")
+async def mfa_admin_reset(
+    user_id: str,
+    payload: MFAAdminResetRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    actor_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if not (
+        current_user.is_superuser
+        or actor_role in {UserRole.OWNER.value, UserRole.ADMIN.value}
+    ):
+        raise HTTPException(status_code=403, detail="Admin authorization required")
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    if not current_user.is_superuser and target_user.workspace_id != current_user.workspace_id:
+        raise HTTPException(status_code=403, detail="Admin reset is limited to your workspace")
+    target_user.mfa_enabled = False
+    target_user.mfa_secret = None
+    target_user.mfa_recovery_codes_json = None
+    target_user.failed_login_attempts = 0
+    target_user.account_locked_until = None
+    target_user.status = UserStatus.ACTIVE
+    _log_security_event(
+        db,
+        event_type="mfa_admin_reset",
+        event_category="authentication",
+        request=request,
+        actor=current_user,
+        target_user=target_user,
+        details={"reason": (payload.reason or "").strip() or "no_reason_provided"},
+    )
+    db.commit()
+    return {"message": "MFA reset completed", "user_id": target_user.id, "mfa_enabled": False}
 
 
 # ─── API Key Routes ───────────────────────────────────────────────────────────
@@ -774,7 +1117,7 @@ async def github_login():
     params = {
         "client_id": settings.github_client_id,
         "redirect_uri": settings.github_redirect_uri,
-        "scope": "user:email read:user",
+        "scope": "user:email read:user repo",
         "state": state,
     }
     url = f"{GITHUB_AUTH_URL}?{urlencode(params)}"
@@ -906,17 +1249,32 @@ async def github_callback(
         user.last_activity = datetime.utcnow()
         db.commit()
 
-    tokens = _create_tokens(user)
-
-    session = UserSession(
-        user_id=user.id,
-        session_token=tokens["access_token"],
-        refresh_token=tokens["refresh_token"],
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        expires_at=datetime.utcnow() + timedelta(seconds=tokens["expires_in"]),
+    _log_security_event(
+        db,
+        event_type="github_connected",
+        event_category="authentication",
+        request=request,
+        actor=user,
+        target_user=user,
+        details={"github_username": github_username, "is_new_user": is_new},
     )
-    db.add(session)
+
+    if user.mfa_enabled:
+        challenge_token = create_access_token(
+            {"user_id": user.id, "workspace_id": user.workspace_id, "type": "github_mfa"},
+            expires_delta=timedelta(minutes=10),
+        )
+        db.commit()
+        return {
+            "mfa_required": True,
+            "mfa_challenge_token": challenge_token,
+            "user_id": user.id,
+            "workspace_id": user.workspace_id,
+            "email": user.email,
+            "github_username": github_username,
+        }
+
+    tokens = _issue_session_tokens(user=user, request=request, db=db)
     db.commit()
 
     return {
@@ -925,9 +1283,53 @@ async def github_callback(
             user_id=user.id,
             workspace_id=user.workspace_id,
             role=user.role.value,
-        ).dict(),
+        ).model_dump(),
         "is_new_user": is_new,
         "github_username": github_username,
+    }
+
+
+@router.post("/github/mfa/complete")
+async def github_mfa_complete(
+    payload: MFACompleteGithubLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    token_data = decode_access_token(payload.challenge_token)
+    if not token_data or token_data.get("type") != "github_mfa":
+        raise HTTPException(status_code=401, detail="Invalid or expired GitHub MFA challenge")
+    user = db.query(User).filter(User.id == token_data.get("user_id")).first()
+    if not user or not user.mfa_enabled:
+        raise HTTPException(status_code=401, detail="GitHub MFA challenge is no longer valid")
+    _consume_mfa_code(
+        user=user,
+        code=payload.mfa_code,
+        db=db,
+        request=request,
+        audit_context="github_oauth_login",
+    )
+    user.failed_login_attempts = 0
+    user.last_login = datetime.utcnow()
+    user.last_activity = datetime.utcnow()
+    tokens = _issue_session_tokens(user=user, request=request, db=db)
+    _log_security_event(
+        db,
+        event_type="login_succeeded",
+        event_category="authentication",
+        request=request,
+        actor=user,
+        target_user=user,
+        details={"oauth_provider": "github", "mfa_enabled": True},
+    )
+    db.commit()
+    return {
+        **TokenResponse(
+            **tokens,
+            user_id=user.id,
+            workspace_id=user.workspace_id,
+            role=user.role.value,
+        ).model_dump(),
+        "github_username": user.github_username,
     }
 
 
@@ -935,9 +1337,11 @@ async def github_callback(
 async def connected_accounts(current_user: User = Depends(get_current_user)):
     github_connected = bool(current_user.github_id and current_user.github_access_token)
     return ConnectedAccountsResponse(
+        github_configured=bool(settings.github_client_id and settings.github_client_secret and settings.github_redirect_uri),
         github_connected=github_connected,
         github_username=current_user.github_username,
         github_connected_at=current_user.updated_at.isoformat() if github_connected and current_user.updated_at else None,
+        github_account_id=current_user.github_id,
     )
 
 
@@ -945,6 +1349,7 @@ async def connected_accounts(current_user: User = Depends(get_current_user)):
 async def unlink_github_account(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     if not current_user.github_id:
         raise HTTPException(status_code=400, detail="GitHub is not connected.")
@@ -952,12 +1357,24 @@ async def unlink_github_account(
     current_user.github_username = None
     current_user.github_access_token = None
     current_user.updated_at = datetime.utcnow()
+    _log_security_event(
+        db,
+        event_type="github_disconnected",
+        event_category="authentication",
+        request=request,
+        actor=current_user,
+        target_user=current_user,
+    )
     db.commit()
     return {"message": "GitHub account disconnected"}
 
 
 @router.get("/github/repos")
-async def github_repos(current_user: User = Depends(get_current_user)):
+async def github_repos(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
     """List authenticated user's GitHub repos (for vendor listing connection)."""
     if not current_user.github_access_token:
         raise HTTPException(status_code=400, detail="GitHub not connected. Sign in with GitHub first.")
@@ -973,6 +1390,16 @@ async def github_repos(current_user: User = Depends(get_current_user)):
         if resp.status_code != 200:
             raise HTTPException(status_code=400, detail="Failed to fetch repos")
         repos = resp.json()
+        _log_security_event(
+            db,
+            event_type="github_repo_list_fetched",
+            event_category="data_access",
+            request=request,
+            actor=current_user,
+            target_user=current_user,
+            details={"repo_count": len(repos)},
+        )
+        db.commit()
         return {
             "repos": [
                 {
@@ -985,6 +1412,9 @@ async def github_repos(current_user: User = Depends(get_current_user)):
                     "language": r.get("language"),
                     "updated_at": r["updated_at"],
                     "private": r["private"],
+                    "visibility": r.get("visibility", "private" if r.get("private") else "public"),
+                    "default_branch": r.get("default_branch"),
+                    "permissions": r.get("permissions", {}),
                     "topics": r.get("topics", []),
                 }
                 for r in repos

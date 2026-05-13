@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 
 os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_github_oauth_wallet.db")
@@ -18,6 +19,9 @@ from fastapi.testclient import TestClient
 
 from apps.api.main import app
 from apps.api.routers.auth import FREE_TRIAL_CREDITS, _build_github_state
+
+GITHUB_TEST_ID = int(uuid4().int % 1_000_000_000)
+GITHUB_TEST_EMAIL = f"github-wallet-{uuid4().hex}@example.com"
 
 
 class _FakeResponse:
@@ -47,7 +51,7 @@ class _FakeAsyncClient:
                     "id": 123456,
                     "login": "reprewindai-dev",
                     "name": "Anthony Veklom",
-                    "email": "veklomdev@hotmail.com",
+                    "email": GITHUB_TEST_EMAIL,
                 },
             )
         if url.endswith("/user/emails"):
@@ -78,7 +82,7 @@ def test_github_oauth_new_user_gets_workspace_tokens_and_trial_wallet(monkeypatc
         wallet = client.get("/api/v1/wallet/balance", headers=headers)
 
     assert me.status_code == 200
-    assert me.json()["email"] == "veklomdev@hotmail.com"
+    assert me.json()["email"] == GITHUB_TEST_EMAIL
     assert me.json()["workspace_name"] == "reprewindai-dev"
     assert wallet.status_code == 200
     assert wallet.json()["balance"] == FREE_TRIAL_CREDITS

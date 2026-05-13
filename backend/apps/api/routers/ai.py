@@ -179,6 +179,7 @@ class AICompleteRequest(BaseModel):
     auto_redact: bool = True
     sign_audit_on_export: bool = True
     lock_to_on_prem: bool = False
+    repo_context: Optional[dict] = None
 
     @field_validator("prompt")
     @classmethod
@@ -393,6 +394,7 @@ def _request_input_text(payload: AICompleteRequest) -> str:
         "auto_redact": payload.auto_redact,
         "sign_audit_on_export": payload.sign_audit_on_export,
         "lock_to_on_prem": payload.lock_to_on_prem,
+        "repo_context": payload.repo_context,
     }
     return json.dumps(serialized, sort_keys=True, ensure_ascii=False)
 
@@ -954,6 +956,7 @@ async def complete(
                 "pricing_tier": pricing_tier,
                 "reserve_units_debited": reserve_units_debited,
                 "governance_controls": governance_controls,
+                "repo_context": payload.repo_context,
                 "cache_status": cache_status,
             },
             response_json={

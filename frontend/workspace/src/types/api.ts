@@ -5,6 +5,7 @@ export interface User {
   full_name?: string | null;
   role: "owner" | "admin" | "analyst" | "user" | "readonly" | "developer" | "viewer" | "billing";
   mfa_enabled: boolean;
+  mfa_backup_codes_remaining?: number;
   created_at: string;
   avatar_url?: string | null;
   workspace_id?: string;
@@ -17,7 +18,10 @@ export interface User {
   plan?: string;
   region?: string;
   last_login_at?: string | null;
+  last_login?: string | null;
   is_superuser?: boolean;
+  github_username?: string | null;
+  github_connected?: boolean;
 }
 
 export interface PlatformPulseActivity {
@@ -107,16 +111,23 @@ export interface Workspace {
 }
 
 export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: "bearer";
-  expires_in: number;
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: "bearer";
+  expires_in?: number;
   user?: User;
+  mfa_required?: boolean;
+  mfa_challenge_token?: string;
+  user_id?: string;
+  workspace_id?: string;
+  email?: string;
+  github_username?: string;
 }
 
 export interface LoginRequest {
   email: string;
   password: string;
+  mfa_code?: string;
 }
 
 export interface RegisterRequest {
@@ -175,6 +186,89 @@ export interface GpcHandoff {
   suggested_models_tools: string[];
   handoff_status: "prepared";
   claim_level: "draft";
+  github_connected?: boolean;
+  selected_repo_full_name?: string | null;
+  selected_repo_id?: number | null;
+  selected_branch?: string | null;
+  repo_context_scope?: string;
+  allowed_repo_actions?: string[];
+  restricted_repo_actions?: string[];
+}
+
+export interface MFASetupResponse {
+  secret: string;
+  provisioning_uri: string;
+  qr_url: string;
+}
+
+export interface MFAEnableResponse {
+  message: string;
+  mfa_enabled: boolean;
+  audit_event: string;
+  backup_codes: string[];
+}
+
+export interface MFARecoveryCodeStatus {
+  backup_codes_remaining: number;
+  backup_codes_total: number;
+}
+
+export interface ConnectedAccountsResponse {
+  github_configured: boolean;
+  github_connected: boolean;
+  github_username?: string | null;
+  github_connected_at?: string | null;
+  github_account_id?: string | null;
+}
+
+export interface GithubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  description?: string | null;
+  html_url: string;
+  stars: number;
+  language?: string | null;
+  updated_at: string;
+  private: boolean;
+  visibility?: string;
+  default_branch?: string | null;
+  permissions?: Record<string, boolean>;
+  topics: string[];
+}
+
+export interface WorkspaceSelectedGithubRepo {
+  id: string;
+  workspace_id: string;
+  github_account_id?: string | null;
+  connected_account_id?: string | null;
+  repo_full_name: string;
+  repo_id?: number | null;
+  default_branch?: string | null;
+  permissions?: Record<string, boolean>;
+  visibility?: string | null;
+  repo_context_scope: string;
+  allowed_repo_actions: string[];
+  restricted_repo_actions: string[];
+  selected_at?: string | null;
+  selected_by?: string | null;
+}
+
+export interface WorkspaceGithubIntegration {
+  github_configured: boolean;
+  github_connected: boolean;
+  github_username?: string | null;
+  github_account_id?: string | null;
+  repo_access_mode: string;
+  repo_context_scope: string;
+  selected_repos: WorkspaceSelectedGithubRepo[];
+  policy: {
+    default_repo_access: string;
+    private_repo_external_provider_transfer_requires_policy: boolean;
+    write_commit_pr_actions_enabled: boolean;
+    secrets_extraction_allowed: boolean;
+    human_approval_required_for_high_risk_actions: boolean;
+  };
 }
 
 export interface AcceptInviteRequest {

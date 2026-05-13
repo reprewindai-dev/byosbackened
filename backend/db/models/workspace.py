@@ -57,3 +57,9 @@ class Workspace(Base):
         cascade="all, delete-orphan",
         foreign_keys="WorkspaceInvite.workspace_id",
     )
+    github_repo_selections = relationship(
+        "WorkspaceGithubRepoSelection",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        foreign_keys="WorkspaceGithubRepoSelection.workspace_id",
+    )

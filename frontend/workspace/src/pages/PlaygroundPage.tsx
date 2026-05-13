@@ -58,6 +58,7 @@ import {
   Cpu,
   Download,
   Gauge,
+  Github,
   GitBranch,
   Loader2,
   MessageSquare,
@@ -77,6 +78,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { ProofStrip, RunStatePanel, type FlowStatus } from "@/components/workspace/FlowPrimitives";
 import { responseDetail } from "@/lib/errors";
+import { useAuthStore } from "@/store/auth-store";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -235,6 +237,42 @@ interface GpcHandoff {
   suggested_models_tools: string[];
   handoff_status: "prepared";
   claim_level: "draft";
+  github_connected?: boolean;
+  selected_repo_full_name?: string | null;
+  selected_repo_id?: number | null;
+  selected_branch?: string | null;
+  repo_context_scope?: string;
+  allowed_repo_actions?: string[];
+  restricted_repo_actions?: string[];
+}
+
+interface WorkspaceSelectedGithubRepo {
+  id: string;
+  repo_full_name: string;
+  repo_id?: number | null;
+  default_branch?: string | null;
+  visibility?: string | null;
+  permissions?: Record<string, boolean>;
+  repo_context_scope: string;
+  allowed_repo_actions: string[];
+  restricted_repo_actions: string[];
+}
+
+interface WorkspaceGithubIntegration {
+  github_configured: boolean;
+  github_connected: boolean;
+  github_username?: string | null;
+  github_account_id?: string | null;
+  repo_access_mode: string;
+  repo_context_scope: string;
+  selected_repos: WorkspaceSelectedGithubRepo[];
+  policy: {
+    default_repo_access: string;
+    private_repo_external_provider_transfer_requires_policy: boolean;
+    write_commit_pr_actions_enabled: boolean;
+    secrets_extraction_allowed: boolean;
+    human_approval_required_for_high_risk_actions: boolean;
+  };
 }
 
 interface CommercialArtifactDraft {
@@ -366,6 +404,11 @@ async function fetchWorkspacePlaygroundProfile(): Promise<PlaygroundProfile> {
   return resp.data;
 }
 
+async function fetchWorkspaceGithubIntegration(): Promise<WorkspaceGithubIntegration> {
+  const resp = await api.get<WorkspaceGithubIntegration>("/workspace/integrations/github");
+  return resp.data;
+}
+
 async function recordFeatureUse(feature: string, metadata: Record<string, unknown> = {}) {
   await api.post("/telemetry/events", {
     events: [
@@ -432,6 +475,7 @@ function readStoredPlaygroundState() {
           autoRedact?: boolean;
           auditExportPinned?: boolean;
           showSystemPrompt?: boolean;
+          selectedRepoFullName?: string;
         })
       : null;
   } catch {
@@ -445,6 +489,7 @@ function readStoredPlaygroundState() {
 
 export function PlaygroundPage() {
   const stored = useMemo(() => readStoredPlaygroundState(), []);
+  const authUser = useAuthStore((s) => s.user);
   const storedVertical = normalizeStoredVertical(stored?.vertical);
   const [vertical, setVertical] = useState<Vertical>(storedVertical);
   const [prompt, setPrompt] = useState(stored?.prompt ?? SAMPLE_PROMPTS[storedVertical]);
@@ -478,6 +523,7 @@ export function PlaygroundPage() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>("");
   const [handoffPreview, setHandoffPreview] = useState<GpcHandoff | null>(null);
   const [artifactDraft, setArtifactDraft] = useState<CommercialArtifactDraft | null>(null);
+  const [selectedRepoFullName, setSelectedRepoFullName] = useState(stored?.selectedRepoFullName ?? "");
   const [compileSubmitting, setCompileSubmitting] = useState(false);
   const [artifactSubmitting, setArtifactSubmitting] = useState(false);
   const [markingEvaluation, setMarkingEvaluation] = useState(false);
@@ -566,8 +612,16 @@ export function PlaygroundPage() {
     queryFn: fetchWorkspacePlaygroundProfile,
     staleTime: 60_000,
   });
+  const githubIntegrationQuery = useQuery({
+    queryKey: ["workspace-github-integration-playground"],
+    queryFn: fetchWorkspaceGithubIntegration,
+    enabled: Boolean(authUser?.id),
+    staleTime: 30_000,
+  });
   const playgroundProfile = profileQuery.data;
+  const githubIntegration = githubIntegrationQuery.data;
   const activeScenarios = playgroundProfile?.default_demo_scenarios ?? [];
+  const selectedWorkspaceRepos = githubIntegration?.selected_repos ?? [];
 
   useEffect(() => {
     if (!playgroundProfile) return;
@@ -578,6 +632,17 @@ export function PlaygroundPage() {
       setPrompt(firstScenario.prompt);
     }
   }, [playgroundProfile, stored?.prompt]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceRepos.length) {
+      if (selectedRepoFullName) setSelectedRepoFullName("");
+      return;
+    }
+    const exists = selectedWorkspaceRepos.some((repo) => repo.repo_full_name === selectedRepoFullName);
+    if (!exists) {
+      setSelectedRepoFullName(selectedWorkspaceRepos[0]?.repo_full_name ?? "");
+    }
+  }, [selectedRepoFullName, selectedWorkspaceRepos]);
 
   const runnableModels = useMemo(
     () =>
@@ -647,6 +712,7 @@ export function PlaygroundPage() {
         autoRedact,
         auditExportPinned,
         showSystemPrompt,
+        selectedRepoFullName,
       }),
     );
   }, [
@@ -661,6 +727,7 @@ export function PlaygroundPage() {
     responseFormat,
     seed,
     selectedModelSlug,
+    selectedRepoFullName,
     sessionTag,
     showSystemPrompt,
     streamEnabled,
@@ -715,6 +782,10 @@ export function PlaygroundPage() {
     () => activeScenarios.find((scenario) => scenario.scenario_id === selectedScenarioId) ?? activeScenarios[0],
     [activeScenarios, selectedScenarioId],
   );
+  const selectedRepo = useMemo(
+    () => selectedWorkspaceRepos.find((repo) => repo.repo_full_name === selectedRepoFullName) ?? null,
+    [selectedRepoFullName, selectedWorkspaceRepos],
+  );
 
   const handleVerticalChange = (v: Vertical) => {
     setVertical(v);
@@ -747,6 +818,7 @@ export function PlaygroundPage() {
         scenario_id: selectedScenario.scenario_id,
         scenario_title: selectedScenario.title,
         user_input: prompt,
+        selected_repo_full_name: selectedRepo?.repo_full_name,
       });
       setHandoffPreview(resp.data);
     } catch (err) {
@@ -754,7 +826,7 @@ export function PlaygroundPage() {
     } finally {
       setCompileSubmitting(false);
     }
-  }, [prompt, selectedScenario]);
+  }, [prompt, selectedRepo?.repo_full_name, selectedScenario]);
 
   const createFounderReviewArtifact = useCallback(async () => {
     if (!handoffPreview || !selectedScenario) return;
@@ -839,6 +911,19 @@ export function PlaygroundPage() {
     timeoutMs = REQUEST_TIMEOUT_MS,
   ) => {
     const startedAt = performance.now();
+    const repoContext = selectedRepo
+      ? {
+          github_connected: Boolean(githubIntegration?.github_connected),
+          selected_repo_full_name: selectedRepo.repo_full_name,
+          selected_repo_id: selectedRepo.repo_id ?? null,
+          selected_branch: selectedRepo.default_branch ?? null,
+          repo_context_scope: selectedRepo.repo_context_scope,
+          allowed_repo_actions: selectedRepo.allowed_repo_actions,
+          restricted_repo_actions: selectedRepo.restricted_repo_actions,
+          access_mode: githubIntegration?.repo_access_mode ?? "read_only",
+          context_prepared_only: true,
+        }
+      : undefined;
     const resp = await api.post<AICompleteResponse>(
       "/ai/complete",
       {
@@ -860,6 +945,7 @@ export function PlaygroundPage() {
         sign_audit_on_export: auditExportPinned,
         billing_event_type: billingEventType,
         max_tokens: maxTokens,
+        repo_context: repoContext,
       },
       { signal, timeout: timeoutMs },
     );
@@ -905,10 +991,13 @@ export function PlaygroundPage() {
     buildGovernanceSystemPrompt,
     effectiveLockToOnPrem,
     frequencyPenalty,
+    githubIntegration?.github_connected,
+    githubIntegration?.repo_access_mode,
     maxTokens,
     presencePenalty,
     responseFormat,
     seed,
+    selectedRepo,
     sessionTag,
     streamEnabled,
     temperature,
@@ -1492,6 +1581,7 @@ export function PlaygroundPage() {
         items={[
           { label: "Completion route", value: "/api/v1/ai/complete" },
           { label: "Model source", value: selectedModel?.slug ?? "workspace model required" },
+          { label: "Repo context", value: selectedRepo?.repo_full_name ?? "none attached" },
           { label: "Audit proof", value: proofAudit },
           { label: "Pipeline", value: savedPipelineSlug ?? "not saved yet" },
         ]}
@@ -1588,6 +1678,53 @@ export function PlaygroundPage() {
           </div>
 
           <div className="frame">
+            <SideHeader icon={<Github className="h-3.5 w-3.5" />} label="GitHub Repo Context" />
+            <div className="space-y-3 px-3 py-3 text-[11px] text-bone-2">
+              {!githubIntegration?.github_connected ? (
+                <div className="rounded-md border border-rule bg-ink/40 px-3 py-3 text-muted">
+                  Connect GitHub in Settings to use workspace-scoped repo context in Playground and GPC.
+                </div>
+              ) : !selectedWorkspaceRepos.length ? (
+                <div className="rounded-md border border-rule bg-ink/40 px-3 py-3 text-muted">
+                  GitHub is connected, but no repos are selected for this workspace yet.
+                </div>
+              ) : (
+                <>
+                  <label className="block">
+                    <div className="mb-1 text-eyebrow">Selected repo</div>
+                    <select
+                      className="v-input h-9 w-full"
+                      value={selectedRepoFullName}
+                      onChange={(event) => setSelectedRepoFullName(event.target.value)}
+                    >
+                      {selectedWorkspaceRepos.map((repo) => (
+                        <option key={repo.id} value={repo.repo_full_name}>
+                          {repo.repo_full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-[11px] text-brass-2">
+                    Repo selected. Context prepared only: metadata-scoped, read-only, audit logged, and not treated as automatic code analysis or execution.
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <ModelFact label="Access" value={githubIntegration.repo_access_mode} />
+                    <ModelFact label="Scope" value={selectedRepo?.repo_context_scope ?? githubIntegration.repo_context_scope} />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-eyebrow">Allowed actions</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(selectedRepo?.allowed_repo_actions ?? []).map((item) => (
+                        <span key={item} className="chip border-rule bg-ink/40 text-muted">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="frame">
             <SideHeader icon={<SlidersHorizontal className="h-3.5 w-3.5" />} label="Tools / Functions" />
             <div className="space-y-1 px-2 py-2">
               <ToolRow name="compliance.fetch" enabled detail="live compliance route" />
@@ -1658,6 +1795,9 @@ export function PlaygroundPage() {
                     <div className="font-display text-lg text-bone">Bring the governed run to life.</div>
                     <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-bone-2">
                       Use a starter or write your own request. Veklom routes, meters, audits, and logs each step before a model answer is accepted.
+                    </p>
+                    <p className="mt-1 text-[11px] leading-5 text-muted">
+                      Repo context: {selectedRepo?.repo_full_name ?? "not attached"} · access {githubIntegration?.repo_access_mode ?? "read_only"} · metadata only
                     </p>
                   </div>
                 </div>
@@ -1759,6 +1899,12 @@ export function PlaygroundPage() {
                   <span className="hidden font-mono md:inline">policy: outbound.public.v3</span>
                   <span className="hidden md:inline">·</span>
                   <span className="hidden font-mono md:inline">~{inputEstimate} tok in</span>
+                  {selectedRepo && (
+                    <>
+                      <span className="hidden md:inline">·</span>
+                      <span className="hidden font-mono md:inline">repo: {selectedRepo.repo_full_name}</span>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="v-btn-ghost h-7 px-2 text-xs" type="button" onClick={() => void compileWithGpc()} disabled={!prompt.trim() || compileSubmitting}>
@@ -1987,6 +2133,14 @@ export function PlaygroundPage() {
                     <div className="mt-1 text-sm text-bone">{handoffPreview.scenario_title}</div>
                     <div className="mt-1 font-mono text-[10px] text-muted">
                       {handoffPreview.handoff_status} · {handoffPreview.claim_level} · {handoffPreview.policy_pack}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-eyebrow">Repo context</div>
+                    <div className="rounded-md border border-rule bg-ink/40 px-3 py-2 text-[11px] text-muted">
+                      {handoffPreview.github_connected && handoffPreview.selected_repo_full_name
+                        ? `${handoffPreview.selected_repo_full_name} · ${handoffPreview.selected_branch ?? "main"} · ${handoffPreview.repo_context_scope ?? "metadata_only"}`
+                        : "No repo context attached"}
                     </div>
                   </div>
                   <div>

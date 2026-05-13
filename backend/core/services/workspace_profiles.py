@@ -640,10 +640,11 @@ def build_static_gpc_handoff(
     scenario_id: str,
     scenario_title: str | None,
     user_input: str,
+    repo_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     profile = resolve_workspace_profile(workspace)
     scenario = find_profile_scenario(profile, scenario_id)
-    return {
+    handoff = {
         "workspaceId": workspace.id,
         "tenantId": workspace.id,
         "industry": profile["industry"],
@@ -660,6 +661,40 @@ def build_static_gpc_handoff(
         "handoff_status": "prepared",
         "claim_level": "draft",
     }
+    if repo_context:
+        handoff.update(
+            {
+                "github_connected": bool(repo_context.get("github_connected")),
+                "selected_repo_full_name": repo_context.get("selected_repo_full_name"),
+                "selected_repo_id": repo_context.get("selected_repo_id"),
+                "selected_branch": repo_context.get("selected_branch"),
+                "repo_context_scope": repo_context.get("repo_context_scope", "metadata_only"),
+                "allowed_repo_actions": repo_context.get("allowed_repo_actions", ["read_repository_metadata"]),
+                "restricted_repo_actions": repo_context.get(
+                    "restricted_repo_actions",
+                    [
+                        "write_repository",
+                        "create_commit",
+                        "open_pull_request",
+                        "extract_secrets",
+                        "send_private_repo_content_to_external_provider_without_policy",
+                    ],
+                ),
+            }
+        )
+    else:
+        handoff.update(
+            {
+                "github_connected": False,
+                "selected_repo_full_name": None,
+                "selected_repo_id": None,
+                "selected_branch": None,
+                "repo_context_scope": "none",
+                "allowed_repo_actions": [],
+                "restricted_repo_actions": [],
+            }
+        )
+    return handoff
 
 
 def dumps_payload(value: Any) -> str:

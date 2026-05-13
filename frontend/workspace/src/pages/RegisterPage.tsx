@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { register } from "@/lib/auth";
+import { beginGithubLogin, register } from "@/lib/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export function RegisterPage() {
@@ -12,6 +12,7 @@ export function RegisterPage() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [industry, setIndustry] = useState("generic");
   const [submitting, setSubmitting] = useState(false);
+  const [githubSubmitting, setGithubSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -44,6 +45,23 @@ export function RegisterPage() {
       setError(typeof detail === "string" ? detail : "Registration failed");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function onGithubSignup() {
+    setError(null);
+    setGithubSubmitting(true);
+    try {
+      const payload = await beginGithubLogin();
+      window.location.href = payload.auth_url;
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        (err as Error)?.message ??
+        "GitHub sign-in unavailable";
+      setError(typeof detail === "string" ? detail : "GitHub sign-in unavailable");
+    } finally {
+      setGithubSubmitting(false);
     }
   }
 
@@ -138,6 +156,11 @@ export function RegisterPage() {
           <button type="submit" disabled={submitting} className="v-btn-primary w-full">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {submitting ? "Creating workspace…" : "Create workspace"}
+          </button>
+
+          <button type="button" disabled={githubSubmitting} className="v-btn-ghost mt-3 w-full justify-center" onClick={onGithubSignup}>
+            {githubSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {githubSubmitting ? "Redirecting to GitHub…" : "Continue with GitHub"}
           </button>
 
           <div className="mt-4 text-center font-mono text-[11px] text-muted">

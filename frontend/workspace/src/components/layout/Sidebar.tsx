@@ -33,7 +33,7 @@ const CUSTOMER_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Workspace",
     items: [
       { to: "/overview", label: "Overview Center", icon: Command, badge: "LIVE" },
-      { to: "/uacp", label: "UACP", icon: BrainCircuit, badge: "PAID" },
+      { to: "/uacp", label: "GPC", icon: BrainCircuit, badge: "PAID" },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],
@@ -95,7 +95,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           {!collapsed && (
             <div className="flex flex-col leading-none">
               <span className="text-[13px] font-semibold tracking-tight">Veklom</span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign control node</span>
             </div>
           )}
         </NavLink>

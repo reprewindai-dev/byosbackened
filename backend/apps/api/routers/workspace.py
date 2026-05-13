@@ -33,10 +33,12 @@ from db.models import (
     CommercialArtifact,
     InviteStatus,
     ProductUsageEvent,
+    SecurityAuditLog,
     StatusSubscription,
     User,
     UserRole,
     Workspace,
+    WorkspaceGithubRepoSelection,
     WorkspaceInvite,
 )
 from db.session import get_db
@@ -84,6 +86,41 @@ class PlaygroundHandoffRequest(BaseModel):
     scenario_id: str
     scenario_title: Optional[str] = None
     user_input: str = Field(default="", max_length=12000)
+    selected_repo_full_name: Optional[str] = None
+
+
+class WorkspaceGithubRepoSelectionRequest(BaseModel):
+    repo_full_name: str
+    repo_id: Optional[int] = None
+    default_branch: Optional[str] = None
+    visibility: Optional[str] = None
+    permissions: Optional[dict] = None
+
+
+def _audit_workspace_event(
+    db: Session,
+    *,
+    current_user: User,
+    request: Request | None,
+    event_type: str,
+    event_category: str,
+    success: bool = True,
+    failure_reason: str | None = None,
+    details: dict | None = None,
+) -> None:
+    db.add(
+        SecurityAuditLog(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            event_type=event_type,
+            event_category=event_category,
+            ip_address=request.client.host if request and request.client else None,
+            user_agent=request.headers.get("user-agent") if request else None,
+            success=success,
+            failure_reason=failure_reason,
+            details=dumps_payload(details or {}) if details else None,
+        )
+    )
 
 
 class CommercialArtifactCreateRequest(BaseModel):
@@ -182,6 +219,34 @@ def _email_transport_configured() -> bool:
     resend_ready = bool(settings.resend_api_key and settings.mail_from)
     smtp_ready = bool(settings.smtp_host and settings.mail_from)
     return resend_ready or smtp_ready
+
+
+def _selected_repo_payload(row: WorkspaceGithubRepoSelection) -> dict:
+    permissions = json.loads(row.permissions_json) if row.permissions_json else {}
+    allowed = json.loads(row.allowed_repo_actions_json) if row.allowed_repo_actions_json else ["read_repository_metadata"]
+    restricted = json.loads(row.restricted_repo_actions_json) if row.restricted_repo_actions_json else [
+        "write_repository",
+        "create_commit",
+        "open_pull_request",
+        "extract_secrets",
+        "send_private_repo_content_to_external_provider_without_policy",
+    ]
+    return {
+        "id": row.id,
+        "workspace_id": row.workspace_id,
+        "github_account_id": row.github_account_id,
+        "connected_account_id": row.connected_account_id,
+        "repo_full_name": row.repo_full_name,
+        "repo_id": row.repo_id,
+        "default_branch": row.default_branch,
+        "permissions": permissions,
+        "visibility": row.visibility,
+        "repo_context_scope": row.repo_context_scope,
+        "allowed_repo_actions": allowed,
+        "restricted_repo_actions": restricted,
+        "selected_at": row.selected_at.isoformat() if row.selected_at else None,
+        "selected_by": row.selected_by,
+    }
 
 
 async def _send_status_email_confirmation(email: str) -> None:
@@ -344,21 +409,170 @@ async def workspace_profile_update(
     return resolve_workspace_profile(workspace)
 
 
+@router.get("/integrations/github")
+async def workspace_github_integration(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    selected_rows = (
+        db.query(WorkspaceGithubRepoSelection)
+        .filter(WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id)
+        .order_by(WorkspaceGithubRepoSelection.selected_at.desc())
+        .all()
+    )
+    return {
+        "github_configured": bool(settings.github_client_id and settings.github_client_secret and settings.github_redirect_uri),
+        "github_connected": bool(current_user.github_id and current_user.github_access_token),
+        "github_username": current_user.github_username,
+        "github_account_id": current_user.github_id,
+        "repo_access_mode": "read_only",
+        "repo_context_scope": "metadata_only",
+        "selected_repos": [_selected_repo_payload(row) for row in selected_rows],
+        "policy": {
+            "default_repo_access": "read_only",
+            "private_repo_external_provider_transfer_requires_policy": True,
+            "write_commit_pr_actions_enabled": False,
+            "secrets_extraction_allowed": False,
+            "human_approval_required_for_high_risk_actions": True,
+        },
+    }
+
+
+@router.post("/integrations/github/select-repo", status_code=201)
+async def workspace_select_github_repo(
+    payload: WorkspaceGithubRepoSelectionRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.github_access_token:
+        raise HTTPException(status_code=400, detail="GitHub not connected. Connect GitHub first.")
+    repo_full_name = payload.repo_full_name.strip()
+    if not repo_full_name or "/" not in repo_full_name:
+        raise HTTPException(status_code=400, detail="repo_full_name must be in owner/repo format")
+    existing = (
+        db.query(WorkspaceGithubRepoSelection)
+        .filter(
+            WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id,
+            WorkspaceGithubRepoSelection.repo_full_name == repo_full_name,
+        )
+        .first()
+    )
+    if existing:
+        existing.repo_id = payload.repo_id or existing.repo_id
+        existing.default_branch = payload.default_branch or existing.default_branch
+        existing.visibility = payload.visibility or existing.visibility
+        existing.permissions_json = dumps_payload(payload.permissions or json.loads(existing.permissions_json or "{}"))
+        existing.github_account_id = current_user.github_id
+        existing.connected_account_id = current_user.github_id
+        existing.selected_by = current_user.id
+        row = existing
+    else:
+        row = WorkspaceGithubRepoSelection(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            github_account_id=current_user.github_id,
+            connected_account_id=current_user.github_id,
+            repo_full_name=repo_full_name,
+            repo_id=payload.repo_id,
+            default_branch=(payload.default_branch or "main").strip()[:120],
+            permissions_json=dumps_payload(payload.permissions or {}),
+            visibility=(payload.visibility or "private").strip()[:40],
+            repo_context_scope="metadata_only",
+            allowed_repo_actions_json=dumps_payload(["read_repository_metadata"]),
+            restricted_repo_actions_json=dumps_payload(
+                [
+                    "write_repository",
+                    "create_commit",
+                    "open_pull_request",
+                    "extract_secrets",
+                    "send_private_repo_content_to_external_provider_without_policy",
+                ]
+            ),
+            selected_by=current_user.id,
+        )
+        db.add(row)
+    _audit_workspace_event(
+        db,
+        current_user=current_user,
+        request=request,
+        event_type="github_repo_selected",
+        event_category="data_access",
+        details={"repo_full_name": repo_full_name, "repo_id": payload.repo_id, "scope": "metadata_only"},
+    )
+    db.commit()
+    db.refresh(row)
+    return _selected_repo_payload(row)
+
+
+@router.delete("/integrations/github/select-repo/{selection_id}", status_code=204)
+async def workspace_unselect_github_repo(
+    selection_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(WorkspaceGithubRepoSelection)
+        .filter(
+            WorkspaceGithubRepoSelection.id == selection_id,
+            WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Selected repo not found")
+    repo_full_name = row.repo_full_name
+    db.delete(row)
+    _audit_workspace_event(
+        db,
+        current_user=current_user,
+        request=request,
+        event_type="github_repo_unselected",
+        event_category="data_access",
+        details={"repo_full_name": repo_full_name},
+    )
+    db.commit()
+
+
 @router.post("/playground/handoff", status_code=201)
 async def create_playground_handoff(
     payload: PlaygroundHandoffRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
+    repo_context = None
+    if payload.selected_repo_full_name:
+        selected_repo = (
+            db.query(WorkspaceGithubRepoSelection)
+            .filter(
+                WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id,
+                WorkspaceGithubRepoSelection.repo_full_name == payload.selected_repo_full_name,
+            )
+            .first()
+        )
+        if not selected_repo:
+            raise HTTPException(status_code=400, detail="Selected repo is not connected to this workspace")
+        repo_context = {
+            "github_connected": bool(current_user.github_id and current_user.github_access_token),
+            "selected_repo_full_name": selected_repo.repo_full_name,
+            "selected_repo_id": selected_repo.repo_id,
+            "selected_branch": selected_repo.default_branch,
+            "repo_context_scope": selected_repo.repo_context_scope,
+            "allowed_repo_actions": json.loads(selected_repo.allowed_repo_actions_json or "[]"),
+            "restricted_repo_actions": json.loads(selected_repo.restricted_repo_actions_json or "[]"),
+        }
     try:
         handoff = build_static_gpc_handoff(
             workspace,
             scenario_id=payload.scenario_id,
             scenario_title=payload.scenario_title,
             user_input=payload.user_input,
+            repo_context=repo_context,
         )
     except KeyError as exc:
         raise HTTPException(status_code=400, detail="Unknown playground scenario") from exc
@@ -377,10 +591,24 @@ async def create_playground_handoff(
                     "playground_profile": handoff["playground_profile"],
                     "claim_level": handoff["claim_level"],
                     "risk_tier": handoff["risk_tier"],
+                    "selected_repo_full_name": handoff.get("selected_repo_full_name"),
                 }
             ),
         )
     )
+    if handoff.get("selected_repo_full_name"):
+        _audit_workspace_event(
+            db,
+            current_user=current_user,
+            request=request,
+            event_type="github_repo_context_attached",
+            event_category="data_access",
+            details={
+                "scenario_id": handoff["scenario_id"],
+                "repo_full_name": handoff.get("selected_repo_full_name"),
+                "repo_context_scope": handoff.get("repo_context_scope"),
+            },
+        )
     db.commit()
     return handoff
 

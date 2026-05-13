@@ -1,8 +1,9 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { GithubCallbackPage } from "./pages/GithubCallbackPage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { ControlCenterPage } from "./pages/ControlCenterPage";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -35,17 +36,27 @@ function OverviewRoute() {
   return user?.is_superuser ? <Navigate to="/control-center" replace /> : <OverviewPage />;
 }
 
+function MfaProtected({ children }: { children: ReactNode }) {
+  const user = useAuthStore((s) => s.user);
+  const location = useLocation();
+  if (!user?.mfa_enabled) {
+    return <Navigate to="/team" replace state={{ from: location.pathname, mfaRequired: true }} />;
+  }
+  return <>{children}</>;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/auth/github/callback" element={<GithubCallbackPage />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
       <Route element={<AppShell />}>
         <Route index element={<HomeRoute />} />
-        <Route path="/dashboard" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
-        <Route path="/control-center" element={<SuperuserOnly><ControlCenterPage /></SuperuserOnly>} />
+        <Route path="/dashboard" element={<MfaProtected><SuperuserOnly><ControlCenterPage /></SuperuserOnly></MfaProtected>} />
+        <Route path="/control-center" element={<MfaProtected><SuperuserOnly><ControlCenterPage /></SuperuserOnly></MfaProtected>} />
         <Route path="/overview" element={<OverviewRoute />} />
         <Route path="/uacp" element={<UacpPage />} />
         <Route path="/playground" element={<PlaygroundPage />} />
@@ -54,12 +65,12 @@ export function AppRoutes() {
         <Route path="/models" element={<ModelsPage />} />
         <Route path="/pipelines" element={<PipelinesPage />} />
         <Route path="/deployments" element={<DeploymentsPage />} />
-        <Route path="/vault" element={<VaultPage />} />
+        <Route path="/vault" element={<MfaProtected><VaultPage /></MfaProtected>} />
         <Route path="/compliance" element={<CompliancePage />} />
         <Route path="/monitoring" element={<MonitoringPage />} />
-        <Route path="/billing" element={<BillingPage />} />
+        <Route path="/billing" element={<MfaProtected><BillingPage /></MfaProtected>} />
         <Route path="/team" element={<TeamPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings" element={<MfaProtected><SettingsPage /></MfaProtected>} />
       </Route>
 
       <Route path="*" element={<HomeRoute />} />

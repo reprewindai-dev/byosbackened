@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -43,6 +44,18 @@ interface MfaSetup {
   secret: string;
   provisioning_uri: string;
   qr_url: string;
+}
+
+interface MfaEnableResponse {
+  message: string;
+  mfa_enabled: boolean;
+  audit_event: string;
+  backup_codes: string[];
+}
+
+interface MfaRecoveryCodeStatus {
+  backup_codes_remaining: number;
+  backup_codes_total: number;
 }
 
 async function listMembers(): Promise<TeamUser[]> {
@@ -118,13 +131,19 @@ async function setupMfa(): Promise<MfaSetup> {
   return resp.data;
 }
 
-async function verifyMfa(code: string): Promise<{ message: string }> {
-  const resp = await api.post<{ message: string }>("/auth/mfa/verify", null, { params: { code } });
+async function verifyMfa(code: string): Promise<MfaEnableResponse> {
+  const resp = await api.post<MfaEnableResponse>("/auth/mfa/verify", null, { params: { code } });
+  return resp.data;
+}
+
+async function fetchRecoveryCodeStatus(): Promise<MfaRecoveryCodeStatus> {
+  const resp = await api.get<MfaRecoveryCodeStatus>("/auth/mfa/recovery-codes/status");
   return resp.data;
 }
 
 export function TeamPage() {
   const qc = useQueryClient();
+  const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const [showInvite, setShowInvite] = useState(false);
@@ -134,6 +153,8 @@ export function TeamPage() {
   const [issuedInvite, setIssuedInvite] = useState<Invite | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaQrFailed, setMfaQrFailed] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [backupCodesConfirmed, setBackupCodesConfirmed] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -141,6 +162,12 @@ export function TeamPage() {
     queryFn: listMembers,
   });
   const invitesQ = useQuery({ queryKey: ["team-invites"], queryFn: listInvites });
+  const recoveryStatusQ = useQuery({
+    queryKey: ["mfa-recovery-status"],
+    queryFn: fetchRecoveryCodeStatus,
+    enabled: currentUserIsAuthed(user),
+    retry: false,
+  });
   const inviteRouteQ = useQuery({ queryKey: ["team-invite-route"], queryFn: probeInviteRoute, retry: false });
   const inviteRouteUnavailable = inviteRouteQ.data === "unavailable";
 
@@ -169,11 +196,11 @@ export function TeamPage() {
 
   const mfaVerifyMut = useMutation({
     mutationFn: verifyMfa,
-    onSuccess: () => {
+    onSuccess: (data) => {
       if (user) setUser({ ...user, mfa_enabled: true });
       qc.invalidateQueries({ queryKey: ["team-members"] });
-      setShowMfa(false);
-      setMfaCode("");
+      qc.invalidateQueries({ queryKey: ["mfa-recovery-status"] });
+      setBackupCodes(data.backup_codes);
     },
   });
 
@@ -206,6 +233,7 @@ export function TeamPage() {
           ? "succeeded"
           : "idle";
   const teamFlowError = inviteMut.error || revokeMut.error || mfaSetupMut.error || mfaVerifyMut.error || (!adminOnly ? error : null);
+  const mfaGuardRedirected = Boolean((location.state as { mfaRequired?: boolean } | null)?.mfaRequired);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -265,7 +293,9 @@ export function TeamPage() {
           {
             label: "MFA setup",
             status: mfaSetupMut.isPending || mfaVerifyMut.isPending ? "running" : mfaSetupMut.isError || mfaVerifyMut.isError ? "failed" : currentMfaEnabled ? "succeeded" : "idle",
-            detail: currentMfaEnabled ? "signed-in account protected" : "TOTP not enabled",
+            detail: currentMfaEnabled
+              ? `${recoveryStatusQ.data?.backup_codes_remaining ?? 0} backup codes remaining`
+              : "TOTP not enabled",
           },
           {
             label: "Audit posture",
@@ -277,6 +307,7 @@ export function TeamPage() {
           { label: "members", value: String(stats.total) },
           { label: "pending", value: String(pendingInvites.length) },
           { label: "MFA", value: `${stats.mfa} / ${stats.total}` },
+          { label: "Backup codes", value: recoveryStatusQ.data ? `${recoveryStatusQ.data.backup_codes_remaining} left` : "pending" },
           { label: "role", value: currentMember?.role ?? user?.role ?? "unknown" },
         ]}
         error={teamFlowError}
@@ -301,7 +332,7 @@ export function TeamPage() {
           { label: "Members source", value: adminOnly ? "/auth/me fallback" : "/workspace/members" },
           { label: "Invite source", value: inviteRouteUnavailable ? "unavailable" : "/workspace/members/invites" },
           { label: "MFA source", value: "/auth/mfa/setup + verify" },
-          { label: "Latest proof", value: issuedInvite ? `invite ${issuedInvite.status}` : currentMfaEnabled ? "MFA enabled" : "awaiting action" },
+          { label: "Latest proof", value: issuedInvite ? `invite ${issuedInvite.status}` : currentMfaEnabled ? `${recoveryStatusQ.data?.backup_codes_remaining ?? 0} backup codes` : "awaiting action" },
         ]}
       />
 
@@ -309,21 +340,38 @@ export function TeamPage() {
         <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
           <ShieldX className="mt-0.5 h-4 w-4" />
           <div className="flex-1">
-            <div className="font-semibold">MFA is off for the signed-in account</div>
+            <div className="font-semibold">
+              {mfaGuardRedirected ? "Sensitive workspace actions require MFA" : "MFA is off for the signed-in account"}
+            </div>
             <div className="mt-0.5 text-xs text-bone-2">
-              Enable TOTP before showing regulated buyers this workspace. The setup flow writes to the live auth backend.
+              {mfaGuardRedirected
+                ? "Command Center, Vault, Billing, and Settings are gated until MFA is re-enabled. Finish setup here, save your backup codes, and then return."
+                : "Enable TOTP before showing regulated buyers this workspace. The setup flow writes to the live auth backend."}
             </div>
           </div>
           <button
             className="v-btn-ghost"
             onClick={() => {
               setMfaQrFailed(false);
+              setBackupCodes(null);
+              setBackupCodesConfirmed(false);
               setShowMfa(true);
               mfaSetupMut.mutate();
             }}
           >
             Set up now
           </button>
+        </div>
+      )}
+      {currentMfaEnabled && (recoveryStatusQ.data?.backup_codes_remaining ?? 0) === 0 && (
+        <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          <ShieldX className="mt-0.5 h-4 w-4" />
+          <div className="flex-1">
+            <div className="font-semibold">Backup code inventory is depleted</div>
+            <div className="mt-0.5 text-xs text-bone-2">
+              Regenerate MFA backup codes before relying on this workspace for operator access.
+            </div>
+          </div>
         </div>
       )}
 
@@ -498,6 +546,8 @@ export function TeamPage() {
                 onClick={() => {
                   setShowMfa(false);
                   setMfaCode("");
+                  setBackupCodes(null);
+                  setBackupCodesConfirmed(false);
                 }}
               >
                 <X className="h-4 w-4" />
@@ -509,6 +559,11 @@ export function TeamPage() {
             )}
             {mfaSetupMut.data && (
               <div className="space-y-4">
+                {!backupCodes && (
+                  <div className="rounded-md border border-brass/40 bg-brass/5 p-3 text-[12px] text-brass-2">
+                    Save your backup codes after verification. If you lose your authenticator and do not have backup codes, you may lose access.
+                  </div>
+                )}
                 <div className="flex flex-col gap-4 md:flex-row">
                   <div className="grid h-44 w-44 place-items-center rounded-md border border-rule bg-white p-2 text-center">
                     {mfaQrFailed ? (
@@ -550,18 +605,57 @@ export function TeamPage() {
                 {mfaVerifyMut.isError && (
                   <div className="text-[12px] text-crimson">{actionUnavailableMessage(mfaVerifyMut.error, "MFA verification")}</div>
                 )}
-                <div className="flex justify-end gap-2">
-                  <button className="v-btn-ghost" onClick={() => setShowMfa(false)}>
-                    Cancel
-                  </button>
-                  <button
-                    className="v-btn-primary"
-                    disabled={mfaCode.length !== 6 || mfaVerifyMut.isPending}
-                    onClick={() => mfaVerifyMut.mutate(mfaCode)}
-                  >
-                    {mfaVerifyMut.isPending ? "Verifying..." : "Enable MFA"}
-                  </button>
-                </div>
+                {backupCodes ? (
+                  <div className="space-y-3 rounded-md border border-rule bg-ink-1/70 p-3">
+                    <div className="font-semibold text-bone">Backup codes</div>
+                    <div className="grid grid-cols-2 gap-2 font-mono text-[12px] text-bone">
+                      {backupCodes.map((code) => (
+                        <div key={code} className="rounded border border-rule bg-ink px-2 py-1">{code}</div>
+                      ))}
+                    </div>
+                    <label className="flex items-start gap-2 text-[12px] text-bone-2">
+                      <input
+                        type="checkbox"
+                        checked={backupCodesConfirmed}
+                        onChange={(event) => setBackupCodesConfirmed(event.target.checked)}
+                      />
+                      <span>I saved these backup codes in a safe place.</span>
+                    </label>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        className="v-btn-ghost"
+                        onClick={() => navigator.clipboard?.writeText(backupCodes.join("\n"))}
+                      >
+                        <Copy className="h-3.5 w-3.5" /> Copy codes
+                      </button>
+                      <button
+                        className="v-btn-primary"
+                        disabled={!backupCodesConfirmed}
+                        onClick={() => {
+                          setShowMfa(false);
+                          setMfaCode("");
+                          setBackupCodes(null);
+                          setBackupCodesConfirmed(false);
+                        }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end gap-2">
+                    <button className="v-btn-ghost" onClick={() => setShowMfa(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      className="v-btn-primary"
+                      disabled={mfaCode.length !== 6 || mfaVerifyMut.isPending}
+                      onClick={() => mfaVerifyMut.mutate(mfaCode)}
+                    >
+                      {mfaVerifyMut.isPending ? "Verifying..." : "Enable MFA"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -684,7 +778,7 @@ export function TeamPage() {
   );
 }
 
-function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="v-card p-4">
       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
@@ -694,4 +788,8 @@ function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; val
       <div className="mt-1.5 text-xl font-semibold text-bone">{value}</div>
     </div>
   );
+}
+
+function currentUserIsAuthed(user: ReturnType<typeof useAuthStore.getState>["user"]) {
+  return Boolean(user?.id);
 }

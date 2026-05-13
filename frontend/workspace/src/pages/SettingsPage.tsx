@@ -6,6 +6,7 @@ import {
   Building2,
   CheckCircle2,
   ExternalLink,
+  Github,
   KeyRound,
   Loader2,
   Settings as Cog,
@@ -13,11 +14,13 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { beginGithubLogin } from "@/lib/auth";
 import { useAuthStore } from "@/store/auth-store";
 import { cn, relativeTime } from "@/lib/cn";
-import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
+import { ProofStrip, RunStatePanel, type FlowStatus } from "@/components/workspace/FlowPrimitives";
+import type { ConnectedAccountsResponse, GithubRepo, WorkspaceGithubIntegration } from "@/types/api";
 
-type Tab = "identity" | "keys" | "models";
+type Tab = "identity" | "keys" | "models" | "integrations";
 
 interface ApiKey {
   id: string;
@@ -148,6 +151,40 @@ async function testWorkspaceConfig() {
   };
 }
 
+async function fetchConnectedAccounts(): Promise<ConnectedAccountsResponse> {
+  const resp = await api.get<ConnectedAccountsResponse>("/auth/connected-accounts");
+  return resp.data;
+}
+
+async function fetchWorkspaceGithubIntegration(): Promise<WorkspaceGithubIntegration> {
+  const resp = await api.get<WorkspaceGithubIntegration>("/workspace/integrations/github");
+  return resp.data;
+}
+
+async function fetchGithubRepos(): Promise<GithubRepo[]> {
+  const resp = await api.get<{ repos: GithubRepo[] }>("/auth/github/repos");
+  return resp.data.repos ?? [];
+}
+
+async function disconnectGithub() {
+  await api.delete("/auth/connected-accounts/github");
+}
+
+async function selectGithubRepo(repo: GithubRepo) {
+  const resp = await api.post("/workspace/integrations/github/select-repo", {
+    repo_full_name: repo.full_name,
+    repo_id: repo.id,
+    default_branch: repo.default_branch,
+    visibility: repo.visibility,
+    permissions: repo.permissions,
+  });
+  return resp.data;
+}
+
+async function unselectGithubRepo(selectionId: string) {
+  await api.delete(`/workspace/integrations/github/select-repo/${selectionId}`);
+}
+
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>("identity");
   const configTest = useMutation({ mutationFn: testWorkspaceConfig });
@@ -156,63 +193,43 @@ export function SettingsPage() {
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <header>
         <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-          Workspace / Settings
+          Settings
         </div>
         <h1 className="text-3xl font-semibold tracking-tight">Workspace administration</h1>
         <p className="mt-2 max-w-2xl text-sm text-bone-2">
-          Operational identity, key inventory, and model governance. Sensitive changes route to their live owner
-          screens so every action is backed by the production API.
+          One opinionated panel for the entire control plane - workspace identity, routing posture, security defaults,
+          branding, and integrations.
         </p>
       </header>
 
-      <nav className="v-card flex gap-1 p-1">
-        <TabBtn active={tab === "identity"} onClick={() => setTab("identity")} icon={<Building2 className="h-4 w-4" />}>
-          Identity
-        </TabBtn>
-        <TabBtn active={tab === "keys"} onClick={() => setTab("keys")} icon={<KeyRound className="h-4 w-4" />}>
-          API keys
-        </TabBtn>
-        <TabBtn active={tab === "models"} onClick={() => setTab("models")} icon={<Box className="h-4 w-4" />}>
-          Models
-        </TabBtn>
-      </nav>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+        <nav className="v-card h-fit p-3">
+          <TabBtn active={tab === "identity"} onClick={() => setTab("identity")} icon={<Building2 className="h-4 w-4" />}>
+            Workspace
+          </TabBtn>
+          <TabBtn active={tab === "models"} onClick={() => setTab("models")} icon={<Box className="h-4 w-4" />}>
+            Routing
+          </TabBtn>
+          <TabBtn active={tab === "keys"} onClick={() => setTab("keys")} icon={<KeyRound className="h-4 w-4" />}>
+            API & SDK
+          </TabBtn>
+          <TabBtn active={tab === "integrations"} onClick={() => setTab("integrations")} icon={<Github className="h-4 w-4" />}>
+            Integrations
+          </TabBtn>
+        </nav>
 
-      <RunStatePanel
-        eyebrow="Settings proof"
-        title="Workspace configuration test"
-        status={configTest.isPending ? "running" : configTest.isError ? "failed" : configTest.data ? "succeeded" : "idle"}
-        summary="Settings does not fake saved configuration. This test reads live identity, key inventory, and model governance routes before the user leaves the page."
-        steps={[
-          { label: "Identity route", status: configTest.data?.rows.find((row) => row.label === "identity")?.ok ? "succeeded" : configTest.isError ? "failed" : configTest.isPending ? "running" : "idle", detail: "/api/v1/auth/me" },
-          { label: "API key route", status: configTest.data?.rows.find((row) => row.label === "api keys")?.ok ? "succeeded" : configTest.isError ? "failed" : configTest.isPending ? "running" : "idle", detail: "/api/v1/workspace/api-keys" },
-          { label: "Model route", status: configTest.data?.rows.find((row) => row.label === "models")?.ok ? "succeeded" : configTest.isError ? "failed" : configTest.isPending ? "running" : "idle", detail: "/api/v1/workspace/models" },
-        ]}
-        metrics={[
-          { label: "latency", value: configTest.data ? `${configTest.data.latency_ms}ms` : configTest.isPending ? "running" : "not tested" },
-          { label: "routes passed", value: configTest.data ? `${configTest.data.rows.filter((row) => row.ok).length} / ${configTest.data.rows.length}` : "not tested" },
-          { label: "active tab", value: tab },
-          { label: "source", value: "live backend" },
-        ]}
-        error={configTest.error}
-        actions={[
-          { label: "Test settings", onClick: () => configTest.mutate(), disabled: configTest.isPending, primary: true },
-          { label: "Open Vault", href: "/vault" },
-          { label: "Open Team", href: "/team" },
-        ]}
-      />
-
-      <ProofStrip
-        items={[
-          { label: "identity", value: "/api/v1/auth/me" },
-          { label: "keys", value: "/api/v1/workspace/api-keys" },
-          { label: "models", value: "/api/v1/workspace/models" },
-          { label: "result", value: configTest.data ? "verified" : "pending" },
-        ]}
-      />
-
-      {tab === "identity" && <IdentityTab />}
-      {tab === "keys" && <ApiKeysTab />}
-      {tab === "models" && <ModelsTab />}
+        <div className="space-y-4">
+          {tab === "identity" && (
+            <>
+              <IdentityTab />
+              <SettingsProofCard configTest={configTest} />
+            </>
+          )}
+          {tab === "keys" && <ApiKeysTab />}
+          {tab === "models" && <ModelsTab />}
+          {tab === "integrations" && <IntegrationsTab />}
+        </div>
+      </div>
     </div>
   );
 }
@@ -232,13 +249,70 @@ function TabBtn({
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition",
+        "flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[13px] font-medium transition",
         active ? "bg-brass/15 text-brass-2" : "text-bone-2 hover:bg-white/5 hover:text-bone",
       )}
     >
       {icon}
       {children}
     </button>
+  );
+}
+
+function SettingsProofCard({
+  configTest,
+}: {
+  configTest: {
+    isPending: boolean;
+    isError: boolean;
+    data?: { latency_ms: number; rows: { label: string; ok: boolean }[] };
+    error?: unknown;
+    mutate: () => void;
+  };
+}) {
+  const rowStatus = (label: string): FlowStatus =>
+    configTest.data?.rows.find((row) => row.label === label)?.ok
+      ? "succeeded"
+      : configTest.isError
+        ? "failed"
+        : configTest.isPending
+          ? "running"
+          : "idle";
+
+  return (
+    <div className="space-y-3">
+      <RunStatePanel
+        eyebrow="Settings proof"
+        title="Live backend configuration check"
+        status={configTest.isPending ? "running" : configTest.isError ? "failed" : configTest.data ? "succeeded" : "idle"}
+        summary="This panel reads the production API surface used by Settings instead of displaying disconnected controls."
+        steps={[
+          { label: "Identity route", status: rowStatus("identity"), detail: "/api/v1/auth/me" },
+          { label: "API key route", status: rowStatus("api keys"), detail: "/api/v1/workspace/api-keys" },
+          { label: "Model route", status: rowStatus("models"), detail: "/api/v1/workspace/models" },
+        ]}
+        metrics={[
+          { label: "latency", value: configTest.data ? `${configTest.data.latency_ms}ms` : configTest.isPending ? "running" : "not tested" },
+          { label: "routes passed", value: configTest.data ? `${configTest.data.rows.filter((row) => row.ok).length} / ${configTest.data.rows.length}` : "not tested" },
+          { label: "surface", value: "workspace" },
+          { label: "source", value: "live backend" },
+        ]}
+        error={configTest.error}
+        actions={[
+          { label: "Test settings", onClick: () => configTest.mutate(), disabled: configTest.isPending, primary: true },
+          { label: "Open Vault", href: "/vault" },
+          { label: "Open Team", href: "/team" },
+        ]}
+      />
+      <ProofStrip
+        items={[
+          { label: "identity", value: "/api/v1/auth/me" },
+          { label: "keys", value: "/api/v1/workspace/api-keys" },
+          { label: "models", value: "/api/v1/workspace/models" },
+          { label: "result", value: configTest.data ? "verified" : "pending" },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -284,7 +358,7 @@ function IdentityTab() {
           <Field label="Signed in as" value={displayName} />
           <Field label="Email" value={user?.email ?? "-"} />
           <Field label="Role" value={user?.role ?? "user"} />
-          <Field label="Last login" value={user?.last_login_at ? relativeTime(user.last_login_at) : "-"} />
+          <Field label="Last login" value={user?.last_login_at ? relativeTime(user.last_login_at) : user?.last_login ? relativeTime(user.last_login) : "-"} />
           <Field label="User ID" value={user?.id ?? "-"} mono />
           <Field label="Superuser" value={user?.is_superuser ? "yes" : "no"} ok={Boolean(user?.is_superuser)} />
         </div>
@@ -520,6 +594,155 @@ function ModelsTab() {
             </div>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+function IntegrationsTab() {
+  const qc = useQueryClient();
+  const connectedQ = useQuery({ queryKey: ["github-connected-account"], queryFn: fetchConnectedAccounts });
+  const integrationQ = useQuery({ queryKey: ["workspace-github-integration"], queryFn: fetchWorkspaceGithubIntegration });
+  const reposQ = useQuery({
+    queryKey: ["github-repos"],
+    queryFn: fetchGithubRepos,
+    enabled: Boolean(connectedQ.data?.github_connected),
+    retry: false,
+  });
+
+  const connectMut = useMutation({
+    mutationFn: beginGithubLogin,
+    onSuccess: (payload) => {
+      window.location.href = payload.auth_url;
+    },
+  });
+  const disconnectMut = useMutation({
+    mutationFn: disconnectGithub,
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["github-connected-account"] }),
+        qc.invalidateQueries({ queryKey: ["workspace-github-integration"] }),
+        qc.invalidateQueries({ queryKey: ["github-repos"] }),
+      ]);
+    },
+  });
+  const selectMut = useMutation({
+    mutationFn: selectGithubRepo,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["workspace-github-integration"] });
+    },
+  });
+  const unselectMut = useMutation({
+    mutationFn: unselectGithubRepo,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["workspace-github-integration"] });
+    },
+  });
+
+  const selectedRepoNames = new Set((integrationQ.data?.selected_repos ?? []).map((repo) => repo.repo_full_name));
+
+  return (
+    <section className="space-y-4">
+      <div className="v-card p-5">
+        <div className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+          <Github className="h-3 w-3" /> GitHub workspace integration
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label="OAuth status" value={connectedQ.data?.github_configured ? "configured" : "not configured"} ok={Boolean(connectedQ.data?.github_configured)} warn={!connectedQ.data?.github_configured} />
+          <Field label="Connection" value={connectedQ.data?.github_connected ? "connected" : "not connected"} ok={Boolean(connectedQ.data?.github_connected)} warn={!connectedQ.data?.github_connected} />
+          <Field label="GitHub user" value={connectedQ.data?.github_username ?? "-"} />
+          <Field label="Repo access mode" value={integrationQ.data?.repo_access_mode ?? "read_only"} ok />
+          <Field label="Context scope" value={integrationQ.data?.repo_context_scope ?? "metadata_only"} ok />
+          <Field label="Selected repos" value={String(integrationQ.data?.selected_repos.length ?? 0)} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {!connectedQ.data?.github_connected ? (
+            <button className="v-btn-primary" disabled={connectMut.isPending || !connectedQ.data?.github_configured} onClick={() => connectMut.mutate()}>
+              {connectMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />} Connect GitHub
+            </button>
+          ) : (
+            <button className="v-btn-ghost" disabled={disconnectMut.isPending} onClick={() => disconnectMut.mutate()}>
+              {disconnectMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />} Disconnect GitHub
+            </button>
+          )}
+          <button className="v-btn-ghost" disabled={!connectedQ.data?.github_connected || reposQ.isFetching} onClick={() => reposQ.refetch()}>
+            {reposQ.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />} Refresh repos
+          </button>
+        </div>
+        <div className="mt-4 rounded-md border border-rule bg-ink/40 p-3 text-[12px] text-bone-2">
+          Repo context is governed and read-only by default. Veklom stores selected repo metadata at the workspace level,
+          does not expose GitHub tokens to the frontend, and treats attached repo context as planning input rather than
+          automatic code execution.
+        </div>
+      </div>
+
+      <div className="v-card p-0">
+        <header className="flex items-center justify-between border-b border-rule px-5 py-3">
+          <div>
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Selected repos</div>
+            <h3 className="mt-0.5 text-sm font-semibold">Workspace-scoped repo context</h3>
+          </div>
+          <span className="v-chip font-mono">{integrationQ.data?.selected_repos.length ?? 0}</span>
+        </header>
+        <div className="divide-y divide-rule/50">
+          {(integrationQ.data?.selected_repos ?? []).length === 0 && (
+            <div className="px-5 py-6 text-sm text-muted">No repos selected for this workspace yet.</div>
+          )}
+          {(integrationQ.data?.selected_repos ?? []).map((repo) => (
+            <div key={repo.id} className="flex items-center gap-4 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold text-bone">{repo.repo_full_name}</div>
+                <div className="mt-0.5 font-mono text-[11px] text-muted">
+                  branch={repo.default_branch ?? "main"} · scope={repo.repo_context_scope} · access=read_only
+                </div>
+              </div>
+              <button className="v-btn-ghost" disabled={unselectMut.isPending} onClick={() => unselectMut.mutate(repo.id)}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="v-card p-0">
+        <header className="flex items-center justify-between border-b border-rule px-5 py-3">
+          <div>
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Available repos</div>
+            <h3 className="mt-0.5 text-sm font-semibold">Choose repos Veklom may reference</h3>
+          </div>
+          <span className="v-chip font-mono">{reposQ.data?.length ?? 0}</span>
+        </header>
+        {reposQ.isError && (
+          <ErrorStrip title="Failed to load GitHub repos" detail={apiErrorMessage(reposQ.error, "GitHub repo list unavailable")} onRetry={() => reposQ.refetch()} />
+        )}
+        <div className="divide-y divide-rule/50">
+          {!connectedQ.data?.github_connected && (
+            <div className="px-5 py-6 text-sm text-muted">Connect GitHub to list repos and attach repo context in Playground.</div>
+          )}
+          {connectedQ.data?.github_connected && (reposQ.data ?? []).length === 0 && !reposQ.isFetching && (
+            <div className="px-5 py-6 text-sm text-muted">No repos returned from GitHub yet.</div>
+          )}
+          {(reposQ.data ?? []).map((repo) => {
+            const selected = selectedRepoNames.has(repo.full_name);
+            return (
+              <div key={repo.id} className="flex items-center gap-4 px-5 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-bone">{repo.full_name}</div>
+                  <div className="mt-0.5 text-[12px] text-muted">
+                    {repo.visibility ?? (repo.private ? "private" : "public")} · {repo.default_branch ?? "main"} · {repo.language ?? "unknown language"}
+                  </div>
+                </div>
+                <button
+                  className={selected ? "v-btn-ghost" : "v-btn-primary"}
+                  disabled={selected || selectMut.isPending}
+                  onClick={() => selectMut.mutate(repo)}
+                >
+                  {selected ? "Selected" : "Use in workspace"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

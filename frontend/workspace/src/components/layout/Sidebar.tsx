@@ -28,20 +28,20 @@ interface NavItem {
   badge?: string;
 }
 
-const CUSTOMER_SECTIONS: { title: string; items: NavItem[] }[] = [
+const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: "Workspace",
     items: [
       { to: "/overview", label: "Overview Center", icon: Command, badge: "LIVE" },
-      { to: "/uacp", label: "GPC", icon: BrainCircuit, badge: "PAID" },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
-      { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
+      { to: "/uacp", label: "GPC", icon: BrainCircuit, badge: "PAID" },
     ],
   },
   {
     title: "Infrastructure",
     items: [
       { to: "/models", label: "Models", icon: Box },
+      { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
       { to: "/pipelines", label: "Pipelines", icon: CircuitBoard },
       { to: "/deployments", label: "Deployments", icon: Gauge },
     ],
@@ -58,6 +58,10 @@ const CUSTOMER_SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: "/monitoring", label: "Monitoring", icon: LineChart },
       { to: "/billing", label: "Billing", icon: CreditCard },
+    ],
+  },
+  {
+    items: [
       { to: "/team", label: "Team", icon: Users },
       { to: "/settings", label: "Settings", icon: Settings2 },
     ],
@@ -110,8 +114,8 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
       <nav className="flex-1 overflow-y-auto py-2">
         {sections.map((section) => (
-          <div key={section.title} className="px-2">
-            {!collapsed && <div className="v-sidebar-section">{section.title}</div>}
+          <div key={section.title ?? section.items.map((item) => item.to).join("-")} className="px-2">
+            {!collapsed && section.title && <div className="v-sidebar-section">{section.title}</div>}
             {section.items.map(({ to, label, icon: Icon, badge }) => (
               <NavLink
                 key={to}
@@ -144,11 +148,11 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             <span className="text-muted">Sovereign Mode</span>
             <span className="inline-flex items-center gap-1 text-moss">
               <Activity className="h-3 w-3" />
-              on-prem
+              ON-PREM
             </span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
-            All runs are evaluated by policy on Hetzner first. Approved fallback is gated by tenant rule.
+            Hetzner-first policy evaluation. Approved fallback only when tenant rules allow it.
           </p>
           <div className="mt-2 flex gap-1.5">
             <span className="rounded border border-brass/30 bg-brass/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-brass-2">
@@ -164,7 +168,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       {!collapsed && (
         <div className="border-t border-rule px-3 py-2 text-[10px] text-muted">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
-          tenant-scoped session
+          Tenant-scoped
         </div>
       )}
     </aside>

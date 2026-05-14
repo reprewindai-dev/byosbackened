@@ -73,6 +73,7 @@ from apps.api.routers.marketplace_automation import router as marketplace_automa
 from apps.api.routers.platform_pulse import router as platform_pulse_router
 from apps.api.routers.internal_operators import router as internal_operators_router
 from apps.api.routers.internal_uacp import router as internal_uacp_router
+from apps.api.routers.service_gateway import router as service_gateway_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
@@ -232,6 +233,9 @@ app.include_router(marketplace_automation_router, prefix=settings.api_prefix)
 app.include_router(platform_pulse_router, prefix=settings.api_prefix)
 app.include_router(internal_operators_router, prefix=settings.api_prefix)
 app.include_router(internal_uacp_router, prefix=settings.api_prefix)
+
+# Service Gateway — BYOS source-of-truth wiring to all downstream services
+app.include_router(service_gateway_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)

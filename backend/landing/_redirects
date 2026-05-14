@@ -1,92 +1,20 @@
-# Cloudflare Pages redirects
-# https://developers.cloudflare.com/pages/configuration/redirects/
-
-# Force apex (no www). Keeps SEO single-canonical, avoids duplicate-content.
-http://veklom.com/*  https://veklom.com/:splat  301
-http://www.veklom.com/*  https://veklom.com/:splat  301
-https://www.veklom.com/*  https://veklom.com/:splat  301
-
-# Truthful workspace routes. The workspace shell is generated from
-# frontend/workspace so all app routes use the same maintainable React build.
-/login             /login/index.html             200
-/login/            /login/index.html             200
-/register          /register/index.html          200
-/register/         /register/index.html          200
-/accept-invite     /accept-invite/index.html     200
-/accept-invite/    /accept-invite/index.html     200
-/dashboard         /dashboard/index.html         200
-/dashboard/        /dashboard/index.html         200
-/control-center    /control-center/index.html    200
-/control-center/   /control-center/index.html    200
-/overview          /overview/index.html          200
-/overview/         /overview/index.html          200
-/gpc               /#theater      302
-/gpc/              /#theater      302
-/gpc/*             /#theater      302
-/uacp              /uacp/index.html              200
-/uacp/             /uacp/index.html              200
-/playground        /playground/index.html        200
-/playground/       /playground/index.html        200
-/monitoring        /monitoring/index.html        200
-/monitoring/       /monitoring/index.html        200
-/models            /models/index.html            200
-/models/           /models/index.html            200
-/billing           /billing/index.html           200
-/billing/          /billing/index.html           200
-/marketplace       /marketplace/index.html       200
-/marketplace/      /marketplace/index.html       200
-/marketplace/*     /marketplace/index.html       200
-/vendor           /vendors/       301
-/vendor/          /vendors/       301
-/vendors          /vendors/index.html       200
-/vendors/         /vendors/index.html       200
-
-# Legacy / compiled-shell aliases land on truthful surfaces
-/workspace-app     /overview                      302
-/workspace-app/    /overview                      302
-/pipelines         /pipelines/index.html         200
-/pipelines/        /pipelines/index.html         200
-/pipelines/*       /pipelines/index.html         200
-/deployments       /deployments/index.html       200
-/deployments/      /deployments/index.html       200
-/deployments/*     /deployments/index.html       200
-/vault             /vault/index.html             200
-/vault/            /vault/index.html             200
-/vault/*           /vault/index.html             200
-/compliance        /compliance/index.html        200
-/compliance/       /compliance/index.html        200
-/compliance/*      /compliance/index.html        200
-/team              /team/index.html              200
-/team/             /team/index.html              200
-/team/*            /team/index.html              200
-/settings          /settings/index.html          200
-/settings/         /settings/index.html          200
-/settings/*        /settings/index.html          200
-/onboarding        /overview                     302
-/onboarding/       /overview                     302
-/onboarding/*      /overview                     302
-
-# Common typos / alternate paths land on real sections
-/contact   /#contact   302
-/pricing.html   /pricing/   301
-/proof     /#proof     302
-/architecture  /#architecture  302
-/security  /#problem   302
-/status          /status/index.html  200
-/status/         /status/index.html  200
-/status.html     /status/index.html  301
-
-# Legal canonical paths. Cloudflare Pages serves the .html file for the
-# extensionless URL; only legacy aliases redirect to the canonical path.
-/legal/terms.html     /legal/terms     301
-/legal/privacy.html   /legal/privacy   301
-/legal/sla.html       /legal/sla       301
-/legal/license.html   /legal/license   301
-/legal/vendor-agreement.html  /legal/vendor-agreement  301
-/legal/vendor.html    /legal/vendor-agreement  301
-/vendor-agreement     /legal/vendor-agreement  301
-/legal/refunds.html   /legal/refunds   301
-/legal/acceptable-use.html  /legal/acceptable-use  301
-
-# Old workers.dev preview URL -> canonical
-https://veklom.pages.dev/*  https://veklom.com/:splat  301
+/uacp /monitoring/ 301
+/uacp/ /monitoring/ 301
+/dashboard /overview/ 301
+/dashboard/ /overview/ 301
+/control-center /overview/ 301
+/control-center/ /overview/ 301
+/workspace-app.html /monitoring/ 302
+/overview /overview/ 301
+/playground /playground/ 301
+/marketplace /marketplace/ 301
+/models /models/ 301
+/pipelines /pipelines/ 301
+/deployments /deployments/ 301
+/vault /vault/ 301
+/compliance /compliance/ 301
+/monitoring /monitoring/ 301
+/billing /billing/ 301
+/team /team/ 301
+/settings /settings/ 301
+/* /index.html 200

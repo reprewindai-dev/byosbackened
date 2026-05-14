@@ -32,3 +32,6 @@ test*_heavy_*.csv
 # Setup logs
 setup_*.log
 hetzner_setup_*.json
+
+backend/.env.*
+backend/.env.*.prod

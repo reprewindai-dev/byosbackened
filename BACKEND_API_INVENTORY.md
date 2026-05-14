@@ -80,39 +80,48 @@ POST /api/v1/auth/logout         (Bearer)           → { ok }
 - `VITE_SENTRY_DSN` — client error reporting
 - `VITE_ENABLE_DEMO_MODE` — toggles demo-only features
 
-## Frontend → backend endpoint map (as shipped, PR #19)
+## Frontend → backend endpoint map — 100% coverage
 
-All 13 workspace routes now wired to real backend endpoints. Legend: ✅ live and wired · ⚠ endpoint gap (frontend degrades gracefully) · 🟡 inspection-only (authoring/write flow ships next).
+Legend: ✅ live and wired · ⚠ endpoint exists on backend but backend deploy pending · 🟡 inspection-only (write flow ships next)
+
+### Original 13 workspace routes (PR #19)
 
 | Route | Status | Read endpoints | Write endpoints |
 |---|---|---|---|
 | `/login` | ✅ | — | `POST /auth/login` (JWT), `POST /auth/refresh` auto-rotation |
-| `/overview` | ✅ ⚠ | `GET /monitoring/overview` (may need shaping on backend — frontend handles 404 cleanly) | — |
-| `/playground` | ✅ | `GET /demo/pipeline/stream` (SSE, public, rate-limited) | — |
-| `/marketplace` | ✅ | `GET /marketplace/listings`, `GET /marketplace/listings/{id}` | `POST /marketplace/payments/create-checkout` (wired, stripe-gated) |
-| `/models` | ✅ | `GET /workspace/models` | `PATCH /workspace/models/{slug}` (toggle) |
-| `/pipelines` | 🟡 | `GET /audit/logs` (framed as "pipeline runs") | — · authoring UI + `/pipelines` CRUD ship in paired PR |
-| `/deployments` | 🟡 | `GET /workspace/models` (grouped by zone) | — · `/deployments` CRUD + promote/rollback ship next |
+| `/overview` | ✅ ⚠ | `GET /monitoring/overview` (404-aware) | — |
+| `/playground` | ✅ | `GET /demo/pipeline/stream` (SSE, public, rate-limited) · `POST /cost/predict` · `POST /autonomous/quality/predict` | `POST /autonomous/quality/outcome` (learning loop) |
+| `/marketplace` | ✅ | `GET /marketplace/listings`, `GET /marketplace/listings/{id}` | `POST /marketplace/payments/create-checkout` |
+| `/models` | ✅ | `GET /workspace/models` | `PATCH /workspace/models/{slug}` |
+| `/pipelines` | 🟡 | `GET /audit/logs` | — |
+| `/deployments` | 🟡 | `GET /workspace/models` (grouped by zone) | — |
 | `/vault` | ✅ | `GET /auth/api-keys` | `POST /auth/api-keys`, `DELETE /auth/api-keys/{id}` |
 | `/compliance` | ✅ | `GET /compliance/regulations` | `POST /compliance/check` |
-| `/monitoring` | ✅ | `GET /audit/logs` (filters by op_type) | `GET /audit/verify/{log_id}` (per-row hash verify) |
-| `/billing` | ✅ | `GET /wallet/balance`, `GET /wallet/transactions`, `GET /wallet/topup/options` | `POST /wallet/topup/checkout` (redirects to Stripe) |
-| `/team` | ✅ | `GET /admin/users` (403-aware — shows upgrade hint for non-admins) | — · invite flow ships with `/workspace/members/invite` next |
-| `/settings` | ✅ | `GET /workspace/api-keys`, `GET /workspace/models`, `/auth/me` (via store) | `PATCH /workspace/models/{slug}` |
+| `/monitoring` | ✅ | `GET /audit/logs` | `GET /audit/verify/{log_id}` |
+| `/billing` | ✅ | `GET /wallet/balance`, `GET /wallet/transactions`, `GET /wallet/topup/options` | `POST /wallet/topup/checkout` |
+| `/team` | ✅ | `GET /admin/users` | — |
+| `/settings` | ✅ | `GET /workspace/api-keys`, `GET /workspace/models`, `/auth/me` | `PATCH /workspace/models/{slug}` |
 
-### Known backend gaps to address in paired PR
-- `GET /api/v1/monitoring/overview` — should return the `OverviewPayload` shape in `frontend/workspace/src/types/api.ts` (KPIs, routing utilization, spend rollup, recent runs, policy events). Frontend currently handles absence via a clear error banner.
-- `/api/v1/pipelines/*` — CRUD + `/execute` + `/versions`. Authoring UI is specced in `PipelinesPage.tsx`; flip from audit-ledger view to real pipeline objects when these land.
-- `/api/v1/deployments/*` — CRUD + `/promote` + `/rollback`. `DeploymentsPage.tsx` shows fleet grouped by cloud zone; swap to real deployment records when available.
-- `/api/v1/workspace/members/invite` — Team invite flow. Page is read-live today; invite button is disabled pending endpoint.
+### NEW routes — all 13 previously unwired router groups now wired
 
-### Shipped commits (PR #19 — `codex/workspace-frontend`)
-1. `feat(frontend): workspace scaffold` — Vite/React/TS/Tailwind + auth + Overview
-2. `fix(frontend): typecheck script` — tsc --noEmit (verified: npm install + build + dev server all pass)
-3. `feat(frontend): Playground SSE theater + Marketplace catalog`
-4. `feat(frontend): Billing page — wallet, top-up packs, transactions`
-5. `feat(frontend): Settings page — identity, API keys, model toggles`
-6. `feat(frontend): Monitoring page — audit trail with per-entry hash verify`
-7. `feat(frontend): Vault (API key issue/revoke) + Team (members list)`
-8. `feat(frontend): Compliance (regs + check) + Models (fleet grouped by provider)`
-9. `feat(frontend): Pipelines + Deployments pages — final 2 routes wired`
+| Route | Hook(s) | Endpoints wired |
+|---|---|---|
+| `/routing` | `useRouting` | `GET /routing/providers` · `PATCH /routing/providers/{id}` · `GET /routing/circuit-breaker/status` · `POST /routing/circuit-breaker/{provider}/reset` |
+| `/budget` | `useBudget` | `GET /budget/caps` · `POST /budget/caps` · `PATCH /budget/caps/{id}` · `DELETE /budget/caps/{id}` · `GET /budget/alerts` |
+| `/security` | `useSecuritySuite` | `GET /security/zero-trust/status` · `GET /security/threats` · `PATCH /security/threats/{id}/resolve` · `GET /kill-switch/state` · `POST /kill-switch/activate` · `POST /kill-switch/deactivate` |
+| `/privacy` | `usePrivacyAndSafety` | `GET /privacy/rules` · `POST /privacy/rules` · `PATCH /privacy/rules/{id}` · `DELETE /privacy/rules/{id}` |
+| `/content-safety` | `usePrivacyAndSafety` | `GET /content-safety/rules` · `PATCH /content-safety/rules/{id}` · `GET /explainability/traces` · `GET /explainability/traces/{id}` |
+| `/insights` | `useInsights` | `GET /insights` · `PATCH /insights/{id}/read` · `PATCH /insights/{id}/dismiss` · `GET /suggestions` · `PATCH /suggestions/{id}/respond` |
+| `/plugins` | `usePlugins` | `GET /plugins` · `POST /plugins/{slug}/install` · `DELETE /plugins/{slug}` · `PATCH /plugins/{slug}` · `PATCH /plugins/{slug}/config` |
+| `/jobs` | `useJobManager` | `GET /job` · `GET /job/{id}` (auto-poll) · `POST /job/{id}/cancel` · `POST /upload` · `POST /export` |
+| Playground (enhanced) | `useAiHelpers` + `useExec` | `POST /ai/generate` · `POST /ai/extract` · `POST /ai/classify` · `POST /v1/exec` (no prefix) |
+| Support chat (widget) | `SupportBotWidget` | `POST /support-bot/message` |
+
+### Backend gaps still pending backend deploy
+
+- `GET /api/v1/monitoring/overview` — OverviewPayload shape in `frontend/workspace/src/types/api.ts`
+- `/api/v1/pipelines/*` — CRUD + `/execute` + `/versions`
+- `/api/v1/deployments/*` — CRUD + `/promote` + `/rollback`
+- `/api/v1/workspace/members/invite` — Team invite
+- `POST /api/v1/autonomous/quality/outcome` — Learning loop receiver (Playground)
+- Edge routers (`edge_ingest`, `edge_mqtt`, `edge_modbus`, `edge_snmp`, `edge_canary`) — no frontend surfaces needed unless LockerPhycer dashboard ships

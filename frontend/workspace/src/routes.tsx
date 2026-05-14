@@ -31,6 +31,7 @@ const ContentSafetyPage = lazy(() => import("@/pages/ContentSafetyPage").then((m
 const InsightsPage = lazy(() => import("@/pages/InsightsPage").then((m) => ({ default: m.InsightsPage })));
 const PluginsPage = lazy(() => import("@/pages/PluginsPage").then((m) => ({ default: m.PluginsPage })));
 const JobsPage = lazy(() => import("@/pages/JobsPage").then((m) => ({ default: m.JobsPage })));
+const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.accessToken);
@@ -84,6 +85,7 @@ export function AppRoutes() {
         <Route path="/insights" element={<RequireAuth><InsightsPage /></RequireAuth>} />
         <Route path="/plugins" element={<RequireAuth><PluginsPage /></RequireAuth>} />
         <Route path="/jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
+        <Route path="/services" element={<RequireAuth><ServicesPage /></RequireAuth>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/overview" replace />} />

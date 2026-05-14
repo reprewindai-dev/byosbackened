@@ -9,6 +9,7 @@ import {
   Gauge,
   KeyRound,
   LineChart,
+  Network,
   Settings2,
   ShieldCheck,
   ShoppingBag,
@@ -41,6 +42,7 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { to: "/models", label: "Models", icon: Box },
       { to: "/pipelines", label: "Pipelines", icon: CircuitBoard },
       { to: "/deployments", label: "Deployments", icon: Gauge },
+      { to: "/services", label: "Services", icon: Network, badge: "NEW" },
     ],
   },
   {

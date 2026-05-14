@@ -377,3 +377,50 @@ export interface ApiError {
   detail: string | { msg: string; type: string }[];
   status_code?: number;
 }
+
+// ─── Service Gateway (BYOS Internal Services) ──────────────────────────────
+
+export type ServiceType = "ai_provider" | "core" | "integration" | "monitoring" | "billing";
+export type ServiceStatus = "healthy" | "degraded" | "unhealthy" | "unknown";
+
+export interface RegisteredService {
+  service_id: string;
+  name: string;
+  service_type: ServiceType;
+  base_url: string;
+  health_endpoint: string;
+  status: ServiceStatus;
+  enabled: boolean;
+  last_health_check: number | null;
+  last_healthy: number | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface ServiceTopologyLayer {
+  id: string;
+  name: string;
+  url: string;
+  status: ServiceStatus;
+  enabled: boolean;
+}
+
+export interface WiringEdge {
+  from: string;
+  to: string;
+  protocol: string;
+  description: string;
+}
+
+export interface ServiceTopology {
+  platform: string;
+  version: string;
+  layers: {
+    ai_providers: ServiceTopologyLayer[];
+    core: ServiceTopologyLayer[];
+    integrations: ServiceTopologyLayer[];
+    monitoring: ServiceTopologyLayer[];
+    billing: ServiceTopologyLayer[];
+  };
+  wiring: WiringEdge[];
+  timestamp: number;
+}

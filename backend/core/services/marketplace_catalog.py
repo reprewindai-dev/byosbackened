@@ -251,18 +251,144 @@ REAL_MARKETPLACE_CATALOG = [
     },
 ]
 
+# ── LockerSphere verticals ────────────────────────────────────────────────────
+# First-party products distributed through the Veklom Marketplace.  Each
+# vertical is a white-label AI security backend with industry-specific
+# compliance, security policies, and AI capabilities.
+
+LOCKERSPHERE_CATALOG = [
+    {
+        "id": "lockersphere-hospital",
+        "vendor_id": "veklom-first-party",
+        "title": "LockerSphere Hospital",
+        "provider": "LockerSphere",
+        "category": "Managed Services",
+        "description": "HIPAA-grade AI security for global healthcare. PHI detection & redaction, HL7/FHIR gateway, clinical AI guardrails, and 7-year audit trails.",
+        "positioning": "White-label AI security platform built for hospitals and health systems — HIPAA, HITECH, GDPR, and HL7-FHIR compliant out of the box.",
+        "price": "Enterprise",
+        "price_cents": 0,
+        "currency": "usd",
+        "billing": "enterprise",
+        "install": "One-Click Install",
+        "target": ["api", "workspace"],
+        "listing_type": "agent",
+        "tags": ["lockersphere", "ai-security", "white-label", "hipaa", "healthcare", "phi-protection", "clinical-ai"],
+        "badges": ["First Party", "HIPAA", "HITECH", "GDPR", "HL7-FHIR"],
+        "featured": True,
+        "compliance": ["HIPAA", "HITECH", "GDPR", "HL7-FHIR", "PIPEDA", "LGPD"],
+        "source_url": "https://github.com/reprewindai-dev/lockerphycer",
+        "use_url": "/api/v1/verticals/hospital",
+        "status": "active",
+    },
+    {
+        "id": "lockersphere-bank",
+        "vendor_id": "veklom-first-party",
+        "title": "LockerSphere Bank",
+        "provider": "LockerSphere",
+        "category": "Managed Services",
+        "description": "PCI-DSS v4.0 compliant AI security for financial institutions. Transaction fraud detection, AML screening, SWIFT message security, SOX compliance.",
+        "positioning": "White-label AI security for banks and financial services — PCI-DSS, SOX, Basel III, and AML-KYC compliant. Real-time fraud detection and regulatory reporting.",
+        "price": "Enterprise",
+        "price_cents": 0,
+        "currency": "usd",
+        "billing": "enterprise",
+        "install": "One-Click Install",
+        "target": ["api", "workspace"],
+        "listing_type": "agent",
+        "tags": ["lockersphere", "ai-security", "white-label", "pci-dss", "banking", "fraud-detection", "aml-kyc"],
+        "badges": ["First Party", "PCI-DSS v4.0", "SOX", "Basel III", "AML-KYC"],
+        "featured": True,
+        "compliance": ["PCI-DSS v4.0", "SOX", "Basel III", "AML-KYC", "SWIFT-CSP", "GDPR", "GLBA"],
+        "source_url": "https://github.com/reprewindai-dev/lockerphycer",
+        "use_url": "/api/v1/verticals/bank",
+        "status": "active",
+    },
+    {
+        "id": "lockersphere-insurance",
+        "vendor_id": "veklom-first-party",
+        "title": "LockerSphere Insurance",
+        "provider": "LockerSphere",
+        "category": "Managed Services",
+        "description": "AI security and compliance for insurance carriers. Claims fraud detection, actuarial model governance, underwriting fairness monitoring, catastrophe modeling.",
+        "positioning": "White-label AI security for insurers — Solvency II, IFRS-17, EU AI Act, and NAIC compliant. Automated claims fraud detection and actuarial governance.",
+        "price": "Enterprise",
+        "price_cents": 0,
+        "currency": "usd",
+        "billing": "enterprise",
+        "install": "One-Click Install",
+        "target": ["api", "workspace"],
+        "listing_type": "agent",
+        "tags": ["lockersphere", "ai-security", "white-label", "solvency-ii", "claims-fraud", "actuarial", "underwriting"],
+        "badges": ["First Party", "Solvency II", "IFRS-17", "EU AI Act", "NAIC"],
+        "featured": True,
+        "compliance": ["Solvency II", "NAIC Model Laws", "IFRS-17", "GDPR", "CCPA", "EU AI Act"],
+        "source_url": "https://github.com/reprewindai-dev/lockerphycer",
+        "use_url": "/api/v1/verticals/insurance",
+        "status": "active",
+    },
+    {
+        "id": "lockersphere-content-creator",
+        "vendor_id": "veklom-first-party",
+        "title": "LockerSphere Content Creator",
+        "provider": "LockerSphere",
+        "category": "Managed Services",
+        "description": "AI security for creators, studios, and media. Content fingerprinting, deepfake detection, DMCA management, harassment shield, and revenue protection.",
+        "positioning": "White-label AI security for content creators and media companies — DMCA, FTC, COPPA, and DSA compliant. Protect your content, brand, and revenue.",
+        "price": "Free",
+        "price_cents": 0,
+        "currency": "usd",
+        "billing": "free",
+        "install": "One-Click Install",
+        "target": ["api", "workspace"],
+        "listing_type": "agent",
+        "tags": ["lockersphere", "ai-security", "white-label", "dmca", "content-moderation", "deepfake-detection", "creator"],
+        "badges": ["First Party", "DMCA", "FTC", "COPPA", "DSA"],
+        "featured": True,
+        "compliance": ["DMCA", "FTC Guidelines", "GDPR", "DSA", "COPPA"],
+        "source_url": "https://github.com/reprewindai-dev/lockerphycer",
+        "use_url": "/api/v1/verticals/content_creator",
+        "status": "active",
+    },
+    {
+        "id": "lockersphere-general",
+        "vendor_id": "veklom-first-party",
+        "title": "LockerSphere",
+        "provider": "LockerSphere",
+        "category": "Managed Services",
+        "description": "AI-powered security that works out of the box. Threat detection, anomaly detection, vulnerability scanning, and content safety — no configuration needed.",
+        "positioning": "General-purpose AI security platform — SOC 2, ISO 27001, and GDPR compliant. Zero-config deployment with threat detection, anomaly monitoring, and audit logging.",
+        "price": "Free",
+        "price_cents": 0,
+        "currency": "usd",
+        "billing": "free",
+        "install": "One-Click Install",
+        "target": ["api", "workspace"],
+        "listing_type": "agent",
+        "tags": ["lockersphere", "ai-security", "white-label", "soc2", "threat-detection", "anomaly-detection"],
+        "badges": ["First Party", "SOC 2", "ISO 27001", "GDPR"],
+        "featured": True,
+        "compliance": ["SOC 2 Type II", "GDPR", "ISO 27001"],
+        "source_url": "https://github.com/reprewindai-dev/lockerphycer",
+        "use_url": "/api/v1/verticals/general",
+        "status": "active",
+    },
+]
+
 
 def real_marketplace_catalog() -> list[dict]:
     """Return a copy so route handlers can enrich safely.
 
-    Install and rating counts are not returned for curated external listings
-    unless Veklom has a live source for that metric. The marketplace should
-    only show factual source, billing, and usage data as available today.
+    Includes both external curated listings and first-party LockerSphere
+    verticals.  Install and rating counts are not returned for curated
+    external listings unless Veklom has a live source for that metric.
     """
-    catalog = deepcopy(REAL_MARKETPLACE_CATALOG)
+    catalog = deepcopy(REAL_MARKETPLACE_CATALOG + LOCKERSPHERE_CATALOG)
     for item in catalog:
         item["source_verified"] = True
-        item["verification_note"] = "Official public source verified by Veklom catalog review."
+        if item.get("vendor_id") == "veklom-first-party":
+            item["verification_note"] = "First-party LockerSphere product by Veklom."
+        else:
+            item["verification_note"] = "Official public source verified by Veklom catalog review."
         item["rating_avg"] = 0
         item["rating_count"] = 0
         item["install_count"] = 0

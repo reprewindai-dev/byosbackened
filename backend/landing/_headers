@@ -1,47 +1,4 @@
-/*
-  X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-
+﻿/*
+  Cache-Control: no-cache, must-revalidate
 /workspace-assets/*
   Cache-Control: public, max-age=31536000, immutable
-
-/workspace-app.html
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/overview/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/playground/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/marketplace/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/models/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/pipelines/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/deployments/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/vault/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/compliance/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/monitoring/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/billing/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/team/*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/settings/*
-  Cache-Control: no-cache, no-store, must-revalidate

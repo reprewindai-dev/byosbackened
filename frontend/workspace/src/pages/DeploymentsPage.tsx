@@ -248,7 +248,7 @@ function PageHeader({ onNew, routeUnavailable, count }: { onNew: () => void; rou
   return (
     <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <div className="text-eyebrow">Deployments · endpoints</div>
+        <div className="text-eyebrow">Endpoints &amp; Deployments</div>
         <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">
           OpenAI-compatible endpoints
         </h1>

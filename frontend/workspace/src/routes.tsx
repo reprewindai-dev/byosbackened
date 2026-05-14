@@ -1,6 +1,9 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useAuthStore } from "@/store/auth-store";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { TopBar } from "@/components/layout/TopBar";
+import { useState } from "react";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage").then((m) => ({ default: m.RegisterPage })));
@@ -34,7 +37,30 @@ const JobsPage = lazy(() => import("@/pages/JobsPage").then((m) => ({ default: m
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.accessToken);
+  const status = useAuthStore((s) => s.status);
+  if (status === "idle") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-brass border-t-transparent" />
+      </div>
+    );
+  }
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function WorkspaceLayout() {
+  const [collapsed, setCollapsed] = useState(false);
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar />
+        <main className="flex-1 overflow-y-auto px-6 py-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
 }
 
 function Fallback() {
@@ -55,35 +81,33 @@ export function AppRoutes() {
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/auth/github/callback" element={<GithubCallbackPage />} />
 
-        {/* Protected workspace */}
-        <Route path="/" element={<RequireAuth><Navigate to="/overview" replace /></RequireAuth>} />
-        <Route path="/overview" element={<RequireAuth><OverviewPage /></RequireAuth>} />
-        <Route path="/playground" element={<RequireAuth><PlaygroundPage /></RequireAuth>} />
-        <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
-        <Route path="/models" element={<RequireAuth><ModelsPage /></RequireAuth>} />
-        <Route path="/pipelines" element={<RequireAuth><PipelinesPage /></RequireAuth>} />
-        <Route path="/deployments" element={<RequireAuth><DeploymentsPage /></RequireAuth>} />
-        <Route path="/vault" element={<RequireAuth><VaultPage /></RequireAuth>} />
-        <Route path="/compliance" element={<RequireAuth><CompliancePage /></RequireAuth>} />
-        <Route path="/monitoring" element={<RequireAuth><MonitoringPage /></RequireAuth>} />
-        <Route path="/billing" element={<RequireAuth><BillingPage /></RequireAuth>} />
-        <Route path="/team" element={<RequireAuth><TeamPage /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-
-        {/* Superuser / internal */}
-        <Route path="/control-center" element={<RequireAuth><ControlCenterPage /></RequireAuth>} />
-        <Route path="/competitive" element={<RequireAuth><CompetitiveAdvantagePage /></RequireAuth>} />
-        <Route path="/uacp" element={<RequireAuth><UacpPage /></RequireAuth>} />
-
-        {/* NEW routes — previously 0% wired */}
-        <Route path="/routing" element={<RequireAuth><RoutingPage /></RequireAuth>} />
-        <Route path="/budget" element={<RequireAuth><BudgetPage /></RequireAuth>} />
-        <Route path="/security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
-        <Route path="/privacy" element={<RequireAuth><PrivacyPage /></RequireAuth>} />
-        <Route path="/content-safety" element={<RequireAuth><ContentSafetyPage /></RequireAuth>} />
-        <Route path="/insights" element={<RequireAuth><InsightsPage /></RequireAuth>} />
-        <Route path="/plugins" element={<RequireAuth><PluginsPage /></RequireAuth>} />
-        <Route path="/jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
+        {/* Protected workspace with sidebar+topbar */}
+        <Route element={<RequireAuth><WorkspaceLayout /></RequireAuth>}>
+          <Route path="/" element={<Navigate to="/overview" replace />} />
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/playground" element={<PlaygroundPage />} />
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/models" element={<ModelsPage />} />
+          <Route path="/pipelines" element={<PipelinesPage />} />
+          <Route path="/deployments" element={<DeploymentsPage />} />
+          <Route path="/vault" element={<VaultPage />} />
+          <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="/monitoring" element={<MonitoringPage />} />
+          <Route path="/billing" element={<BillingPage />} />
+          <Route path="/team" element={<TeamPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/control-center" element={<ControlCenterPage />} />
+          <Route path="/competitive" element={<CompetitiveAdvantagePage />} />
+          <Route path="/uacp" element={<UacpPage />} />
+          <Route path="/routing" element={<RoutingPage />} />
+          <Route path="/budget" element={<BudgetPage />} />
+          <Route path="/security" element={<SecurityPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/content-safety" element={<ContentSafetyPage />} />
+          <Route path="/insights" element={<InsightsPage />} />
+          <Route path="/plugins" element={<PluginsPage />} />
+          <Route path="/jobs" element={<JobsPage />} />
+        </Route>
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/overview" replace />} />

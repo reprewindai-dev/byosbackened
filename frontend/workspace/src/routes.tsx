@@ -19,6 +19,7 @@ import { CompliancePage } from "./pages/CompliancePage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { PipelinesPage } from "./pages/PipelinesPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
+import { CompetitiveAdvantagePage } from "./pages/CompetitiveAdvantagePage";
 import { useAuthStore } from "@/store/auth-store";
 
 function SuperuserOnly({ children }: { children: ReactNode }) {
@@ -69,6 +70,7 @@ export function AppRoutes() {
         <Route path="/billing" element={<MfaProtected><BillingPage /></MfaProtected>} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/settings" element={<MfaProtected><SettingsPage /></MfaProtected>} />
+        <Route path="/advantage" element={<CompetitiveAdvantagePage />} />
       </Route>
 
       <Route path="*" element={<HomeRoute />} />

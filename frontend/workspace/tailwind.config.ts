@@ -1,5 +1,12 @@
 import type { Config } from "tailwindcss";
 
+// =============================================================
+// VEKLOM DESIGN SYSTEM — Black + Brass/Orange
+// LOCKED PALETTE — Do NOT add violet, purple, indigo, or any
+// light-mode colors. This is a dark-only app.
+// Accent hierarchy: brass (primary) → moss (success) → crimson (error) → amber (warn)
+// =============================================================
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -39,9 +46,8 @@ export default {
         crimson: {
           DEFAULT: "#ff6b6b",
         },
-        violet: {
-          DEFAULT: "#a78bfa",
-        },
+        // ❌ violet PERMANENTLY REMOVED — was leaking #a78bfa purple into UI
+        // ❌ Do NOT re-add violet, purple, indigo, or any light-mode surface color
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],

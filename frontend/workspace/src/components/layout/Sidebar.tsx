@@ -12,6 +12,7 @@ import {
   Settings2,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
   TerminalSquare,
   Users,
 } from "lucide-react";
@@ -31,6 +32,7 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { to: "/overview", label: "Overview", icon: Gauge },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
+      { to: "/advantage", label: "Why Us", icon: Sparkles },
     ],
   },
   {

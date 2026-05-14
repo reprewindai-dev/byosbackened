@@ -5,43 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/workspace-assets/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Veklom Workspace</title>
-
-    <!-- 1. App CSS first -->
-    <link rel="stylesheet" crossorigin href="/workspace-assets/index-WqgIFi2m.css">
-
-    <!-- 2. Theme override AFTER app CSS so it wins -->
-    <link rel="stylesheet" href="/workspace-assets/vk-theme.css">
-
-    <!-- 3. Set theme BEFORE app JS renders — no flash -->
-    <script>
-      document.documentElement.dataset.theme =
-        (function(){try{return localStorage.getItem('vk-theme')||'dark'}catch(e){return 'dark'}})();
-    </script>
-
-    <!-- 4. App JS last -->
     <script type="module" crossorigin src="/workspace-assets/index-EUKZeqk4.js"></script>
+    <link rel="stylesheet" crossorigin href="/workspace-assets/index-WqgIFi2m.css">
   </head>
   <body>
     <div id="root"></div>
-
-    <!-- 5. Toggle button + logic -->
-    <script>
-      window.addEventListener('DOMContentLoaded', function () {
-        if (document.getElementById('vk-theme-btn')) return;
-        var btn = document.createElement('button');
-        btn.id = 'vk-theme-btn';
-        btn.setAttribute('aria-label', 'Toggle day/night mode');
-        btn.title = 'Toggle day/night';
-        var cur = document.documentElement.dataset.theme || 'dark';
-        btn.innerHTML = cur === 'dark' ? '&#9728;&#65039;' : '&#127769;';
-        btn.addEventListener('click', function () {
-          var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-          document.documentElement.dataset.theme = next;
-          btn.innerHTML = next === 'dark' ? '&#9728;&#65039;' : '&#127769;';
-          try { localStorage.setItem('vk-theme', next); } catch(e) {}
-        });
-        document.body.appendChild(btn);
-      });
-    </script>
   </body>
 </html>

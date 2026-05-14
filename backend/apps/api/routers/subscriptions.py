@@ -1,6 +1,7 @@
-"""Stripe subscription management: plans, checkout, webhook, portal."""
+"""Stripe activation and Operating Reserve management."""
+import json
 import stripe
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
@@ -15,19 +16,187 @@ from db.models import Subscription, PlanTier, SubscriptionStatus, Workspace, Use
 settings = get_settings()
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
+
+def _configure_stripe() -> None:
+    """Apply secret key and pinned API version for deterministic Stripe calls."""
+    stripe.api_key = settings.stripe_secret_key
+    stripe.api_version = settings.stripe_api_version
+
 # ─── Plan catalog ─────────────────────────────────────────────────────────────
-# IMPORTANT: Backend subscription pricing and landing/dashboard displays must
-# stay aligned. Token packs are separate one-time purchases handled by the
-# wallet router.
+# IMPORTANT: Backend activation pricing and landing/dashboard displays must
+# stay aligned. Reserve balances are USD-denominated in reserve units
+# (1,000 units = $1.00) for exact integer accounting in the existing schema.
+
+RESERVE_UNITS_PER_USD = 1000
+
+EVENT_PRICING = {
+    "free": {
+        "playground_run_cents": None,
+        "compare_run_cents": None,
+        "pipeline_test_cents": None,
+        "endpoint_test_cents": None,
+        "deployment_verification_cents": None,
+        "uacp_plan_compile_cents": None,
+        "uacp_run_execution_cents": None,
+        "uacp_artifact_generation_cents": None,
+        "signed_export_cents": None,
+        "audit_export_cents": None,
+        "byok_governance_calls_per_1000_cents": None,
+        "managed_governance_calls_per_1000_cents": None,
+        "signed_evidence_package_cents": None,
+        "auditor_bundle_cents": None,
+    },
+    "starter": {
+        "playground_run_cents": 25,
+        "compare_run_cents": 75,
+        "pipeline_test_cents": 25,
+        "endpoint_test_cents": 50,
+        "deployment_verification_cents": 50,
+        "uacp_plan_compile_cents": 150,
+        "uacp_run_execution_cents": 300,
+        "uacp_artifact_generation_cents": 500,
+        "signed_export_cents": 300,
+        "audit_export_cents": 300,
+        "byok_governance_calls_per_1000_cents": 600,
+        "managed_governance_calls_per_1000_cents": 1200,
+        "signed_evidence_package_cents": 9900,
+        "auditor_bundle_cents": 24900,
+    },
+    "pro": {
+        "playground_run_cents": 40,
+        "compare_run_cents": 120,
+        "pipeline_test_cents": 40,
+        "endpoint_test_cents": 80,
+        "deployment_verification_cents": 80,
+        "uacp_plan_compile_cents": 200,
+        "uacp_run_execution_cents": 400,
+        "uacp_artifact_generation_cents": 700,
+        "signed_export_cents": 400,
+        "audit_export_cents": 400,
+        "byok_governance_calls_per_1000_cents": 800,
+        "managed_governance_calls_per_1000_cents": 1600,
+        "signed_evidence_package_cents": 14900,
+        "auditor_bundle_cents": 34900,
+    },
+    "sovereign": {
+        "playground_run_cents": None,
+        "compare_run_cents": None,
+        "pipeline_test_cents": None,
+        "endpoint_test_cents": 100,
+        "deployment_verification_cents": 100,
+        "uacp_plan_compile_cents": 250,
+        "uacp_run_execution_cents": 500,
+        "uacp_artifact_generation_cents": 1000,
+        "signed_export_cents": None,
+        "audit_export_cents": None,
+        "byok_governance_calls_per_1000_cents": 1000,
+        "managed_governance_calls_per_1000_cents": 2000,
+        "signed_evidence_package_cents": 19900,
+        "auditor_bundle_cents": 49900,
+    },
+    "enterprise": {
+        "playground_run_cents": None,
+        "compare_run_cents": None,
+        "pipeline_test_cents": None,
+        "endpoint_test_cents": None,
+        "deployment_verification_cents": None,
+        "uacp_plan_compile_cents": None,
+        "uacp_run_execution_cents": None,
+        "uacp_artifact_generation_cents": None,
+        "signed_export_cents": None,
+        "audit_export_cents": None,
+        "byok_governance_calls_per_1000_cents": None,
+        "managed_governance_calls_per_1000_cents": None,
+        "signed_evidence_package_cents": None,
+        "auditor_bundle_cents": None,
+    },
+}
+
+
+def _with_event_pricing(plan: dict) -> dict:
+    """Attach versioned public event pricing to the plan response."""
+    plan_copy = dict(plan)
+    tier = str(plan_copy.get("tier") or "free")
+    pricing = {
+        "version": "v1_public",
+        "currency": "usd",
+        **EVENT_PRICING.get(tier, EVENT_PRICING["free"]),
+    }
+    plan_copy["pricing"] = pricing
+    plan_copy["event_pricing"] = pricing
+    return plan_copy
+
+
+def _reserve_units_from_cents(cents: int | str | None) -> int:
+    """Convert paid reserve cents into integer reserve units."""
+    return int(cents or 0) * RESERVE_UNITS_PER_USD // 100
+
+
+def _reset_legacy_non_cash_reserve_before_activation(
+    db: Session,
+    workspace_id: str,
+    session_id: str,
+) -> None:
+    """Remove stale non-cash balances before the first paid reserve credit.
+
+    Older evaluation accounts could have wallet balances from token-era grants
+    or endpoint middleware debits. Operating Reserve must only become spendable
+    after Stripe-backed activation, so first activation starts from zero and then
+    credits the paid reserve portion.
+    """
+    wallet = db.query(TokenWallet).filter(TokenWallet.workspace_id == workspace_id).first()
+    if not wallet or wallet.balance == 0:
+        return
+
+    prior_paid_purchase = (
+        db.query(TokenTransaction)
+        .filter(
+            TokenTransaction.workspace_id == workspace_id,
+            TokenTransaction.transaction_type == "purchase",
+            TokenTransaction.stripe_checkout_session_id.isnot(None),
+        )
+        .first()
+    )
+    if prior_paid_purchase:
+        return
+
+    balance_before = wallet.balance
+    created_at = datetime.utcnow() - timedelta(microseconds=1)
+    wallet.balance = 0
+    wallet.total_credits_purchased = 0
+    wallet.total_credits_used = 0
+    wallet.monthly_credits_used = 0
+    wallet.updated_at = datetime.utcnow()
+    db.add(
+        TokenTransaction(
+            wallet_id=wallet.id,
+            workspace_id=workspace_id,
+            transaction_type="adjustment",
+            amount=-balance_before,
+            balance_before=balance_before,
+            balance_after=0,
+            request_id=f"{session_id}:legacy-reserve-reset",
+            description="Legacy non-cash reserve reset before paid activation",
+            created_at=created_at,
+            metadata_json=json.dumps(
+                {
+                    "reason": "legacy_non_cash_reserve_reset",
+                    "source": "workspace_activation",
+                    "cash_backed": False,
+                }
+            ),
+        )
+    )
+    db.flush()
 
 PLANS = {
     "starter": {
-        "name": "Team",
+        "name": "Founding",
         "tier": "starter",
-        "price_monthly_cents": 1_200_000,   # $12,000.00 / month (Team tier)
-        "price_yearly_cents": 12_000_000,   # $120,000.00 / year
+        "activation_cents": 39_500,
+        "minimum_reserve_cents": 15_000,
         "self_serve_checkout": True,
-        "monthly_credits_included": 10_000_000,
+        "monthly_credits_included": 0,
         "features": {
             "api_keys_max": 5,
             "support_channel": "ai_bot",
@@ -48,12 +217,12 @@ PLANS = {
         },
     },
     "pro": {
-        "name": "Business",
+        "name": "Standard",
         "tier": "pro",
-        "price_monthly_cents": 3_500_000,   # $35,000.00 / month (Business tier)
-        "price_yearly_cents": 35_000_000,  # $350,000.00 / year
+        "activation_cents": 79_500,
+        "minimum_reserve_cents": 30_000,
         "self_serve_checkout": True,
-        "monthly_credits_included": 100_000_000,
+        "monthly_credits_included": 0,
         "features": {
             "api_keys_max": 20,
             "support_channel": "ai_bot_priority",
@@ -76,12 +245,12 @@ PLANS = {
         },
     },
     "sovereign": {
-        "name": "Sovereign",
+        "name": "Regulated",
         "tier": "sovereign",
-        "price_monthly_cents": 250_000,     # $2,500.00 / month
-        "price_yearly_cents": 2_500_000,    # $25,000.00 / year
-        "self_serve_checkout": True,
-        "monthly_credits_included": 500_000_000,
+        "activation_cents": 250_000,
+        "minimum_reserve_cents": 250_000,
+        "self_serve_checkout": False,
+        "monthly_credits_included": 0,
         "features": {
             "api_keys_max": 100,
             "support_channel": "ai_bot_priority",
@@ -109,10 +278,10 @@ PLANS = {
     "enterprise": {
         "name": "Enterprise",
         "tier": "enterprise",
-        "price_monthly_cents": None,
-        "price_yearly_cents": None,
+        "activation_cents": None,
+        "minimum_reserve_cents": None,
         "self_serve_checkout": False,
-        "monthly_credits_included": None,
+        "monthly_credits_included": 0,
         "features": {
             "api_keys_max": None,            # Unlimited
             "support_channel": "ai_bot_dedicated",
@@ -148,12 +317,18 @@ PLANS = {
 
 # Free tier is handled outside Stripe subscription checkout.
 FREE_PLAN = {
-    "name": "Free",
+    "name": "Free Evaluation",
     "tier": "free",
-    "price_monthly_cents": 0,
-    "price_yearly_cents": 0,
+    "activation_cents": 0,
+    "minimum_reserve_cents": 0,
     "self_serve_checkout": False,
-    "monthly_credits_included": 50_000,
+    "monthly_credits_included": 0,
+    "free_evaluation_limits": {
+        "governed_playground_runs": 15,
+        "compare_runs": 3,
+        "policy_tests": 20,
+        "watermarked_exports": 2,
+    },
     "features": {
         "view_marketplace": True,
         "comment": True,
@@ -180,7 +355,7 @@ FREE_PLAN = {
 
 class CheckoutRequest(BaseModel):
     plan: PlanTier
-    billing_cycle: str = "monthly"
+    billing_cycle: str = "activation"
     success_url: str
     cancel_url: str
 
@@ -207,8 +382,12 @@ class SubscriptionResponse(BaseModel):
 @router.get("/plans")
 async def list_plans():
     """Return all available plans (public endpoint)."""
-    public_keys = ("starter", "pro", "enterprise")
-    return {"plans": [FREE_PLAN] + [PLANS[k] for k in public_keys]}
+    public_keys = ("starter", "pro", "sovereign", "enterprise")
+    return {
+        "pricing_version": "v1_public",
+        "reserve_units_per_usd": RESERVE_UNITS_PER_USD,
+        "plans": [_with_event_pricing(FREE_PLAN)] + [_with_event_pricing(PLANS[k]) for k in public_keys],
+    }
 
 
 @router.get("/current", response_model=SubscriptionResponse)
@@ -230,7 +409,7 @@ async def current_subscription(
                 workspace_id=current_user.workspace_id,
                 plan=ws.license_tier,
                 status="trialing",
-                billing_cycle="monthly",
+                billing_cycle="evaluation",
                 amount_cents=0,
                 currency="usd",
                 current_period_end=None,
@@ -243,7 +422,7 @@ async def current_subscription(
             workspace_id=current_user.workspace_id,
             plan="free",
             status="active",
-            billing_cycle="monthly",
+            billing_cycle="evaluation",
             amount_cents=0,
             currency="usd",
             current_period_end=None,
@@ -270,21 +449,22 @@ async def create_checkout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a Stripe Checkout session for a plan upgrade."""
+    """Create a one-time Stripe Checkout session for workspace activation."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
-    stripe.api_key = settings.stripe_secret_key
+    _configure_stripe()
     plan_info = PLANS.get(payload.plan.value)
     if not plan_info:
         raise HTTPException(status_code=400, detail="Invalid plan")
-    if payload.billing_cycle not in ("monthly", "yearly"):
-        raise HTTPException(status_code=400, detail="Invalid billing cycle")
     if not plan_info.get("self_serve_checkout"):
-        raise HTTPException(status_code=400, detail="Enterprise plan requires sales-assisted checkout")
+        raise HTTPException(status_code=400, detail="Regulated and Enterprise plans require sales-assisted activation")
 
-    price_key = "price_yearly_cents" if payload.billing_cycle == "yearly" else "price_monthly_cents"
-    amount = plan_info[price_key]
+    activation_cents = int(plan_info.get("activation_cents") or 0)
+    minimum_reserve_cents = int(plan_info.get("minimum_reserve_cents") or 0)
+    amount = activation_cents + minimum_reserve_cents
+    if activation_cents <= 0:
+        raise HTTPException(status_code=400, detail="Plan is not available for self-serve activation")
 
     sub = db.query(Subscription).filter(
         Subscription.workspace_id == current_user.workspace_id
@@ -304,7 +484,8 @@ async def create_checkout(
                 workspace_id=current_user.workspace_id,
                 stripe_customer_id=customer_id,
                 plan=PlanTier.STARTER,
-                status=SubscriptionStatus.TRIALING,
+                status=SubscriptionStatus.INCOMPLETE,
+                billing_cycle="activation",
             )
             db.add(sub)
         else:
@@ -322,19 +503,20 @@ async def create_checkout(
                     "description": f"Veklom AI operations platform — {plan_info['tier']} tier",
                 },
                 "unit_amount": amount,
-                "recurring": {
-                    "interval": "year" if payload.billing_cycle == "yearly" else "month"
-                },
             },
             "quantity": 1,
         }],
-        mode="subscription",
+        mode="payment",
         success_url=payload.success_url + "?session_id={CHECKOUT_SESSION_ID}",
         cancel_url=payload.cancel_url,
         metadata={
             "workspace_id": current_user.workspace_id,
             "plan": payload.plan.value,
-            "billing_cycle": payload.billing_cycle,
+            "billing_cycle": "activation",
+            "type": "workspace_activation",
+            "activation_cents": str(activation_cents),
+            "minimum_reserve_cents": str(minimum_reserve_cents),
+            "reserve_units": str(_reserve_units_from_cents(minimum_reserve_cents)),
         },
     )
     return CheckoutResponse(checkout_url=session.url, session_id=session.id)
@@ -344,14 +526,24 @@ async def create_checkout(
 async def check_session(
     session_id: str,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Poll Stripe session status after checkout redirect."""
+    """Poll Stripe session status after checkout redirect and reconcile paid sessions."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
-    stripe.api_key = settings.stripe_secret_key
+    _configure_stripe()
     try:
         session = stripe.checkout.Session.retrieve(session_id)
-        return {"status": session.status, "payment_status": session.payment_status}
+        if session.get("metadata", {}).get("workspace_id") != current_user.workspace_id:
+            raise HTTPException(status_code=403, detail="Checkout session does not belong to this workspace")
+        applied = False
+        if session.status == "complete" and session.payment_status == "paid":
+            applied = _apply_paid_checkout_session(db, session)
+        return {
+            "status": session.status,
+            "payment_status": session.payment_status,
+            "applied": applied,
+        }
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -365,7 +557,7 @@ async def billing_portal(
     """Create a Stripe Customer Portal session for self-service billing."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
-    stripe.api_key = settings.stripe_secret_key
+    _configure_stripe()
 
     sub = db.query(Subscription).filter(
         Subscription.workspace_id == current_user.workspace_id
@@ -402,6 +594,9 @@ async def stripe_webhook(
     data = event["data"]["object"]
 
     is_checkout_completed = event_type == "checkout.session.completed"
+    if is_checkout_completed:
+        _apply_paid_checkout_session(db, data)
+
     is_subscription_checkout = is_checkout_completed and data.get("mode") == "subscription"
 
     if event_type in ("customer.subscription.updated", "customer.subscription.created") or is_subscription_checkout:
@@ -429,8 +624,7 @@ async def stripe_webhook(
 
             sub.billing_cycle = data.get("metadata", {}).get("billing_cycle", sub.billing_cycle or "monthly")
             resolved_plan = PLANS.get(sub.plan.value, PLANS["starter"])
-            resolved_price_key = "price_yearly_cents" if sub.billing_cycle == "yearly" else "price_monthly_cents"
-            resolved_amount = resolved_plan.get(resolved_price_key) or 0
+            resolved_amount = resolved_plan.get("activation_cents") or 0
             sub.amount_cents = str(resolved_amount)
             sub.monthly_credits_included = str(resolved_plan.get("monthly_credits_included") or 0)
 
@@ -469,20 +663,95 @@ async def stripe_webhook(
                 sub.canceled_at = datetime.utcnow()
                 db.commit()
 
-    if event_type == "checkout.session.completed":
-        # Handle token pack purchases (one-time payments)
-        session = data
-        if session.get("mode") == "payment":
-            workspace_id = session.get("metadata", {}).get("workspace_id")
-            credits = session.get("metadata", {}).get("credits")
-            if workspace_id and credits:
-                _credit_token_wallet(
-                    db, workspace_id, int(credits),
-                    stripe_checkout_session_id=session.get("id"),
-                    stripe_payment_intent_id=session.get("payment_intent")
-                )
-
     return {"received": True}
+
+
+def _apply_paid_checkout_session(db: Session, session) -> bool:
+    """Idempotently apply a paid Stripe Checkout session to local state."""
+    if session.get("mode") != "payment" or session.get("payment_status") != "paid":
+        return False
+
+    metadata = session.get("metadata", {}) or {}
+    workspace_id = metadata.get("workspace_id")
+    session_id = session.get("id")
+    if not workspace_id or not session_id:
+        return False
+
+    session_type = metadata.get("type")
+    if session_type == "operating_reserve":
+        reserve_units = metadata.get("reserve_units") or metadata.get("credits")
+        if not reserve_units:
+            return False
+        existing = db.query(TokenTransaction).filter(
+            TokenTransaction.stripe_checkout_session_id == session_id,
+            TokenTransaction.transaction_type == "purchase",
+        ).first()
+        if existing:
+            return False
+        _credit_token_wallet(
+            db,
+            workspace_id,
+            int(reserve_units),
+            stripe_checkout_session_id=session_id,
+            stripe_payment_intent_id=session.get("payment_intent"),
+        )
+        return True
+
+    if session_type == "workspace_activation":
+        plan_val = metadata.get("plan", "starter")
+        sub = db.query(Subscription).filter(Subscription.workspace_id == workspace_id).first()
+        if not sub:
+            sub = Subscription(workspace_id=workspace_id)
+            db.add(sub)
+
+        if (sub.subscription_metadata or {}).get("activation_session_id") == session_id:
+            return False
+
+        try:
+            sub.plan = PlanTier(plan_val)
+        except ValueError:
+            sub.plan = PlanTier.STARTER
+        plan_info = PLANS.get(sub.plan.value, PLANS["starter"])
+        sub.status = SubscriptionStatus.ACTIVE
+        sub.billing_cycle = "activation"
+        sub.amount_cents = str(plan_info.get("activation_cents") or 0)
+        sub.monthly_credits_included = "0"
+        if session.get("customer"):
+            sub.stripe_customer_id = session["customer"]
+        if session.get("payment_intent"):
+            sub.subscription_metadata = {
+                **(sub.subscription_metadata or {}),
+                "activation_session_id": session_id,
+                "activation_payment_intent_id": session.get("payment_intent"),
+                "activated_at": datetime.utcnow().isoformat(),
+                "minimum_reserve_cents": metadata.get("minimum_reserve_cents", "0"),
+                "activation_cents": metadata.get("activation_cents", str(plan_info.get("activation_cents") or 0)),
+                "reserve_units": metadata.get("reserve_units", "0"),
+            }
+
+        reserve_units = int(metadata.get("reserve_units") or _reserve_units_from_cents(metadata.get("minimum_reserve_cents")))
+        if reserve_units > 0:
+            existing = db.query(TokenTransaction).filter(
+                TokenTransaction.stripe_checkout_session_id == session_id,
+                TokenTransaction.transaction_type == "purchase",
+            ).first()
+            if not existing:
+                _reset_legacy_non_cash_reserve_before_activation(db, workspace_id, session_id)
+                _credit_token_wallet(
+                    db,
+                    workspace_id,
+                    reserve_units,
+                    stripe_checkout_session_id=session_id,
+                    stripe_payment_intent_id=session.get("payment_intent"),
+                    description="Minimum operating reserve from activation",
+                )
+            else:
+                db.commit()
+        else:
+            db.commit()
+        return True
+
+    return False
 
 
 def _credit_token_wallet(
@@ -491,9 +760,9 @@ def _credit_token_wallet(
     credits: int,
     stripe_checkout_session_id: str = None,
     stripe_payment_intent_id: str = None,
-    description: str = "Token pack purchase"
+    description: str = "Operating reserve funding"
 ):
-    """Credit token wallet for a workspace."""
+    """Credit operating reserve for a workspace."""
     # Get or create wallet
     wallet = db.query(TokenWallet).filter(
         TokenWallet.workspace_id == workspace_id
@@ -520,7 +789,8 @@ def _credit_token_wallet(
         balance_after=balance_after,
         stripe_checkout_session_id=stripe_checkout_session_id,
         stripe_payment_intent_id=stripe_payment_intent_id,
-        description=description
+        description=description,
+        created_at=datetime.utcnow(),
     )
     db.add(transaction)
     

@@ -83,5 +83,5 @@ class RateLimiter:
         
         # All passed, return lowest remaining
         min_remaining = min(r[1] for r in results)
-        min_reset = min(r[2] for r in results, key=lambda x: x.timestamp())
+        min_reset = min((r[2] for r in results), key=lambda x: x.timestamp())
         return True, min_remaining, min_reset

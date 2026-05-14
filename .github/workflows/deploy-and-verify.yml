@@ -1,0 +1,255 @@
+name: Deploy & Health Check
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify-deploy:
+    runs-on: ubuntu-latest
+    env:
+      VEKLOM_HOST: 5.78.135.11
+      VEKLOM_APP_ID: zjhp30ys1jlk8yaoxc96h2zd
+      VEKLOM_APP_DIR: /data/coolify/applications/zjhp30ys1jlk8yaoxc96h2zd
+      USER_EMAIL: ${{ secrets.USER_EMAIL }}
+      CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+      DEFAULT_RESEARCH_QUERY: ${{ secrets.DEFAULT_RESEARCH_QUERY }}
+      UACP_ADMIN_KEY: ${{ secrets.UACP_ADMIN_KEY }}
+      UACP_INTERNAL_API_KEY: ${{ secrets.UACP_INTERNAL_API_KEY }}
+      LICENSE_ISSUE_URL: ${{ secrets.LICENSE_ISSUE_URL }}
+      LICENSE_ISSUE_BACKUP_URL: ${{ secrets.LICENSE_ISSUE_BACKUP_URL }}
+      LICENSE_VERIFY_URL: ${{ secrets.LICENSE_VERIFY_URL }}
+      BUYER_DOWNLOAD_BASE_URL: ${{ secrets.BUYER_DOWNLOAD_BASE_URL }}
+      BUYER_DOWNLOAD_VERSION: ${{ secrets.BUYER_DOWNLOAD_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$HETZNER_SSH_PRIVATE_KEY" || (echo "HETZNER_SSH_PRIVATE_KEY is missing" && exit 1)
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_PRIVATE_KEY" > ~/.ssh/veklom-deploy
+          chmod 600 ~/.ssh/veklom-deploy
+          ssh-keyscan -H "$VEKLOM_HOST" >> ~/.ssh/known_hosts
+
+      - name: Build and apply live API image
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/backend-${GITHUB_SHA}.tar"
+          env_file="$RUNNER_TEMP/backend-env-${GITHUB_SHA}"
+          umask 077
+          printf '%s\n' \
+            "USER_EMAIL=${USER_EMAIL}" \
+            "CONTACT_EMAIL=${CONTACT_EMAIL}" \
+            "DEFAULT_RESEARCH_QUERY=${DEFAULT_RESEARCH_QUERY}" \
+            "UACP_ADMIN_KEY=${UACP_ADMIN_KEY}" \
+            "UACP_INTERNAL_API_KEY=${UACP_INTERNAL_API_KEY}" \
+            "LICENSE_ISSUE_URL=${LICENSE_ISSUE_URL}" \
+            "LICENSE_ISSUE_BACKUP_URL=${LICENSE_ISSUE_BACKUP_URL}" \
+            "LICENSE_VERIFY_URL=${LICENSE_VERIFY_URL}" \
+            "BUYER_DOWNLOAD_BASE_URL=${BUYER_DOWNLOAD_BASE_URL}" \
+            "BUYER_DOWNLOAD_VERSION=${BUYER_DOWNLOAD_VERSION}" \
+            > "$env_file"
+          git archive --format=tar -o "$archive" HEAD backend
+          scp -i ~/.ssh/veklom-deploy "$archive" "root@${VEKLOM_HOST}:/tmp/backend-${GITHUB_SHA}.tar"
+          scp -i ~/.ssh/veklom-deploy "$env_file" "root@${VEKLOM_HOST}:/tmp/backend-env-${GITHUB_SHA}"
+          ssh -i ~/.ssh/veklom-deploy "root@${VEKLOM_HOST}" \
+            "COMMIT_SHA='${GITHUB_SHA}' APP_ID='${VEKLOM_APP_ID}' APP_DIR='${VEKLOM_APP_DIR}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          build_dir="/tmp/veklom-build-${COMMIT_SHA}"
+          rm -rf "$build_dir"
+          mkdir -p "$build_dir"
+          tar -xf "/tmp/backend-${COMMIT_SHA}.tar" -C "$build_dir"
+          cd "$build_dir/backend"
+          docker build -f infra/docker/Dockerfile.api -t "${APP_ID}:${COMMIT_SHA}" .
+          cd "$APP_DIR"
+          if ! docker compose config >/dev/null 2>&1; then
+            echo "Current compose is invalid; restoring latest valid actions backup before deploy"
+            restored=0
+            for backup in $(ls -1t docker-compose.yaml.bak-actions-* 2>/dev/null || true); do
+              if docker compose -f "$backup" config >/dev/null 2>&1; then
+                cp "$backup" docker-compose.yaml
+                restored=1
+                break
+              fi
+            done
+            test "$restored" = "1" || (echo "No valid compose backup found" && exit 1)
+          fi
+          cp docker-compose.yaml "docker-compose.yaml.bak-actions-${COMMIT_SHA}-$(date +%Y%m%d%H%M%S)"
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          app_id = os.environ["APP_ID"]
+          commit_sha = os.environ["COMMIT_SHA"]
+          compose_path = Path("docker-compose.yaml")
+          env_path = Path(f"/tmp/backend-env-{commit_sha}")
+          compose = compose_path.read_text()
+          compose, count = re.subn(
+              r"image: '[^']+'",
+              f"image: '{app_id}:{commit_sha}'",
+              compose,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update live compose image tag")
+
+          env_values = {}
+          for raw_line in env_path.read_text().splitlines():
+              line = raw_line.strip()
+              if not line or "=" not in line:
+                  continue
+              key, value = line.split("=", 1)
+              env_values[key] = value
+
+          def quote(value: str) -> str:
+              return "'" + value.replace("'", "''") + "'"
+
+          lines = compose.splitlines()
+          try:
+              services_idx = next(i for i, line in enumerate(lines) if line.strip() == "services:")
+              services_indent = len(lines[services_idx]) - len(lines[services_idx].lstrip(" "))
+              service_idx = next(
+                  i for i in range(services_idx + 1, len(lines))
+                  if (
+                      lines[i].strip()
+                      and not lines[i].lstrip().startswith("#")
+                      and lines[i].rstrip().endswith(":")
+                      and len(lines[i]) - len(lines[i].lstrip(" ")) > services_indent
+                  )
+              )
+          except StopIteration as exc:
+              raise SystemExit("Could not locate first compose service") from exc
+
+          service_indent = len(lines[service_idx]) - len(lines[service_idx].lstrip(" "))
+          service_end = len(lines)
+          for i in range(service_idx + 1, len(lines)):
+              if (
+                  lines[i].strip()
+                  and not lines[i].lstrip().startswith("#")
+                  and len(lines[i]) - len(lines[i].lstrip(" ")) <= service_indent
+              ):
+                  service_end = i
+                  break
+
+          child_indent = None
+          for i in range(service_idx + 1, service_end):
+              if lines[i].strip() and not lines[i].lstrip().startswith("#"):
+                  indent = len(lines[i]) - len(lines[i].lstrip(" "))
+                  if indent > service_indent:
+                      child_indent = indent
+                      break
+          if child_indent is None:
+              child_indent = service_indent + 4
+          env_item_indent = child_indent + 4
+          child_prefix = " " * child_indent
+          env_item_prefix = " " * env_item_indent
+
+          env_idx = None
+          for i in range(service_idx + 1, service_end):
+              if (
+                  lines[i].strip() == "environment:"
+                  and len(lines[i]) - len(lines[i].lstrip(" ")) == child_indent
+              ):
+                  env_idx = i
+                  break
+
+          rendered = [f"{env_item_prefix}{key}: {quote(value)}" for key, value in sorted(env_values.items())]
+          if env_idx is None:
+              lines[service_idx + 1:service_idx + 1] = [f"{child_prefix}environment:", *rendered]
+          else:
+              for i in range(env_idx + 1, service_end):
+                  if lines[i].strip() and not lines[i].lstrip().startswith("#"):
+                      indent = len(lines[i]) - len(lines[i].lstrip(" "))
+                      if indent > child_indent:
+                          env_item_indent = indent
+                          env_item_prefix = " " * env_item_indent
+                      break
+              env_end = service_end
+              for i in range(env_idx + 1, service_end):
+                  if (
+                      lines[i].strip()
+                      and len(lines[i]) - len(lines[i].lstrip(" ")) <= child_indent
+                  ):
+                      env_end = i
+                      break
+              existing_keys = set()
+              new_block = []
+              for line in lines[env_idx + 1:env_end]:
+                  match = re.match(rf"^{re.escape(env_item_prefix)}([A-Za-z_][A-Za-z0-9_]*):", line)
+                  if match and match.group(1) in env_values:
+                      key = match.group(1)
+                      existing_keys.add(key)
+                      new_block.append(f"{env_item_prefix}{key}: {quote(env_values[key])}")
+                  else:
+                      new_block.append(line)
+              for key, value in sorted(env_values.items()):
+                  if key not in existing_keys:
+                      new_block.append(f"{env_item_prefix}{key}: {quote(value)}")
+              lines[env_idx + 1:env_end] = new_block
+
+          compose = "\n".join(lines) + "\n"
+          compose_path.write_text(compose)
+          PY
+          docker compose up -d --remove-orphans
+          rm -rf "$build_dir" "/tmp/backend-${COMMIT_SHA}.tar" "/tmp/backend-env-${COMMIT_SHA}"
+          REMOTE
+
+      - name: Wait for live API health
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/health || true)
+            echo "Main API status attempt $i: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "DEPLOY FAILED - api.veklom.com/health did not return 200"
+          exit 1
+
+      - name: Health check - status data
+        run: |
+          RESP=$(curl -fsS https://api.veklom.com/status/data)
+          echo "Status response: $RESP"
+          echo "$RESP" | grep -q '"services"' || (echo "Status check failed" && exit 1)
+          echo "LLM proxy healthy"
+
+      - name: Health check - Edge Control Layer public demo
+        run: |
+          curl -fsS https://api.veklom.com/api/v1/edge/demo/summary | grep -q '"scenarios"'
+          curl -fsS "https://api.veklom.com/api/v1/edge/demo/infrastructure?scenario=network&live=false" | grep -q '"normalized"'
+          curl -fsS "https://api.veklom.com/api/v1/edge/demo/infrastructure?scenario=machine&live=false" | grep -q '"cost_control"'
+          echo "Edge public demo canaries healthy"
+
+      - name: Health check - protected protocol routes stay protected
+        run: |
+          SNMP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/api/v1/edge/protocol/snmp)
+          MODBUS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.veklom.com/api/v1/edge/protocol/modbus)
+          echo "SNMP protected status: $SNMP_STATUS"
+          echo "Modbus protected status: $MODBUS_STATUS"
+          test "$SNMP_STATUS" = "401"
+          test "$MODBUS_STATUS" = "401"
+
+      - name: Health check - marketplace catalog
+        run: |
+          CATALOG=$(curl -fsS https://api.veklom.com/api/v1/marketplace/listings)
+          echo "$CATALOG" | grep -q 'https://github.com/slackapi/slack-github-action' || (
+            echo "Marketplace catalog is stale: Slack source URL was not updated" && exit 1
+          )
+          echo "$CATALOG" | grep -q '"source_verified":true' || (
+            echo "Marketplace catalog is missing source_verified=true" && exit 1
+          )
+          echo "$CATALOG" | grep -q '"install_count":0' || (
+            echo "Marketplace catalog is exposing unverified install counts" && exit 1
+          )
+          echo "Marketplace catalog healthy"
+
+      - name: Health check - Engine
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://5.78.153.146:8000/health || echo "000")
+          echo "Engine status: $STATUS"

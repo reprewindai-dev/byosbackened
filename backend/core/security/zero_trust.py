@@ -19,10 +19,13 @@ _PUBLIC_PATHS = {
     "/status",      # system health - no auth required
     "/status.html",
     "/status/data", # public demo status payload
+    "/status/json",
+    "/status/subscribe",
     "/api/v1/edge/demo/summary",
     "/api/v1/edge/demo/infrastructure",
     "/api/v1/demo/pipeline/stream",
     "/api/v1/demo/pipeline/health",
+    "/api/v1/edge/canary/public",
     "/v1/exec",     # uses its own X-API-Key + tenant RLS auth
     f"{settings.api_prefix}/register",
     f"{settings.api_prefix}/login",
@@ -37,6 +40,8 @@ _PUBLIC_PATHS = {
     f"{settings.api_prefix}/support/chat",
     f"{settings.api_prefix}/payments/webhook",
     f"{settings.api_prefix}/webhooks/resend",
+    f"{settings.api_prefix}/webhooks/qstash/uacp-job",
+    f"{settings.api_prefix}/workflows/uacp-maintenance",
     # Docs now require auth + tokens (100 per view)
     # f"{settings.api_prefix}/docs",      # LOCKED - requires auth + 100 tokens
     # f"{settings.api_prefix}/redoc",     # LOCKED - requires auth + 100 tokens
@@ -109,9 +114,17 @@ class ZeroTrustMiddleware(BaseHTTPMiddleware):
 
         # Public marketplace browsing endpoints (read-only)
         if method == "GET":
-            listings_base = f"{settings.api_prefix}/listings"
-            if path == listings_base or path.startswith(listings_base + "/"):
-                return await call_next(request)
+            public_marketplace_bases = (
+                f"{settings.api_prefix}/listings",
+                f"{settings.api_prefix}/categories",
+                f"{settings.api_prefix}/evidence",
+                f"{settings.api_prefix}/marketplace/listings",
+                f"{settings.api_prefix}/marketplace/categories",
+                f"{settings.api_prefix}/marketplace/evidence",
+            )
+            for base in public_marketplace_bases:
+                if path == base or path.startswith(base + "/"):
+                    return await call_next(request)
 
         if path.endswith(_PUBLIC_STATIC_SUFFIXES):
             return await call_next(request)

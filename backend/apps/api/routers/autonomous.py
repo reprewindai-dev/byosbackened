@@ -1,4 +1,6 @@
 """Autonomous optimization endpoints."""
+import hashlib
+import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from db.session import get_db
@@ -20,6 +22,33 @@ routing_optimizer_ml = get_routing_optimizer_ml()
 quality_predictor_ml = get_quality_predictor_ml()
 quality_optimizer = get_quality_optimizer()
 training_pipeline = get_training_pipeline()
+_HOT_AUTONOMOUS_CACHE: dict[str, tuple[float, dict]] = {}
+_HOT_AUTONOMOUS_TTL_SECONDS = 30.0
+
+
+def _cache_get(key: str) -> Optional[dict]:
+    cached = _HOT_AUTONOMOUS_CACHE.get(key)
+    if not cached:
+        return None
+    expiry, payload = cached
+    if expiry <= time.time():
+        _HOT_AUTONOMOUS_CACHE.pop(key, None)
+        return None
+    return payload
+
+
+def _cache_set(key: str, payload: dict) -> None:
+    now = time.time()
+    _HOT_AUTONOMOUS_CACHE[key] = (now + _HOT_AUTONOMOUS_TTL_SECONDS, payload)
+    if len(_HOT_AUTONOMOUS_CACHE) > 8000:
+        expired = [k for k, (expiry, _) in _HOT_AUTONOMOUS_CACHE.items() if expiry <= now]
+        for k in expired[:4000]:
+            _HOT_AUTONOMOUS_CACHE.pop(k, None)
+
+
+def _predict_key(*parts: object) -> str:
+    raw = "|".join(str(part) for part in parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 class MLPredictionRequest(BaseModel):
@@ -43,6 +72,19 @@ async def predict_cost_ml(
 ):
     """Predict cost using ML model (workspace-specific)."""
     from datetime import datetime
+    cache_key = _predict_key(
+        "autonomous_cost_predict",
+        workspace_id,
+        request.operation_type,
+        request.provider,
+        request.input_tokens,
+        request.estimated_output_tokens,
+        request.model or "",
+        datetime.utcnow().hour,
+    )
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
     
     prediction = cost_predictor_ml.predict_cost(
         workspace_id=workspace_id,
@@ -54,13 +96,15 @@ async def predict_cost_ml(
         time_of_day=datetime.utcnow().hour,
     )
     
-    return {
+    response = {
         "predicted_cost": str(prediction["predicted_cost"]),
         "confidence_lower": str(prediction["confidence_lower"]),
         "confidence_upper": str(prediction["confidence_upper"]),
         "is_ml_prediction": prediction.get("is_ml_prediction", False),
         "model_version": prediction.get("model_version"),
     }
+    _cache_set(cache_key, response)
+    return response
 
 
 @router.post("/routing/select")
@@ -151,6 +195,16 @@ async def predict_quality_ml(
     db: Session = Depends(get_db),
 ):
     """Predict quality score before running operation."""
+    cache_key = _predict_key(
+        "autonomous_quality_predict",
+        workspace_id,
+        operation_type,
+        provider,
+        (input_text or "")[:1024],
+    )
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
     prediction = quality_predictor_ml.predict_quality(
         workspace_id=workspace_id,
         operation_type=operation_type,
@@ -159,13 +213,15 @@ async def predict_quality_ml(
         db=db,
     )
     
-    return {
+    response = {
         "predicted_quality": prediction["predicted_quality"],
         "confidence_lower": prediction["confidence_lower"],
         "confidence_upper": prediction["confidence_upper"],
         "is_ml_prediction": prediction.get("is_ml_prediction", False),
         "model_version": prediction.get("model_version"),
     }
+    _cache_set(cache_key, response)
+    return response
 
 
 @router.post("/quality/optimize")
@@ -197,6 +253,16 @@ async def predict_failure_risk(
     db: Session = Depends(get_db),
 ):
     """Predict if operation is likely to fail before running."""
+    cache_key = _predict_key(
+        "autonomous_failure_risk",
+        workspace_id,
+        operation_type,
+        provider,
+        (input_text or "")[:1024],
+    )
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
     risk = quality_optimizer.predict_failure_risk(
         workspace_id=workspace_id,
         operation_type=operation_type,
@@ -205,6 +271,7 @@ async def predict_failure_risk(
         db=db,
     )
     
+    _cache_set(cache_key, risk)
     return risk
 
 

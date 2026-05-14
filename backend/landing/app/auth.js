@@ -221,6 +221,10 @@ const VK = {
     return this.request("/wallet/balance");
   },
 
+  async getMonitoringDashboard() {
+    return this.request("/monitoring/dashboard");
+  },
+
   async aiComplete({ model, prompt, max_tokens = 512 }) {
     return this.request("/ai/complete", {
       method: "POST",
@@ -230,6 +234,14 @@ const VK = {
 
   async getGithubRepos() {
     return this.request("/auth/github/repos");
+  },
+
+  async getConnectedAccounts() {
+    return this.request("/auth/connected-accounts", { method: "GET" });
+  },
+
+  async unlinkGithubAccount() {
+    return this.request("/auth/connected-accounts/github", { method: "DELETE" });
   },
 
   async marketplaceList(status_filter = null) {

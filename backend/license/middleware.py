@@ -31,6 +31,15 @@ LICENSE_EXEMPT_PATHS = {
     "/api/v1/auth/register",
 }
 
+LICENSE_EXEMPT_PREFIXES = (
+    "/api/v1/internal/operators",
+    "/api/v1/internal/uacp",
+)
+
+
+def _is_license_exempt_path(path: str) -> bool:
+    return path in LICENSE_EXEMPT_PATHS or any(path.startswith(prefix) for prefix in LICENSE_EXEMPT_PREFIXES)
+
 
 async def bootstrap_license_check() -> LicenseValidationResult:
     """Run the startup license check and cache the result."""
@@ -64,7 +73,7 @@ class LicenseGateMiddleware(BaseHTTPMiddleware):
         if not settings.license_enforcement_enabled:
             return await call_next(request)
 
-        if request.url.path in LICENSE_EXEMPT_PATHS:
+        if _is_license_exempt_path(request.url.path):
             return await call_next(request)
 
         result = await self._refresh_if_needed()

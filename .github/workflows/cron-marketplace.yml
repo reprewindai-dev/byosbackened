@@ -1,0 +1,52 @@
+name: Marketplace Automation Cron
+
+on:
+  schedule:
+    - cron: "15 */5 * * 1"
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  run-marketplace-automation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger marketplace automation endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+          MARKETPLACE_AUTOMATION_API_KEY: ${{ secrets.MARKETPLACE_AUTOMATION_API_KEY }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+        run: |
+          set -euo pipefail
+          WORKER_KEY="${MARKETPLACE_AUTOMATION_API_KEY:-${INTERNAL_API_KEY:-}}"
+          if [ -z "$WORKER_KEY" ]; then
+            echo "MARKETPLACE_AUTOMATION_API_KEY and INTERNAL_API_KEY are not configured; marketplace automation cannot run."
+            exit 1
+          fi
+          if [ -z "${MARKETPLACE_AUTOMATION_API_KEY:-}" ]; then
+            echo "MARKETPLACE_AUTOMATION_API_KEY missing; using INTERNAL_API_KEY break-glass fallback until scoped key is minted."
+          fi
+          curl -X POST "$BACKEND_URL/api/v1/marketplace/automation/run" \
+            -H "Authorization: Bearer $WORKER_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger":"cron","source":"github-actions"}' \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            --fail --silent --show-error
+
+      - name: Open incident issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: marketplace automation may not classify/validate queued listings until this is resolved.
+          EOF
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "[OPS] Marketplace automation cron failed" \
+            --body-file incident.md

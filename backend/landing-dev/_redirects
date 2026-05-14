@@ -1,0 +1,37 @@
+# Cloudflare Pages redirects for veklom.dev
+
+http://veklom.dev/*  https://veklom.dev/:splat  301
+http://www.veklom.dev/*  https://veklom.dev/:splat  301
+https://www.veklom.dev/*  https://veklom.dev/:splat  301
+
+/backend          /platform/#runtime      302
+/backend/         /platform/#runtime      302
+/runtime          /platform/#runtime      302
+/runtime/         /platform/#runtime      302
+/contract         /platform/#contract     302
+/contract/        /platform/#contract     302
+/routes           /platform/#routes       302
+/routes/          /platform/#routes       302
+/platform         /platform/index.html  200
+/platform/        /platform/index.html  200
+/demo             /demo/index.html  200
+/demo/            /demo/index.html  200
+
+/status           /status/index.html  200
+/status/          /status/index.html  200
+/status.html      /status/index.html  301
+
+/legal/terms.html     /legal/terms     301
+/legal/privacy.html   /legal/privacy   301
+/legal/sla.html       /legal/sla       301
+/legal/license.html   /legal/license   301
+/legal/refunds.html   /legal/refunds   301
+
+/gpc              https://veklom.com/gpc/  302
+/gpc/             https://veklom.com/gpc/  302
+/pricing          https://veklom.com/#pricing  302
+/pricing/         https://veklom.com/#pricing  302
+/signup           https://veklom.com/signup/  302
+/signup/          https://veklom.com/signup/  302
+
+https://veklom-dev-acquisition.pages.dev/*  https://veklom.dev/:splat  301

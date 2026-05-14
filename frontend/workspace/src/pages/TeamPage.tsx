@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -13,6 +14,9 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
+import { actionUnavailableMessage, isRouteUnavailable } from "@/lib/errors";
+import { ProofStrip, RunStatePanel, type FlowStatus } from "@/components/workspace/FlowPrimitives";
+import { useAuthStore } from "@/store/auth-store";
 
 interface TeamUser {
   id: string;
@@ -36,9 +40,54 @@ interface Invite {
   token?: string;
 }
 
+interface MfaSetup {
+  secret: string;
+  provisioning_uri: string;
+  qr_url: string;
+}
+
+interface MfaEnableResponse {
+  message: string;
+  mfa_enabled: boolean;
+  audit_event: string;
+  backup_codes: string[];
+}
+
+interface MfaRecoveryCodeStatus {
+  backup_codes_remaining: number;
+  backup_codes_total: number;
+}
+
 async function listMembers(): Promise<TeamUser[]> {
-  const resp = await api.get<{ items: TeamUser[] }>("/workspace/members");
-  return resp.data.items ?? [];
+  try {
+    const resp = await api.get<{ items: TeamUser[] }>("/workspace/members");
+    return resp.data.items ?? [];
+  } catch (err) {
+    if (!isRouteUnavailable(err)) throw err;
+    const me = await api.get<{
+      id: string;
+      email: string;
+      full_name?: string | null;
+      role: string;
+      status: string;
+      mfa_enabled: boolean;
+      last_login?: string | null;
+      created_at: string;
+    }>("/auth/me");
+    return [
+      {
+        id: me.data.id,
+        email: me.data.email,
+        full_name: me.data.full_name ?? null,
+        role: me.data.role,
+        status: me.data.status,
+        is_active: me.data.status === "active",
+        mfa_enabled: me.data.mfa_enabled,
+        last_login: me.data.last_login ?? null,
+        created_at: me.data.created_at,
+      },
+    ];
+  }
 }
 
 async function listInvites(): Promise<Invite[]> {
@@ -52,6 +101,18 @@ async function listInvites(): Promise<Invite[]> {
   }
 }
 
+async function probeInviteRoute(): Promise<"available" | "forbidden" | "unavailable"> {
+  try {
+    await api.get<{ items: Invite[] }>("/workspace/members/invites");
+    return "available";
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 403) return "forbidden";
+    if (isRouteUnavailable(err)) return "unavailable";
+    throw err;
+  }
+}
+
 const ROLE_STYLE: Record<string, string> = {
   owner: "v-chip-brass",
   admin: "v-chip-brass",
@@ -60,18 +121,55 @@ const ROLE_STYLE: Record<string, string> = {
   billing: "",
 };
 
+function buildInviteLink(invite: Invite): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://veklom.com";
+  return `${origin}/accept-invite?invite_secret=${encodeURIComponent(invite.token ?? "")}`;
+}
+
+async function setupMfa(): Promise<MfaSetup> {
+  const resp = await api.post<MfaSetup>("/auth/mfa/setup", {});
+  return resp.data;
+}
+
+async function verifyMfa(code: string): Promise<MfaEnableResponse> {
+  const resp = await api.post<MfaEnableResponse>("/auth/mfa/verify", null, { params: { code } });
+  return resp.data;
+}
+
+async function fetchRecoveryCodeStatus(): Promise<MfaRecoveryCodeStatus> {
+  const resp = await api.get<MfaRecoveryCodeStatus>("/auth/mfa/recovery-codes/status");
+  return resp.data;
+}
+
 export function TeamPage() {
   const qc = useQueryClient();
+  const location = useLocation();
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
   const [showInvite, setShowInvite] = useState(false);
+  const [showMfa, setShowMfa] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [issuedInvite, setIssuedInvite] = useState<Invite | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaQrFailed, setMfaQrFailed] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [backupCodesConfirmed, setBackupCodesConfirmed] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["team-members"],
     queryFn: listMembers,
   });
   const invitesQ = useQuery({ queryKey: ["team-invites"], queryFn: listInvites });
+  const recoveryStatusQ = useQuery({
+    queryKey: ["mfa-recovery-status"],
+    queryFn: fetchRecoveryCodeStatus,
+    enabled: currentUserIsAuthed(user),
+    retry: false,
+  });
+  const inviteRouteQ = useQuery({ queryKey: ["team-invite-route"], queryFn: probeInviteRoute, retry: false });
+  const inviteRouteUnavailable = inviteRouteQ.data === "unavailable";
 
   const inviteMut = useMutation({
     mutationFn: async (payload: { email: string; role: string }) => {
@@ -92,6 +190,20 @@ export function TeamPage() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["team-invites"] }),
   });
 
+  const mfaSetupMut = useMutation({
+    mutationFn: setupMfa,
+  });
+
+  const mfaVerifyMut = useMutation({
+    mutationFn: verifyMfa,
+    onSuccess: (data) => {
+      if (user) setUser({ ...user, mfa_enabled: true });
+      qc.invalidateQueries({ queryKey: ["team-members"] });
+      qc.invalidateQueries({ queryKey: ["mfa-recovery-status"] });
+      setBackupCodes(data.backup_codes);
+    },
+  });
+
   const stats = useMemo(() => {
     const users = data ?? [];
     return {
@@ -109,6 +221,19 @@ export function TeamPage() {
   }, [isError, error]);
 
   const pendingInvites = (invitesQ.data ?? []).filter((i) => i.status === "pending");
+  const currentMember = (data ?? []).find((member) => member.id === user?.id || member.email === user?.email);
+  const currentMfaEnabled = currentMember?.mfa_enabled ?? user?.mfa_enabled ?? false;
+  const teamFlowStatus: FlowStatus = inviteMut.isPending || revokeMut.isPending || mfaSetupMut.isPending || mfaVerifyMut.isPending
+    ? "running"
+    : inviteMut.isError || revokeMut.isError || mfaSetupMut.isError || mfaVerifyMut.isError || (isError && !adminOnly)
+      ? "failed"
+      : inviteRouteUnavailable
+        ? "unavailable"
+        : issuedInvite || inviteMut.isSuccess || mfaVerifyMut.isSuccess
+          ? "succeeded"
+          : "idle";
+  const teamFlowError = inviteMut.error || revokeMut.error || mfaSetupMut.error || mfaVerifyMut.error || (!adminOnly ? error : null);
+  const mfaGuardRedirected = Boolean((location.state as { mfaRequired?: boolean } | null)?.mfaRequired);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -130,10 +255,132 @@ export function TeamPage() {
             <span className="v-chip">SAML / SCIM (coming)</span>
           </div>
         </div>
-        <button className="v-btn-primary" onClick={() => setShowInvite(true)}>
-          <Mail className="h-4 w-4" /> Invite member
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {!currentMfaEnabled && (
+            <button
+              className="v-btn-ghost"
+              onClick={() => {
+                setMfaQrFailed(false);
+                setShowMfa(true);
+                mfaSetupMut.mutate();
+              }}
+            >
+              <ShieldCheck className="h-4 w-4" /> Set up MFA
+            </button>
+          )}
+          <button className="v-btn-primary" disabled={inviteRouteUnavailable} onClick={() => setShowInvite(true)}>
+            <Mail className="h-4 w-4" /> Invite member
+          </button>
+        </div>
       </header>
+
+      <RunStatePanel
+        eyebrow="Team loop"
+        title="Invite, assign role, enforce MFA, and keep an audit trail"
+        status={teamFlowStatus}
+        summary="Team actions stay on this page: load members, create an invite, copy the one-time link, revoke if needed, and prove MFA posture from live auth routes."
+        steps={[
+          {
+            label: "Member directory",
+            status: isLoading || invitesQ.isLoading ? "running" : isError && !adminOnly ? "failed" : "succeeded",
+            detail: adminOnly ? "current role cannot enumerate members" : "/workspace/members",
+          },
+          {
+            label: "Invite member",
+            status: inviteMut.isPending ? "running" : inviteMut.isError ? "failed" : issuedInvite || inviteMut.isSuccess ? "succeeded" : "idle",
+            detail: inviteRouteUnavailable ? "invite route unavailable" : pendingInvites.length ? `${pendingInvites.length} pending` : "ready",
+          },
+          {
+            label: "MFA setup",
+            status: mfaSetupMut.isPending || mfaVerifyMut.isPending ? "running" : mfaSetupMut.isError || mfaVerifyMut.isError ? "failed" : currentMfaEnabled ? "succeeded" : "idle",
+            detail: currentMfaEnabled
+              ? `${recoveryStatusQ.data?.backup_codes_remaining ?? 0} backup codes remaining`
+              : "TOTP not enabled",
+          },
+          {
+            label: "Audit posture",
+            status: data || issuedInvite || pendingInvites.length ? "succeeded" : "idle",
+            detail: "member, invite, and auth state are backend-sourced",
+          },
+        ]}
+        metrics={[
+          { label: "members", value: String(stats.total) },
+          { label: "pending", value: String(pendingInvites.length) },
+          { label: "MFA", value: `${stats.mfa} / ${stats.total}` },
+          { label: "Backup codes", value: recoveryStatusQ.data ? `${recoveryStatusQ.data.backup_codes_remaining} left` : "pending" },
+          { label: "role", value: currentMember?.role ?? user?.role ?? "unknown" },
+        ]}
+        error={teamFlowError}
+        actions={[
+          { label: "Invite member", onClick: () => setShowInvite(true), disabled: inviteRouteUnavailable, primary: true },
+          {
+            label: currentMfaEnabled ? "MFA enabled" : "Set up MFA",
+          onClick: () => {
+            setMfaQrFailed(false);
+            setShowMfa(true);
+            mfaSetupMut.mutate();
+          },
+            disabled: currentMfaEnabled || mfaSetupMut.isPending,
+          },
+          { label: "Refresh team", onClick: () => void refetch(), disabled: isLoading },
+          { label: "View evidence", href: "/compliance" },
+        ]}
+      />
+
+      <ProofStrip
+        items={[
+          { label: "Members source", value: adminOnly ? "/auth/me fallback" : "/workspace/members" },
+          { label: "Invite source", value: inviteRouteUnavailable ? "unavailable" : "/workspace/members/invites" },
+          { label: "MFA source", value: "/auth/mfa/setup + verify" },
+          { label: "Latest proof", value: issuedInvite ? `invite ${issuedInvite.status}` : currentMfaEnabled ? `${recoveryStatusQ.data?.backup_codes_remaining ?? 0} backup codes` : "awaiting action" },
+        ]}
+      />
+
+      {!currentMfaEnabled && (
+        <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          <ShieldX className="mt-0.5 h-4 w-4" />
+          <div className="flex-1">
+            <div className="font-semibold">
+              {mfaGuardRedirected ? "Sensitive workspace actions require MFA" : "MFA is off for the signed-in account"}
+            </div>
+            <div className="mt-0.5 text-xs text-bone-2">
+              {mfaGuardRedirected
+                ? "Command Center, Vault, Billing, and Settings are gated until MFA is re-enabled. Finish setup here, save your backup codes, and then return."
+                : "Enable TOTP before showing regulated buyers this workspace. The setup flow writes to the live auth backend."}
+            </div>
+          </div>
+          <button
+            className="v-btn-ghost"
+            onClick={() => {
+              setMfaQrFailed(false);
+              setBackupCodes(null);
+              setBackupCodesConfirmed(false);
+              setShowMfa(true);
+              mfaSetupMut.mutate();
+            }}
+          >
+            Set up now
+          </button>
+        </div>
+      )}
+      {currentMfaEnabled && (recoveryStatusQ.data?.backup_codes_remaining ?? 0) === 0 && (
+        <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          <ShieldX className="mt-0.5 h-4 w-4" />
+          <div className="flex-1">
+            <div className="font-semibold">Backup code inventory is depleted</div>
+            <div className="mt-0.5 text-xs text-bone-2">
+              Regenerate MFA backup codes before relying on this workspace for operator access.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteRouteUnavailable && (
+        <div className="v-card border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
+          Team invite delivery is not enabled on the live backend yet. Current signed-in identity is shown from{" "}
+          <span className="font-mono">/api/v1/auth/me</span> until the member directory route is available.
+        </div>
+      )}
 
       {adminOnly && (
         <div className="v-card flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
@@ -286,6 +533,135 @@ export function TeamPage() {
         </section>
       )}
 
+      {showMfa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm">
+          <div className="v-card w-full max-w-lg p-5">
+            <header className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Set up MFA</h3>
+                <p className="mt-1 text-sm text-bone-2">Scan the QR code with an authenticator app, then enter the 6-digit code.</p>
+              </div>
+              <button
+                className="text-muted hover:text-bone"
+                onClick={() => {
+                  setShowMfa(false);
+                  setMfaCode("");
+                  setBackupCodes(null);
+                  setBackupCodesConfirmed(false);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            {mfaSetupMut.isPending && <div className="py-8 text-center font-mono text-[12px] text-muted">creating MFA secret...</div>}
+            {mfaSetupMut.isError && (
+              <div className="text-[12px] text-crimson">{actionUnavailableMessage(mfaSetupMut.error, "MFA setup")}</div>
+            )}
+            {mfaSetupMut.data && (
+              <div className="space-y-4">
+                {!backupCodes && (
+                  <div className="rounded-md border border-brass/40 bg-brass/5 p-3 text-[12px] text-brass-2">
+                    Save your backup codes after verification. If you lose your authenticator and do not have backup codes, you may lose access.
+                  </div>
+                )}
+                <div className="flex flex-col gap-4 md:flex-row">
+                  <div className="grid h-44 w-44 place-items-center rounded-md border border-rule bg-white p-2 text-center">
+                    {mfaQrFailed ? (
+                      <div className="px-2 font-mono text-[10px] uppercase tracking-[0.12em] text-ink">
+                        QR unavailable. Use manual secret.
+                      </div>
+                    ) : (
+                      <img
+                        src={mfaSetupMut.data.qr_url}
+                        alt="MFA QR code"
+                        className="h-40 w-40"
+                        onError={() => setMfaQrFailed(true)}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="v-label">Manual secret</div>
+                    <div className="break-all rounded-md border border-rule bg-ink-1/70 p-2 font-mono text-[11px] text-bone">
+                      {mfaSetupMut.data.secret}
+                    </div>
+                    <button
+                      className="v-btn-ghost mt-2 h-8 px-3 text-xs"
+                      onClick={() => navigator.clipboard?.writeText(mfaSetupMut.data!.secret)}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copy secret
+                    </button>
+                  </div>
+                </div>
+                <label className="block">
+                  <div className="v-label">Authenticator code</div>
+                  <input
+                    className="v-input w-full font-mono"
+                    inputMode="numeric"
+                    value={mfaCode}
+                    onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="123456"
+                  />
+                </label>
+                {mfaVerifyMut.isError && (
+                  <div className="text-[12px] text-crimson">{actionUnavailableMessage(mfaVerifyMut.error, "MFA verification")}</div>
+                )}
+                {backupCodes ? (
+                  <div className="space-y-3 rounded-md border border-rule bg-ink-1/70 p-3">
+                    <div className="font-semibold text-bone">Backup codes</div>
+                    <div className="grid grid-cols-2 gap-2 font-mono text-[12px] text-bone">
+                      {backupCodes.map((code) => (
+                        <div key={code} className="rounded border border-rule bg-ink px-2 py-1">{code}</div>
+                      ))}
+                    </div>
+                    <label className="flex items-start gap-2 text-[12px] text-bone-2">
+                      <input
+                        type="checkbox"
+                        checked={backupCodesConfirmed}
+                        onChange={(event) => setBackupCodesConfirmed(event.target.checked)}
+                      />
+                      <span>I saved these backup codes in a safe place.</span>
+                    </label>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        className="v-btn-ghost"
+                        onClick={() => navigator.clipboard?.writeText(backupCodes.join("\n"))}
+                      >
+                        <Copy className="h-3.5 w-3.5" /> Copy codes
+                      </button>
+                      <button
+                        className="v-btn-primary"
+                        disabled={!backupCodesConfirmed}
+                        onClick={() => {
+                          setShowMfa(false);
+                          setMfaCode("");
+                          setBackupCodes(null);
+                          setBackupCodesConfirmed(false);
+                        }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end gap-2">
+                    <button className="v-btn-ghost" onClick={() => setShowMfa(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      className="v-btn-primary"
+                      disabled={mfaCode.length !== 6 || mfaVerifyMut.isPending}
+                      onClick={() => mfaVerifyMut.mutate(mfaCode)}
+                    >
+                      {mfaVerifyMut.isPending ? "Verifying..." : "Enable MFA"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 backdrop-blur-sm">
           <div className="v-card w-full max-w-md p-5">
@@ -305,24 +681,23 @@ export function TeamPage() {
               <div className="space-y-3">
                 <div className="text-sm text-bone-2">
                   Invite created for <span className="font-mono text-bone">{issuedInvite.email}</span>.
-                  Share this acceptance link — it will not be shown again.
+                  Share this invite link. It will not be shown again.
                 </div>
                 <div className="flex items-center gap-2">
                   <input
                     readOnly
                     className="v-input w-full font-mono text-[11px]"
-                    value={`${window.location.origin}/accept-invite?token=${issuedInvite.token ?? ""}`}
+                    value={buildInviteLink(issuedInvite)}
                     onFocus={(e) => e.currentTarget.select()}
                   />
                   <button
                     className="v-btn-ghost"
-                    onClick={() =>
-                      navigator.clipboard?.writeText(
-                        `${window.location.origin}/accept-invite?token=${issuedInvite.token ?? ""}`,
-                      )
-                    }
+                    onClick={() => {
+                      navigator.clipboard?.writeText(buildInviteLink(issuedInvite));
+                      setInviteCopied(true);
+                    }}
                   >
-                    <Copy className="h-3.5 w-3.5" /> Copy
+                    <Copy className="h-3.5 w-3.5" /> {inviteCopied ? "Copied" : "Copy"}
                   </button>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
@@ -330,6 +705,7 @@ export function TeamPage() {
                     className="v-btn-ghost"
                     onClick={() => {
                       setIssuedInvite(null);
+                      setInviteCopied(false);
                     }}
                   >
                     Invite another
@@ -339,6 +715,7 @@ export function TeamPage() {
                     onClick={() => {
                       setShowInvite(false);
                       setIssuedInvite(null);
+                      setInviteCopied(false);
                     }}
                   >
                     Done
@@ -377,9 +754,7 @@ export function TeamPage() {
                 </label>
                 {inviteMut.isError && (
                   <div className="text-[12px] text-crimson">
-                    {(inviteMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-                      ?? (inviteMut.error as Error)?.message
-                      ?? "Invite failed"}
+                    {actionUnavailableMessage(inviteMut.error, "Team invites")}
                   </div>
                 )}
                 <div className="flex justify-end gap-2 pt-2">
@@ -403,7 +778,7 @@ export function TeamPage() {
   );
 }
 
-function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="v-card p-4">
       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
@@ -413,4 +788,8 @@ function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; val
       <div className="mt-1.5 text-xl font-semibold text-bone">{value}</div>
     </div>
   );
+}
+
+function currentUserIsAuthed(user: ReturnType<typeof useAuthStore.getState>["user"]) {
+  return Boolean(user?.id);
 }

@@ -16,6 +16,7 @@ from core.security.encryption import encrypt_field
 from db.models import LicenseKey
 from db.session import Base, engine, get_db
 from license.tier import LicenseTier
+from license.server_signing import build_license_payload, sign_license_payload
 from license.stripe_webhook import router as stripe_webhook_router
 
 settings = get_settings()
@@ -52,6 +53,8 @@ class ActivateRequest(BaseModel):
 class VerifyRequest(BaseModel):
     license_key: str
     machine_fingerprint: str
+    package_name: str = "veklom-backend"
+    package_version: str = "0.1.0"
 
 
 class DeactivateRequest(BaseModel):
@@ -127,7 +130,8 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-@app.post("/issue", response_model=IssueResponse)
+@app.post("/issue", response_model=IssueResponse, include_in_schema=False)
+@app.post("/api/licenses/issue", response_model=IssueResponse)
 async def issue_license(
     payload: IssueRequest,
     x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
@@ -189,13 +193,35 @@ async def activate_license(payload: ActivateRequest, db: Session = Depends(get_d
     return _serialize_license(record)
 
 
-@app.post("/verify", response_model=VerifyResponse)
+def _signed_verify_envelope(record: LicenseKey, status: str, machine_fingerprint: str) -> dict[str, Any]:
+    package_name = getattr(record, "_request_package_name", "veklom-backend")
+    package_version = getattr(record, "_request_package_version", settings.app_version)
+    payload = build_license_payload(
+        license_id=record.id,
+        workspace_id=record.workspace_id,
+        tier=record.tier.value,
+        features={"edge_control_layer": True, "v1_exec": True},
+        machine_fingerprint=machine_fingerprint,
+        package_name=package_name,
+        package_version=package_version,
+        status=status,
+        expires_at=record.expires_at.replace(tzinfo=timezone.utc) if record.expires_at and record.expires_at.tzinfo is None else record.expires_at,
+        grace_until=record.grace_until.replace(tzinfo=timezone.utc) if record.grace_until and record.grace_until.tzinfo is None else record.grace_until,
+    )
+    return sign_license_payload(payload)
+
+
+@app.post("/verify", include_in_schema=False)
+@app.post("/api/licenses/verify")
 async def verify_license(payload: VerifyRequest, db: Session = Depends(get_db)):
     raw_key = _normalize_key(payload.license_key)
     record = db.query(LicenseKey).filter(LicenseKey.key_hash == _key_hash(raw_key)).first()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if not record:
-        return VerifyResponse(valid=False, status="missing", reason="license_not_found")
+        return {"valid": False, "status": "missing", "reason": "license_not_found"}
+
+    record._request_package_name = payload.package_name
+    record._request_package_version = payload.package_version
 
     if record.expires_at and now > record.expires_at:
         record.active = False
@@ -203,68 +229,22 @@ async def verify_license(payload: VerifyRequest, db: Session = Depends(get_db)):
         record.deactivated_at = now
         record.updated_at = now
         db.commit()
-        return VerifyResponse(
-            valid=False,
-            status="expired",
-            reason="license_expired",
-            workspace_id=record.workspace_id,
-            tier=record.tier.value,
-            expires_at=record.expires_at,
-            license_key_prefix=record.key_prefix,
-        )
+        return {"valid": False, "status": "expired", "reason": "license_expired"}
 
     if record.machine_fingerprint and record.machine_fingerprint != payload.machine_fingerprint:
-        return VerifyResponse(
-            valid=False,
-            status="mismatch",
-            reason="machine_fingerprint_mismatch",
-            workspace_id=record.workspace_id,
-            tier=record.tier.value,
-            expires_at=record.expires_at,
-            license_key_prefix=record.key_prefix,
-        )
+        return {"valid": False, "status": "mismatch", "reason": "machine_fingerprint_mismatch"}
 
     if not record.active:
         if record.revoked_reason == "payment_failed" and record.grace_until and now <= record.grace_until:
             record.last_verified_at = now
             db.commit()
-            return VerifyResponse(
-                valid=True,
-                status="grace",
-                reason="payment_failed",
-                workspace_id=record.workspace_id,
-                tier=record.tier.value,
-                expires_at=record.expires_at,
-                grace_until=record.grace_until,
-                machine_fingerprint_bound=record.machine_fingerprint,
-                license_key_prefix=record.key_prefix,
-            )
-        return VerifyResponse(
-            valid=False,
-            status="inactive",
-            reason=record.revoked_reason or "license_inactive",
-            workspace_id=record.workspace_id,
-            tier=record.tier.value,
-            expires_at=record.expires_at,
-            grace_until=record.grace_until,
-            machine_fingerprint_bound=record.machine_fingerprint,
-            license_key_prefix=record.key_prefix,
-        )
+            return _signed_verify_envelope(record, "payment_failed", payload.machine_fingerprint)
+        return {"valid": False, "status": "inactive", "reason": record.revoked_reason or "license_inactive"}
 
     record.last_verified_at = now
     record.updated_at = now
     db.commit()
-    return VerifyResponse(
-        valid=True,
-        status="active",
-        reason="ok",
-        workspace_id=record.workspace_id,
-        tier=record.tier.value,
-        expires_at=record.expires_at,
-        grace_until=record.grace_until,
-        machine_fingerprint_bound=record.machine_fingerprint,
-        license_key_prefix=record.key_prefix,
-    )
+    return _signed_verify_envelope(record, "active", payload.machine_fingerprint)
 
 
 @app.post("/deactivate", response_model=VerifyResponse)

@@ -17,11 +17,14 @@ Base.metadata.create_all(bind=engine)
 @pytest.fixture
 def db():
     """Create test database session."""
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture

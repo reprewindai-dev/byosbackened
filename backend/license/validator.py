@@ -13,7 +13,9 @@ from typing import Any, Optional
 import httpx
 
 from core.config import get_settings
-from license.fingerprint import get_machine_fingerprint
+from license.client_verifier import LicenseVerificationError, verify_signed_license_response
+from license.machine_fingerprint import get_machine_fingerprint
+from license.offline_cache import verify_signed_cache, write_signed_cache
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,9 @@ class LicenseValidationResult:
     tier: str = ""
     expires_at: Optional[datetime] = None
     grace_until: Optional[datetime] = None
+    offline_until: Optional[datetime] = None
+    license_id: str = ""
+    features: Optional[dict[str, Any]] = None
     raw: Optional[dict[str, Any]] = None
 
 
@@ -54,7 +59,7 @@ def _parse_dt(value: Any) -> Optional[datetime]:
 def _normalize_verify_url(url: str) -> str:
     url = (url or "").strip().rstrip("/")
     if not url:
-        return "https://license.veklom.com/verify"
+        return ""
     if url.endswith("/verify"):
         return url
     return f"{url}/verify"
@@ -66,6 +71,19 @@ def _cache_path() -> Path:
     if configured:
         return Path(configured).expanduser().resolve()
     return (Path.home() / ".veklom" / "license-cache.json").resolve()
+
+
+def _public_key_text() -> str:
+    settings = get_settings()
+    if settings.license_public_key:
+        return settings.license_public_key
+    path = Path(settings.license_public_key_path or "license_public_key.pem")
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def _serialize_result(result: LicenseValidationResult) -> dict[str, Any]:
@@ -82,6 +100,8 @@ def _serialize_result(result: LicenseValidationResult) -> dict[str, Any]:
         "expires_at": result.expires_at.isoformat() if result.expires_at else None,
         "workspace_id": result.workspace_id,
         "tier": result.tier,
+        "offline_until": result.offline_until.isoformat() if result.offline_until else None,
+        "license_id": result.license_id,
         "machine_fingerprint": result.machine_fingerprint,
     }
 
@@ -106,19 +126,6 @@ def _read_cache() -> Optional[dict[str, Any]]:
         return None
 
 
-def _cache_allows_startup(cache: dict[str, Any], now: datetime, grace_hours: int) -> bool:
-    if not cache.get("valid"):
-        return False
-    grace_until = _parse_dt(cache.get("grace_until"))
-    if grace_until:
-        return now <= grace_until
-    last_verified = _parse_dt(cache.get("last_verified"))
-    if not last_verified:
-        return False
-    # Default to a conservative grace window from last successful verification.
-    return now <= (last_verified + timedelta(hours=grace_hours))
-
-
 def _get_license_key() -> str:
     settings = get_settings()
     return (settings.license_key or os.getenv("LICENSE_KEY", "")).strip()
@@ -138,14 +145,14 @@ def _build_payload() -> dict[str, Any]:
         "hostname": os.getenv("HOSTNAME", ""),
         "app_name": settings.app_name,
         "app_version": settings.app_version,
+        "package_name": settings.package_name,
+        "package_version": settings.package_version or settings.app_version,
     }
 
 
 def cache_license_result(result: LicenseValidationResult) -> None:
     global _LICENSE_RESULT
     _LICENSE_RESULT = result
-    if result.valid:
-        _write_cache(result)
 
 
 def get_cached_license_result() -> Optional[LicenseValidationResult]:
@@ -155,7 +162,7 @@ def get_cached_license_result() -> Optional[LicenseValidationResult]:
 async def verify_license_once() -> LicenseValidationResult:
     settings = get_settings()
     verify_urls = [
-        _normalize_verify_url(settings.license_verify_url),
+        url for url in [_normalize_verify_url(settings.license_verify_url)] if url
     ]
     backup_url = _normalize_verify_url(settings.license_verify_backup_url)
     if backup_url and backup_url not in verify_urls:
@@ -186,6 +193,18 @@ async def verify_license_once() -> LicenseValidationResult:
         cache_license_result(result)
         return result
 
+    if not verify_urls:
+        result = LicenseValidationResult(
+            valid=False,
+            status="misconfigured",
+            reason="license_verify_url_missing",
+            checked_at=now,
+            machine_fingerprint=machine_fingerprint,
+            license_key_prefix=license_key[:8],
+        )
+        cache_license_result(result)
+        return result
+
     timeout = httpx.Timeout(3.0, connect=1.0)
     payload = None
     last_error: Optional[Exception] = None
@@ -202,25 +221,34 @@ async def verify_license_once() -> LicenseValidationResult:
                 continue
 
     if payload is None:
-        cache = _read_cache()
-        if cache and _cache_allows_startup(cache, now, int(settings.license_cache_grace_hours or 48)):
-            grace_until = _parse_dt(cache.get("grace_until"))
-            expires_at = _parse_dt(cache.get("expires_at"))
+        try:
+            verified = verify_signed_cache(
+                _cache_path(),
+                public_key_text=_public_key_text(),
+                machine_fingerprint=machine_fingerprint,
+                package_name=settings.package_name,
+                package_version=settings.package_version or settings.app_version,
+                now=now,
+            )
             result = LicenseValidationResult(
                 valid=True,
                 status="cached",
                 reason="license_server_unreachable_cache_valid",
                 checked_at=now,
                 machine_fingerprint=machine_fingerprint,
-                license_key_prefix=str(cache.get("key") or ""),
-                workspace_id=str(cache.get("workspace_id") or ""),
-                tier=str(cache.get("tier") or ""),
-                expires_at=expires_at,
-                grace_until=grace_until or (now + timedelta(hours=int(settings.license_cache_grace_hours or 48))),
-                raw={"cache": cache, "error": str(last_error) if last_error else ""},
+                workspace_id=verified.workspace_id,
+                tier=verified.tier,
+                expires_at=verified.expires_at,
+                grace_until=verified.grace_until,
+                offline_until=verified.offline_until,
+                license_id=verified.license_id,
+                features=verified.features,
+                raw={"signed_cache": True, "error": str(last_error) if last_error else ""},
             )
             cache_license_result(result)
             return result
+        except LicenseVerificationError as exc:
+            logger.warning("Signed offline license cache rejected: %s", exc)
 
         result = LicenseValidationResult(
             valid=False,
@@ -233,25 +261,44 @@ async def verify_license_once() -> LicenseValidationResult:
         cache_license_result(result)
         return result
 
-    valid = bool(payload.get("valid"))
-    status = str(payload.get("status") or ("active" if valid else "invalid"))
-    reason = str(payload.get("reason") or "")
-    grace_until = _parse_dt(payload.get("grace_until"))
-    expires_at = _parse_dt(payload.get("expires_at"))
+    try:
+        verified = verify_signed_license_response(
+            payload,
+            public_key_text=_public_key_text(),
+            machine_fingerprint=machine_fingerprint,
+            package_name=settings.package_name,
+            package_version=settings.package_version or settings.app_version,
+            now=now,
+        )
+    except LicenseVerificationError as exc:
+        result = LicenseValidationResult(
+            valid=False,
+            status="invalid",
+            reason=str(exc),
+            checked_at=now,
+            machine_fingerprint=machine_fingerprint,
+            raw={"signed_response_error": str(exc)},
+        )
+        cache_license_result(result)
+        return result
+
     result = LicenseValidationResult(
-        valid=valid,
-        status=status,
-        reason=reason,
+        valid=True,
+        status=verified.status,
+        reason=verified.reason,
         checked_at=now,
         machine_fingerprint=machine_fingerprint,
-        license_key_prefix=str(payload.get("license_key_prefix") or ""),
-        workspace_id=str(payload.get("workspace_id") or ""),
-        tier=str(payload.get("tier") or ""),
-        expires_at=expires_at,
-        grace_until=grace_until,
+        workspace_id=verified.workspace_id,
+        tier=verified.tier,
+        expires_at=verified.expires_at,
+        grace_until=verified.grace_until,
+        offline_until=verified.offline_until,
+        license_id=verified.license_id,
+        features=verified.features,
         raw=payload,
     )
     cache_license_result(result)
+    write_signed_cache(_cache_path(), payload, verified)
     return result
 
 

@@ -29,13 +29,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from apps.api.deps import get_current_user
+from apps.api.deps import APIKeyPrincipal, get_current_user, get_current_workspace_id, require_api_key_scope
 from core.cost_intelligence import CostCalculator
 from db.models import (
     Listing,
     Pipeline,
     PipelineStatus,
     PipelineVersion,
+    SecurityAuditLog,
     User,
     Vendor,
 )
@@ -129,6 +130,24 @@ class PreflightResponse(BaseModel):
     failure_risk: Optional[float] = None
     alternative_providers: list[dict]
     compliance_badges: list[str]
+
+
+class AutomationRunRequest(BaseModel):
+    trigger: str = Field("manual", max_length=64)
+    source: str = Field("api", max_length=120)
+    limit: int = Field(25, ge=1, le=100)
+
+
+class AutomationRunResponse(BaseModel):
+    status: str
+    workspace_id: str
+    trigger: str
+    source: str
+    scanned: int
+    classified: int
+    validation_marked: int
+    pending_review: int
+    generated_at: str
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -231,6 +250,7 @@ def _llm_classify(title: str, description: str, payload: Optional[dict]) -> Opti
     except Exception:
         return None
 
+
     prompt = (
         "You are a marketplace classifier. Given a listing, return ONLY a JSON object with "
         "keys: listing_type, category, tags (array of <= 8 strings), summary (<= 280 chars), "
@@ -267,6 +287,97 @@ def _llm_classify(title: str, description: str, payload: Optional[dict]) -> Opti
     except Exception as exc:
         logger.info(f"LLM classify fallback (using heuristic): {exc}")
         return None
+
+
+@router.post("/automation/run", response_model=AutomationRunResponse)
+async def run_marketplace_automation(
+    payload: AutomationRunRequest,
+    principal: APIKeyPrincipal = Depends(require_api_key_scope("MARKETPLACE_AUTOMATION")),
+    db: Session = Depends(get_db),
+):
+    """Run scheduled marketplace classification and trust-bookkeeping."""
+    workspace_id = principal.workspace_id
+    now = datetime.utcnow()
+    listings = (
+        db.query(Listing)
+        .filter(Listing.workspace_id == workspace_id)
+        .filter(Listing.status.in_(("draft", "pending_review")))
+        .order_by(desc(Listing.updated_at))
+        .limit(payload.limit)
+        .all()
+    )
+    classified = 0
+    validation_marked = 0
+    pending_review = 0
+    for listing in listings:
+        if not listing.auto_classified:
+            data = _heuristic_classify(
+                listing.title,
+                listing.description or "",
+                listing.install_payload if isinstance(listing.install_payload, dict) else None,
+            )
+            listing.listing_type = data["listing_type"]
+            listing.category = data["category"]
+            listing.tags = data["tags"]
+            listing.summary = data["summary"]
+            listing.compliance_badges = data["compliance_badges"]
+            listing.auto_classified = True
+            classified += 1
+
+        if listing.auto_classified and not listing.auto_validated:
+            listing.validation_report = {
+                "status": "needs_review",
+                "checks": {
+                    "schema": "passed" if listing.install_payload else "needs_review",
+                    "classification": "passed",
+                    "human_review": "required",
+                },
+                "source": payload.source,
+                "trigger": payload.trigger,
+                "generated_at": now.isoformat() + "Z",
+            }
+            listing.auto_validated = True
+            validation_marked += 1
+
+        if listing.status == "draft":
+            listing.status = "pending_review"
+            pending_review += 1
+        listing.updated_at = now
+
+    db.add(
+        SecurityAuditLog(
+            workspace_id=workspace_id,
+            user_id=principal.user_id,
+            event_type="marketplace_automation_cron",
+            event_category="automation",
+            success=True,
+            details=json.dumps(
+                {
+                    "api_key_id": principal.api_key_id,
+                    "trigger": payload.trigger,
+                    "source": payload.source,
+                    "scanned": len(listings),
+                    "classified": classified,
+                    "validation_marked": validation_marked,
+                    "pending_review": pending_review,
+                },
+                sort_keys=True,
+            ),
+            created_at=now,
+        )
+    )
+    db.commit()
+    return AutomationRunResponse(
+        status="ok",
+        workspace_id=workspace_id,
+        trigger=payload.trigger,
+        source=payload.source,
+        scanned=len(listings),
+        classified=classified,
+        validation_marked=validation_marked,
+        pending_review=pending_review,
+        generated_at=now.isoformat() + "Z",
+    )
 
 
 def _trust_tier_can_auto_publish(vendor: Vendor) -> bool:

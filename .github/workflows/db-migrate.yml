@@ -1,0 +1,44 @@
+name: Database Migration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/alembic/**'
+      - 'backend/db/migrations/**'
+      - 'backend/db/models/**'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      VEKLOM_HOST: 5.78.135.11
+      VEKLOM_APP_DIR: /data/coolify/applications/zjhp30ys1jlk8yaoxc96h2zd
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$HETZNER_SSH_PRIVATE_KEY" || (echo "HETZNER_SSH_PRIVATE_KEY is missing" && exit 1)
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_PRIVATE_KEY" > ~/.ssh/veklom-deploy
+          chmod 600 ~/.ssh/veklom-deploy
+          ssh-keyscan -H "$VEKLOM_HOST" >> ~/.ssh/known_hosts
+
+      - name: Run Alembic migrations inside live API container
+        run: |
+          ssh -i ~/.ssh/veklom-deploy "root@${VEKLOM_HOST}" \
+            "APP_DIR='${VEKLOM_APP_DIR}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$APP_DIR"
+          service="$(docker compose ps --services | sed -n '1p')"
+          test -n "$service" || (echo "No Coolify API service found" && exit 1)
+          DB_SCHEME="$(docker compose exec -T "$service" python -c "import os; u=os.environ.get('DATABASE_URL') or ''; print('postgres' if u.startswith(('postgresql://','postgres://')) else 'invalid')")"
+          test "$DB_SCHEME" = "postgres" || (echo "Live API container DATABASE_URL is not Postgres" && exit 1)
+          docker compose exec -T "$service" alembic upgrade head
+          docker compose exec -T "$service" alembic current
+          REMOTE
+          echo "Migrations applied"

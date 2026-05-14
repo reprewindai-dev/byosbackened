@@ -1,19 +1,24 @@
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Check,
+  CheckCircle2,
+  Clock3,
   Copy,
   KeyRound,
   Loader2,
   Lock,
+  MoreHorizontal,
   Plus,
-  ShieldCheck,
+  RotateCcw,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, relativeTime } from "@/lib/cn";
+import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
 
 interface ApiKey {
   id: string;
@@ -44,11 +49,7 @@ async function createKey(payload: {
   rate_limit_per_minute: number;
   expires_in_days: number | null;
 }) {
-  const body = {
-    ...payload,
-    expires_in_days: payload.expires_in_days,
-  };
-  const resp = await api.post<ApiKeyCreateResponse>("/auth/api-keys", body);
+  const resp = await api.post<ApiKeyCreateResponse>("/auth/api-keys", payload);
   return resp.data;
 }
 
@@ -59,9 +60,10 @@ async function revokeKey(id: string) {
 export function VaultPage() {
   const qc = useQueryClient();
   const keys = useQuery({ queryKey: ["vault-api-keys"], queryFn: listKeys });
-
   const [creating, setCreating] = useState(false);
   const [justCreated, setJustCreated] = useState<ApiKeyCreateResponse | null>(null);
+  const [selectedKey, setSelectedKey] = useState<ApiKey | null>(null);
+  const [search, setSearch] = useState("");
 
   const create = useMutation({
     mutationFn: createKey,
@@ -77,152 +79,88 @@ export function VaultPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["vault-api-keys"] }),
   });
 
+  const allKeys = keys.data ?? [];
+  const filteredKeys = useMemo(() => filterKeys(allKeys, search), [allKeys, search]);
+  const active = allKeys.filter((key) => key.is_active).length;
+  const revoked = allKeys.filter((key) => !key.is_active).length;
+  const expiring = allKeys.filter((key) => key.expires_at && daysUntil(key.expires_at) <= 30).length;
+
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-            Workspace · Vault
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Sovereign secret store</h1>
-          <p className="mt-2 max-w-2xl text-sm text-bone-2">
-            API keys and integration credentials, sealed at rest with AES-256, injected at runtime, never written
-            to disk. Each key is scoped, rate-limited, and tracked through every request.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="v-chip v-chip-ok">
-              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              live · <span className="font-mono">/api/v1/auth/api-keys</span>
-            </span>
-            <span className="v-chip">AES-256 sealed</span>
-            <span className="v-chip">runtime injection only</span>
-          </div>
-        </div>
-        <button className="v-btn-primary" onClick={() => setCreating(true)} disabled={creating}>
-          <Plus className="h-4 w-4" /> Issue new key
-        </button>
-      </header>
+    <div className="mx-auto w-full max-w-[1400px]">
+      <PageHeader active={active} revoked={revoked} expiring={expiring} onNew={() => setCreating(true)} />
+
+      <RunStatePanel
+        className="mb-4"
+        eyebrow="Key lifecycle"
+        title={justCreated ? "API key issued - copy it now" : "Create, verify, rotate, revoke"}
+        status={create.isPending || revoke.isPending || keys.isFetching ? "running" : create.isError || revoke.isError || keys.isError ? "failed" : justCreated ? "succeeded" : "idle"}
+        summary="Vault uses the live API-key route. Newly issued secrets are shown once, active keys stay visible, and revoke updates the same ledger."
+        steps={[
+          { label: "Key inventory", status: keys.isFetching ? "running" : keys.isError ? "failed" : "succeeded", detail: "/api/v1/auth/api-keys" },
+          { label: "Create key", status: create.isPending ? "running" : justCreated ? "succeeded" : create.isError ? "failed" : "idle", detail: justCreated?.key_prefix ?? "not issued" },
+          { label: "Revoke or rotate", status: revoke.isPending ? "running" : revoke.isError ? "failed" : "idle", detail: "live revoke route" },
+        ]}
+        metrics={[
+          { label: "active", value: String(active) },
+          { label: "revoked", value: String(revoked) },
+          { label: "expiring", value: String(expiring) },
+          { label: "visible result", value: justCreated ? "secret shown once" : "inventory" },
+        ]}
+        error={create.error || revoke.error || keys.error}
+        actions={[
+          { label: "Issue key", onClick: () => setCreating(true), disabled: create.isPending, primary: true },
+          { label: "Refresh inventory", onClick: () => keys.refetch(), disabled: keys.isFetching },
+          { label: "Open monitoring", href: "/monitoring" },
+        ]}
+      />
+
+      <ProofStrip
+        className="mb-4"
+        items={[
+          { label: "inventory", value: keys.data ? "/api/v1/auth/api-keys" : keys.isError ? "unavailable" : "loading" },
+          { label: "created", value: justCreated?.key_prefix ?? "none this session" },
+          { label: "active", value: String(active) },
+          { label: "scope", value: "workspace" },
+        ]}
+      />
 
       {justCreated && <JustCreatedBanner item={justCreated} onDismiss={() => setJustCreated(null)} />}
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCell
-          icon={<KeyRound className="h-3 w-3" />}
-          label="Active keys"
-          value={String(keys.data?.filter((k) => k.is_active).length ?? 0)}
-        />
-        <StatCell
-          icon={<Lock className="h-3 w-3" />}
-          label="Revoked"
-          value={String(keys.data?.filter((k) => !k.is_active).length ?? 0)}
-        />
-        <StatCell
-          icon={<ShieldCheck className="h-3 w-3" />}
-          label="At-rest cipher"
-          value="AES-256"
-        />
-        <StatCell
-          icon={<ShieldCheck className="h-3 w-3" />}
-          label="In-transit"
-          value="TLS 1.3 / mTLS"
-        />
-      </section>
-
       {keys.isError && (
-        <div className="v-card flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+        <div className="frame mb-4 flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
           <AlertCircle className="mt-0.5 h-4 w-4" />
           <div className="flex-1">
             <div className="font-semibold">Failed to load vault</div>
             <div className="mt-0.5 text-xs opacity-80">{(keys.error as Error)?.message ?? "Unknown"}</div>
           </div>
-          <button className="v-btn-ghost" onClick={() => keys.refetch()}>
+          <button className="v-btn-ghost h-8 px-3 text-xs" onClick={() => keys.refetch()}>
             Retry
           </button>
         </div>
       )}
 
-      <section className="v-card p-0">
-        <header className="flex items-center justify-between border-b border-rule px-5 py-3">
-          <div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-              API keys
-            </div>
-            <h3 className="mt-0.5 text-sm font-semibold">
-              Used in <span className="font-mono text-brass-2">X-API-Key</span> header for /v1/exec and tool calls
-            </h3>
-          </div>
-        </header>
+      <section>
+        <SecretsTable
+          keys={filteredKeys}
+          loading={keys.isLoading}
+          query={search}
+          onQuery={setSearch}
+          active={active}
+          revoked={revoked}
+          expiring={expiring}
+          revokePending={revoke.isPending}
+          onInspect={setSelectedKey}
+          onRevoke={(key) => {
+            if (window.confirm(`Revoke "${key.name}"? Active integrations using this key will fail.`)) {
+              revoke.mutate(key.id);
+            }
+          }}
+        />
 
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b border-rule font-mono text-[10px] uppercase tracking-wider text-muted">
-              <th className="px-5 py-2 text-left font-medium">Name</th>
-              <th className="px-5 py-2 text-left font-medium">Prefix</th>
-              <th className="px-5 py-2 text-left font-medium">Scopes</th>
-              <th className="px-5 py-2 text-right font-medium">Rate</th>
-              <th className="px-5 py-2 text-right font-medium">Last used</th>
-              <th className="px-5 py-2 text-right font-medium">Status</th>
-              <th className="px-5 py-2 text-right font-medium" />
-            </tr>
-          </thead>
-          <tbody className="font-mono">
-            {keys.isLoading && (
-              <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-muted">
-                  loading…
-                </td>
-              </tr>
-            )}
-            {!keys.isLoading && keys.data?.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-muted">
-                  No keys yet. Issue one to call the execution API.
-                </td>
-              </tr>
-            )}
-            {keys.data?.map((k) => (
-              <tr key={k.id} className="border-b border-rule/60 last:border-0">
-                <td className="px-5 py-2.5 text-bone">{k.name}</td>
-                <td className="px-5 py-2.5 text-muted">{k.key_prefix}…</td>
-                <td className="px-5 py-2.5">
-                  <div className="flex flex-wrap gap-1">
-                    {k.scopes.map((s) => (
-                      <span key={s} className="v-chip font-mono text-[10px]">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-5 py-2.5 text-right text-bone-2">{k.rate_limit_per_minute}/min</td>
-                <td className="px-5 py-2.5 text-right text-muted">
-                  {k.last_used_at ? relativeTime(k.last_used_at) : "never"}
-                </td>
-                <td className="px-5 py-2.5 text-right">
-                  <span className={cn("v-chip font-mono", k.is_active ? "v-chip-ok" : "v-chip-err")}>
-                    {k.is_active ? "active" : "revoked"}
-                  </span>
-                </td>
-                <td className="px-5 py-2.5 text-right">
-                  {k.is_active && (
-                    <button
-                      className="v-btn-ghost text-crimson hover:bg-crimson/10"
-                      onClick={() => {
-                        if (
-                          confirm(`Revoke “${k.name}”? This cannot be undone. Active integrations will fail.`)
-                        ) {
-                          revoke.mutate(k.id);
-                        }
-                      }}
-                      disabled={revoke.isPending}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Revoke
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mt-4 grid grid-cols-12 gap-4">
+          <ApiKeysPanel keys={filteredKeys} />
+          <VaultPosture active={active} revoked={revoked} expiring={expiring} total={allKeys.length} />
+        </div>
       </section>
 
       {creating && (
@@ -233,37 +171,312 @@ export function VaultPage() {
           error={create.error ? (create.error as Error).message : null}
         />
       )}
+
+      {selectedKey && <KeyDetailDrawer item={selectedKey} onClose={() => setSelectedKey(null)} />}
     </div>
   );
 }
 
-function StatCell({
-  icon,
-  label,
-  value,
+function PageHeader({
+  active,
+  revoked,
+  expiring,
+  onNew,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
+  active: number;
+  revoked: number;
+  expiring: number;
+  onNew: () => void;
 }) {
   return (
-    <div className="v-card p-4">
-      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
-        {icon}
-        {label}
+    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <div className="text-eyebrow">Vault</div>
+        <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">
+          Sovereign secret store
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm text-bone-2">
+          AES-256 at rest, TLS in transit, runtime injection only - secrets never appear in logs.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge tone="ok" dot>
+            live · <span className="font-mono">/api/v1/auth/api-keys</span>
+          </Badge>
+          <Badge tone="primary">
+            <Lock className="h-3 w-3" /> AES-256
+          </Badge>
+          <Badge tone="info">workspace scoped</Badge>
+          <Badge tone="muted">
+            {active} active · {revoked} revoked
+          </Badge>
+          {expiring > 0 && (
+            <Badge tone="warn" dot>
+              {expiring} expiring
+            </Badge>
+          )}
+        </div>
       </div>
-      <div className="mt-1.5 text-xl font-semibold text-bone">{value}</div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70"
+          disabled
+          title="Bulk rotation is not exposed by the live backend yet."
+        >
+          <RotateCcw className="h-3.5 w-3.5" /> Rotate all
+        </button>
+        <button className="v-btn-primary h-8 px-3 text-xs" onClick={onNew}>
+          <Plus className="h-3.5 w-3.5" /> New secret
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function SecretsTable({
+  keys,
+  loading,
+  query,
+  onQuery,
+  active,
+  revoked,
+  expiring,
+  revokePending,
+  onInspect,
+  onRevoke,
+}: {
+  keys: ApiKey[];
+  loading: boolean;
+  query: string;
+  onQuery: (value: string) => void;
+  active: number;
+  revoked: number;
+  expiring: number;
+  revokePending: boolean;
+  onInspect: (key: ApiKey) => void;
+  onRevoke: (key: ApiKey) => void;
+}) {
+  return (
+    <div className="frame overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule/80 px-4 py-3">
+        <label className="flex w-full max-w-[360px] items-center gap-2 rounded-md border border-rule bg-ink-1/70 px-2.5 py-1.5">
+          <Search className="h-4 w-4 text-muted" />
+          <input
+            className="w-full bg-transparent text-[13px] text-bone outline-none placeholder:text-muted"
+            placeholder="Search by name, scope, or prefix..."
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="muted">{active} active</Badge>
+          <Badge tone={expiring ? "warn" : "muted"} dot={expiring > 0}>
+            {expiring} expiring
+          </Badge>
+          <Badge tone="muted">{revoked} revoked</Badge>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[840px] text-[12.5px]">
+          <thead className="border-b border-rule/70 bg-ink-1/70 text-eyebrow">
+            <tr>
+              <th className="px-4 py-2 text-left">Name</th>
+              <th className="px-4 py-2 text-left">Type</th>
+              <th className="px-4 py-2 text-left">Scope</th>
+              <th className="px-4 py-2 text-left">Last used</th>
+              <th className="px-4 py-2 text-left">Rotation</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right" />
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={7} className="px-5 py-8 text-center font-mono text-[12px] text-muted">
+                  loading...
+                </td>
+              </tr>
+            )}
+            {!loading && keys.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-5 py-8 text-center font-mono text-[12px] text-muted">
+                  No keys match this view.
+                </td>
+              </tr>
+            )}
+            {keys.map((key) => (
+              <tr key={key.id} className="border-b border-rule/50 last:border-0 hover-elevate">
+                <td className="px-4 py-2 font-mono text-bone">
+                  <div>{key.name}</div>
+                  <div className="text-[11px] text-muted">{key.key_prefix}...</div>
+                </td>
+                <td className="px-4 py-2 text-muted">API key</td>
+                <td className="px-4 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {key.scopes.map((scope) => (
+                      <Badge key={scope} tone="muted">
+                        {scope}
+                      </Badge>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-muted">{key.last_used_at ? relativeTime(key.last_used_at) : "never"}</td>
+                <td className="px-4 py-2 font-mono text-[11.5px] text-bone-2">
+                  <Clock3 className="mr-1 inline h-3 w-3 text-muted" />
+                  {rotationLabel(key)}
+                </td>
+                <td className="px-4 py-2">
+                  <Badge tone={key.is_active ? (isExpiring(key) ? "warn" : "ok") : "warn"} dot>
+                    {key.is_active ? (isExpiring(key) ? "expiring" : "active") : "revoked"}
+                  </Badge>
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button className="v-btn-ghost h-7 px-2" title="Inspect key metadata" onClick={() => onInspect(key)}>
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                  {key.is_active && (
+                    <button
+                      className="v-btn-ghost ml-1 h-7 px-2 text-crimson hover:bg-crimson/10"
+                      onClick={() => onRevoke(key)}
+                      disabled={revokePending}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function JustCreatedBanner({
-  item,
-  onDismiss,
+function ApiKeysPanel({ keys }: { keys: ApiKey[] }) {
+  return (
+    <div className="frame col-span-12 p-4 lg:col-span-7">
+      <div className="text-eyebrow">API keys</div>
+      <div className="font-display text-[14px] text-bone">Tenant-scoped · per-resource permissions</div>
+      <div className="mt-3 space-y-2">
+        {keys.length === 0 && (
+          <div className="rounded-md border border-dashed border-rule bg-ink-1/40 px-4 py-5 text-sm text-bone-2">
+            No visible keys. Issue one to call governed execution APIs.
+          </div>
+        )}
+        {keys.map((key) => (
+          <div key={key.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rule bg-ink-1/45 px-3 py-2.5">
+            <div className="flex items-start gap-3">
+              <div className="grid h-8 w-8 place-items-center rounded-md bg-brass/15 text-brass-2">
+                <KeyRound className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-[13px] text-bone">{key.name}</div>
+                <div className="font-mono text-[11px] text-muted">{key.key_prefix}...</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {key.scopes.map((scope) => (
+                <Badge key={scope} tone="muted">
+                  {scope}
+                </Badge>
+              ))}
+              <Badge tone={key.is_active ? "ok" : "warn"} dot>
+                {key.is_active ? "active" : "revoked"}
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VaultPosture({
+  active,
+  revoked,
+  expiring,
+  total,
 }: {
-  item: ApiKeyCreateResponse;
-  onDismiss: () => void;
+  active: number;
+  revoked: number;
+  expiring: number;
+  total: number;
 }) {
+  const rows = [
+    { label: "Runtime injection only", value: "X-API-Key / Bearer path" },
+    { label: "One-shot reveal", value: "raw key shown once" },
+    { label: "Per-key rate limits", value: `${active} active configured` },
+    { label: "Revocation", value: `${revoked} revoked` },
+    { label: "Expiration posture", value: expiring ? `${expiring} expiring within 30d` : "no 30d expiries" },
+    { label: "Vault inventory", value: `${total} total keys` },
+  ];
+  return (
+    <div className="frame col-span-12 p-4 lg:col-span-5">
+      <div className="text-eyebrow">Vault posture</div>
+      <div className="font-display text-[14px] text-bone">Governance over storage</div>
+      <ul className="mt-3 space-y-2 text-[12px]">
+        {rows.map((row) => (
+          <li key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-rule bg-ink-1/45 px-3 py-2">
+            <span className="flex items-center gap-2 text-bone-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-moss" />
+              {row.label}
+            </span>
+            <span className="text-right font-mono text-[11px] text-muted">{row.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function KeyDetailDrawer({ item, onClose }: { item: ApiKey; onClose: () => void }) {
+  const rows = [
+    ["Prefix", `${item.key_prefix}...`],
+    ["Status", item.is_active ? "active" : "revoked"],
+    ["Scopes", item.scopes.join(", ") || "none"],
+    ["Rate limit", `${item.rate_limit_per_minute} / min`],
+    ["Created", relativeTime(item.created_at)],
+    ["Last used", item.last_used_at ? relativeTime(item.last_used_at) : "never"],
+    ["Expires", item.expires_at ? rotationLabel(item) : "manual rotation"],
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <button className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Close key details" />
+      <aside className="frame relative h-full w-full max-w-md overflow-y-auto rounded-none border-y-0 border-r-0 p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-eyebrow">Vault key detail</div>
+            <h2 className="font-display mt-1 text-xl font-semibold text-bone">{item.name}</h2>
+            <p className="mt-1 text-sm text-bone-2">
+              Metadata only. Raw secrets are shown once at issue time and are never recoverable from the vault.
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-2">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-3 rounded-md border border-rule bg-ink-1/45 px-3 py-2 text-[12px]">
+              <span className="text-muted">{label}</span>
+              <span className="max-w-[60%] truncate text-right font-mono text-bone">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-md border border-brass/30 bg-brass/5 p-3 text-[12px] text-bone-2">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-brass-2">Operational rule</div>
+          Rotate by issuing a replacement key, updating the integration, then revoking this key. Bulk rotation remains
+          disabled until the backend exposes a safe batch-rotation route.
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function JustCreatedBanner({ item, onDismiss }: { item: ApiKeyCreateResponse; onDismiss: () => void }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(item.raw_key).then(() => {
@@ -272,33 +485,26 @@ function JustCreatedBanner({
     });
   };
   return (
-    <div className="v-card border-brass/50 bg-brass/5 p-5">
+    <div className="frame mb-4 border-brass/50 bg-brass/5 p-5">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-brass-2">
           <KeyRound className="h-3 w-3" />
-          Secret issued — copy now, it will never be shown again
+          Secret issued - copy now, it will never be shown again
         </div>
-        <button
-          onClick={onDismiss}
-          className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone"
-          aria-label="Dismiss"
-        >
+        <button onClick={onDismiss} className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone" aria-label="Dismiss">
           <X className="h-4 w-4" />
         </button>
       </div>
       <div className="mt-2 flex items-center gap-2 rounded-md border border-rule bg-ink-2 px-3 py-2">
         <code className="flex-1 break-all font-mono text-[12px] text-bone">{item.raw_key}</code>
-        <button
-          className={cn("v-btn-ghost shrink-0", copied && "text-moss")}
-          onClick={copy}
-        >
+        <button className={cn("v-btn-ghost shrink-0", copied && "text-moss")} onClick={copy}>
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
       <div className="mt-2 font-mono text-[11px] text-muted">
-        Key <span className="text-bone">{item.name}</span> · prefix{" "}
-        <span className="text-bone">{item.key_prefix}…</span> · scopes {item.scopes.join(", ")}
+        Key <span className="text-bone">{item.name}</span> · prefix <span className="text-bone">{item.key_prefix}...</span> · scopes{" "}
+        {item.scopes.join(", ")}
       </div>
     </div>
   );
@@ -325,8 +531,8 @@ function CreateKeyModal({
   const [rate, setRate] = useState(60);
   const [expiry, setExpiry] = useState<string>("90");
 
-  const toggleScope = (s: string) => {
-    setScopes((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+  const toggleScope = (scope: string) => {
+    setScopes((prev) => (prev.includes(scope) ? prev.filter((x) => x !== scope) : [...prev, scope]));
   };
 
   const submit = () => {
@@ -342,14 +548,10 @@ function CreateKeyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-label="Close" />
-      <div className="relative w-full max-w-md rounded-xl border border-rule bg-ink-1 p-5 shadow-2xl">
+      <div className="frame relative w-full max-w-md p-5 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Issue API key</h2>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone"
-            aria-label="Close"
-          >
+          <h2 className="font-display text-lg font-semibold text-bone">Issue API key</h2>
+          <button onClick={onClose} className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -362,9 +564,9 @@ function CreateKeyModal({
             <input
               id="key-name"
               className="v-input"
-              placeholder="e.g. production-backend"
+              placeholder="production-backend"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.target.value)}
               autoFocus
             />
           </div>
@@ -372,20 +574,18 @@ function CreateKeyModal({
           <div>
             <div className="v-label">Scopes</div>
             <div className="flex flex-wrap gap-2">
-              {AVAILABLE_SCOPES.map((s) => {
-                const on = scopes.includes(s);
+              {AVAILABLE_SCOPES.map((scope) => {
+                const on = scopes.includes(scope);
                 return (
                   <button
-                    key={s}
-                    onClick={() => toggleScope(s)}
+                    key={scope}
+                    onClick={() => toggleScope(scope)}
                     className={cn(
                       "rounded-md border px-3 py-1 font-mono text-[12px] transition",
-                      on
-                        ? "border-brass/50 bg-brass/15 text-brass-2"
-                        : "border-rule bg-white/[0.02] text-muted hover:text-bone",
+                      on ? "border-brass/50 bg-brass/15 text-brass-2" : "border-rule bg-white/[0.02] text-muted hover:text-bone",
                     )}
                   >
-                    {s}
+                    {scope}
                   </button>
                 );
               })}
@@ -404,23 +604,18 @@ function CreateKeyModal({
                 value={rate}
                 min={1}
                 max={10000}
-                onChange={(e) => setRate(parseInt(e.target.value || "60", 10))}
+                onChange={(event) => setRate(parseInt(event.target.value || "60", 10))}
               />
             </div>
             <div>
               <label className="v-label" htmlFor="expiry">
                 Expires
               </label>
-              <select
-                id="expiry"
-                className="v-input"
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-              >
+              <select id="expiry" className="v-input" value={expiry} onChange={(event) => setExpiry(event.target.value)}>
                 <option value="30">30 days</option>
                 <option value="90">90 days</option>
                 <option value="365">1 year</option>
-                <option value="never">Never (not recommended)</option>
+                <option value="never">Never</option>
               </select>
             </div>
           </div>
@@ -436,17 +631,67 @@ function CreateKeyModal({
             <button className="v-btn-ghost flex-1" onClick={onClose} disabled={pending}>
               Cancel
             </button>
-            <button
-              className="v-btn-primary flex-1"
-              onClick={submit}
-              disabled={pending || !name.trim() || scopes.length === 0}
-            >
+            <button className="v-btn-primary flex-1" onClick={submit} disabled={pending || !name.trim() || scopes.length === 0}>
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {pending ? "Issuing…" : "Issue key"}
+              {pending ? "Issuing..." : "Issue key"}
             </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function filterKeys(keys: ApiKey[], query: string): ApiKey[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return keys;
+  return keys.filter((key) =>
+    [key.name, key.key_prefix, key.scopes.join(" ")]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q)),
+  );
+}
+
+function daysUntil(iso: string): number {
+  const target = new Date(iso).getTime();
+  if (!Number.isFinite(target)) return Number.POSITIVE_INFINITY;
+  return Math.ceil((target - Date.now()) / 86400000);
+}
+
+function isExpiring(key: ApiKey): boolean {
+  return Boolean(key.expires_at && daysUntil(key.expires_at) <= 30 && key.is_active);
+}
+
+function rotationLabel(key: ApiKey): string {
+  if (!key.expires_at) return "manual";
+  const days = daysUntil(key.expires_at);
+  if (days < 0) return "expired";
+  if (days === 0) return "today";
+  return `${days} d`;
+}
+
+function Badge({
+  children,
+  tone = "muted",
+  dot,
+}: {
+  children: ReactNode;
+  tone?: "muted" | "primary" | "ok" | "warn" | "info";
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "chip",
+        tone === "muted" && "border-rule bg-white/[0.02] text-bone-2",
+        tone === "primary" && "border-brass/40 bg-brass/5 text-brass-2",
+        tone === "ok" && "border-moss/30 bg-moss/5 text-moss",
+        tone === "warn" && "border-amber/30 bg-amber/5 text-amber",
+        tone === "info" && "border-electric/30 bg-electric/5 text-electric",
+      )}
+    >
+      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+      {children}
+    </span>
   );
 }

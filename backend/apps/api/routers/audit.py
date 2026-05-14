@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from db.session import get_db
 from apps.api.deps import get_current_workspace_id
-from db.models import AIAuditLog
-from core.audit.audit_logger import verify_log
+from db.models import AIAuditLog, WorkspaceRequestLog
+from core.audit.audit_logger import verification_scheme
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -48,6 +48,16 @@ async def get_audit_logs(
     
     total = query.count()
     logs = query.order_by(AIAuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    request_rows = (
+        db.query(WorkspaceRequestLog)
+        .filter(
+            WorkspaceRequestLog.workspace_id == workspace_id,
+            WorkspaceRequestLog.source_table == "ai_audit_logs",
+            WorkspaceRequestLog.source_id.in_([log.id for log in logs] or [""]),
+        )
+        .all()
+    )
+    request_by_source = {row.source_id: row for row in request_rows}
     
     return {
         "total": total,
@@ -55,11 +65,14 @@ async def get_audit_logs(
         "limit": limit,
         "logs": [
             {
+                "log_hash": log.log_hash,
                 "id": log.id,
                 "operation_type": log.operation_type,
                 "provider": log.provider,
                 "model": log.model,
                 "cost": str(log.cost),
+                "latency_ms": request_by_source.get(log.id).latency_ms if request_by_source.get(log.id) else None,
+                "status": request_by_source.get(log.id).status if request_by_source.get(log.id) else "success",
                 "pii_detected": log.pii_detected,
                 "pii_types": log.pii_types,
                 "created_at": log.created_at.isoformat(),
@@ -89,12 +102,23 @@ async def verify_audit_log(
             detail="Audit log not found",
         )
     
-    verified = verify_log(log)
-    
+    scheme = verification_scheme(log)
+    verified = scheme is not None
+    verification_status = "verified" if verified else "inconclusive"
+    reason = None
+    if scheme == "legacy_preflush":
+        verification_status = "verified_legacy"
+        reason = "verified_against_legacy_preflush_hash_scheme"
+    elif not verified:
+        reason = "stored_hash_does_not_match_current_or_legacy_scheme"
+
     return {
         "log_id": log_id,
         "verified": verified,
         "hash_match": verified,
+        "verification_status": verification_status,
+        "reason": reason,
+        "verification_scheme": scheme,
         "log_hash": log.log_hash[:16] + "..." if log.log_hash else None,
     }
 

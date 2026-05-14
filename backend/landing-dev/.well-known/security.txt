@@ -1,0 +1,8 @@
+# Veklom security disclosure policy (RFC 9116)
+# https://veklom.com/.well-known/security.txt
+
+Contact: mailto:security@veklom.com
+Expires: 2027-04-26T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://veklom.com/.well-known/security.txt
+Policy: https://veklom.com/legal/acceptable-use.html

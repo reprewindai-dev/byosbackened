@@ -14,7 +14,8 @@ class Regulation(str, Enum):
     PIPEDA = "pipeda"
     LGPD = "lgpd"
     SOC2 = "soc2"
-    HIPAA = "hipaa"  # Future
+    HIPAA = "hipaa"
+    EU_AI_ACT = "eu_ai_act"
     PCI_DSS = "pci_dss"  # Future
 
 
@@ -55,6 +56,30 @@ class RegulationManager:
                     "access_controls",
                     "audit_logging",
                     "incident_response",
+                ],
+            },
+            Regulation.HIPAA.value: {
+                "name": "Health Insurance Portability and Accountability Act",
+                "region": "United States",
+                "requirements": [
+                    "access_controls",
+                    "audit_trail",
+                    "encryption_at_rest",
+                    "encryption_in_transit",
+                    "phi_protection",
+                    "pii_protection",
+                ],
+            },
+            Regulation.EU_AI_ACT.value: {
+                "name": "EU AI Act",
+                "region": "EU",
+                "requirements": [
+                    "risk_management",
+                    "logging",
+                    "transparency",
+                    "human_oversight",
+                    "audit_trail",
+                    "pii_protection",
                 ],
             },
         }

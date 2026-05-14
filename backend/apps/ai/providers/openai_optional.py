@@ -21,7 +21,7 @@ class OpenAIOptionalProvider(STTProvider, LLMProvider):
 
     def __init__(self):
         self.api_key = getattr(settings, "openai_api_key", "")
-        self.base_url = "https://api.openai.com/v1"
+        self.base_url = getattr(settings, "openai_base_url", "https://api.openai.com/v1").rstrip("/")
         self.chat_model = getattr(settings, "openai_model_chat", "gpt-4o-mini")
         self.whisper_model = getattr(settings, "openai_model_whisper", "whisper-1")
         self.headers = {}

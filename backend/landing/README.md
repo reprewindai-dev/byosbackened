@@ -1,46 +1,54 @@
-# Veklom Landing + Marketplace Surface
+# Veklom Landing / Workspace Static Deploy
 
-This directory is the production static web surface for:
+This directory is the Cloudflare Pages production deploy directory for `veklom.com`.
 
-- `veklom.com` (showpiece + live demo + marketplace entry)
-- `veklom.dev` (acquisition/strategic surface when deployed)
+## Production deploy directory
 
-## Messaging authority lock
+`backend/landing`
 
-- Canonical public copy source is `COPY_LOCK_ISSUE1.md`.
-- Required `.com` hierarchy is demo-first and marketplace-entry-first.
-- Acquisition positioning is secondary on `.com` and must not be foregrounded.
+## Accepted workspace artifact
 
-## Included routes
+The accepted black/orange Veklom workspace loads from:
 
-- `/` marketing page
-- `/signup/` self-serve workspace creation
-- `/login/` authentication
-- `/dashboard/` API key + subscription management
-- `/blog/` field notes
-- `/legal/` legal pages
+- `workspace-assets/index-EUKZeqk4.js`
+- `workspace-assets/index-WqgIFi2m.css`
 
-## API integration
+The route shell is:
 
-Frontend auth/billing calls are handled by `app/auth.js`:
+- `workspace-app.html`
 
-- `*.veklom.dev` -> `https://api.veklom.dev/api/v1`
-- default -> `https://api.veklom.com/api/v1`
+All workspace routes under this directory must load those two exact assets.
 
-You can override at runtime with `window.VEKLOM_API`.
+## Workspace routes
 
-## Deploy model
+- `/overview/`
+- `/playground/`
+- `/marketplace/`
+- `/models/`
+- `/pipelines/`
+- `/deployments/`
+- `/vault/`
+- `/compliance/`
+- `/monitoring/`
+- `/billing/`
+- `/team/`
+- `/settings/`
 
-- Static assets deploy from this folder to Cloudflare Pages.
-- Backend can also serve this folder directly (FastAPI mounts `landing/` at `/`).
-- `_headers` and `_redirects` are required for security headers and canonical URL behavior.
+`/monitoring/` is the canonical verification route and must show `Real-time observability`.
 
-## Non-negotiables
+## Rejected files / states
 
-- Do not commit real secrets into any `.env*` file in this repo.
-- Keep pricing in sync with:
-  - `landing/index.html`
-  - `apps/api/routers/subscriptions.py`
-  - `PRICING_TRUTH.md`
-- Keep public phrasing in sync with:
-  - `landing/COPY_LOCK_ISSUE1.md`
+- `workspace-live.js`
+- stale workspace hashes
+- purple workspace UI
+- sparse mimic UI
+- `Marketplace transparency`
+- `Source verified`
+
+## Deploy
+
+```powershell
+wrangler pages deploy backend/landing --project-name veklom --branch main --commit-dirty=true
+```
+
+No build step is required for artifact restoration.

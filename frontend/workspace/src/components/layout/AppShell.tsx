@@ -12,7 +12,7 @@ export function AppShell() {
   if (status === "idle") {
     return (
       <div className="flex h-screen items-center justify-center text-muted">
-        <div className="animate-pulse font-mono text-[11px] uppercase tracking-widest">Loading workspace…</div>
+        <div className="animate-pulse font-mono text-[11px] uppercase tracking-widest">Loading workspace...</div>
       </div>
     );
   }

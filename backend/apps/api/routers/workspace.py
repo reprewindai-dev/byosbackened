@@ -1,16 +1,46 @@
 """Workspace gateway dashboard APIs."""
 from __future__ import annotations
 
+import hashlib
+import html
+import ipaddress
+import json
+from pathlib import Path
+from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
-from db.models import InviteStatus, User, UserRole, UserStatus, WorkspaceInvite
+from core.config import get_settings
+from core.notifications.emailer import send_email
+from core.security.encryption import encrypt_field
+from core.services.workspace_profiles import (
+    build_static_gpc_handoff,
+    dumps_payload,
+    ensure_workspace_profile_defaults,
+    normalize_industry,
+    resolve_workspace_profile,
+)
+from db.models import (
+    CommercialArtifact,
+    InviteStatus,
+    ProductUsageEvent,
+    SecurityAuditLog,
+    StatusSubscription,
+    User,
+    UserRole,
+    Workspace,
+    WorkspaceGithubRepoSelection,
+    WorkspaceInvite,
+)
 from db.session import get_db
 from core.services.financial_analytics import (
     fetch_workspace_request_metrics,
@@ -28,6 +58,7 @@ from core.services.workspace_gateway import (
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 public_router = APIRouter(tags=["public-status"])
+settings = get_settings()
 
 
 class ModelToggleRequest(BaseModel):
@@ -42,6 +73,75 @@ class BudgetUpdateRequest(BaseModel):
     alert_thresholds: Optional[list[int]] = [50, 80, 95]
 
 
+class StatusSubscribeRequest(BaseModel):
+    channel: str
+    target: str
+
+
+class WorkspaceProfileUpdateRequest(BaseModel):
+    industry: Optional[str] = None
+
+
+class PlaygroundHandoffRequest(BaseModel):
+    scenario_id: str
+    scenario_title: Optional[str] = None
+    user_input: str = Field(default="", max_length=12000)
+    selected_repo_full_name: Optional[str] = None
+
+
+class WorkspaceGithubRepoSelectionRequest(BaseModel):
+    repo_full_name: str
+    repo_id: Optional[int] = None
+    default_branch: Optional[str] = None
+    visibility: Optional[str] = None
+    permissions: Optional[dict] = None
+
+
+def _audit_workspace_event(
+    db: Session,
+    *,
+    current_user: User,
+    request: Request | None,
+    event_type: str,
+    event_category: str,
+    success: bool = True,
+    failure_reason: str | None = None,
+    details: dict | None = None,
+) -> None:
+    db.add(
+        SecurityAuditLog(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            event_type=event_type,
+            event_category=event_category,
+            ip_address=request.client.host if request and request.client else None,
+            user_agent=request.headers.get("user-agent") if request else None,
+            success=success,
+            failure_reason=failure_reason,
+            details=dumps_payload(details or {}) if details else None,
+        )
+    )
+
+
+class CommercialArtifactCreateRequest(BaseModel):
+    title: str
+    handoff: dict
+    community_or_source: Optional[str] = None
+    url: Optional[str] = None
+    audience_type: Optional[str] = None
+    pain_signal: Optional[str] = None
+    why_veklom_fits: Optional[str] = None
+    suggested_reply_or_post: Optional[str] = None
+    cta: Optional[str] = None
+    archive_record_id: Optional[str] = None
+
+
+class CommercialArtifactUpdateRequest(BaseModel):
+    founder_review_status: Optional[str] = None
+    outcome: Optional[str] = None
+    archive_record_id: Optional[str] = None
+
+
 def _parse_datetime_param(value: Optional[str], field: str) -> Optional[datetime]:
     """Parse optional ISO8601 datetime query string."""
     if value is None:
@@ -54,6 +154,198 @@ def _parse_datetime_param(value: Optional[str], field: str) -> Optional[datetime
         return datetime.fromisoformat(value)
     except (AttributeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=f"Invalid ISO datetime for {field}") from exc
+
+
+def _status_target_hash(channel: str, target: str) -> str:
+    return hashlib.sha256(f"{channel}:{target}".encode("utf-8")).hexdigest()
+
+
+def _mask_status_target(channel: str, target: str) -> str:
+    if channel == "email":
+        name, _, domain = target.partition("@")
+        return f"{name[:2]}***@{domain}" if domain else "email subscriber"
+    parsed = urlparse(target)
+    path = parsed.path.rstrip("/")
+    tail = path.split("/")[-1] if path else ""
+    masked_tail = f"{tail[:4]}..." if tail else "endpoint"
+    return f"{parsed.scheme}://{parsed.netloc}/.../{masked_tail}"
+
+
+def _is_public_webhook_host(hostname: str) -> bool:
+    host = (hostname or "").strip().lower()
+    if not host or host in {"localhost", "example.com", "example.org", "example.net"}:
+        return False
+    if host.endswith(".local"):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+        return not (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+        )
+    except ValueError:
+        return "." in host
+
+
+def _validate_status_target(channel: str, target: str) -> str:
+    channel = (channel or "").strip().lower()
+    target = (target or "").strip()
+    if channel not in {"email", "webhook", "slack"}:
+        raise HTTPException(status_code=400, detail="Channel must be email, webhook, or slack")
+
+    if len(target) > 2048:
+        raise HTTPException(status_code=400, detail="Subscription target is too long")
+
+    if channel == "email":
+        if not target or "@" not in target or "." not in target.rsplit("@", 1)[-1]:
+            raise HTTPException(status_code=400, detail="A valid email address is required")
+        return target.lower()
+
+    parsed = urlparse(target)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Webhook subscriptions require a public HTTPS URL")
+    hostname = parsed.hostname or ""
+    if not _is_public_webhook_host(hostname):
+        raise HTTPException(status_code=400, detail="Webhook host must be public and routable")
+    if channel == "slack" and not (hostname == "hooks.slack.com" and parsed.path.startswith("/services/")):
+        raise HTTPException(status_code=400, detail="Slack subscriptions require a hooks.slack.com/services webhook")
+    return target
+
+
+def _email_transport_configured() -> bool:
+    resend_ready = bool(settings.resend_api_key and settings.mail_from)
+    smtp_ready = bool(settings.smtp_host and settings.mail_from)
+    return resend_ready or smtp_ready
+
+
+def _selected_repo_payload(row: WorkspaceGithubRepoSelection) -> dict:
+    permissions = json.loads(row.permissions_json) if row.permissions_json else {}
+    allowed = json.loads(row.allowed_repo_actions_json) if row.allowed_repo_actions_json else ["read_repository_metadata"]
+    restricted = json.loads(row.restricted_repo_actions_json) if row.restricted_repo_actions_json else [
+        "write_repository",
+        "create_commit",
+        "open_pull_request",
+        "extract_secrets",
+        "send_private_repo_content_to_external_provider_without_policy",
+    ]
+    return {
+        "id": row.id,
+        "workspace_id": row.workspace_id,
+        "github_account_id": row.github_account_id,
+        "connected_account_id": row.connected_account_id,
+        "repo_full_name": row.repo_full_name,
+        "repo_id": row.repo_id,
+        "default_branch": row.default_branch,
+        "permissions": permissions,
+        "visibility": row.visibility,
+        "repo_context_scope": row.repo_context_scope,
+        "allowed_repo_actions": allowed,
+        "restricted_repo_actions": restricted,
+        "selected_at": row.selected_at.isoformat() if row.selected_at else None,
+        "selected_by": row.selected_by,
+    }
+
+
+async def _send_status_email_confirmation(email: str) -> None:
+    if not _email_transport_configured():
+        raise HTTPException(status_code=503, detail="Email delivery is not configured")
+    await send_email(
+        to_email=email,
+        subject="Veklom status updates enabled",
+        text_body=(
+            "You are subscribed to Veklom status updates.\n\n"
+            "Public JSON: https://api.veklom.com/status/data\n"
+            "RSS: https://api.veklom.com/status/rss.xml\n"
+        ),
+        html_body=(
+            "<p>You are subscribed to <strong>Veklom status updates</strong>.</p>"
+            '<p>Public JSON: <a href="https://api.veklom.com/status/data">status/data</a><br />'
+            'RSS: <a href="https://api.veklom.com/status/rss.xml">status/rss.xml</a></p>'
+        ),
+    )
+
+
+async def _send_slack_confirmation(url: str) -> None:
+    payload = {
+        "text": "Veklom status updates enabled.",
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Veklom status updates enabled.*\nThis Slack channel will receive Veklom incident and maintenance notices.",
+                },
+            }
+        ],
+    }
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        response = await client.post(url, json=payload)
+        if response.status_code >= 400:
+            raise HTTPException(status_code=400, detail="Slack webhook rejected the confirmation message")
+
+
+def _status_items_for_feed(payload: dict) -> list[dict]:
+    items = []
+    for incident in payload.get("incidents", []):
+        items.append(
+            {
+                "id": incident.get("id"),
+                "title": incident.get("title") or "Veklom incident",
+                "description": incident.get("description") or "",
+                "category": f"{incident.get('severity', 'incident')} / {incident.get('status', 'open')}",
+                "created_at": incident.get("created_at") or payload.get("timestamp"),
+            }
+        )
+    for item in payload.get("maintenance", []):
+        items.append(
+            {
+                "id": item.get("id"),
+                "title": item.get("title") or "Scheduled maintenance",
+                "description": item.get("description") or "",
+                "category": f"maintenance / {item.get('severity', 'info')}",
+                "created_at": item.get("created_at") or payload.get("timestamp"),
+            }
+        )
+    if not items:
+        items.append(
+            {
+                "id": "veklom-operational",
+                "title": "All Veklom services operational",
+                "description": "No active incidents or scheduled maintenance are currently reported.",
+                "category": "operational",
+                "created_at": payload.get("timestamp") or datetime.utcnow().isoformat(),
+            }
+        )
+    return items
+
+
+def _render_status_rss(payload: dict) -> str:
+    items_xml = []
+    for item in _status_items_for_feed(payload):
+        title = html.escape(str(item["title"]))
+        description = html.escape(str(item["description"]))
+        category = html.escape(str(item["category"]))
+        link = f"https://veklom.com/status#{html.escape(str(item['id']))}"
+        guid = html.escape(str(item["id"]))
+        pub_date = html.escape(str(item["created_at"]))
+        items_xml.append(
+            f"<item><title>{title}</title><link>{link}</link><guid>{guid}</guid>"
+            f"<category>{category}</category><pubDate>{pub_date}</pubDate>"
+            f"<description>{description}</description></item>"
+        )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rss version="2.0"><channel>'
+        "<title>Veklom Status</title>"
+        "<link>https://veklom.com/status</link>"
+        "<description>Veklom public incident and maintenance feed.</description>"
+        f"<lastBuildDate>{html.escape(str(payload.get('timestamp') or datetime.utcnow().isoformat()))}</lastBuildDate>"
+        + "".join(items_xml)
+        + "</channel></rss>"
+    )
 
 
 @router.get("/analytics/summary")
@@ -77,6 +369,408 @@ async def workspace_overview(
     db: Session = Depends(get_db),
 ):
     return fetch_overview(db, workspace_id=current_user.workspace_id)
+
+
+@router.get("/playground/profile")
+async def workspace_playground_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    ensure_workspace_profile_defaults(workspace)
+    db.commit()
+    db.refresh(workspace)
+    return resolve_workspace_profile(workspace)
+
+
+@router.patch("/profile")
+async def workspace_profile_update(
+    payload: WorkspaceProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if payload.industry is not None:
+        normalized = normalize_industry(payload.industry)
+        workspace.industry = normalized
+        workspace.playground_profile = normalized
+        workspace.risk_tier = None
+        workspace.default_policy_pack = None
+        workspace.default_demo_scenarios = None
+        workspace.default_evidence_requirements = None
+        workspace.default_blocking_rules = None
+    ensure_workspace_profile_defaults(workspace)
+    db.commit()
+    db.refresh(workspace)
+    return resolve_workspace_profile(workspace)
+
+
+@router.get("/integrations/github")
+async def workspace_github_integration(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    selected_rows = (
+        db.query(WorkspaceGithubRepoSelection)
+        .filter(WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id)
+        .order_by(WorkspaceGithubRepoSelection.selected_at.desc())
+        .all()
+    )
+    return {
+        "github_configured": bool(settings.github_client_id and settings.github_client_secret and settings.github_redirect_uri),
+        "github_connected": bool(current_user.github_id and current_user.github_access_token),
+        "github_username": current_user.github_username,
+        "github_account_id": current_user.github_id,
+        "repo_access_mode": "read_only",
+        "repo_context_scope": "metadata_only",
+        "selected_repos": [_selected_repo_payload(row) for row in selected_rows],
+        "policy": {
+            "default_repo_access": "read_only",
+            "private_repo_external_provider_transfer_requires_policy": True,
+            "write_commit_pr_actions_enabled": False,
+            "secrets_extraction_allowed": False,
+            "human_approval_required_for_high_risk_actions": True,
+        },
+    }
+
+
+@router.post("/integrations/github/select-repo", status_code=201)
+async def workspace_select_github_repo(
+    payload: WorkspaceGithubRepoSelectionRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.github_access_token:
+        raise HTTPException(status_code=400, detail="GitHub not connected. Connect GitHub first.")
+    repo_full_name = payload.repo_full_name.strip()
+    if not repo_full_name or "/" not in repo_full_name:
+        raise HTTPException(status_code=400, detail="repo_full_name must be in owner/repo format")
+    existing = (
+        db.query(WorkspaceGithubRepoSelection)
+        .filter(
+            WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id,
+            WorkspaceGithubRepoSelection.repo_full_name == repo_full_name,
+        )
+        .first()
+    )
+    if existing:
+        existing.repo_id = payload.repo_id or existing.repo_id
+        existing.default_branch = payload.default_branch or existing.default_branch
+        existing.visibility = payload.visibility or existing.visibility
+        existing.permissions_json = dumps_payload(payload.permissions or json.loads(existing.permissions_json or "{}"))
+        existing.github_account_id = current_user.github_id
+        existing.connected_account_id = current_user.github_id
+        existing.selected_by = current_user.id
+        row = existing
+    else:
+        row = WorkspaceGithubRepoSelection(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            github_account_id=current_user.github_id,
+            connected_account_id=current_user.github_id,
+            repo_full_name=repo_full_name,
+            repo_id=payload.repo_id,
+            default_branch=(payload.default_branch or "main").strip()[:120],
+            permissions_json=dumps_payload(payload.permissions or {}),
+            visibility=(payload.visibility or "private").strip()[:40],
+            repo_context_scope="metadata_only",
+            allowed_repo_actions_json=dumps_payload(["read_repository_metadata"]),
+            restricted_repo_actions_json=dumps_payload(
+                [
+                    "write_repository",
+                    "create_commit",
+                    "open_pull_request",
+                    "extract_secrets",
+                    "send_private_repo_content_to_external_provider_without_policy",
+                ]
+            ),
+            selected_by=current_user.id,
+        )
+        db.add(row)
+    _audit_workspace_event(
+        db,
+        current_user=current_user,
+        request=request,
+        event_type="github_repo_selected",
+        event_category="data_access",
+        details={"repo_full_name": repo_full_name, "repo_id": payload.repo_id, "scope": "metadata_only"},
+    )
+    db.commit()
+    db.refresh(row)
+    return _selected_repo_payload(row)
+
+
+@router.delete("/integrations/github/select-repo/{selection_id}", status_code=204)
+async def workspace_unselect_github_repo(
+    selection_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(WorkspaceGithubRepoSelection)
+        .filter(
+            WorkspaceGithubRepoSelection.id == selection_id,
+            WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Selected repo not found")
+    repo_full_name = row.repo_full_name
+    db.delete(row)
+    _audit_workspace_event(
+        db,
+        current_user=current_user,
+        request=request,
+        event_type="github_repo_unselected",
+        event_category="data_access",
+        details={"repo_full_name": repo_full_name},
+    )
+    db.commit()
+
+
+@router.post("/playground/handoff", status_code=201)
+async def create_playground_handoff(
+    payload: PlaygroundHandoffRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(Workspace).filter(Workspace.id == current_user.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    repo_context = None
+    if payload.selected_repo_full_name:
+        selected_repo = (
+            db.query(WorkspaceGithubRepoSelection)
+            .filter(
+                WorkspaceGithubRepoSelection.workspace_id == current_user.workspace_id,
+                WorkspaceGithubRepoSelection.repo_full_name == payload.selected_repo_full_name,
+            )
+            .first()
+        )
+        if not selected_repo:
+            raise HTTPException(status_code=400, detail="Selected repo is not connected to this workspace")
+        repo_context = {
+            "github_connected": bool(current_user.github_id and current_user.github_access_token),
+            "selected_repo_full_name": selected_repo.repo_full_name,
+            "selected_repo_id": selected_repo.repo_id,
+            "selected_branch": selected_repo.default_branch,
+            "repo_context_scope": selected_repo.repo_context_scope,
+            "allowed_repo_actions": json.loads(selected_repo.allowed_repo_actions_json or "[]"),
+            "restricted_repo_actions": json.loads(selected_repo.restricted_repo_actions_json or "[]"),
+        }
+    try:
+        handoff = build_static_gpc_handoff(
+            workspace,
+            scenario_id=payload.scenario_id,
+            scenario_title=payload.scenario_title,
+            user_input=payload.user_input,
+            repo_context=repo_context,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail="Unknown playground scenario") from exc
+    db.add(
+        ProductUsageEvent(
+            workspace_id=current_user.workspace_id,
+            user_id=current_user.id,
+            event_type="feature_use",
+            surface="playground",
+            route="/playground",
+            feature="gpc_handoff_prepared",
+            metadata_json=dumps_payload(
+                {
+                    "scenario_id": handoff["scenario_id"],
+                    "industry": handoff["industry"],
+                    "playground_profile": handoff["playground_profile"],
+                    "claim_level": handoff["claim_level"],
+                    "risk_tier": handoff["risk_tier"],
+                    "selected_repo_full_name": handoff.get("selected_repo_full_name"),
+                }
+            ),
+        )
+    )
+    if handoff.get("selected_repo_full_name"):
+        _audit_workspace_event(
+            db,
+            current_user=current_user,
+            request=request,
+            event_type="github_repo_context_attached",
+            event_category="data_access",
+            details={
+                "scenario_id": handoff["scenario_id"],
+                "repo_full_name": handoff.get("selected_repo_full_name"),
+                "repo_context_scope": handoff.get("repo_context_scope"),
+            },
+        )
+    db.commit()
+    return handoff
+
+
+@router.post("/commercial/community-awareness-run", status_code=201)
+async def create_community_awareness_artifact(
+    payload: CommercialArtifactCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    handoff = payload.handoff or {}
+    industry = str(handoff.get("industry") or "generic")
+    regulated = industry in {
+        "banking_fintech",
+        "healthcare_hospital",
+        "insurance",
+        "legal_compliance",
+        "government_public_sector",
+    }
+    artifact_payload = {
+        "run_type": "Community Awareness Run",
+        "community/source": payload.community_or_source,
+        "URL": payload.url,
+        "audience type": payload.audience_type,
+        "pain signal": payload.pain_signal,
+        "why Veklom fits": payload.why_veklom_fits,
+        "suggested reply/post": payload.suggested_reply_or_post,
+        "CTA": payload.cta,
+        "spam risk": "medium",
+        "regulated claim risk": "high" if regulated else "medium",
+        "competitor claim risk": "medium",
+        "founderReviewStatus": "pending_founder_review",
+        "archiveRecordId": payload.archive_record_id,
+        "outcome": "draft",
+        "rules": {
+            "auto_posting": False,
+            "spam_allowed": False,
+            "unsupported_competitor_attacks_allowed": False,
+            "regulated_claims_require_founder_approval": True,
+            "fake_urgency_allowed": False,
+        },
+    }
+    artifact = CommercialArtifact(
+        workspace_id=current_user.workspace_id,
+        user_id=current_user.id,
+        artifact_type="community_awareness_run",
+        title=payload.title.strip()[:200] or "Community Awareness Run",
+        source_type="vertical_playground",
+        source_scenario_id=str(handoff.get("scenario_id") or "")[:160] or None,
+        handoff_json=dumps_payload(handoff),
+        artifact_json=dumps_payload(artifact_payload),
+        founder_review_status="pending_founder_review",
+        spam_risk="medium",
+        regulated_claim_risk="high" if regulated else "medium",
+        competitor_claim_risk="medium",
+        archive_record_id=(payload.archive_record_id or "")[:200] or None,
+        outcome="draft",
+    )
+    db.add(artifact)
+    db.commit()
+    db.refresh(artifact)
+    return {
+        "id": artifact.id,
+        "artifact_type": artifact.artifact_type,
+        "title": artifact.title,
+        "founderReviewStatus": artifact.founder_review_status,
+        "archiveRecordId": artifact.archive_record_id,
+        "outcome": artifact.outcome,
+        "artifact": json.loads(artifact.artifact_json),
+    }
+
+
+@router.patch("/commercial/artifacts/{artifact_id}")
+async def update_commercial_artifact(
+    artifact_id: str,
+    payload: CommercialArtifactUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    artifact = (
+        db.query(CommercialArtifact)
+        .filter(
+            CommercialArtifact.id == artifact_id,
+            CommercialArtifact.workspace_id == current_user.workspace_id,
+        )
+        .first()
+    )
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Commercial artifact not found")
+    artifact_payload = json.loads(artifact.artifact_json)
+    if payload.founder_review_status is not None:
+        artifact.founder_review_status = payload.founder_review_status.strip()[:80] or artifact.founder_review_status
+        artifact_payload["founderReviewStatus"] = artifact.founder_review_status
+    if payload.outcome is not None:
+        artifact.outcome = payload.outcome.strip()[:120] or artifact.outcome
+        artifact_payload["outcome"] = artifact.outcome
+    if payload.archive_record_id is not None:
+        artifact.archive_record_id = payload.archive_record_id.strip()[:200] or None
+        artifact_payload["archiveRecordId"] = artifact.archive_record_id
+    artifact.artifact_json = dumps_payload(artifact_payload)
+    db.commit()
+    db.refresh(artifact)
+    return {
+        "id": artifact.id,
+        "founderReviewStatus": artifact.founder_review_status,
+        "archiveRecordId": artifact.archive_record_id,
+        "outcome": artifact.outcome,
+    }
+
+
+@router.get("/commercial/scorecard")
+async def workspace_commercial_scorecard(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+    usage_query = db.query(ProductUsageEvent).filter(
+        ProductUsageEvent.workspace_id == current_user.workspace_id,
+        ProductUsageEvent.created_at >= start,
+        ProductUsageEvent.created_at <= now,
+    )
+    artifact_query = db.query(CommercialArtifact).filter(
+        CommercialArtifact.workspace_id == current_user.workspace_id,
+        CommercialArtifact.created_at >= start,
+        CommercialArtifact.created_at <= now,
+    )
+    return {
+        "generated_at": now.isoformat(),
+        "window_days": days,
+        "counters": {
+            "vertical_demos_generated": usage_query.filter(
+                ProductUsageEvent.event_type == "feature_use",
+                ProductUsageEvent.feature == "vertical_demo_generated",
+            ).count(),
+            "gpc_handoffs_prepared": usage_query.filter(
+                ProductUsageEvent.event_type == "feature_use",
+                ProductUsageEvent.feature == "gpc_handoff_prepared",
+            ).count(),
+            "founder_reviewed_vertical_artifacts": artifact_query.filter(
+                CommercialArtifact.founder_review_status != "pending_founder_review"
+            ).count(),
+            "evaluation_conversations_influenced_by_vertical_demo": usage_query.filter(
+                ProductUsageEvent.event_type == "feature_use",
+                ProductUsageEvent.feature == "evaluation_conversation_influenced_by_vertical_demo",
+            ).count(),
+        },
+        "targets_14d": {
+            "qualified_evaluation_conversations": 3,
+            "serious_byos_private_backend_access_requests": 1,
+            "credible_vendor_tool_conversations": 1,
+            "approved_package_concepts": 3,
+            "founder_approved_public_community_interactions": 10,
+        },
+        "over_the_bar": {
+            "signed_evaluation_agreements": 1,
+            "paid_pilot_or_operating_reserve_funded": 1,
+            "technical_procurement_processes_started": 1,
+            "credible_vendor_tool_committed": 1,
+        },
+    }
 
 
 @router.get("/observability")
@@ -118,11 +812,13 @@ async def workspace_analytics_requests(
     offset: int = Query(0, ge=0),
     include_rows: bool = Query(False),
 ):
+    parsed_end = _parse_datetime_param(end_date, "end_date") or datetime.utcnow()
+    parsed_start = _parse_datetime_param(start_date, "start_date") or (parsed_end - timedelta(days=30))
     return fetch_workspace_request_metrics(
         db=db,
         workspace_id=current_user.workspace_id,
-        start_date=_parse_datetime_param(start_date, "start_date"),
-        end_date=_parse_datetime_param(end_date, "end_date"),
+        start_date=parsed_start,
+        end_date=parsed_end,
         model=model,
         request_path=request_path,
         status=status,
@@ -384,74 +1080,83 @@ async def public_status_data(db: Session = Depends(get_db)):
     return fetch_public_status_payload(db)
 
 
-@public_router.get("/status", include_in_schema=False)
+@public_router.get("/status/json")
+async def public_status_json(db: Session = Depends(get_db)):
+    return fetch_public_status_payload(db)
+
+
+@public_router.get("/status/rss.xml", include_in_schema=False)
+async def public_status_rss(db: Session = Depends(get_db)):
+    payload = fetch_public_status_payload(db)
+    return Response(content=_render_status_rss(payload), media_type="application/rss+xml")
+
+
+@public_router.post("/status/subscribe", status_code=201)
+async def public_status_subscribe(
+    payload: StatusSubscribeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    channel = (payload.channel or "").strip().lower()
+    target = _validate_status_target(channel, payload.target)
+    target_hash = _status_target_hash(channel, target)
+    existing = db.query(StatusSubscription).filter(StatusSubscription.target_hash == target_hash).first()
+
+    confirmation_sent = False
+    verification_status = "pending"
+    last_delivery_status = None
+
+    if channel == "email":
+        await _send_status_email_confirmation(target)
+        confirmation_sent = True
+        verification_status = "verified"
+        last_delivery_status = "confirmation_sent"
+    elif channel == "slack":
+        await _send_slack_confirmation(target)
+        confirmation_sent = True
+        verification_status = "verified"
+        last_delivery_status = "confirmation_sent"
+    else:
+        verification_status = "accepted"
+        last_delivery_status = "not_tested"
+
+    if existing:
+        existing.status = "active"
+        existing.verification_status = verification_status
+        existing.last_delivery_status = last_delivery_status
+        existing.last_delivery_at = datetime.utcnow() if confirmation_sent else existing.last_delivery_at
+        existing.updated_at = datetime.utcnow()
+        row = existing
+    else:
+        row = StatusSubscription(
+            channel=channel,
+            target_hash=target_hash,
+            target_encrypted=encrypt_field(target),
+            target_label=_mask_status_target(channel, target),
+            status="active",
+            verification_status=verification_status,
+            last_delivery_status=last_delivery_status,
+            last_delivery_at=datetime.utcnow() if confirmation_sent else None,
+            source_ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+        db.add(row)
+
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "channel": row.channel,
+        "status": row.status,
+        "verification_status": row.verification_status,
+        "target": row.target_label,
+        "confirmation_sent": confirmation_sent,
+        "json_url": "https://api.veklom.com/status/data",
+        "rss_url": "https://api.veklom.com/status/rss.xml",
+    }
+
+
+@public_router.get("/status/page", include_in_schema=False)
 async def public_status_page():
-    html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Veklom Status</title>
-<meta name="robots" content="noindex, nofollow" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app/app.css">
-<style>
-.status-shell { max-width: 980px; margin: 0 auto; padding: 64px 24px 96px; }
-.status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:20px; }
-.status-card { background:var(--ink-2); border:1px solid var(--rule); border-radius:6px; padding:20px; }
-.status-pill { display:inline-flex; padding:4px 10px; border:1px solid var(--ok); color:var(--ok); font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; border-radius:2px; }
-.status-row { display:flex; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--rule); }
-.status-row:last-child { border-bottom:0; }
-.status-title { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--mute); }
-.status-value { color:var(--bone); }
-.status-small { color:var(--bone-2); font-size:14px; line-height:1.6; }
-</style>
-</head>
-<body>
-<main class="status-shell">
-  <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom Status</div>
-  <div class="status-card">
-    <div class="status-pill" id="status-pill">Loading</div>
-    <h1 class="app-h1" style="margin-top:14px;">Service status and incident feed</h1>
-    <p class="app-sub">Public uptime and incident view for API, Auth, Marketplace, and AI Proxy.</p>
-    <div id="status-root" class="status-small">Loading status...</div>
-  </div>
-</main>
-<script src="/app/auth.js"></script>
-<script>
-async function loadStatus() {
-  const root = document.getElementById("status-root");
-  const pill = document.getElementById("status-pill");
-  try {
-    const out = await VK.publicRequest("/status/data");
-    pill.textContent = "Operational";
-    root.innerHTML = [
-      '<div class="status-grid">' + out.services.map(service =>
-        '<div class="status-card">' +
-          '<div class="status-title">' + service.name + '</div>' +
-          '<div style="font-family:var(--serif); font-size:28px; margin:10px 0 6px;">' + Number(service.uptime_90d).toFixed(2) + '%</div>' +
-          '<div class="status-small">Status: ' + service.status + '</div>' +
-        '</div>'
-      ).join("") + '</div>',
-      '<div class="status-card" style="margin-top:18px;">' +
-        '<div class="status-title">Current Incidents</div>' +
-        (out.incidents.length ? out.incidents.map(i => '<div class="status-row"><div><strong>' + i.title + '</strong><div class="status-small">' + (i.description || "") + '</div></div><div class="status-value">' + i.severity + ' / ' + i.status + '</div></div>').join("") : '<p class="status-small" style="margin-top:12px;">No current incidents.</p>') +
-      '</div>',
-      '<div class="status-card" style="margin-top:18px;">' +
-        '<div class="status-title">Scheduled Maintenance</div>' +
-        (out.maintenance.length ? out.maintenance.map(i => '<div class="status-row"><div><strong>' + i.title + '</strong><div class="status-small">' + (i.description || "") + '</div></div><div class="status-value">' + i.severity + '</div></div>').join("") : '<p class="status-small" style="margin-top:12px;">No scheduled maintenance.</p>') +
-      '</div>'
-    ].join("");
-  } catch (err) {
-    pill.textContent = "Degraded";
-    root.innerHTML = '<div class="alert alert-error">' + (err.message || "Unable to load status") + '</div>';
-  }
-}
-loadStatus();
-</script>
-</body>
-</html>"""
-    return Response(content=html, media_type="text/html")
+    status_path = Path(__file__).resolve().parents[3] / "landing" / "status.html"
+    return FileResponse(status_path, media_type="text/html")

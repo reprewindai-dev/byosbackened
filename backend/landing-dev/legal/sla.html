@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Service Level Agreement — Veklom</title>
+<meta name="description" content="Veklom Service Level Agreement. Bug-fix response times by tier, exclusions, and the service-credit remedy structure for missed targets." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://veklom.com/legal/sla.html" />
+<link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+
+<nav class="legal-nav">
+  <div class="container">
+    <a href="../" class="brand">
+      <img src="../logo.svg" alt="Veklom logo"/>
+      <span>Veklom</span>
+    </a>
+    <div class="crumb">
+      <a href="../">Home</a><span class="sep">·</span><a href="./">Legal</a><span class="sep">·</span>Service Level Agreement
+    </div>
+  </div>
+</nav>
+
+<header class="legal-head">
+  <div class="container">
+    <div class="legal-eyebrow">Document 06</div>
+    <h1 class="legal-title">Service Level <span class="it">Agreement</span></h1>
+    <div class="legal-meta">
+      <span><strong>Effective:</strong> April 26, 2026</span>
+      <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="legal-disclaimer">
+      Veklom is self-hosted; uptime is Your responsibility, not ours. This SLA covers what we are responsible for: bug-fix response times, version-update cadence, and support channel availability for paid Subscribers, by tier.
+    </div>
+  </div>
+</header>
+
+<main class="legal-body">
+  <div class="container">
+
+    <section>
+      <h2><span class="num">§ 1</span>What this SLA covers (and does not)</h2>
+      <p><strong>Covered:</strong> Veklom's response times to confirmed bug reports, version-update delivery cadence, and support-channel availability for active Subscribers in good standing.</p>
+      <p><strong>Not covered:</strong> Uptime of Your deployment (You operate it), performance of Your infrastructure, performance of third-party AI providers (OpenAI, Anthropic, etc.), Your modifications to the Source Code, force-majeure events, or any matter within Your operational control.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 2</span>Severity definitions</h2>
+      <table>
+        <thead><tr><th>Severity</th><th>Definition</th></tr></thead>
+        <tbody>
+          <tr><td><strong>S1 — Critical</strong></td><td>The Software is non-functional in production for the Customer with no workaround. Examples: persistent crash on startup; total data loss in a documented operation.</td></tr>
+          <tr><td><strong>S2 — Major</strong></td><td>A core feature is broken with significant business impact, but a workaround is available. Examples: a routing path silently fails for a specific provider; a documented endpoint returns wrong responses for a specific input class.</td></tr>
+          <tr><td><strong>S3 — Minor</strong></td><td>A non-core feature is broken or behaves unexpectedly. Documentation discrepancies, cosmetic issues, edge-case errors with low frequency.</td></tr>
+          <tr><td><strong>S4 — Enhancement</strong></td><td>Feature requests, performance improvements, optional refactors.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 3</span>Response &amp; resolution targets by tier</h2>
+      <table>
+        <thead><tr><th></th><th>Standard</th><th>Pro</th><th>Enterprise</th></tr></thead>
+        <tbody>
+          <tr><td>S1 first response</td><td>2 business days</td><td>1 business day</td><td>4 business hours</td></tr>
+          <tr><td>S1 fix target</td><td>14 business days</td><td>5 business days</td><td>24 business hours</td></tr>
+          <tr><td>S2 first response</td><td>3 business days</td><td>1 business day</td><td>1 business day</td></tr>
+          <tr><td>S2 fix target</td><td>21 business days</td><td>10 business days</td><td>5 business days</td></tr>
+          <tr><td>S3 first response</td><td>5 business days</td><td>3 business days</td><td>2 business days</td></tr>
+          <tr><td>S3 fix target</td><td>next quarterly release</td><td>next monthly release</td><td>next monthly release</td></tr>
+          <tr><td>S4 acknowledgement</td><td>10 business days</td><td>5 business days</td><td>5 business days</td></tr>
+          <tr><td>Version-update cadence</td><td>quarterly</td><td>monthly</td><td>monthly</td></tr>
+          <tr><td>Support channel</td><td>private Discord, async</td><td>direct email</td><td>priority engineering channel</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:14px; color:var(--mute); font-style:italic; margin-top:12px;">"Business day" means Monday–Friday, 09:00–17:00 Eastern Time, excluding U.S. federal holidays. "Business hour" means hours within those windows.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 4</span>How to file a report</h2>
+      <p>To file a bug report or support request, email Your tier's support address with:</p>
+      <ol>
+        <li>The version of the Software You are running (commit hash or release tag);</li>
+        <li>A clear description of the expected behavior and observed behavior;</li>
+        <li>Steps to reproduce, including configuration excerpts (with secrets redacted);</li>
+        <li>Relevant logs and correlation IDs;</li>
+        <li>Your assessment of severity (we may adjust based on the criteria in <a href="#§ 2">Section 2</a>).</li>
+      </ol>
+      <p>Reports without sufficient information will be acknowledged but cannot be triaged until the missing information is provided. The clock for fix targets begins when a report is reproducible.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 5</span>Service-credit remedy for missed targets</h2>
+      <p>If Veklom misses a fix target for a confirmed S1 or S2 bug, You are entitled to a service credit calculated as:</p>
+      <div class="uppercase-block">Credit = (Days Late ÷ 30) × Monthly Subscription Fee · capped at 30 days of fees per calendar year</div>
+      <p>Service credits are applied to future invoices. They are not paid in cash unless required by applicable law. Service credits are <strong>Your sole and exclusive remedy</strong> for missed SLA targets, except as provided in <a href="license.html#liability">Software License Agreement § 11</a>.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 6</span>Exclusions</h2>
+      <p>The fix targets in Section 3 do not apply to:</p>
+      <ol>
+        <li>Issues caused by Your modifications to the Source Code;</li>
+        <li>Issues caused by Your infrastructure (network, database, Redis, container orchestration);</li>
+        <li>Issues caused by third-party AI providers (rate limits, model deprecation, API changes upstream);</li>
+        <li>Force-majeure events (see <a href="license.html#force-majeure">Software License Agreement § 17</a>);</li>
+        <li>Use of versions of the Software more than two (2) major versions behind the current release;</li>
+        <li>Pilot-rate or charter-rate Subscribers, who receive best-effort response under Standard-tier targets unless their Order Form provides otherwise;</li>
+        <li>Customers in payment arrears for more than 15 days.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 7</span>Severity escalation</h2>
+      <p>Enterprise-tier Subscribers may escalate stalled tickets to a named Veklom engineering contact. Pro-tier Subscribers may escalate to <a href="mailto:legal@veklom.com">legal@veklom.com</a> if a ticket exceeds its fix target by 50%. Standard-tier Subscribers receive best-effort engagement on the private Discord support channel.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">§ 8</span>SLA versioning</h2>
+      <p>Veklom may update this SLA with thirty (30) days' notice. SLA changes that materially reduce Your entitlements take effect on the next renewal cycle. Multi-year prepaid Subscribers continue under the SLA in effect at signing for the duration of their committed term.</p>
+    </section>
+
+    <section style="border-bottom:none;">
+      <div class="callout">
+        <p><strong>Bug reports:</strong> <a href="mailto:hello@veklom.com">hello@veklom.com</a> with <em>"BUG · S[1–4] · &lt;short-title&gt;"</em> in the subject.<br/><strong>Enterprise priority channel:</strong> assigned at contract signing.</p>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="legal-foot">
+  <div class="container">
+    <div>© MMXXVI Veklom · All rights reserved · Document version 1.0</div>
+    <div class="links">
+      <a href="./">All Legal</a>
+      <a href="../">Home</a>
+      <a href="mailto:hello@veklom.com">hello@veklom.com</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

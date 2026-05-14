@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Accept Veklom Invite</title>
+    <script>
+      (function () {
+        var query = window.location.search || "";
+        if (query.indexOf("?token=") === 0) {
+          query = "?invite_secret=" + encodeURIComponent(new URLSearchParams(query).get("token") || "");
+        }
+        window.location.replace("/accept-invite" + query);
+      })();
+    </script>
+  </head>
+  <body>
+    Redirecting to Veklom workspace invite...
+  </body>
+</html>

@@ -42,7 +42,17 @@ class ModbusTCPClient:
             if not client.connect():
                 raise ModbusTCPReadError(f"Failed to connect to Modbus TCP device on {self.host}:{self.port}")
 
-            result = client.read_holding_registers(address=address, count=count, slave=slave)
+            try:
+                result = client.read_holding_registers(address=address, count=count, slave=slave)
+            except TypeError as exc:
+                if "unexpected keyword argument 'slave'" not in str(exc):
+                    raise
+                try:
+                    result = client.read_holding_registers(address=address, count=count, unit=slave)
+                except TypeError as inner_exc:
+                    if "unexpected keyword argument 'unit'" not in str(inner_exc):
+                        raise
+                    result = client.read_holding_registers(address=address, count=count, device_id=slave)
             if result.isError():
                 raise ModbusTCPReadError(f"Modbus TCP read error on address {address}, slave {slave}")
             if not hasattr(result, "registers") or not result.registers:

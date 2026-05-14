@@ -19,6 +19,7 @@ class _FakeResponse:
 class _FakeClient:
     def __init__(self, *args, **kwargs):
         self.calls: list[str] = []
+        self.__class__.last_instance = self
 
     async def __aenter__(self):
         return self
@@ -28,7 +29,7 @@ class _FakeClient:
 
     async def post(self, url: str, json: dict, headers: dict):
         self.calls.append(url)
-        if url == "https://license.veklom.com/issue":
+        if url == "https://license.veklom.com/api/licenses/issue":
             return _FakeResponse(502)
         return _FakeResponse(
             200,
@@ -52,8 +53,8 @@ class _FakeDB:
 
 
 def test_issue_trial_license_falls_back_to_backup_url(monkeypatch):
-    monkeypatch.setattr(trial_onboarding.settings, "license_issue_url", "https://license.veklom.com/issue")
-    monkeypatch.setattr(trial_onboarding.settings, "license_issue_backup_url", "https://license2.veklom.com/issue")
+    monkeypatch.setattr(trial_onboarding.settings, "license_issue_url", "https://license.veklom.com/api/licenses/issue")
+    monkeypatch.setattr(trial_onboarding.settings, "license_issue_backup_url", "https://license2.veklom.com/api/licenses/issue")
     monkeypatch.setattr(trial_onboarding.settings, "license_admin_token", "token")
     monkeypatch.setattr(trial_onboarding.settings, "buyer_download_base_url", "")
     monkeypatch.setattr(trial_onboarding.settings, "buyer_download_version", "1.0.0")
@@ -83,6 +84,10 @@ def test_issue_trial_license_falls_back_to_backup_url(monkeypatch):
 
     assert payload.license_id == "lic-123"
     assert payload.tier == "starter"
+    assert _FakeClient.last_instance.calls == [
+        "https://license.veklom.com/api/licenses/issue",
+        "https://license2.veklom.com/api/licenses/issue",
+    ]
     assert workspace.license_key_id == "lic-123"
     assert workspace.license_tier == "starter"
     assert workspace.license_download_url.endswith("veklom-backend-starter-1.0.0.zip")

@@ -13,7 +13,7 @@ from db.models import (
     MLModel, Deployment, DeploymentStatus, RoutingDecision, CostPrediction,
     AIAuditLog, Budget, SecurityAuditLog,
     AbuseLog, IncidentLog, RoutingPolicy, CostAllocation,
-    SecurityEvent, UserSession, APIKey,
+    SecurityEvent, UserSession, APIKey, VeklomRun,
     Subscription, LicenseKey, ContentFilterLog, AgeVerification,
     SystemMetrics, Alert, ExecutionLog,
     EdgeCanaryReport,

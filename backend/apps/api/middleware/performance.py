@@ -90,9 +90,20 @@ CACHEABLE_ENDPOINTS = {
     "/api/v1/suggestions",
     "/api/v1/autonomous/routing/stats",
     "/api/v1/budget",
-    "/status",
     "/health",
 }
+
+
+def _security_headers() -> Dict[str, str]:
+    """Security headers that cached responses must preserve on cache hits."""
+    return {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1; mode=block",
+        "Content-Security-Policy": "default-src 'self'",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+    }
+
 
 # Endpoints that should be compressed
 COMPRESSIBLE_PATHS = {
@@ -127,6 +138,7 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
                 headers = {
                     "X-Cache": "HIT",
                     "Cache-Control": "private, max-age=30",
+                    **_security_headers(),
                 }
                 # Echo correlation ID if present (proves we processed the request)
                 if correlation_id:

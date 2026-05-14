@@ -1,0 +1,61 @@
+name: Backend Health Monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public backend health
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+        run: |
+          set -euo pipefail
+          for ROUTE in \
+            "/health" \
+            "/status" \
+            "/api/v1/demo/pipeline/health" \
+            "/api/v1/edge/demo/summary"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+              --retry 3 --retry-delay 10 --retry-all-errors "$BACKEND_URL$ROUTE")
+            echo "$ROUTE -> HTTP $STATUS"
+            if [ "$STATUS" != "200" ]; then
+              echo "Health check FAILED for $ROUTE"
+              exit 1
+            fi
+          done
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d '{"text":"Veklom backend health check FAILED. Check production immediately."}'
+          else
+            echo "SLACK_WEBHOOK_URL is not configured; failure notification skipped."
+          fi
+
+      - name: Open incident issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: production health endpoint or demo proof endpoint failed canary.
+          EOF
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "[OPS] Backend health monitor failed" \
+            --body-file incident.md

@@ -1,16 +1,23 @@
-"""SMTP email delivery helpers."""
+"""Transactional email delivery helpers."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import smtplib
 from email.message import EmailMessage
 from typing import Optional
 
+import httpx
+
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def _resend_enabled() -> bool:
+    return bool(settings.resend_api_key and settings.mail_from)
 
 
 def _smtp_enabled() -> bool:
@@ -50,6 +57,35 @@ def _send_message(msg: EmailMessage) -> None:
         server.send_message(msg)
 
 
+def _send_via_resend(
+    *,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: Optional[str] = None,
+    reply_to: Optional[str] = None,
+) -> None:
+    payload = {
+        "from": settings.mail_from,
+        "to": [to_email],
+        "subject": subject,
+        "text": text_body,
+    }
+    if html_body:
+        payload["html"] = html_body
+    effective_reply_to = reply_to or settings.mail_reply_to
+    if effective_reply_to:
+        payload["reply_to"] = effective_reply_to
+
+    headers = {
+        "Authorization": f"Bearer {settings.resend_api_key}",
+        "Content-Type": "application/json",
+    }
+    with httpx.Client(timeout=15.0) as client:
+        response = client.post("https://api.resend.com/emails", headers=headers, content=json.dumps(payload))
+        response.raise_for_status()
+
+
 async def send_email(
     to_email: str,
     subject: str,
@@ -57,7 +93,18 @@ async def send_email(
     html_body: Optional[str] = None,
     reply_to: Optional[str] = None,
 ) -> bool:
-    """Send a transactional email via configured SMTP."""
+    """Send a transactional email via Resend API or SMTP fallback."""
+    if _resend_enabled():
+        await asyncio.to_thread(
+            _send_via_resend,
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+            reply_to=reply_to,
+        )
+        return True
+
     msg = _build_message(to_email, subject, text_body, html_body=html_body, reply_to=reply_to)
     await asyncio.to_thread(_send_message, msg)
     return True
@@ -94,4 +141,3 @@ async def send_trial_welcome_email(
     </html>
     """.strip()
     return await send_email(to_email, subject, text_body, html_body=html_body)
-

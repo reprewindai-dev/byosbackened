@@ -40,13 +40,20 @@ dependencies = [
     "numpy>=1.24.0",
     "scipy>=1.11.0",
     "stripe>=7.0.0",
+    "svix>=1.31.0",
     "pyotp>=2.9.0",
     "qrcode>=7.4.2",
     "email-validator>=2.1.0",
     "sentry-sdk[fastapi]>=1.38.0",
     "python-slugify>=8.0.0",
     "pymodbus>=3.6.1,<4.0.0",
-    "pysnmp==4.4.12",
+    "pysnmp>=7.1.0,<8.0.0",
+    "pyasn1>=0.6.3,<0.7.0",
+    "apscheduler==3.10.4",
+    "upstash-search>=0.1.1",
+    "qstash>=2.0.0",
+    "upstash-workflow",
+    "upstash-redis>=1.4.0",
 ]
 
 [project.optional-dependencies]
@@ -65,7 +72,9 @@ include = [
     "core*",
     "db*",
     "edge*",
+    "herald*",
     "license*",
+    "onboarding*",
 ]
 
 [tool.black]

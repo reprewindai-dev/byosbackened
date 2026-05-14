@@ -1,6 +1,7 @@
-"""Token wallet router - balance, transactions, and credit purchase."""
+"""Operating reserve router - balance, transactions, and reserve funding."""
+import json
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -10,7 +11,7 @@ from sqlalchemy import desc
 from apps.api.deps import get_current_user, get_current_workspace_id
 from core.config import get_settings
 from db.session import get_db
-from db.models import TokenWallet, TokenTransaction, User
+from db.models import Subscription, SubscriptionStatus, TokenWallet, TokenTransaction, User
 from core.redis_pool import get_redis
 
 settings = get_settings()
@@ -19,8 +20,14 @@ router = APIRouter(prefix="/wallet", tags=["wallet"])
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
+RESERVE_UNITS_PER_USD = 1000
+
+
 class WalletBalanceResponse(BaseModel):
     workspace_id: str
+    reserve_balance_units: int
+    reserve_balance_usd: str
+    # Deprecated compatibility fields. The public product language is Operating Reserve, not credits.
     balance: int
     monthly_credits_included: int
     monthly_credits_used: int
@@ -40,6 +47,7 @@ class TransactionResponse(BaseModel):
     endpoint_method: Optional[str]
     request_id: Optional[str]
     description: Optional[str]
+    metadata: Optional[dict[str, Any]] = None
     created_at: str
 
 
@@ -53,6 +61,8 @@ class TransactionListResponse(BaseModel):
 class TopupOption(BaseModel):
     pack_name: str
     price_cents: int
+    reserve_units: int
+    reserve_usd: str
     credits: int
     bonus_percent: int
 
@@ -62,7 +72,7 @@ class TopupOptionsResponse(BaseModel):
 
 
 class CreateCheckoutRequest(BaseModel):
-    pack_name: str  # starter, growth, team, enterprise
+    pack_name: str  # founding, standard, regulated
     success_url: str
     cancel_url: str
 
@@ -72,32 +82,26 @@ class CreateCheckoutResponse(BaseModel):
     session_id: str
 
 
-# ─── Token Pack Definitions ───────────────────────────────────────────────────
+# ─── Operating Reserve Definitions ────────────────────────────────────────────
 
-TOKEN_PACKS = {
-    "starter": {
-        "name": "Starter Pack",
-        "price_cents": 2500,  # $25
-        "credits": 2_500_000,
+RESERVE_PACKS = {
+    "founding": {
+        "name": "Founding Reserve",
+        "price_cents": 15_000,  # $150 minimum reserve
+        "reserve_units": 150_000,
         "bonus_percent": 0,
     },
-    "growth": {
-        "name": "Growth Pack",
-        "price_cents": 10000,  # $100
-        "credits": 12_000_000,
-        "bonus_percent": 20,
+    "standard": {
+        "name": "Standard Reserve",
+        "price_cents": 30_000,  # $300 minimum reserve
+        "reserve_units": 300_000,
+        "bonus_percent": 0,
     },
-    "team": {
-        "name": "Team Pack",
-        "price_cents": 50000,  # $500
-        "credits": 75_000_000,
-        "bonus_percent": 50,
-    },
-    "enterprise": {
-        "name": "Enterprise Pack",
-        "price_cents": 200000,  # $2,000
-        "credits": 350_000_000,
-        "bonus_percent": 75,
+    "regulated": {
+        "name": "Regulated Reserve",
+        "price_cents": 250_000,  # $2,500 minimum reserve
+        "reserve_units": 2_500_000,
+        "bonus_percent": 0,
     },
 }
 
@@ -155,6 +159,29 @@ def _invalidate_balance_cache(workspace_id: str):
         pass
 
 
+def _has_active_paid_subscription(db: Session, workspace_id: str) -> bool:
+    """Operating Reserve is cash-backed only after paid activation."""
+    return (
+        db.query(Subscription)
+        .filter(
+            Subscription.workspace_id == workspace_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .first()
+        is not None
+    )
+
+
+def _parse_transaction_metadata(raw: Optional[str]) -> Optional[dict[str, Any]]:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/balance", response_model=WalletBalanceResponse)
@@ -162,25 +189,31 @@ async def get_balance(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
 ):
-    """Get current token wallet balance and stats."""
+    """Get current operating reserve balance and stats."""
     # Try cache first
     cached = _get_cached_balance(workspace_id)
     
     wallet = _get_or_create_wallet(db, workspace_id)
+    paid_active = _has_active_paid_subscription(db, workspace_id)
+    effective_balance = wallet.balance if paid_active else 0
+    effective_purchased = wallet.total_credits_purchased if paid_active else 0
+    effective_used = wallet.total_credits_used if paid_active else 0
     
     # Update cache if different
-    if cached != wallet.balance:
-        _cache_balance(workspace_id, wallet.balance)
+    if cached != effective_balance:
+        _cache_balance(workspace_id, effective_balance)
     
     return WalletBalanceResponse(
         workspace_id=wallet.workspace_id,
-        balance=wallet.balance,
-        monthly_credits_included=wallet.monthly_credits_included or 0,
-        monthly_credits_used=wallet.monthly_credits_used or 0,
+        reserve_balance_units=effective_balance,
+        reserve_balance_usd=f"{effective_balance / RESERVE_UNITS_PER_USD:.2f}",
+        balance=effective_balance,
+        monthly_credits_included=wallet.monthly_credits_included if paid_active else 0,
+        monthly_credits_used=wallet.monthly_credits_used if paid_active else 0,
         monthly_period_start=wallet.monthly_period_start.isoformat() if wallet.monthly_period_start else None,
         monthly_period_end=wallet.monthly_period_end.isoformat() if wallet.monthly_period_end else None,
-        total_credits_purchased=wallet.total_credits_purchased or 0,
-        total_credits_used=wallet.total_credits_used or 0,
+        total_credits_purchased=effective_purchased or 0,
+        total_credits_used=effective_used or 0,
     )
 
 
@@ -192,7 +225,7 @@ async def get_transactions(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
 ):
-    """Get token transaction history."""
+    """Get operating reserve transaction history."""
     query = db.query(TokenTransaction).filter(
         TokenTransaction.workspace_id == workspace_id
     )
@@ -218,6 +251,7 @@ async def get_transactions(
                 endpoint_method=t.endpoint_method,
                 request_id=t.request_id,
                 description=t.description,
+                metadata=_parse_transaction_metadata(t.metadata_json),
                 created_at=t.created_at.isoformat() if t.created_at else None,
             )
             for t in transactions
@@ -230,16 +264,18 @@ async def get_transactions(
 
 @router.get("/topup/options", response_model=TopupOptionsResponse)
 async def get_topup_options():
-    """Get available token pack options."""
+    """Get available operating reserve funding options."""
     return TopupOptionsResponse(
         options=[
             TopupOption(
                 pack_name=pack_id,
                 price_cents=pack["price_cents"],
-                credits=pack["credits"],
+                reserve_units=pack["reserve_units"],
+                reserve_usd=f"{pack['reserve_units'] / RESERVE_UNITS_PER_USD:.2f}",
+                credits=pack["reserve_units"],
                 bonus_percent=pack["bonus_percent"],
             )
-            for pack_id, pack in TOKEN_PACKS.items()
+            for pack_id, pack in RESERVE_PACKS.items()
         ]
     )
 
@@ -250,21 +286,33 @@ async def create_topup_checkout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create Stripe checkout session for token pack purchase."""
+    """Create Stripe checkout session for operating reserve funding."""
     import stripe
     
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
     
     stripe.api_key = settings.stripe_secret_key
+    stripe.api_version = settings.stripe_api_version
     
     # Validate pack
-    pack = TOKEN_PACKS.get(request.pack_name)
+    pack = RESERVE_PACKS.get(request.pack_name)
     if not pack:
-        raise HTTPException(status_code=400, detail="Invalid token pack")
+        raise HTTPException(status_code=400, detail="Invalid reserve pack")
     
     workspace_id = current_user.workspace_id
+    active_subscription = db.query(Subscription).filter(
+        Subscription.workspace_id == workspace_id,
+        Subscription.status == SubscriptionStatus.ACTIVE,
+    ).first()
+    if not active_subscription:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Activate the workspace before adding operating reserve.",
+        )
     
+    success_separator = "&" if "?" in request.success_url else "?"
+
     # Create checkout session
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
@@ -272,21 +320,22 @@ async def create_topup_checkout(
             "price_data": {
                 "currency": "usd",
                 "product_data": {
-                    "name": f"Veklom Token Pack - {pack['name']}",
-                    "description": f"{pack['credits']:,} API credits ({pack['bonus_percent']}% bonus)",
+                    "name": f"Veklom Operating Reserve - {pack['name']}",
+                    "description": f"${pack['reserve_units'] / RESERVE_UNITS_PER_USD:,.2f} operating reserve for governed execution",
                 },
                 "unit_amount": pack["price_cents"],
             },
             "quantity": 1,
         }],
         mode="payment",
-        success_url=request.success_url + "?session_id={CHECKOUT_SESSION_ID}",
+        success_url=request.success_url + f"{success_separator}session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=request.cancel_url,
         metadata={
             "workspace_id": workspace_id,
             "pack_name": request.pack_name,
-            "credits": str(pack["credits"]),
-            "type": "token_pack",
+            "reserve_units": str(pack["reserve_units"]),
+            "credits": str(pack["reserve_units"]),
+            "type": "operating_reserve",
         },
     )
     
@@ -302,7 +351,7 @@ async def get_usage_stats(
     workspace_id: str = Depends(get_current_workspace_id),
     db: Session = Depends(get_db),
 ):
-    """Get usage statistics for the wallet."""
+    """Get operating reserve usage statistics."""
     from datetime import timedelta
     from sqlalchemy import func
     
@@ -310,7 +359,7 @@ async def get_usage_stats(
     
     # Get usage stats
     usage_stats = db.query(
-        func.sum(TokenTransaction.amount).label("total_credits"),
+        func.sum(TokenTransaction.amount).label("total_reserve_units"),
         func.count(TokenTransaction.id).label("transaction_count"),
     ).filter(
         TokenTransaction.workspace_id == workspace_id,
@@ -321,7 +370,7 @@ async def get_usage_stats(
     # Get top endpoints
     top_endpoints = db.query(
         TokenTransaction.endpoint_path,
-        func.sum(-TokenTransaction.amount).label("credits_used"),
+        func.sum(-TokenTransaction.amount).label("reserve_units_used"),
         func.count(TokenTransaction.id).label("call_count"),
     ).filter(
         TokenTransaction.workspace_id == workspace_id,
@@ -330,17 +379,21 @@ async def get_usage_stats(
     ).group_by(
         TokenTransaction.endpoint_path
     ).order_by(
-        desc("credits_used")
+        desc("reserve_units_used")
     ).limit(10).all()
     
     return {
         "period_days": days,
-        "total_credits_used": abs(int(usage_stats.total_credits or 0)),
+        "total_reserve_units_used": abs(int(usage_stats.total_reserve_units or 0)),
+        "total_reserve_usd_used": f"{abs(int(usage_stats.total_reserve_units or 0)) / RESERVE_UNITS_PER_USD:.2f}",
+        "total_credits_used": abs(int(usage_stats.total_reserve_units or 0)),
         "transaction_count": int(usage_stats.transaction_count or 0),
         "top_endpoints": [
             {
                 "endpoint": ep.endpoint_path,
-                "credits_used": int(ep.credits_used or 0),
+                "reserve_units_used": int(ep.reserve_units_used or 0),
+                "reserve_usd_used": f"{int(ep.reserve_units_used or 0) / RESERVE_UNITS_PER_USD:.2f}",
+                "credits_used": int(ep.reserve_units_used or 0),
                 "call_count": int(ep.call_count or 0),
             }
             for ep in top_endpoints

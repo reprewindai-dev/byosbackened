@@ -12,7 +12,7 @@ from db.models.cost_allocation import CostAllocation
 from db.models.budget import Budget
 from db.models.security_audit import SecurityAuditLog
 from db.models.abuse_log import AbuseLog
-from db.models.incident_log import IncidentLog
+from db.models.incident_log import IncidentLog, IncidentSeverity, IncidentStatus
 from db.models.routing_policy import RoutingPolicy
 from db.models.ml_model import MLModel
 from db.models.deployment import Deployment, DeploymentStatus, DeploymentStrategy
@@ -32,6 +32,7 @@ from db.models.security_event import SecurityEvent, ThreatType, SecurityLevel
 from db.models.user_session import UserSession
 from db.models.api_key import APIKey
 from db.models.workspace_request_log import WorkspaceRequestLog
+from db.models.veklom_run import VeklomRun
 from db.models.workspace_model_setting import WorkspaceModelSetting
 from db.models.subscription import Subscription, PlanTier, SubscriptionStatus
 from license.tier import LicenseTier
@@ -45,6 +46,11 @@ from db.models.system_metrics import SystemMetrics
 from db.models.alert import Alert, AlertSeverity
 from db.models.execution_log import ExecutionLog
 from db.models.token_wallet import TokenWallet, TokenTransaction
+from db.models.status_subscription import StatusSubscription
+from db.models.signup_lead import SignupLead
+from db.models.product_usage_event import ProductUsageEvent
+from db.models.commercial_artifact import CommercialArtifact
+from db.models.workspace_github_repo_selection import WorkspaceGithubRepoSelection
 
 
 def _optional_import(path: str, names: tuple[str, ...]) -> tuple[object, ...]:
@@ -79,7 +85,7 @@ __all__ = [
     "Budget",
     "SecurityAuditLog",
     "AbuseLog",
-    "IncidentLog",
+    "IncidentLog", "IncidentSeverity", "IncidentStatus",
     "RoutingPolicy",
     "MLModel",
     "Deployment", "DeploymentStatus", "DeploymentStrategy",
@@ -93,6 +99,7 @@ __all__ = [
     "UserSession",
     "APIKey",
     "WorkspaceRequestLog",
+    "VeklomRun",
     "WorkspaceModelSetting",
     "Subscription", "PlanTier", "SubscriptionStatus",
     "LicenseTier",
@@ -102,6 +109,11 @@ __all__ = [
     "Alert", "AlertSeverity",
     "ExecutionLog",
     "TokenWallet", "TokenTransaction",
+    "StatusSubscription",
+    "SignupLead",
+    "ProductUsageEvent",
+    "CommercialArtifact",
+    "WorkspaceGithubRepoSelection",
     "Vendor",
     "Listing",
     "MarketplaceFile",

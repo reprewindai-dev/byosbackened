@@ -4,17 +4,25 @@ import { useAuthStore } from "@/store/auth-store";
 declare global {
   interface Window {
     __VEKLOM_API_BASE__?: string;
+    __UACP_BACKEND_BASE_URL__?: string;
     __VEKLOM_ENV__?: string;
     __VEKLOM_STRIPE_PK__?: string;
   }
 }
 
+function normalizeBaseUrl(value?: string | null): string {
+  return value ? value.replace(/\/+$/, "") : "";
+}
+
 export function resolveApiBase(): string {
-  if (typeof window !== "undefined" && window.__VEKLOM_API_BASE__) {
-    return window.__VEKLOM_API_BASE__.replace(/\/+$/, "");
+  if (typeof window !== "undefined") {
+    const runtimeBase = window.__UACP_BACKEND_BASE_URL__ || window.__VEKLOM_API_BASE__;
+    if (runtimeBase) return normalizeBaseUrl(runtimeBase);
   }
-  const buildTime = import.meta.env.VITE_VEKLOM_API_BASE as string | undefined;
-  if (buildTime) return buildTime.replace(/\/+$/, "");
+  const buildTime =
+    (import.meta.env.VITE_UACP_BACKEND_BASE_URL as string | undefined) ||
+    (import.meta.env.VITE_VEKLOM_API_BASE as string | undefined);
+  if (buildTime) return normalizeBaseUrl(buildTime);
   if (typeof location !== "undefined") {
     const h = location.hostname;
     if (/^localhost$|^127\.|^0\.0\.0\.0$/.test(h)) return "";
@@ -31,16 +39,20 @@ export function resolveStripePk(): string {
 
 const API_BASE = resolveApiBase();
 const API_PREFIX = "/api/v1";
+const DEFAULT_API_TIMEOUT_MS = 25_000;
+const AUTH_API_TIMEOUT_MS = 20_000;
 
 export const api: AxiosInstance = axios.create({
   baseURL: `${API_BASE}${API_PREFIX}`,
-  timeout: 20_000,
+  timeout: DEFAULT_API_TIMEOUT_MS,
   withCredentials: false,
+  transitional: { clarifyTimeoutError: true },
 });
 
 export const apiRoot: AxiosInstance = axios.create({
   baseURL: API_BASE || "/",
-  timeout: 20_000,
+  timeout: DEFAULT_API_TIMEOUT_MS,
+  transitional: { clarifyTimeoutError: true },
 });
 
 function attachAuthHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
@@ -66,9 +78,11 @@ async function refreshAccessToken(): Promise<string | null> {
   }
   refreshInFlight = (async () => {
     try {
-      const resp = await axios.post(`${API_BASE}${API_PREFIX}/auth/refresh`, {
-        refresh_token: refreshToken,
-      });
+      const resp = await axios.post(
+        `${API_BASE}${API_PREFIX}/auth/refresh`,
+        { refresh_token: refreshToken },
+        { timeout: AUTH_API_TIMEOUT_MS, transitional: { clarifyTimeoutError: true } },
+      );
       const { access_token, refresh_token, expires_in } = resp.data as {
         access_token: string;
         refresh_token?: string;
@@ -94,7 +108,20 @@ function makeResponseInterceptor(instance: AxiosInstance) {
   instance.interceptors.response.use(
     (r) => r,
     async (error: AxiosError) => {
-      const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+      const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean; _networkRetried?: boolean }) | undefined;
+      const method = original?.method?.toLowerCase() ?? "get";
+      const safeToRetry = method === "get" || method === "head" || method === "options";
+      const transientTransportFailure =
+        error.code === "ERR_NETWORK" ||
+        error.code === "ECONNABORTED" ||
+        error.code === "ETIMEDOUT" ||
+        /network error|timeout/i.test(error.message);
+
+      if (original && safeToRetry && transientTransportFailure && !original._networkRetried) {
+        original._networkRetried = true;
+        return instance.request(original);
+      }
+
       if (error.response?.status === 401 && original && !original._retried) {
         original._retried = true;
         const fresh = await refreshAccessToken();

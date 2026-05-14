@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
 from core.config import get_settings
+from core.services.marketplace_catalog import real_marketplace_catalog
 from db.models import (
     User,
     Vendor,
@@ -43,6 +44,36 @@ def _vendor_has_paid_marketplace_access(vendor: Vendor) -> bool:
         (vendor.subscription_status or "").lower() == "active"
         and (vendor.plan or "").lower() in _PAID_VENDOR_PLANS
     )
+
+
+def _db_listing_payload(x: Listing) -> dict:
+    return {
+        "id": x.id,
+        "vendor_id": x.vendor_id,
+        "title": x.title,
+        "provider": "Veklom",
+        "category": "Managed Services",
+        "description": x.description,
+        "positioning": x.description,
+        "price": "Free" if not x.price_cents else f"${x.price_cents / 100:,.0f}",
+        "price_cents": x.price_cents,
+        "currency": x.currency,
+        "billing": "free" if not x.price_cents else "external",
+        "install": "Veklom account",
+        "target": ["veklom"],
+        "rating_avg": 0,
+        "rating_count": 0,
+        "install_count": 0,
+        "badges": ["First-party", "Live backend", "Governed API"],
+        "featured": True,
+        "compliance": ["SOC2"],
+        "source_url": "https://veklom.com/marketplace/",
+        "use_url": "https://veklom.com/signup/",
+        "source_verified": True,
+        "verification_note": "First-party Veklom listing owned by this production deployment.",
+        "status": x.status,
+        "created_at": x.created_at.isoformat(),
+    }
 
 
 def _require_vendor(db: Session, user: User) -> Vendor:
@@ -199,23 +230,41 @@ async def listings_list(
     else:
         q = q.filter(Listing.status.in_(_LISTING_PUBLIC_STATUSES))
     rows = q.order_by(Listing.created_at.desc()).all()
+    catalog_rows = real_marketplace_catalog()
+    db_rows = [_db_listing_payload(x) for x in rows]
+    return catalog_rows + db_rows
+
+
+@router.get("/categories")
+async def listings_categories(db: Session = Depends(get_db)):
+    rows = real_marketplace_catalog()
+    rows.extend(
+        _db_listing_payload(row)
+        for row in db.query(Listing).filter(Listing.status.in_(_LISTING_PUBLIC_STATUSES)).all()
+    )
+    total = len(rows)
+    paid = sum(1 for row in rows if row.get("price_cents") and row["price_cents"] > 0)
+    free = total - paid
+    categories: dict[str, int] = {}
+    for row in rows:
+        category = row.get("category") or "Other"
+        categories[category] = categories.get(category, 0) + 1
     return [
-        {
-            "id": x.id,
-            "vendor_id": x.vendor_id,
-            "title": x.title,
-            "description": x.description,
-            "price_cents": x.price_cents,
-            "currency": x.currency,
-            "status": x.status,
-            "created_at": x.created_at.isoformat(),
-        }
-        for x in rows
+        {"id": "all", "label": "All", "count": total},
+        {"id": "paid", "label": "Paid", "count": paid},
+        {"id": "free", "label": "Free", "count": free},
+        *[
+            {"id": key.lower().replace(" ", "-"), "label": key, "count": value}
+            for key, value in sorted(categories.items())
+        ],
     ]
 
 
 @router.get("/listings/{listing_id}")
 async def listings_get(listing_id: str, db: Session = Depends(get_db)):
+    for listing in real_marketplace_catalog():
+        if listing["id"] == listing_id:
+            return listing
     x = db.query(Listing).filter(Listing.id == listing_id).first()
     if not x:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -505,21 +554,26 @@ class OrderCreateRequest(BaseModel):
     items: list[str] = Field(default_factory=list, description="Listing IDs")
 
 
-@router.post("/orders/create")
-async def orders_create(
-    payload: OrderCreateRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    if not payload.items:
+def _create_order_for_listing_ids(
+    *,
+    db: Session,
+    current_user: User,
+    listing_ids: list[str],
+) -> MarketplaceOrder:
+    if not listing_ids:
         raise HTTPException(status_code=400, detail="No order items provided")
-    deduped_items = list(dict.fromkeys(payload.items))
+
+    deduped_items = list(dict.fromkeys(listing_ids))
     listings = db.query(Listing).filter(Listing.id.in_(deduped_items), Listing.status == "active").all()
-    if not listings:
-        raise HTTPException(status_code=404, detail="No active listings found")
+    found_ids = {x.id for x in listings}
+    missing_ids = [x for x in deduped_items if x not in found_ids]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail="One or more active listings were not found")
+
     currencies = {x.currency for x in listings}
     if len(currencies) != 1:
         raise HTTPException(status_code=400, detail="All listings in an order must have matching currency")
+
     total = sum(x.price_cents for x in listings)
     order = MarketplaceOrder(
         buyer_id=current_user.id,
@@ -542,7 +596,58 @@ async def orders_create(
         )
     db.commit()
     db.refresh(order)
+    return order
+
+
+@router.post("/orders/create")
+async def orders_create(
+    payload: OrderCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    order = _create_order_for_listing_ids(db=db, current_user=current_user, listing_ids=payload.items)
     return {"id": order.id, "total_cents": order.total_cents, "currency": order.currency}
+
+
+def _serialize_order(row: MarketplaceOrder, db: Session) -> dict:
+    items = []
+    for item in row.items:
+        listing = db.query(Listing).filter(Listing.id == item.listing_id).first()
+        items.append(
+            {
+                "id": item.id,
+                "listing_id": item.listing_id,
+                "listing_title": listing.title if listing else None,
+                "vendor_id": item.vendor_id,
+                "price_cents": item.price_cents,
+                "status": item.status,
+            }
+        )
+    return {
+        "id": row.id,
+        "status": row.status,
+        "total_cents": row.total_cents,
+        "currency": row.currency,
+        "stripe_payment_intent": row.stripe_payment_intent,
+        "items": items,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.get("/orders/me")
+async def orders_me(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(MarketplaceOrder)
+        .filter(MarketplaceOrder.buyer_id == current_user.id)
+        .order_by(MarketplaceOrder.created_at.desc())
+        .limit(max(1, min(limit, 100)))
+        .all()
+    )
+    return {"items": [_serialize_order(row, db) for row in rows]}
 
 
 @router.get("/orders/{order_id}")
@@ -557,18 +662,7 @@ async def orders_get(
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="Order not found")
-    return {
-        "id": row.id,
-        "status": row.status,
-        "total_cents": row.total_cents,
-        "currency": row.currency,
-        "stripe_payment_intent": row.stripe_payment_intent,
-        "items": [
-            {"id": i.id, "listing_id": i.listing_id, "vendor_id": i.vendor_id, "price_cents": i.price_cents, "status": i.status}
-            for i in row.items
-        ],
-        "created_at": row.created_at.isoformat(),
-    }
+    return _serialize_order(row, db)
 
 
 class PaymentIntentRequest(BaseModel):
@@ -605,7 +699,8 @@ async def payments_create_intent(
 
 
 class CheckoutSessionRequest(BaseModel):
-    order_id: str
+    order_id: Optional[str] = None
+    listing_id: Optional[str] = None
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
 
@@ -619,12 +714,18 @@ async def payments_create_checkout(
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Stripe is not configured")
     stripe.api_key = settings.stripe_secret_key
-    order = db.query(MarketplaceOrder).filter(
-        MarketplaceOrder.id == payload.order_id,
-        MarketplaceOrder.buyer_id == current_user.id,
-    ).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+    if payload.order_id:
+        order = db.query(MarketplaceOrder).filter(
+            MarketplaceOrder.id == payload.order_id,
+            MarketplaceOrder.buyer_id == current_user.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+    elif payload.listing_id:
+        order = _create_order_for_listing_ids(db=db, current_user=current_user, listing_ids=[payload.listing_id])
+    else:
+        raise HTTPException(status_code=400, detail="order_id or listing_id is required")
+
     if order.total_cents <= 0:
         raise HTTPException(status_code=400, detail="Order total must be positive")
     if order.status == "paid":
@@ -635,6 +736,8 @@ async def payments_create_checkout(
 
     line_items = []
     for item in order.items:
+        if item.price_cents <= 0:
+            continue
         listing = db.query(Listing).filter(Listing.id == item.listing_id).first()
         title = listing.title if listing else f"Listing {item.listing_id}"
         line_items.append(
@@ -650,6 +753,8 @@ async def payments_create_checkout(
                 },
             }
         )
+    if not line_items:
+        raise HTTPException(status_code=400, detail="Order has no paid checkout items")
 
     session = stripe.checkout.Session.create(
         mode="payment",
@@ -660,7 +765,7 @@ async def payments_create_checkout(
         cancel_url=cancel_url,
         metadata={"order_id": order.id, "workspace_id": order.workspace_id},
     )
-    return {"checkout_url": session.url, "checkout_session_id": session.id}
+    return {"checkout_url": session.url, "checkout_session_id": session.id, "order_id": order.id}
 
 
 @router.post("/payments/webhook")

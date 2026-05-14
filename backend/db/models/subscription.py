@@ -13,6 +13,21 @@ class PlanTier(str, enum.Enum):
     SOVEREIGN = "sovereign"
     ENTERPRISE = "enterprise"
 
+    @property
+    def display_name(self) -> str:
+        """Public-facing plan name matching veklom.com/pricing."""
+        return PLAN_DISPLAY_NAMES.get(self.value, self.value)
+
+
+PLAN_DISPLAY_NAMES: dict[str, str] = {
+    "starter": "Founding",
+    "pro": "Standard",
+    "sovereign": "Regulated",
+    "enterprise": "Enterprise",
+}
+
+PLAN_HIERARCHY = ["starter", "pro", "sovereign", "enterprise"]
+
 
 class SubscriptionStatus(str, enum.Enum):
     ACTIVE = "active"

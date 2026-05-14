@@ -8,7 +8,6 @@ import {
   FileCheck2,
   Gauge,
   KeyRound,
-  LayoutDashboard,
   LineChart,
   Settings2,
   ShieldCheck,
@@ -25,11 +24,11 @@ interface NavItem {
   badge?: string;
 }
 
-const SECTIONS: { title: string; items: NavItem[] }[] = [
+const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: "Workspace",
     items: [
-      { to: "/overview", label: "Overview", icon: LayoutDashboard },
+      { to: "/overview", label: "Overview", icon: Gauge },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],
@@ -76,7 +75,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           {!collapsed && (
             <div className="flex flex-col leading-none">
               <span className="text-[13px] font-semibold tracking-tight">Veklom</span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign control node</span>
             </div>
           )}
         </NavLink>
@@ -90,9 +89,9 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
-        {SECTIONS.map((section) => (
-          <div key={section.title} className="px-2">
-            {!collapsed && <div className="v-sidebar-section">{section.title}</div>}
+        {CUSTOMER_SECTIONS.map((section) => (
+          <div key={section.title ?? section.items.map((item) => item.to).join("-")} className="px-2">
+            {!collapsed && section.title && <div className="v-sidebar-section">{section.title}</div>}
             {section.items.map(({ to, label, icon: Icon, badge }) => (
               <NavLink
                 key={to}
@@ -125,7 +124,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             <span className="text-muted">Sovereign Mode</span>
             <span className="inline-flex items-center gap-1 text-moss">
               <Activity className="h-3 w-3" />
-              on-prem
+              ON-PREM
             </span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
@@ -145,7 +144,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       {!collapsed && (
         <div className="border-t border-rule px-3 py-2 text-[10px] text-muted">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
-          mTLS internal · v1.42.0
+          mTLS internal - v1.42.0
         </div>
       )}
     </aside>

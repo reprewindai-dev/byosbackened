@@ -156,22 +156,51 @@ def _call_with_circuit_breaker(
     prompt: str,
     model: str,
     options: dict,
-) -> tuple[dict, str]:
+    scope: str,
+) -> tuple[dict, str, str]:
     """
     Try Ollama first, respecting circuit breaker state.
     Falls back to Groq if circuit is OPEN or Ollama fails.
-    Returns (result_dict, provider_name).
+    Returns (result_dict, provider_name, routing_reason).
     """
-    use_groq = is_open()
+    use_groq = is_open(scope)
+    routing_reason = "circuit_open" if use_groq else "primary_runtime"
 
     if not use_groq:
         try:
-            result = ollama.generate(prompt=prompt, model=model, options=options or None)
-            record_success()
-            return result, "ollama"
+            fast_timeout_seconds = float(settings.llm_latency_budget_seconds)
+            recovery_timeout_seconds = max(
+                float(settings.llm_timeout_seconds),
+                float(settings.llm_on_prem_timeout_seconds),
+            )
+            fast_ollama = (
+                OllamaClient(base_url=ollama.base_url, model=model, timeout=fast_timeout_seconds)
+                if isinstance(getattr(ollama, "base_url", None), str)
+                else ollama
+            )
+            result = fast_ollama.generate(prompt=prompt, model=model, options=options or None)
+            record_success(scope)
+            return result, "ollama", "primary_runtime"
         except OllamaError as exc:
-            new_state = record_failure()
+            text = str(exc).lower()
+            timed_out = "timed out" in text or "timeout" in text
+            if timed_out and recovery_timeout_seconds > fast_timeout_seconds:
+                try:
+                    recovered = OllamaClient(
+                        base_url=getattr(ollama, "base_url", None),
+                        model=model,
+                        timeout=recovery_timeout_seconds,
+                    ).generate(prompt=prompt, model=model, options=options or None)
+                    record_success(scope)
+                    return recovered, "ollama", "ollama_cold_start_recovered"
+                except OllamaError as recovery_exc:
+                    exc = recovery_exc
+                    text = str(exc).lower()
+                    timed_out = "timed out" in text or "timeout" in text
+
+            new_state = record_failure(scope)
             logger.warning("[CB] Ollama failed (%s), state now %s", exc, new_state)
+            routing_reason = "ollama_latency_budget_exceeded" if "timed out" in text or "timeout" in text else "ollama_unavailable"
             use_groq = True
 
     # ── Groq fallback path ────────────────────────────────────────────────────
@@ -186,8 +215,9 @@ def _call_with_circuit_breaker(
                 prompt=prompt,
                 max_tokens=options.get("num_predict"),
                 temperature=options.get("temperature"),
+                timeout_seconds=settings.groq_timeout_seconds,
             )
-            return result, "groq"
+            return result, "groq", routing_reason
         except GroqFallbackError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -248,8 +278,10 @@ def exec_llm(
 
     # 5. Call LLM (Ollama → Groq via circuit breaker)
     started = time.perf_counter()
-    result, provider = _call_with_circuit_breaker(ollama, effective_prompt, model, options)
+    circuit_scope = f"{workspace_id}:v1_exec:{model}"
+    result, provider, routing_reason = _call_with_circuit_breaker(ollama, effective_prompt, model, options, circuit_scope)
     latency_ms = int((time.perf_counter() - started) * 1000) or result["latency_ms"]
+    fallback_triggered = provider != "ollama"
 
     # 6. Persist conversation turn
     if mem is not None:
@@ -286,6 +318,7 @@ def exec_llm(
         request_json={
             "prompt": body.prompt,
             "model": body.model,
+            "requested_provider": "ollama",
             "conversation_id": body.conversation_id,
             "use_memory": body.use_memory,
             "temperature": body.temperature,
@@ -294,6 +327,9 @@ def exec_llm(
         response_json={
             "response": result["response"],
             "provider": provider,
+            "requested_provider": "ollama",
+            "fallback_triggered": fallback_triggered,
+            "routing_reason": routing_reason if fallback_triggered else "primary_runtime",
             "prompt_tokens": result["prompt_tokens"],
             "completion_tokens": result["completion_tokens"],
             "total_tokens": result["total_tokens"],

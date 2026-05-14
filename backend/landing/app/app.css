@@ -19,12 +19,14 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: var(--ink); color: var(--bone); font-family: var(--sans); min-height: 100vh; }
+body { margin: 0; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 a { color: var(--brass-2); text-decoration: none; }
 a:hover { color: var(--brass); }
 
 .app-shell {
   max-width: 480px;
   margin: 0 auto;
+  min-height: 100vh;
   padding: 64px 24px 96px;
 }
 .app-shell.wide { max-width: 920px; }
@@ -33,6 +35,7 @@ a:hover { color: var(--brass); }
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 32px;
   margin-bottom: 48px;
   font-family: var(--serif);
   font-size: 22px;
@@ -44,6 +47,7 @@ a:hover { color: var(--brass); }
   background: var(--ink-2);
   border: 1px solid var(--rule);
   border-radius: 6px;
+  min-height: 456px;
   padding: 40px 32px;
 }
 
@@ -123,6 +127,7 @@ a:hover { color: var(--brass); }
   font-size: 14px;
   margin-bottom: 18px;
 }
+#alert { min-height: 0; }
 .alert-error { background: rgba(224, 122, 107, 0.1); border: 1px solid var(--danger); color: var(--danger); }
 .alert-ok { background: rgba(123, 179, 122, 0.1); border: 1px solid var(--ok); color: var(--ok); }
 

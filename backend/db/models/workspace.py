@@ -1,5 +1,5 @@
 """Workspace model (multi-tenant)."""
-from sqlalchemy import Column, String, DateTime, Boolean
+from sqlalchemy import Column, String, DateTime, Boolean, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.session import Base
@@ -24,6 +24,13 @@ class Workspace(Base):
     license_issued_at = Column(DateTime, nullable=True)
     license_expires_at = Column(DateTime, nullable=True)
     license_download_url = Column(String, nullable=True)
+    industry = Column(String, nullable=False, default="generic", index=True)
+    playground_profile = Column(String, nullable=False, default="generic")
+    risk_tier = Column(String, nullable=False, default="generic")
+    default_policy_pack = Column(String, nullable=True)
+    default_demo_scenarios = Column(Text, nullable=True)
+    default_evidence_requirements = Column(Text, nullable=True)
+    default_blocking_rules = Column(Text, nullable=True)
 
     # Relationships
     users = relationship("User", back_populates="workspace", cascade="all, delete-orphan")
@@ -44,4 +51,15 @@ class Workspace(Base):
     api_keys = relationship("APIKey", back_populates="workspace", cascade="all, delete-orphan")
     pipelines = relationship("Pipeline", cascade="all, delete-orphan", foreign_keys="Pipeline.workspace_id")
     pipeline_runs = relationship("PipelineRun", cascade="all, delete-orphan", foreign_keys="PipelineRun.workspace_id")
-    invites = relationship("WorkspaceInvite", cascade="all, delete-orphan", foreign_keys="WorkspaceInvite.workspace_id")
+    invites = relationship(
+        "WorkspaceInvite",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        foreign_keys="WorkspaceInvite.workspace_id",
+    )
+    github_repo_selections = relationship(
+        "WorkspaceGithubRepoSelection",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        foreign_keys="WorkspaceGithubRepoSelection.workspace_id",
+    )

@@ -1,0 +1,104 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger deploy hook when configured
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          RAILWAY_DEPLOY_HOOK: ${{ secrets.RAILWAY_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          HOOK="${COOLIFY_DEPLOY_WEBHOOK:-${RENDER_DEPLOY_HOOK:-${RAILWAY_DEPLOY_HOOK:-}}}"
+          if [ -n "$HOOK" ]; then
+            curl -X POST "$HOOK" --retry 3 --retry-delay 10 --retry-all-errors --fail --silent --show-error
+          else
+            echo "No deploy hook configured; relying on Coolify Git auto-deploy for main."
+          fi
+
+      - name: Verify backend is up
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://api.veklom.com' }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${BACKEND_URL%/}"
+          ROUTES=(
+            "/health"
+            "/api/v1/edge/demo/summary"
+            "/api/v1/edge/demo/infrastructure?scenario=network&live=false"
+          )
+
+          echo "Waiting for backend readiness at $BASE_URL"
+          READY="false"
+          LAST_STATUS="000"
+          LAST_BODY_FILE="$(mktemp)"
+          trap 'rm -f "$LAST_BODY_FILE"' EXIT
+
+          for ATTEMPT in $(seq 1 24); do
+            : > "$LAST_BODY_FILE"
+            if ! STATUS=$(curl -L -sS --output "$LAST_BODY_FILE" --write-out "%{http_code}" --max-time 15 \
+              "$BASE_URL/health"); then
+              STATUS="000"
+            fi
+            LAST_STATUS="$STATUS"
+            echo "readiness attempt $ATTEMPT/24: /health -> HTTP $STATUS"
+
+            if [ "$STATUS" = "200" ]; then
+              READY="true"
+              break
+            fi
+
+            sleep 15
+          done
+
+          if [ "$READY" != "true" ]; then
+            echo "Backend did not become ready after 6 minutes."
+            echo "Last /health status: HTTP $LAST_STATUS"
+            echo "Last response body:"
+            cat "$LAST_BODY_FILE"
+            exit 1
+          fi
+
+          for ROUTE in "${ROUTES[@]}"; do
+            BODY_FILE="$(mktemp)"
+            STATUS=$(curl -L -sS --output "$BODY_FILE" --write-out "%{http_code}" --max-time 20 \
+              --retry 4 --retry-delay 10 --retry-all-errors --retry-connrefused "$BASE_URL$ROUTE")
+            echo "$ROUTE -> HTTP $STATUS"
+            if [ "$STATUS" != "200" ]; then
+              echo "Response body:"
+              cat "$BODY_FILE"
+              exit 1
+            fi
+            rm -f "$BODY_FILE"
+          done
+
+      - name: Open incident issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > backend-deploy-incident.md <<EOF
+          Workflow: $GITHUB_WORKFLOW
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Impact: latest backend main may not be healthy in production, or the deploy verification robot failed.
+          EOF
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "[OPS] Backend deploy verification failed" \
+            --body-file backend-deploy-incident.md

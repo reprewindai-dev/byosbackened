@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  backend:
+    name: Backend gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -e ".[dev]"
+
+      - name: Critical Python lint
+        run: |
+          ruff check --select E9,F63,F7,F82 \
+            backend/apps/api \
+            backend/core/security \
+            backend/edge \
+            backend/herald \
+            backend/license \
+            backend/onboarding \
+            backend/tests/test_edge_demo_contract.py \
+            backend/tests/test_edge_demo_routes.py \
+            backend/tests/test_middleware_edges.py \
+            backend/tests/test_edge_gateway.py \
+            backend/tests/test_demo_pipeline_quota.py \
+            backend/tests/test_herald_onboarding.py \
+            backend/tests/test_internal_operators.py \
+            backend/tests/test_route_security_audit.py \
+            backend/tests/test_buyer_package.py \
+            backend/tests/test_license_health.py \
+            backend/tests/test_license_protection.py
+
+      - name: Python compile check
+        run: python -m compileall -q backend/apps backend/core backend/db backend/edge backend/herald backend/license backend/onboarding
+
+      - name: Repository hygiene gate
+        shell: pwsh
+        run: backend/scripts/check_repo_hygiene.ps1
+
+      - name: Run backend contract tests
+        env:
+          DATABASE_URL: sqlite:///./ci-test.db
+          SECRET_KEY: test-secret-key-ci
+          STRIPE_SECRET_KEY: sk_test_placeholder_not_real
+          LICENSE_ADMIN_TOKEN: test-admin-token
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+        run: |
+          cd backend
+          pytest --tb=short -q \
+            tests/test_edge_demo_contract.py \
+            tests/test_edge_demo_routes.py \
+            tests/test_middleware_edges.py \
+            tests/test_edge_gateway.py \
+            tests/test_demo_pipeline_quota.py \
+            tests/test_herald_onboarding.py \
+            tests/test_internal_operators.py \
+            tests/test_route_security_audit.py \
+            tests/test_buyer_package.py \
+            tests/test_license_health.py \
+            tests/test_license_protection.py
+
+      - name: Route security audit
+        env:
+          DATABASE_URL: sqlite:///./ci-test.db
+          SECRET_KEY: test-secret-key-ci
+          STRIPE_SECRET_KEY: sk_test_placeholder_not_real
+          LICENSE_ADMIN_TOKEN: test-admin-token
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+        run: python backend/scripts/audit_route_security.py
+
+  workspace:
+    name: Workspace gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/workspace
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Export static workspace bundle
+        run: npm run export:landing
+
+      - name: Verify frozen .com landing artifact
+        working-directory: ${{ github.workspace }}
+        run: python backend/scripts/verify_com_landing_freeze.py

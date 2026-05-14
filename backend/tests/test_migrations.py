@@ -16,6 +16,9 @@ settings = get_settings()
 @pytest.fixture
 def temp_db():
     """Create temporary database for migration testing."""
+    if not settings.database_url.startswith("postgresql"):
+        pytest.skip("Migration reversibility tests require a PostgreSQL test database")
+
     # Create temporary database URL
     db_url = settings.database_url.replace("/", "/test_migration_")
     

@@ -1,0 +1,17 @@
+# Cloudflare Pages config for the shared Veklom static shell.
+# Deploys to:
+# - veklom.com as the buyer-facing Sovereign AI Hub / GPC demo.
+# - veklom.dev as the technical BYOS backend / legacy hookup demo.
+# This is a STATIC SITE; runtime secrets/env vars live with the API services.
+#
+# Files in this directory deploy as-is:
+#   index.html            — landing page
+#   logo.svg, favicon.svg — branding assets
+#   robots.txt            — crawler directives
+#   sitemap.xml           — search-engine sitemap
+#   _headers              — security headers (HSTS, CSP, etc.)
+#   _redirects            — URL routing rules
+
+name = "veklom"
+compatibility_date = "2026-04-25"
+pages_build_output_dir = "."

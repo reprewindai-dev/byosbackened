@@ -1,0 +1,27 @@
+name-template: "Veklom $NEXT_PATCH_VERSION"
+tag-template: "v$NEXT_PATCH_VERSION"
+categories:
+  - title: "Revenue Surface"
+    labels:
+      - revenue
+      - marketplace
+      - billing
+  - title: "Security and Compliance"
+    labels:
+      - security
+      - compliance
+      - audit
+  - title: "Backend and Infrastructure"
+    labels:
+      - backend
+      - infrastructure
+      - deployment
+  - title: "Workspace"
+    labels:
+      - frontend
+      - workspace
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+template: |
+  ## Changes
+
+  $CHANGES

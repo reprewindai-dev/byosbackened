@@ -16,17 +16,16 @@ import time
 import logging
 import json
 import re
-import hashlib
 import asyncio
 from typing import Dict, List, Optional, Any
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response, JSONResponse
 
 from core.config import get_settings
-from core.security.zero_trust import ZeroTrustMiddleware
+from core.security.client_ip import get_client_ip
 from db.session import SessionLocal
 from db.models import SecurityEvent
 
@@ -346,15 +345,7 @@ class IntrusionDetectionSystem:
     
     def _get_client_ip(self, request: Request) -> str:
         """Get client IP from request."""
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip.strip()
-        
-        return request.client.host if request.client else "unknown"
+        return get_client_ip(request)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -646,15 +637,7 @@ class LockerSecurityMiddleware(BaseHTTPMiddleware):
     
     def _get_client_ip(self, request: Request) -> str:
         """Get client IP from request."""
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip.strip()
-        
-        return request.client.host if request.client else "unknown"
+        return get_client_ip(request)
     
     def _classify_endpoint(self, path: str) -> str:
         """Classify endpoint for rate limiting."""

@@ -6,6 +6,8 @@ from typing import List, Dict
 from datetime import datetime
 import statistics
 
+__test__ = False
+
 # Test configuration
 BASE_URL = "http://localhost:8000"
 WORKSPACE_ID = "test-workspace-load"

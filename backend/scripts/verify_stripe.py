@@ -26,6 +26,11 @@ from setup_stripe import (  # type: ignore
 
 
 def main() -> int:
+    fail("verify_stripe.py is retired for the old recurring subscription model.")
+    info("Current model: one-time activation plus USD Operating Reserve.")
+    info("Verify live pricing through GET /api/v1/subscriptions/plans and Stripe one-time products.")
+    return 2
+
     header("Veklom · Stripe verification")
 
     env = load_env()
@@ -40,6 +45,7 @@ def main() -> int:
         fail("stripe library missing → pip install stripe")
         return 3
     stripe.api_key = secret_key
+    stripe.api_version = env.get("STRIPE_API_VERSION", "2026-04-22.dahlia")
 
     failures = 0
 

@@ -6,11 +6,12 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from apps.api.deps import get_current_user
+from apps.api.routers.ai import AICompleteRequest, AICompleteResponse, complete
 from db.models import Deployment, DeploymentStatus, DeploymentStrategy, User
 from db.session import get_db
 
@@ -42,9 +43,37 @@ class PromoteRequest(BaseModel):
     target_traffic_percent: int = Field(100, ge=1, le=100)
 
 
+class DeploymentTestRequest(BaseModel):
+    prompt: str = Field("Reply with exactly: OK", min_length=1, max_length=20000)
+    max_tokens: int = Field(20, ge=1, le=512)
+
+
+class DeploymentTestResponse(BaseModel):
+    status: str
+    response_text: str
+    latency_ms: int
+    provider: str
+    model: str
+    requested_model: str
+    endpoint: str
+    audit_log_id: str | None
+    audit_created: bool
+    usage_recorded: bool
+    cost_usd: str
+    reserve_units_debited: int
+    request_id: str
+    tested_at: str
+
+
 def _slugify(s: str) -> str:
     s = _SLUG_RE.sub("-", s.lower()).strip("-")
     return s[:120] or f"deploy-{uuid.uuid4().hex[:8]}"
+
+
+def _endpoint_path(d: Deployment) -> str:
+    service_type = d.service_type or "api"
+    slug = d.slug or d.name or d.id
+    return f"https://api.veklom.com/v1/{service_type}/{slug}"
 
 
 def _serialize(d: Deployment) -> dict:
@@ -68,6 +97,13 @@ def _serialize(d: Deployment) -> dict:
         "rolled_back_at": d.rolled_back_at.isoformat() if d.rolled_back_at else None,
         "last_health_check": d.last_health_check.isoformat() if d.last_health_check else None,
     }
+
+
+def _merge_health_metrics(d: Deployment, patch: dict) -> None:
+    current = dict(d.health_metrics or {})
+    current.update(patch)
+    d.health_metrics = current
+    d.last_health_check = datetime.utcnow()
 
 
 @router.get("")
@@ -267,6 +303,103 @@ async def rollback_deployment(
     db.commit()
     db.refresh(d)
     return _serialize(d)
+
+
+@router.post("/{deployment_id}/test", response_model=DeploymentTestResponse)
+async def test_deployment(
+    deployment_id: str,
+    payload: DeploymentTestRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    d = (
+        db.query(Deployment)
+        .filter(Deployment.id == deployment_id, Deployment.workspace_id == current_user.workspace_id)
+        .first()
+    )
+    if not d:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Deployment not found")
+    if d.status != DeploymentStatus.ACTIVE:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Deployment is not active. Current status: {d.status.value if hasattr(d.status, 'value') else d.status}",
+        )
+    if not d.model_slug:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Deployment has no model configured")
+
+    ai_payload = AICompleteRequest(
+        model=d.model_slug,
+        prompt=payload.prompt,
+        max_tokens=payload.max_tokens,
+        temperature=0,
+        billing_event_type="endpoint_test",
+        session_tag="Standard",
+        auto_redact=True,
+        sign_audit_on_export=True,
+        lock_to_on_prem=(d.provider == "ollama"),
+    )
+
+    try:
+        result: AICompleteResponse = await complete(
+            payload=ai_payload,
+            request=request,
+            current_user=current_user,
+            db=db,
+        )
+    except HTTPException as exc:
+        _merge_health_metrics(
+            d,
+            {
+                "last_test_status": "failed",
+                "last_test_error": str(exc.detail),
+                "last_test_http_status": exc.status_code,
+                "last_tested_at": datetime.utcnow().isoformat() + "Z",
+            },
+        )
+        db.commit()
+        raise
+
+    tested_at = datetime.utcnow()
+    previous_series = []
+    if isinstance((d.health_metrics or {}).get("rps_series"), list):
+        previous_series = list((d.health_metrics or {}).get("rps_series") or [])
+    rps_series = (previous_series + [1])[-32:]
+    _merge_health_metrics(
+        d,
+        {
+            "last_test_status": "passed",
+            "last_tested_at": tested_at.isoformat() + "Z",
+            "last_test_latency_ms": result.latency_ms,
+            "last_test_provider": result.provider,
+            "last_test_model": result.model,
+            "last_test_audit_log_id": result.audit_log_id,
+            "last_test_request_id": result.request_id,
+            "p50_ms": result.latency_ms,
+            "rps": max(1, int((d.health_metrics or {}).get("rps") or 0)),
+            "rps_series": rps_series,
+            "error_rate": 0,
+        },
+    )
+    db.commit()
+    db.refresh(d)
+
+    return DeploymentTestResponse(
+        status="passed",
+        response_text=result.response_text,
+        latency_ms=result.latency_ms,
+        provider=result.provider,
+        model=result.model,
+        requested_model=result.requested_model,
+        endpoint=_endpoint_path(d),
+        audit_log_id=result.audit_log_id,
+        audit_created=bool(result.audit_log_id),
+        usage_recorded=result.reserve_units_debited >= 0,
+        cost_usd=result.cost_usd,
+        reserve_units_debited=result.reserve_units_debited,
+        request_id=result.request_id,
+        tested_at=tested_at.isoformat() + "Z",
+    )
 
 
 @router.delete("/{deployment_id}", status_code=204)

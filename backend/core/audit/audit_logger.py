@@ -5,6 +5,7 @@ import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 from decimal import Decimal
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from db.models import AIAuditLog
 from core.config import get_settings
@@ -55,6 +56,13 @@ class AuditLogger:
         input_preview = input_data[:500] if len(input_data) > 500 else input_data
         output_preview = output_data[:500] if len(output_data) > 500 else output_data
         
+        previous_log = (
+            db.query(AIAuditLog)
+            .filter(AIAuditLog.workspace_id == workspace_id)
+            .order_by(desc(AIAuditLog.created_at))
+            .first()
+        )
+
         # Create audit log entry
         audit_log = AIAuditLog(
             workspace_id=workspace_id,
@@ -73,28 +81,48 @@ class AuditLogger:
             routing_reasoning=routing_reasoning,
             pii_detected=pii_detected,
             pii_types=pii_types,
-            previous_log_hash=self.last_log_hash,
+            previous_log_hash=previous_log.log_hash if previous_log else None,
         )
-        
-        # Calculate log hash (HMAC-SHA256 of entire entry)
-        log_hash = self._calculate_log_hash(audit_log)
-        audit_log.log_hash = log_hash
-        
-        # Save to database
+
+        # Flush first so SQLAlchemy assigns id/created_at. Hashing before flush
+        # makes verification fail because the persisted row no longer matches.
+        audit_log.log_hash = ""
         db.add(audit_log)
+        db.flush()
+        audit_log.log_hash = self._calculate_log_hash(audit_log)
         db.commit()
         db.refresh(audit_log)
         
         # Update last log hash for chaining
-        self.last_log_hash = log_hash
+        self.last_log_hash = audit_log.log_hash
         
-        logger.info(f"Audit log created: {audit_log.id}, hash={log_hash[:16]}...")
+        logger.info("Audit log created: %s, hash=%s...", audit_log.id, audit_log.log_hash[:16])
         
         return audit_log
 
     def _calculate_log_hash(self, audit_log: AIAuditLog) -> str:
         """Calculate HMAC-SHA256 hash of audit log entry."""
         # Create string representation of log entry
+        log_data = self._hash_payload(audit_log)
+
+        log_string = json.dumps(log_data, sort_keys=True)
+
+        # Calculate HMAC
+        secret = settings.secret_key.encode()
+        hmac_hash = hmac.new(secret, log_string.encode(), hashlib.sha256)
+        return hmac_hash.hexdigest()
+
+    def _calculate_legacy_preflush_hash(self, audit_log: AIAuditLog) -> str:
+        """Calculate the historical pre-flush hash scheme used by older rows."""
+        log_data = self._hash_payload(audit_log)
+        log_data["id"] = None
+        log_data["created_at"] = None
+        log_string = json.dumps(log_data, sort_keys=True)
+        secret = settings.secret_key.encode()
+        return hmac.new(secret, log_string.encode(), hashlib.sha256).hexdigest()
+
+    def _hash_payload(self, audit_log: AIAuditLog) -> Dict[str, Any]:
+        """Create the canonical hash payload for an audit row."""
         log_data = {
             "id": audit_log.id,
             "workspace_id": audit_log.workspace_id,
@@ -108,18 +136,23 @@ class AuditLogger:
             "created_at": audit_log.created_at.isoformat() if audit_log.created_at else None,
             "previous_log_hash": audit_log.previous_log_hash,
         }
-        
-        log_string = json.dumps(log_data, sort_keys=True)
-        
-        # Calculate HMAC
-        secret = settings.secret_key.encode()
-        hmac_hash = hmac.new(secret, log_string.encode(), hashlib.sha256)
-        return hmac_hash.hexdigest()
+        return log_data
 
     def verify_log(self, audit_log: AIAuditLog) -> bool:
         """Verify audit log integrity."""
+        return self.verification_scheme(audit_log) is not None
+
+    def verification_scheme(self, audit_log: AIAuditLog) -> Optional[str]:
+        """Return the matching verification scheme, or None on mismatch."""
         calculated_hash = self._calculate_log_hash(audit_log)
-        return calculated_hash == audit_log.log_hash
+        if calculated_hash == audit_log.log_hash:
+            return "current"
+
+        legacy_hash = self._calculate_legacy_preflush_hash(audit_log)
+        if legacy_hash == audit_log.log_hash:
+            return "legacy_preflush"
+
+        return None
 
 
 # Global audit logger instance
@@ -162,3 +195,8 @@ def log_ai_operation(
 def verify_log(audit_log: AIAuditLog) -> bool:
     """Verify audit log integrity."""
     return _audit_logger.verify_log(audit_log)
+
+
+def verification_scheme(audit_log: AIAuditLog) -> Optional[str]:
+    """Return the matching audit verification scheme, or None."""
+    return _audit_logger.verification_scheme(audit_log)

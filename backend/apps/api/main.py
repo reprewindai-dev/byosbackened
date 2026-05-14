@@ -6,15 +6,13 @@ import os
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from core.config import get_settings
 from core.auth import get_current_workspace
 from db.session import SessionLocal
-from db.models import TokenWallet, TokenTransaction
-from datetime import datetime
-import uuid
 from core.logging import setup_logging
+from core.observability.sentry import configure_sentry
 from core.security.zero_trust import ZeroTrustMiddleware
 from apps.api.middleware.metrics import MetricsMiddleware
 from apps.api.middleware.intelligent_routing import IntelligentRoutingMiddleware
@@ -22,7 +20,6 @@ from apps.api.middleware.edge_routing import EdgeRoutingMiddleware
 from apps.api.middleware.budget_check import BudgetCheckMiddleware
 from apps.api.middleware.rate_limit import RateLimitMiddleware
 from apps.api.middleware.entitlement_check import EntitlementCheckMiddleware
-from apps.api.middleware.token_deduction import TokenDeductionMiddleware
 from apps.api.middleware.locker_security_integration import LockerSecurityMiddleware
 from apps.api.middleware.request_security import RequestSecurityMiddleware
 from apps.api.middleware.performance import PerformanceMiddleware, GzipMiddleware
@@ -68,21 +65,29 @@ from apps.api.routers.workspace import public_router as public_status_router
 from apps.api.routers.marketplace_v1 import router as marketplace_v1_router
 from apps.api.routers.edge_canary import router as edge_canary_router
 from apps.api.routers.resend_webhooks import router as resend_webhooks_router
+from apps.api.routers.qstash_webhooks import router as qstash_webhooks_router
+from apps.api.routers.telemetry import router as telemetry_router
 from apps.api.routers.pipelines import router as pipelines_router
 from apps.api.routers.deployments import router as deployments_router
 from apps.api.routers.marketplace_automation import router as marketplace_automation_router
+from apps.api.routers.platform_pulse import router as platform_pulse_router
+from apps.api.routers.internal_operators import router as internal_operators_router
+from apps.api.routers.internal_uacp import router as internal_uacp_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
+from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
 from edge.routers.mqtt import router as edge_mqtt_router
 from edge.routers.control import router as edge_control_router
 from edge.routers.modbus import router as edge_modbus_router
 from edge.routers.snmp import router as edge_snmp_router
 from license.middleware import LicenseGateMiddleware, bootstrap_license_check
+from herald.scheduler import start_herald_scheduler, stop_herald_scheduler
 import logging
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 setup_logging()
+configure_sentry()
 
 # Initialize providers
 from core.providers.init import initialize_providers
@@ -101,6 +106,8 @@ app = FastAPI(
     # Security hardening
     max_request_size=10 * 1024 * 1024,  # 10MB limit per request
 )
+
+register_workflows(app)
 
 
 @app.on_event("startup")
@@ -125,9 +132,16 @@ async def startup_validation():
         # Safety net: ensure core tables exist even if migrations were missed.
         Base.metadata.create_all(bind=engine)
         logger.info("Database schema presence check completed")
+        start_herald_scheduler()
     except ValueError as e:
         logger.critical(f"PRODUCTION CONFIGURATION INVALID: {e}")
         raise
+
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    """Stop background schedulers cleanly."""
+    stop_herald_scheduler()
 
 
 # Middleware stack (outermost = first to run)
@@ -141,7 +155,6 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(ZeroTrustMiddleware)
 app.add_middleware(LicenseGateMiddleware)
 app.add_middleware(EntitlementCheckMiddleware)
-app.add_middleware(TokenDeductionMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(IntelligentRoutingMiddleware)
 app.add_middleware(EdgeRoutingMiddleware)
@@ -203,7 +216,7 @@ app.include_router(support_bot_router, prefix=settings.api_prefix)
 app.include_router(ai_router, prefix=settings.api_prefix)
 app.include_router(workspace_router, prefix=settings.api_prefix)
 app.include_router(public_status_router)
-app.include_router(marketplace_v1_router, prefix=settings.api_prefix)
+app.include_router(marketplace_v1_router, prefix=f"{settings.api_prefix}/marketplace")
 app.include_router(edge_ingest_router, prefix=settings.api_prefix)
 app.include_router(edge_mqtt_router, prefix=settings.api_prefix)
 app.include_router(edge_control_router, prefix=settings.api_prefix)
@@ -211,9 +224,14 @@ app.include_router(edge_modbus_router, prefix=settings.api_prefix)
 app.include_router(edge_snmp_router, prefix=settings.api_prefix)
 app.include_router(edge_canary_router, prefix=settings.api_prefix)
 app.include_router(resend_webhooks_router, prefix=settings.api_prefix)
+app.include_router(qstash_webhooks_router, prefix=settings.api_prefix)
+app.include_router(telemetry_router, prefix=settings.api_prefix)
 app.include_router(pipelines_router, prefix=settings.api_prefix)
 app.include_router(deployments_router, prefix=settings.api_prefix)
 app.include_router(marketplace_automation_router, prefix=settings.api_prefix)
+app.include_router(platform_pulse_router, prefix=settings.api_prefix)
+app.include_router(internal_operators_router, prefix=settings.api_prefix)
+app.include_router(internal_uacp_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)
@@ -261,89 +279,17 @@ async def legacy_stripe_webhook(request: Request):
         db.close()
 
 
-def deduct_tokens_for_docs(workspace_id: str, endpoint: str):
-    """Deduct 100 tokens for docs access."""
-    db = SessionLocal()
-    try:
-        wallet = db.query(TokenWallet).filter(
-            TokenWallet.workspace_id == workspace_id
-        ).with_for_update().first()
-        
-        if not wallet:
-            wallet = TokenWallet(workspace_id=workspace_id, balance=0)
-            db.add(wallet)
-            db.flush()
-        
-        if wallet.balance < 100:
-            return False, wallet.balance
-        
-        # Record transaction
-        transaction = TokenTransaction(
-            wallet_id=wallet.id,
-            workspace_id=workspace_id,
-            transaction_type="usage",
-            amount=-100,
-            balance_before=wallet.balance,
-            balance_after=wallet.balance - 100,
-            endpoint_path=endpoint,
-            endpoint_method="GET",
-            request_id=str(uuid.uuid4()),
-            description=f"API documentation access: {endpoint}"
-        )
-        db.add(transaction)
-        
-        wallet.balance -= 100
-        wallet.updated_at = datetime.utcnow()
-        db.commit()
-        
-        return True, wallet.balance
-    finally:
-        db.close()
-
-
-# Protected documentation routes - require auth + tokens (100 tokens per view)
+# Protected documentation routes - require auth, but docs viewing is not a billable event.
 @app.get(f"{settings.api_prefix}/docs", include_in_schema=False)
 async def protected_docs(request: Request, workspace_id: str = Depends(get_current_workspace)):
-    """Swagger UI - requires authentication and 100 tokens per view."""
-    success, balance = deduct_tokens_for_docs(workspace_id, "/api/v1/docs")
-    if not success:
-        return JSONResponse(
-            status_code=402,
-            content={
-                "detail": "Insufficient tokens. Docs access requires 100 tokens.",
-                "required": 100,
-                "balance": balance,
-                "purchase_url": "/api/v1/wallet/topup"
-            },
-            headers={"X-Tokens-Required": "100", "X-Tokens-Balance": str(balance)}
-        )
-    
-    response = FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
-    response.headers["X-Tokens-Cost"] = "100"
-    response.headers["X-Tokens-Remaining"] = str(balance)
-    return response
+    """Swagger UI - authenticated operator documentation."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "swagger_ui.html"))
 
 
 @app.get(f"{settings.api_prefix}/redoc", include_in_schema=False)
 async def protected_redoc(request: Request, workspace_id: str = Depends(get_current_workspace)):
-    """ReDoc UI - requires authentication and 100 tokens per view."""
-    success, balance = deduct_tokens_for_docs(workspace_id, "/api/v1/redoc")
-    if not success:
-        return JSONResponse(
-            status_code=402,
-            content={
-                "detail": "Insufficient tokens. Docs access requires 100 tokens.",
-                "required": 100,
-                "balance": balance,
-                "purchase_url": "/api/v1/wallet/topup"
-            },
-            headers={"X-Tokens-Required": "100", "X-Tokens-Balance": str(balance)}
-        )
-    
-    response = FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))
-    response.headers["X-Tokens-Cost"] = "100"
-    response.headers["X-Tokens-Remaining"] = str(balance)
-    return response
+    """ReDoc UI - authenticated operator documentation."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "..", "static", "redoc.html"))
 
 
 @app.get(f"{settings.api_prefix}/openapi.json", include_in_schema=False)

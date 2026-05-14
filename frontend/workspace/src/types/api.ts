@@ -378,9 +378,9 @@ export interface ApiError {
   status_code?: number;
 }
 
-// ─── Service Gateway (BYOS Source of Truth) ─────────────────────────────────
+// ─── Service Gateway (BYOS Internal Services) ──────────────────────────────
 
-export type ServiceType = "frontend" | "engine" | "runtime" | "proxy" | "vertical";
+export type ServiceType = "ai_provider" | "core" | "integration" | "monitoring" | "billing";
 export type ServiceStatus = "healthy" | "degraded" | "unhealthy" | "unknown";
 
 export interface RegisteredService {
@@ -389,13 +389,11 @@ export interface RegisteredService {
   service_type: ServiceType;
   base_url: string;
   health_endpoint: string;
-  api_prefix: string;
   status: ServiceStatus;
   enabled: boolean;
   last_health_check: number | null;
   last_healthy: number | null;
-  metadata: Record<string, string>;
-  requires_auth: boolean;
+  metadata: Record<string, unknown>;
 }
 
 export interface ServiceTopologyLayer {
@@ -414,14 +412,14 @@ export interface WiringEdge {
 }
 
 export interface ServiceTopology {
-  source_of_truth: string;
+  platform: string;
   version: string;
   layers: {
-    frontends: ServiceTopologyLayer[];
-    engines: ServiceTopologyLayer[];
-    runtimes: ServiceTopologyLayer[];
-    proxies: ServiceTopologyLayer[];
-    verticals: ServiceTopologyLayer[];
+    ai_providers: ServiceTopologyLayer[];
+    core: ServiceTopologyLayer[];
+    integrations: ServiceTopologyLayer[];
+    monitoring: ServiceTopologyLayer[];
+    billing: ServiceTopologyLayer[];
   };
   wiring: WiringEdge[];
   timestamp: number;

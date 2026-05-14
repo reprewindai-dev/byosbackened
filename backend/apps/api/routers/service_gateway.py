@@ -1,10 +1,8 @@
 """
-Service Gateway — BYOS source-of-truth API for managing connected services.
+Service Gateway — BYOS internal service management API.
 
-Exposes endpoints for service registration, health monitoring, routing
-configuration, and frontend consumption. All downstream services
-(CO2 Router, Cobi Engine, Runtime DEKES, LockerSphere verticals)
-are registered and managed through this gateway.
+Exposes endpoints for managing BYOS's own internal services:
+AI providers, workspace services, monitoring, billing, etc.
 """
 
 import logging
@@ -31,12 +29,10 @@ router = APIRouter(prefix="/services", tags=["service-gateway"])
 class ServiceRegisterRequest(BaseModel):
     service_id: str
     name: str
-    service_type: str = "frontend"
-    base_url: str
+    service_type: str = "core"
+    base_url: str = ""
     health_endpoint: str = "/health"
-    api_prefix: str = "/api/v1"
     metadata: dict = Field(default_factory=dict)
-    requires_auth: bool = True
 
 
 class ServiceUpdateRequest(BaseModel):
@@ -71,7 +67,7 @@ async def list_services(
     service_type: Optional[str] = None,
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """List all registered services. Optionally filter by type."""
+    """List all BYOS internal services. Optionally filter by type."""
     registry = get_service_registry()
 
     if service_type:
@@ -111,7 +107,7 @@ async def get_service(
     service_id: str,
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """Get details for a specific registered service."""
+    """Get details for a specific internal service."""
     registry = get_service_registry()
     svc = registry.get(service_id)
     if not svc:
@@ -124,7 +120,7 @@ async def register_service(
     request: ServiceRegisterRequest,
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """Register a new service with the BYOS source-of-truth."""
+    """Register a new internal service."""
     registry = get_service_registry()
 
     try:
@@ -141,9 +137,7 @@ async def register_service(
         service_type=st,
         base_url=request.base_url,
         health_endpoint=request.health_endpoint,
-        api_prefix=request.api_prefix,
         metadata=request.metadata,
-        requires_auth=request.requires_auth,
     )
 
     registered = registry.register(service)
@@ -159,7 +153,7 @@ async def update_service(
     request: ServiceUpdateRequest,
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """Update a registered service's configuration."""
+    """Update an internal service's configuration."""
     registry = get_service_registry()
     svc = registry.get(service_id)
     if not svc:
@@ -194,7 +188,7 @@ async def report_health(
     report: ServiceHealthReport,
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """Receive a health report from a downstream service."""
+    """Receive a health report from an internal service."""
     registry = get_service_registry()
 
     try:
@@ -221,37 +215,34 @@ async def report_health(
 async def service_topology(
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """
-    Returns the full service topology — how BYOS wires to all
-    downstream frontends, engines, runtimes, and verticals.
-    """
+    """Returns the BYOS internal service topology."""
     registry = get_service_registry()
     all_services = registry.list_all()
 
     topology = {
-        "source_of_truth": "byos-backend",
+        "platform": "veklom",
         "version": "1.0.0",
         "layers": {
-            "frontends": [],
-            "engines": [],
-            "runtimes": [],
-            "proxies": [],
-            "verticals": [],
+            "ai_providers": [],
+            "core": [],
+            "integrations": [],
+            "monitoring": [],
+            "billing": [],
         },
         "wiring": [],
         "timestamp": time.time(),
     }
 
     layer_map = {
-        ServiceType.FRONTEND: "frontends",
-        ServiceType.ENGINE: "engines",
-        ServiceType.RUNTIME: "runtimes",
-        ServiceType.PROXY: "proxies",
-        ServiceType.VERTICAL: "verticals",
+        ServiceType.AI_PROVIDER: "ai_providers",
+        ServiceType.CORE: "core",
+        ServiceType.INTEGRATION: "integrations",
+        ServiceType.MONITORING: "monitoring",
+        ServiceType.BILLING: "billing",
     }
 
     for svc in all_services:
-        layer = layer_map.get(svc.service_type, "frontends")
+        layer = layer_map.get(svc.service_type, "core")
         topology["layers"][layer].append({
             "id": svc.service_id,
             "name": svc.name,
@@ -260,37 +251,37 @@ async def service_topology(
             "enabled": svc.enabled,
         })
 
-    # Wiring: BYOS → all services
+    # Internal wiring: how BYOS subsystems connect
     topology["wiring"] = [
         {
-            "from": "byos-backend",
-            "to": "co2router-site",
-            "protocol": "HTTPS",
-            "description": "BYOS serves as auth/billing source for CO2 Router frontend",
+            "from": "provider-router",
+            "to": "ollama-local",
+            "protocol": "HTTP",
+            "description": "Primary AI inference — local Ollama",
         },
         {
-            "from": "co2router-site",
-            "to": "ecobe-mvp",
+            "from": "provider-router",
+            "to": "groq-cloud",
             "protocol": "HTTPS",
-            "description": "CO2 Router site proxies demo decisions through ecobe-mvp",
+            "description": "Fallback AI inference — Groq cloud",
         },
         {
-            "from": "ecobe-mvp",
-            "to": "ecobe-engine",
-            "protocol": "HTTPS",
-            "description": "ecobe-mvp forwards to the canonical engine for real decisions",
+            "from": "circuit-breaker",
+            "to": "provider-router",
+            "protocol": "internal",
+            "description": "Circuit breaker controls failover between providers",
         },
         {
-            "from": "byos-backend",
-            "to": "runtime-dekes",
-            "protocol": "HTTPS",
-            "description": "BYOS provides auth, billing, and quota enforcement for DEKES",
+            "from": "workspace-gateway",
+            "to": "billing-engine",
+            "protocol": "internal",
+            "description": "Workspace operations trigger billing metering",
         },
         {
-            "from": "byos-backend",
-            "to": "lockersphere-*",
-            "protocol": "HTTPS",
-            "description": "BYOS provides shared auth/billing for all LockerSphere verticals",
+            "from": "workspace-gateway",
+            "to": "security-suite",
+            "protocol": "internal",
+            "description": "All workspace actions pass through security checks",
         },
     ]
 
@@ -301,30 +292,22 @@ async def service_topology(
 async def list_providers(
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """
-    List all provider routes for the frontend routing panel.
-    Combines LLM providers with service providers.
-    """
+    """List AI provider routes with circuit breaker status."""
     registry = get_service_registry()
-    engines = registry.list_by_type(ServiceType.ENGINE)
-    proxies = registry.list_by_type(ServiceType.PROXY)
-    runtimes = registry.list_by_type(ServiceType.RUNTIME)
+    ai_providers = registry.list_by_type(ServiceType.AI_PROVIDER)
 
     providers = []
-    for idx, svc in enumerate(engines + proxies + runtimes):
+    for idx, svc in enumerate(ai_providers):
         providers.append({
             "id": svc.service_id,
             "name": svc.name,
-            "provider": svc.service_type.value,
-            "model": svc.metadata.get("stack", "unknown"),
+            "role": svc.metadata.get("role", "unknown"),
+            "models": svc.metadata.get("models", []),
+            "base_url": svc.base_url,
             "priority": idx + 1,
             "enabled": svc.enabled,
-            "latency_p50_ms": 0,
-            "latency_p99_ms": 0,
-            "error_rate_pct": 0.0,
+            "status": svc.status.value,
             "circuit_state": "closed" if svc.status != ServiceStatus.UNHEALTHY else "open",
-            "last_failure_at": None,
-            "cost_per_1k_tokens_usd": 0.0,
         })
 
     return providers
@@ -334,23 +317,21 @@ async def list_providers(
 async def circuit_breaker_status(
     workspace_id: str = Depends(get_current_workspace_id),
 ):
-    """
-    Circuit breaker status for all registered services.
-    Used by the frontend routing panel.
-    """
+    """Circuit breaker status for AI providers."""
     registry = get_service_registry()
-    all_services = registry.list_all()
+    ai_providers = registry.list_by_type(ServiceType.AI_PROVIDER)
 
     statuses = []
-    for svc in all_services:
-        if svc.service_type in (ServiceType.ENGINE, ServiceType.PROXY, ServiceType.RUNTIME):
-            statuses.append({
-                "provider": svc.service_id,
-                "state": "closed" if svc.status != ServiceStatus.UNHEALTHY else "open",
-                "failure_count": 0,
-                "success_count": 0,
-                "last_state_change_at": time.time(),
-                "next_retry_at": None,
-            })
+    for svc in ai_providers:
+        statuses.append({
+            "provider": svc.service_id,
+            "name": svc.name,
+            "role": svc.metadata.get("role", "unknown"),
+            "state": "closed" if svc.status != ServiceStatus.UNHEALTHY else "open",
+            "failure_count": 0,
+            "success_count": 0,
+            "last_state_change_at": time.time(),
+            "next_retry_at": None,
+        })
 
     return statuses

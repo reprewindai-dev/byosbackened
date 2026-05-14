@@ -1,9 +1,9 @@
 """
-Service Registry — Central registry for all BYOS-connected services.
+Service Registry — Central registry for BYOS internal services.
 
-BYOS is the source of truth. All downstream services (CO2 Router, Cobi Engine,
-Runtime DEKES, LockerSphere verticals) register here and receive routing,
-auth tokens, and health monitoring.
+Tracks BYOS's own internal subsystems (AI providers, workspace services,
+monitoring, billing, etc.) for health monitoring, routing, and the
+Services dashboard.
 """
 
 import logging
@@ -23,163 +23,110 @@ class ServiceStatus(str, Enum):
 
 
 class ServiceType(str, Enum):
-    FRONTEND = "frontend"
-    ENGINE = "engine"
-    RUNTIME = "runtime"
-    PROXY = "proxy"
-    VERTICAL = "vertical"
+    AI_PROVIDER = "ai_provider"
+    CORE = "core"
+    INTEGRATION = "integration"
+    MONITORING = "monitoring"
+    BILLING = "billing"
 
 
 class RegisteredService(BaseModel):
-    """A service registered with the BYOS source-of-truth."""
+    """An internal BYOS service."""
 
     service_id: str = Field(..., description="Unique service identifier")
     name: str = Field(..., description="Human-readable service name")
     service_type: ServiceType
-    base_url: str = Field(..., description="Base URL for the service")
+    base_url: str = Field(default="", description="Base URL or internal path")
     health_endpoint: str = Field(default="/health", description="Health check path")
-    api_prefix: str = Field(default="/api/v1", description="API prefix for the service")
     status: ServiceStatus = ServiceStatus.UNKNOWN
     last_health_check: Optional[float] = None
     last_healthy: Optional[float] = None
     metadata: dict = Field(default_factory=dict)
     enabled: bool = True
-    requires_auth: bool = True
 
 
-# ─── Default service definitions ──────────────────────────────────────────────
+# ─── Default BYOS internal services ──────────────────────────────────────────
 
 DEFAULT_SERVICES: list[dict] = [
     {
-        "service_id": "co2router-site",
-        "name": "CO2 Router Site",
-        "service_type": ServiceType.FRONTEND,
-        "base_url": "https://co2router.com",
-        "health_endpoint": "/api/health",
-        "api_prefix": "/api",
+        "service_id": "ollama-local",
+        "name": "Ollama Local Inference",
+        "service_type": ServiceType.AI_PROVIDER,
+        "base_url": "http://localhost:11434",
+        "health_endpoint": "/api/tags",
         "metadata": {
-            "description": "Public-facing marketing site and live demo for CO2 Router",
-            "repo": "reprewindai-dev/co2router-site",
-            "stack": "Next.js 14, TypeScript, Tailwind CSS",
+            "description": "Local LLM inference via Ollama",
+            "role": "primary",
+            "models": ["llama3", "mistral", "codellama"],
         },
     },
     {
-        "service_id": "ecobe-engine",
-        "name": "Cobi Engine (ecobe-engineclaude)",
-        "service_type": ServiceType.ENGINE,
-        "base_url": "https://co2router.tech",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
+        "service_id": "groq-cloud",
+        "name": "Groq Cloud Fallback",
+        "service_type": ServiceType.AI_PROVIDER,
+        "base_url": "https://api.groq.com",
+        "health_endpoint": "/openai/v1/models",
         "metadata": {
-            "description": "CO2 Router deterministic decision engine — routing, replay, proof, adapters",
-            "repo": "reprewindai-dev/ecobe-engineclaude",
-            "stack": "TypeScript, Express, Prisma, Redis",
+            "description": "Cloud LLM fallback via Groq — activates when Ollama circuit opens",
+            "role": "fallback",
+            "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
         },
     },
     {
-        "service_id": "ecobe-mvp",
-        "name": "Cobi MVP Runtime Proxy",
-        "service_type": ServiceType.PROXY,
-        "base_url": "https://ecobe-mvp-5mjgu.ondigitalocean.app",
-        "health_endpoint": "/health",
-        "api_prefix": "",
+        "service_id": "circuit-breaker",
+        "name": "Provider Circuit Breaker",
+        "service_type": ServiceType.CORE,
         "metadata": {
-            "description": "Decision proxy — accepts demo traffic and forwards to engine",
-            "repo": "reprewindai-dev/ecobe-mvp",
-            "stack": "Next.js, Express, Prisma",
+            "description": "Automatic failover between Ollama (primary) and Groq (fallback)",
+            "pattern": "circuit-breaker with half-open recovery",
         },
     },
     {
-        "service_id": "runtime-dekes",
-        "name": "DEKES Signed Runtime",
-        "service_type": ServiceType.RUNTIME,
-        "base_url": "",
-        "health_endpoint": "/api/health",
-        "api_prefix": "/api",
+        "service_id": "provider-router",
+        "name": "Intelligent Provider Router",
+        "service_type": ServiceType.CORE,
         "metadata": {
-            "description": "Lead intelligence and buyer qualification runtime",
-            "repo": "reprewindai-dev/runtimedekes",
-            "stack": "Next.js, Prisma, PostgreSQL, Stripe",
+            "description": "Cost-optimized routing across AI providers",
+            "strategies": ["cost_optimized", "quality_optimized", "speed_optimized", "hybrid"],
         },
     },
     {
-        "service_id": "lockersphere-security",
-        "name": "LockerSphere Security",
-        "service_type": ServiceType.VERTICAL,
-        "base_url": "",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
+        "service_id": "workspace-gateway",
+        "name": "Workspace Gateway",
+        "service_type": ServiceType.CORE,
         "metadata": {
-            "description": "AI-powered security platform — the original LockerSphere",
-            "repo": "reprewindai-dev/lockerphycer",
-            "vertical": "security",
+            "description": "Multi-tenant workspace isolation and management",
         },
     },
     {
-        "service_id": "lockersphere-hospital",
-        "name": "LockerSphere Hospital",
-        "service_type": ServiceType.VERTICAL,
-        "base_url": "",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
+        "service_id": "billing-engine",
+        "name": "Billing & Subscription Engine",
+        "service_type": ServiceType.BILLING,
         "metadata": {
-            "description": "HIPAA-grade hospital safety, HL7/FHIR, global compliance",
-            "vertical": "hospital",
+            "description": "Stripe-powered billing, subscriptions, and usage metering",
         },
     },
     {
-        "service_id": "lockersphere-bank",
-        "name": "LockerSphere Bank",
-        "service_type": ServiceType.VERTICAL,
-        "base_url": "",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
+        "service_id": "security-suite",
+        "name": "Security Suite",
+        "service_type": ServiceType.CORE,
         "metadata": {
-            "description": "PCI-DSS, SOX, anti-fraud, transaction monitoring",
-            "vertical": "bank",
+            "description": "Content safety, DLP, threat detection, and compliance monitoring",
         },
     },
     {
-        "service_id": "lockersphere-insurance",
-        "name": "LockerSphere Insurance",
-        "service_type": ServiceType.VERTICAL,
-        "base_url": "",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
+        "service_id": "monitoring-suite",
+        "name": "Monitoring Suite",
+        "service_type": ServiceType.MONITORING,
         "metadata": {
-            "description": "Claims processing, actuarial AI, underwriting",
-            "vertical": "insurance",
-        },
-    },
-    {
-        "service_id": "lockersphere-content",
-        "name": "LockerSphere Content Creator",
-        "service_type": ServiceType.VERTICAL,
-        "base_url": "",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
-        "metadata": {
-            "description": "Content moderation, copyright protection, monetization",
-            "vertical": "content_creator",
-        },
-    },
-    {
-        "service_id": "lockersphere-general",
-        "name": "LockerSphere General",
-        "service_type": ServiceType.VERTICAL,
-        "base_url": "",
-        "health_endpoint": "/health",
-        "api_prefix": "/api/v1",
-        "metadata": {
-            "description": "General-purpose white-label — works out of the box",
-            "vertical": "general",
+            "description": "Platform health, usage metrics, and alerting",
         },
     },
 ]
 
 
 class ServiceRegistry:
-    """In-memory service registry. BYOS is the source of truth."""
+    """In-memory registry of BYOS internal services."""
 
     def __init__(self):
         self._services: dict[str, RegisteredService] = {}

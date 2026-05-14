@@ -1,14 +1,13 @@
 /**
- * useServiceGateway — wires /api/v1/services/* (BYOS source-of-truth service registry)
+ * useServiceGateway — hooks for /api/v1/services/* (BYOS internal service registry)
  *
- * Provides hooks for listing registered services, viewing the topology,
- * and managing service health across CO2 Router, Cobi Engine, Runtime DEKES,
- * and all LockerSphere verticals.
+ * Manages BYOS's own internal services: AI providers (Ollama, Groq),
+ * workspace gateway, billing engine, security suite, monitoring, etc.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export type ServiceType = "frontend" | "engine" | "runtime" | "proxy" | "vertical";
+export type ServiceType = "ai_provider" | "core" | "integration" | "monitoring" | "billing";
 export type ServiceStatus = "healthy" | "degraded" | "unhealthy" | "unknown";
 
 export type RegisteredService = {
@@ -19,7 +18,7 @@ export type RegisteredService = {
   status: ServiceStatus;
   enabled: boolean;
   last_health_check: number | null;
-  metadata: Record<string, string>;
+  metadata: Record<string, unknown>;
 };
 
 export type ServiceTopologyLayer = {
@@ -38,14 +37,14 @@ export type WiringEdge = {
 };
 
 export type ServiceTopology = {
-  source_of_truth: string;
+  platform: string;
   version: string;
   layers: {
-    frontends: ServiceTopologyLayer[];
-    engines: ServiceTopologyLayer[];
-    runtimes: ServiceTopologyLayer[];
-    proxies: ServiceTopologyLayer[];
-    verticals: ServiceTopologyLayer[];
+    ai_providers: ServiceTopologyLayer[];
+    core: ServiceTopologyLayer[];
+    integrations: ServiceTopologyLayer[];
+    monitoring: ServiceTopologyLayer[];
+    billing: ServiceTopologyLayer[];
   };
   wiring: WiringEdge[];
   timestamp: number;
@@ -107,8 +106,8 @@ export function useRegisterService() {
       service_id: string;
       name: string;
       service_type: ServiceType;
-      base_url: string;
-      metadata?: Record<string, string>;
+      base_url?: string;
+      metadata?: Record<string, unknown>;
     }) => api.post("/services/register", payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["services"] }),
   });
@@ -121,7 +120,7 @@ export function useUpdateService() {
       service_id: string;
       base_url?: string;
       enabled?: boolean;
-      metadata?: Record<string, string>;
+      metadata?: Record<string, unknown>;
     }) => {
       const { service_id, ...body } = payload;
       return api.patch(`/services/registry/${service_id}`, body);

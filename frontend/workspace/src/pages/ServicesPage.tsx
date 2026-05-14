@@ -1,8 +1,8 @@
 /**
- * ServicesPage — BYOS Source of Truth service topology dashboard.
+ * ServicesPage — BYOS internal service topology dashboard.
  *
- * Shows all registered services (CO2 Router, Cobi Engine, Runtime DEKES,
- * LockerSphere verticals) and their wiring to the BYOS backend.
+ * Shows all internal services (AI providers, workspace gateway, billing,
+ * security, monitoring) and how they wire together.
  */
 import { useServiceRegistry, useServiceTopology } from "@/hooks/useServiceGateway";
 
@@ -21,19 +21,27 @@ const statusDots: Record<string, string> = {
 };
 
 const typeLabels: Record<string, string> = {
-  frontend: "Frontend",
-  engine: "Engine",
-  runtime: "Runtime",
-  proxy: "Proxy",
-  vertical: "Vertical",
+  ai_provider: "AI Provider",
+  core: "Core",
+  integration: "Integration",
+  monitoring: "Monitoring",
+  billing: "Billing",
 };
 
 const typeBadgeColors: Record<string, string> = {
-  frontend: "bg-blue-500/20 text-blue-300",
-  engine: "bg-purple-500/20 text-purple-300",
-  runtime: "bg-cyan-500/20 text-cyan-300",
-  proxy: "bg-amber-500/20 text-amber-300",
-  vertical: "bg-emerald-500/20 text-emerald-300",
+  ai_provider: "bg-purple-500/20 text-purple-300",
+  core: "bg-cyan-500/20 text-cyan-300",
+  integration: "bg-blue-500/20 text-blue-300",
+  monitoring: "bg-amber-500/20 text-amber-300",
+  billing: "bg-emerald-500/20 text-emerald-300",
+};
+
+const layerLabels: Record<string, string> = {
+  ai_providers: "AI Providers",
+  core: "Core Services",
+  integrations: "Integrations",
+  monitoring: "Monitoring",
+  billing: "Billing",
 };
 
 export default function ServicesPage() {
@@ -43,16 +51,16 @@ export default function ServicesPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-semibold text-white">Service Topology</h1>
+        <h1 className="text-2xl font-semibold text-white">Internal Services</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          BYOS is the source of truth. All connected services are registered and monitored here.
+          BYOS platform services — AI providers, routing, security, billing, and monitoring.
         </p>
       </header>
 
       {/* Topology wiring */}
       {!topoLoading && topology && (
         <section className="rounded-xl border border-zinc-700/60 bg-zinc-800/50 p-6">
-          <h2 className="text-lg font-medium text-white mb-4">Wiring Diagram</h2>
+          <h2 className="text-lg font-medium text-white mb-4">Internal Wiring</h2>
           <div className="space-y-3">
             {topology.wiring.map((edge, i) => (
               <div
@@ -60,7 +68,7 @@ export default function ServicesPage() {
                 className="flex items-center gap-3 rounded-lg bg-zinc-900/60 px-4 py-3 text-sm"
               >
                 <span className="font-mono text-cyan-300">{edge.from}</span>
-                <span className="text-zinc-500">→</span>
+                <span className="text-zinc-500">&rarr;</span>
                 <span className="font-mono text-emerald-300">{edge.to}</span>
                 <span className="ml-auto text-xs text-zinc-500">{edge.protocol}</span>
                 <span className="text-xs text-zinc-400 max-w-[350px] truncate">
@@ -75,7 +83,7 @@ export default function ServicesPage() {
       {/* Service registry table */}
       <section className="rounded-xl border border-zinc-700/60 bg-zinc-800/50 p-6">
         <h2 className="text-lg font-medium text-white mb-4">
-          Registered Services
+          Platform Services
           {registry && (
             <span className="ml-2 text-sm text-zinc-400">({registry.total})</span>
           )}
@@ -128,16 +136,11 @@ export default function ServicesPage() {
                     </td>
                     <td className="py-3 pr-4">
                       {svc.base_url ? (
-                        <a
-                          href={svc.base_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-cyan-400 hover:underline font-mono text-xs"
-                        >
+                        <span className="text-cyan-400 font-mono text-xs">
                           {svc.base_url}
-                        </a>
+                        </span>
                       ) : (
-                        <span className="text-zinc-500 text-xs">—</span>
+                        <span className="text-zinc-500 text-xs">&mdash;</span>
                       )}
                     </td>
                     <td className="py-3 pr-4">
@@ -164,7 +167,7 @@ export default function ServicesPage() {
               className="rounded-xl border border-zinc-700/60 bg-zinc-800/50 p-5"
             >
               <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide mb-3">
-                {layer}
+                {layerLabels[layer] ?? layer}
               </h3>
               {services.length === 0 ? (
                 <p className="text-xs text-zinc-500">No services</p>

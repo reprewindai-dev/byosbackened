@@ -12,7 +12,6 @@ import {
   Settings2,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
   TerminalSquare,
   Users,
 } from "lucide-react";
@@ -32,7 +31,6 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { to: "/overview", label: "Overview", icon: Gauge },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
-      { to: "/advantage", label: "Why Us", icon: Sparkles },
     ],
   },
   {
@@ -40,7 +38,7 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: "/models", label: "Models", icon: Box },
       { to: "/pipelines", label: "Pipelines", icon: CircuitBoard },
-      { to: "/deployments", label: "Deployments", icon: Gauge },
+      { to: "/deployments", label: "Endpoints", icon: Gauge },
     ],
   },
   {
@@ -55,6 +53,11 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: "/monitoring", label: "Monitoring", icon: LineChart },
       { to: "/billing", label: "Billing", icon: CreditCard },
+    ],
+  },
+  {
+    title: "Access",
+    items: [
       { to: "/team", label: "Team", icon: Users },
       { to: "/settings", label: "Settings", icon: Settings2 },
     ],

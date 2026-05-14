@@ -234,13 +234,27 @@ export function OverviewPage() {
 
   return (
     <div className="command-wall">
-      <CommandHeader
-        userScope={isSuperuser ? "Owner Command Center" : "Tenant Overview Center"}
-        workspace={user?.workspace_name ?? user?.workspace_id ?? "workspace"}
-        state={state}
-        isLoading={overview.isLoading}
-        isSuperuser={isSuperuser}
-      />
+      {/* Sovereign Control Plane Header */}
+      <header className="mb-6 border-b border-rule pb-6">
+        <div className="text-eyebrow">Sovereign control plane</div>
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-bone">
+          {user?.workspace_name ?? "Workspace"} — Control Center
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          Real-time telemetry, routing, governance, spend, and operational health.
+        </p>
+      </header>
+
+      {/* KPI Cards Grid */}
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <KpiCard label="Requests/min" value={data ? String(data.kpi.requests_per_minute) : "--"} delta={data?.kpi.requests_delta_pct} series={data?.kpi.requests_series} />
+        <KpiCard label="P50 Latency" value={data ? `${data.kpi.p50_latency_ms}ms` : "--"} delta={data?.kpi.p50_delta_ms ? -data.kpi.p50_delta_ms : undefined} />
+        <KpiCard label="Tokens/sec" value={data ? String(data.kpi.tokens_per_second) : "--"} delta={data?.kpi.tokens_delta_pct} series={data?.kpi.tokens_series} />
+        <KpiCard label="Spend Today" value={data ? fmtCents(data.spend.spend_cents) : "--"} capPct={data?.spend.forecast_cap_pct} />
+        <KpiCard label="Active Models" value={data ? `${data.kpi.active_models}` : "--"} sub={data ? `${data.kpi.active_models_quantized} quantized` : undefined} />
+        <KpiCard label="Audit Entries" value={data ? fmtNumber(data.kpi.audit_entries) : "--"} sub={data ? `${data.kpi.audit_verified_pct}% verified` : undefined} />
+      </div>
+
       <CommandBridge data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} isSuperuser={isSuperuser} />
 
       {overview.isError && (
@@ -283,35 +297,7 @@ export function OverviewPage() {
   );
 }
 
-function CommandHeader({
-  userScope,
-  workspace,
-  state,
-  isLoading,
-  isSuperuser,
-}: {
-  userScope: string;
-  workspace: string;
-  state: InstitutionalState | null;
-  isLoading: boolean;
-  isSuperuser: boolean;
-}) {
-  return (
-    <header className="command-header">
-      <div>
-        <div className="command-kicker">{isSuperuser ? "Veklom owner command center" : "Veklom workspace overview"}</div>
-        <h1>{isSuperuser ? "Institutional command center" : "Workspace overview center"}</h1>
-        <p>{userScope} - {workspace}</p>
-      </div>
-      <div className="command-status-strip">
-        <StatusDatum label="Institutional state" value={isLoading ? "synchronizing" : state?.posture ?? "no signal"} tone={state?.tone ?? "neutral"} />
-        <StatusDatum label="Execution confidence" value={state ? `${state.executionConfidence}%` : "-"} tone={state?.executionConfidence && state.executionConfidence >= 80 ? "stable" : "watch"} />
-        <StatusDatum label="Route integrity" value={state ? `${state.routeIntegrity}%` : "-"} tone={state?.routeIntegrity && state.routeIntegrity >= 80 ? "stable" : "watch"} />
-        <StatusDatum label="Memory continuity" value={state ? `${state.memoryContinuity}%` : "-"} tone="stable" />
-      </div>
-    </header>
-  );
-}
+
 
 function CommandBridge({
   data,
@@ -989,4 +975,46 @@ function buildArchiveLineage(data?: OverviewPayload) {
     hash: event.id.slice(0, 10),
   }));
   return [...audits, ...policies];
+}
+
+function KpiCard({
+  label,
+  value,
+  delta,
+  series,
+  capPct,
+  sub,
+}: {
+  label: string;
+  value: string;
+  delta?: number;
+  series?: number[];
+  capPct?: number;
+  sub?: string;
+}) {
+  const up = delta !== undefined && delta > 0;
+  return (
+    <div className="frame p-3">
+      <div className="text-eyebrow mb-1">{label}</div>
+      <div className="flex items-end gap-2">
+        <span className="text-xl font-semibold text-bone">{value}</span>
+        {delta !== undefined && delta !== 0 && (
+          <span className={cn("text-xs font-medium", up ? "text-moss" : "text-crimson")}>
+            {up ? "+" : ""}{delta}%
+          </span>
+        )}
+      </div>
+      {sub && <div className="mt-1 text-2xs text-muted">{sub}</div>}
+      {capPct !== undefined && capPct > 0 && (
+        <div className="mt-2 h-1 w-full rounded-full bg-white/5">
+          <div className="h-full rounded-full bg-brass" style={{ width: `${Math.min(100, capPct)}%` }} />
+        </div>
+      )}
+      {series && series.length > 0 && (
+        <div className="mt-2">
+          <Sparkline values={series} height={24} />
+        </div>
+      )}
+    </div>
+  );
 }

@@ -47,8 +47,8 @@ export const adminService = {
   getUsageStats: (params?: { from?: string; to?: string }) =>
     api.get("/admin/live-ops", { params }),
 
-  /** POST /admin/impersonate/{user_id} */
-  impersonateUser: (user_id: string) => api.post(`/admin/impersonate/${user_id}`),
+  /** No route found: POST /admin/impersonate/{user_id}; backend bridge is an explicit 404 stub */
+  impersonateUser: (user_id: string) => noRoute(`/admin/impersonate/${user_id}`),
 
   // ─── Feature Flags ───────────────────────────────────────
   /** No route found: GET /admin/flags */

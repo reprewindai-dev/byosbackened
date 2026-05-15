@@ -707,11 +707,6 @@ async def matrix_operators_runs(request: Request) -> Response:
     return await _proxy_request(request=request, target_path="/internal/operators/runs")
 
 
-@router.post("/support/chat")
-async def matrix_support_chat(request: Request) -> Response:
-    return await _proxy_request(request=request, target_path="/support/chat", method="POST")
-
-
 @router.get("/audit/logs")
 async def matrix_audit_logs(request: Request) -> Response:
     return await _proxy_request(request=request, target_path="/audit/logs")

@@ -1,6 +1,7 @@
 """AI-powered support bot â€” uses existing LLM stack (Ollama â†’ Groq fallback).
 No human intervention needed. Knows pricing, features, docs, troubleshooting."""
 
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -60,6 +61,35 @@ class SupportResponse(BaseModel):
 _rate_limit: dict[str, list[float]] = {}
 MAX_MESSAGES_PER_MINUTE = 6
 MAX_MESSAGE_LENGTH = 1500
+SUPPORT_LLM_TIMEOUT_SECONDS = 6
+
+
+def _fallback_support_response(message: str) -> str:
+    msg = message.lower()
+    if any(term in msg for term in ("price", "pricing", "billing", "reserve", "plan", "checkout")):
+        return (
+            "Veklom uses workspace activation plus operating reserve. Start on Billing, choose an available plan, "
+            "fund reserve through Stripe checkout, then governed runs debit usage in real time."
+        )
+    if any(term in msg for term in ("login", "auth", "github", "account", "token", "401")):
+        return (
+            "For access issues, sign in through /login, use GitHub authentication if connected, and retry after "
+            "refreshing the session. API requests require Authorization: Bearer <jwt_token>."
+        )
+    if any(term in msg for term in ("marketplace", "listing", "install", "tool")):
+        return (
+            "Marketplace listings are available under /login/#/marketplace. Open a listing to inspect source, "
+            "preflight evidence, and install or purchase through the governed checkout flow."
+        )
+    if any(term in msg for term in ("gpc", "uacp", "operator", "workflow")):
+        return (
+            "GPC is exposed at /login/#/gpc and is backed by the UACP/internal operator API spine. Paid workspaces "
+            "can inspect route health and compile governed execution plans there."
+        )
+    return (
+        "I can help with Veklom setup, billing, marketplace, GPC/UACP, authentication, and workspace routing. "
+        "Tell me what page or action is failing and I will give the shortest fix path."
+    )
 
 
 @router.post("/chat", response_model=SupportResponse)
@@ -136,27 +166,30 @@ async def support_chat(payload: SupportMessage, request: Request):
         if not is_open():
             try:
                 client = get_ollama_client()
-                result = await client.chat(
-                    model=settings.llm_model_default,
-                    messages=messages,
-                    options={"temperature": 0.3, "num_predict": 1024},
+                result = await asyncio.wait_for(
+                    client.chat(
+                        model=settings.llm_model_default,
+                        messages=messages,
+                        options={"temperature": 0.3, "num_predict": 1024},
+                    ),
+                    timeout=SUPPORT_LLM_TIMEOUT_SECONDS,
                 )
                 response_text = result.get("message", {}).get("content", "")
-            except Exception:
+            except (Exception, asyncio.TimeoutError):
                 pass
 
         if not response_text:
             try:
-                response_text = await call_groq(
-                    messages=messages,
-                    max_tokens=1024,
-                    temperature=0.3,
+                response_text = await asyncio.wait_for(
+                    call_groq(
+                        messages=messages,
+                        max_tokens=1024,
+                        temperature=0.3,
+                    ),
+                    timeout=SUPPORT_LLM_TIMEOUT_SECONDS,
                 )
-            except Exception:
-                response_text = (
-                    "I'm temporarily unable to process your request. "
-                    "Please try again in a moment, or email support@veklom.com for assistance."
-                )
+            except (Exception, asyncio.TimeoutError):
+                response_text = _fallback_support_response(payload.message)
 
         try:
             await memory.add_message(

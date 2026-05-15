@@ -111,7 +111,9 @@ export function useKillSwitchState() {
   return useQuery({
     queryKey: ["kill-switch"],
     queryFn: async () => {
-      const resp = await api.get<{ killed: boolean; reason?: string | null; activated_by?: string | null; activated_at?: string | null }>("/cost/kill-switch/status");
+      const resp = await api.get<{ killed: boolean; reason?: string | null; activated_by?: string | null; activated_at?: string | null }>(
+        "/cost/kill-switch/status",
+      );
       return {
         active: resp.data.killed,
         reason: resp.data.reason ?? null,

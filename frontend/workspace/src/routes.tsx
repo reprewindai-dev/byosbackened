@@ -59,6 +59,11 @@ export function AppRoutes() {
         <Route path="/" element={<RequireAuth><Navigate to="/playground" replace /></RequireAuth>} />
         <Route path="/playground" element={<RequireAuth><PlaygroundPage /></RequireAuth>} />
         <Route path="/gpc" element={<RequireAuth><UacpPage /></RequireAuth>} />
+        <Route path="/uacp/v0" element={<RequireAuth><UacpPage /></RequireAuth>} />
+        <Route path="/uacp/v1" element={<RequireAuth><UacpPage /></RequireAuth>} />
+        <Route path="/uacp/v2" element={<RequireAuth><UacpPage /></RequireAuth>} />
+        <Route path="/uacp/v3" element={<RequireAuth><UacpPage /></RequireAuth>} />
+        <Route path="/uacp/v4" element={<RequireAuth><UacpPage /></RequireAuth>} />
         <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
         <Route path="/models" element={<RequireAuth><ModelsPage /></RequireAuth>} />
         <Route path="/pipelines" element={<RequireAuth><PipelinesPage /></RequireAuth>} />
@@ -67,6 +72,7 @@ export function AppRoutes() {
         <Route path="/compliance" element={<RequireAuth><CompliancePage /></RequireAuth>} />
         <Route path="/autonomy" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
         <Route path="/automation" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
+        <Route path="/operators" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
         <Route path="/monitoring" element={<RequireAuth><MonitoringPage /></RequireAuth>} />
         <Route path="/billing" element={<RequireAuth><BillingPage /></RequireAuth>} />
         <Route path="/team" element={<RequireAuth><TeamPage /></RequireAuth>} />

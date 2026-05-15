@@ -6,8 +6,8 @@ export const adminService = {
   listUsers: (params?: { page?: number; limit?: number; search?: string }) =>
     api.get("/admin/users", { params }),
 
-  /** GET /admin/users/{user_id} */
-  getUser: (user_id: string) => api.get(`/admin/users/${user_id}`),
+  /** No route found: GET /admin/users/{user_id} */
+  getUser: (user_id: string) => noRoute(`/admin/users/${user_id}`),
 
   /** PATCH /admin/users/{user_id} */
   updateUser: (user_id: string, body: Record<string, unknown>) =>
@@ -59,13 +59,13 @@ export const adminService = {
     noRoute(`/admin/flags/${flag}`, enabled),
 
   // ─── Kill Switch ─────────────────────────────────────────
-  /** GET /kill-switch/status */
-  getKillSwitch: () => api.get("/kill-switch/status"),
+  /** GET /cost/kill-switch/status */
+  getKillSwitch: () => api.get("/cost/kill-switch/status"),
 
-  /** POST /kill-switch/activate */
+  /** POST /cost/kill-switch */
   engageKillSwitch: (body: { reason: string; scope?: string }) =>
-    api.post("/kill-switch/activate", body),
+    api.post("/cost/kill-switch", body),
 
-  /** POST /kill-switch/deactivate */
-  disengageKillSwitch: () => api.post("/kill-switch/deactivate"),
+  /** DELETE /cost/kill-switch */
+  disengageKillSwitch: () => api.delete("/cost/kill-switch"),
 };

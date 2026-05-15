@@ -1,6 +1,6 @@
 ﻿{
     "site":  "https://veklom.com",
-    "generated_at":  "2026-05-15T05:48:39Z",
+    "generated_at":  "2026-05-15T05:51:55Z",
     "algorithm":  "sha256",
     "hash_scope":  "deployed_static_source_before_cdn_runtime_injection",
     "content_signal":  {
@@ -34,8 +34,8 @@
                         "url":  "https://veklom.com/_redirects",
                         "path":  "/_redirects",
                         "source":  "_redirects",
-                        "sha256":  "7aa98762d405920420f3dc6a9e694a905e8fa20dd8f4b364e53b0d11db67342d",
-                        "bytes":  2253
+                        "sha256":  "996f982640fb7e2b5aafc32cc2fb6634c5f18d7261cc1557c74b716e442d38d8",
+                        "bytes":  2337
                     },
                     {
                         "url":  "https://veklom.com/accept-invite.html",

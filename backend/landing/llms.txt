@@ -1,0 +1,40 @@
+# Veklom Sovereign AI Hub
+
+Canonical: https://veklom.com/
+Sitemap: https://veklom.com/sitemap.xml
+Robots: https://veklom.com/robots.txt
+Content-Signal: search=yes, ai-input=no, ai-train=no
+Content-Integrity: https://veklom.com/.well-known/content-integrity.json
+
+## Use Policy
+
+Veklom permits classic search indexing and ordinary search snippets.
+Veklom does not grant permission to use site content as AI model training data.
+Veklom does not grant permission to use site content as AI input for RAG, grounding, synthetic answer generation, or similar generative extraction.
+
+## Public Pages
+
+- https://veklom.com/
+- https://veklom.com/pricing/
+- https://veklom.com/signup/
+- https://veklom.com/vendors/
+- https://veklom.com/docs/
+- https://veklom.com/blog/
+- https://veklom.com/blog/why-saas-cannot-serve-regulated-buyers/
+- https://veklom.com/blog/true-cost-of-llm-sprawl/
+- https://veklom.com/blog/hipaa-compliant-ai-pipelines/
+- https://veklom.com/legal/terms
+- https://veklom.com/legal/privacy
+- https://veklom.com/legal/sla
+- https://veklom.com/legal/license
+- https://veklom.com/legal/vendor-agreement
+- https://veklom.com/legal/acceptable-use
+- https://veklom.com/legal/refunds
+
+## Workspace
+
+The deployed workspace app is one artifact under:
+
+- https://veklom.com/login/#/
+
+Clean workspace paths redirect into the `/login/#/...` hash routes and are not separate workspace artifacts.

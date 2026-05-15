@@ -1,4 +1,12 @@
 User-agent: *
+# As a condition of accessing this website, you agree to abide by the
+# following content signals:
+# search: building a search index and providing search results with links and
+# short excerpts. Search does not include AI-generated search summaries.
+# ai-input: inputting content into AI models for retrieval augmented generation,
+# grounding, or other real-time generative answer use.
+# ai-train: training or fine-tuning AI models.
+Content-Signal: search=yes, ai-input=no, ai-train=no
 Allow: /
 
 User-agent: Amazonbot

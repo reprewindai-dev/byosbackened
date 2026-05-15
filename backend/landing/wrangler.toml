@@ -12,6 +12,6 @@
 #   _headers              — security headers (HSTS, CSP, etc.)
 #   _redirects            — URL routing rules
 
-name = "veklom"
+name = "veklom-live"
 compatibility_date = "2026-04-25"
 pages_build_output_dir = "."

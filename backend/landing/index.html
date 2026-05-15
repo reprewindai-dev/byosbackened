@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -645,7 +645,15 @@
       body::before, body::after { animation: none !important; }
     }
   </style>
-</head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4ZBVVR3V33"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4ZBVVR3V33');
+  </script></head>
 <body>
 
 <header class="nav">
@@ -660,8 +668,9 @@
       <a href="#theater">Live demo</a>
       <a href="#why">Hub modules</a>
       <a href="#pricing">Pricing</a>
-      <a href="/marketplace">Tools</a>
-      <a href="/overview">Workspace</a>
+      <a href="/docs/">Docs</a>
+      <a href="/login/#/marketplace">Tools</a>
+      <a href="/login/#/">Workspace</a>
       <a class="cta-ghost" href="/login/">Sign in</a>
       <a class="cta-primary" href="/signup/">Start free trial</a>
     </nav>
@@ -725,7 +734,7 @@
   <section class="theater-wrap" id="theater">
     <div class="container">
       <div class="section-head" style="margin-bottom:22px;">
-        <span class="section-eyebrow">GPC â€” Governed Plan Compiler</span>
+        <span class="section-eyebrow">GPC — Governed Plan Compiler</span>
         <h2 class="section-title">Turn messy AI ideas into governed plans before they become pipelines.</h2>
         <p class="section-copy">Most teams can get a model to answer. The hard part is turning that answer into a workflow security, compliance, operations, and finance can approve. The demo shows workflow, risks, policy requirements, approvals, evidence, cost controls, and deployment path before engineering time is wasted.</p>
       </div>

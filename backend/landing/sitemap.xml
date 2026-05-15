@@ -24,6 +24,12 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://veklom.com/docs/</loc>
+    <lastmod>2026-05-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
   <!-- Field Notes (blog) -->
   <url>
     <loc>https://veklom.com/blog/</loc>

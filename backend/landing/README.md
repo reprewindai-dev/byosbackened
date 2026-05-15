@@ -21,20 +21,24 @@ All workspace routes under this directory must load those two exact assets.
 
 ## Workspace routes
 
-- `/overview/`
-- `/playground/`
-- `/marketplace/`
-- `/models/`
-- `/pipelines/`
-- `/deployments/`
-- `/vault/`
-- `/compliance/`
-- `/monitoring/`
-- `/billing/`
-- `/team/`
-- `/settings/`
+The deployed workspace app is one artifact under `/login/`.
 
-`/monitoring/` is the canonical verification route and must show `Real-time observability`.
+- `/login/#/`
+- `/login/#/playground`
+- `/login/#/marketplace`
+- `/login/#/models`
+- `/login/#/pipelines`
+- `/login/#/deployments`
+- `/login/#/vault`
+- `/login/#/compliance`
+- `/login/#/monitoring`
+- `/login/#/billing`
+- `/login/#/team`
+- `/login/#/settings`
+
+Root clean paths redirect to the matching `/login/#/...` route and must not
+serve separate workspace artifacts. `/login/#/monitoring` is the canonical
+verification route and must show `Real-time observability`.
 
 ## Rejected files / states
 
@@ -48,7 +52,7 @@ All workspace routes under this directory must load those two exact assets.
 ## Deploy
 
 ```powershell
-wrangler pages deploy backend/landing --project-name veklom --branch main --commit-dirty=true
+wrangler pages deploy backend/landing --project-name veklom-live --branch main --commit-dirty=true
 ```
 
 No build step is required for artifact restoration.

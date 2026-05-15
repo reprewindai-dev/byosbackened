@@ -1,57 +1,77 @@
 import { api } from "@/lib/api";
 
 /**
- * Internal operator routes — only callable by super-admins/operators.
- * These wrap /internal/operators and /internal/uacp endpoints.
+ * Internal operator + internal UACP bridge routes.
+ * These are superuser/automation-key only and are customer-safe wrappers.
  */
 export const internalService = {
-  // ─── Operators ───────────────────────────────────────────
-  /** GET /internal/operators */
-  listOperators: (params?: { page?: number; limit?: number }) =>
-    api.get("/internal/operators", { params }),
+  // ---------------------------------------------------------
+  // Operators
+  // ---------------------------------------------------------
+  operatorOverview: () => api.get("/internal/operators/overview"),
 
-  /** POST /internal/operators */
-  createOperator: (body: Record<string, unknown>) =>
-    api.post("/internal/operators", body),
+  operatorDigest: () => api.get("/internal/operators/digest"),
 
-  /** GET /internal/operators/{operator_id} */
-  getOperator: (operator_id: string) =>
-    api.get(`/internal/operators/${operator_id}`),
+  runOperatorWatch: () => api.post("/internal/operators/watch"),
 
-  /** PATCH /internal/operators/{operator_id} */
-  updateOperator: (operator_id: string, body: Record<string, unknown>) =>
-    api.patch(`/internal/operators/${operator_id}`, body),
+  queueQstashJob: (body: Record<string, unknown>) =>
+    api.post("/internal/operators/qstash/enqueue", body),
 
-  /** DELETE /internal/operators/{operator_id} */
-  deleteOperator: (operator_id: string) =>
-    api.delete(`/internal/operators/${operator_id}`),
+  triggerMaintenanceWorkflow: (body: Record<string, unknown>) =>
+    api.post("/internal/operators/workflows/uacp-maintenance/trigger", body),
 
-  /** POST /internal/operators/{operator_id}/suspend */
-  suspendOperator: (operator_id: string) =>
-    api.post(`/internal/operators/${operator_id}/suspend`),
+  listWorkers: (params?: { limit?: number }) => api.get("/internal/operators/workers", { params }),
 
-  // ─── UACP (Universal AI Control Plane) ───────────────────
-  /** GET /internal/uacp/status */
-  getUACPStatus: () => api.get("/internal/uacp/status"),
+  getWorkerRegistry: () => api.get("/internal/operators/registry"),
 
-  /** GET /internal/uacp/nodes */
-  listUACPNodes: () => api.get("/internal/uacp/nodes"),
+  getWorker: (workerId: string) => api.get(`/internal/operators/workers/${encodeURIComponent(workerId)}`),
 
-  /** POST /internal/uacp/nodes */
-  addUACPNode: (body: Record<string, unknown>) =>
-    api.post("/internal/uacp/nodes", body),
+  workerHeartbeat: (workerId: string, body: Record<string, unknown>) =>
+    api.post(`/internal/operators/workers/${encodeURIComponent(workerId)}/heartbeat`, body),
 
-  /** DELETE /internal/uacp/nodes/{node_id} */
-  removeUACPNode: (node_id: string) =>
-    api.delete(`/internal/uacp/nodes/${node_id}`),
+  createWorkerRun: (body: Record<string, unknown>) =>
+    api.post("/internal/operators/runs", body),
 
-  /** POST /internal/uacp/sync */
-  syncUACP: () => api.post("/internal/uacp/sync"),
+  listWorkerRuns: (params?: { limit?: number }) =>
+    api.get("/internal/operators/runs", { params }),
 
-  /** GET /internal/uacp/versions */
-  listUACPVersions: () => api.get("/internal/uacp/versions"),
+  // ---------------------------------------------------------
+  // Internal UACP bridge
+  // ---------------------------------------------------------
+  getUacpSummary: () => api.get("/internal/uacp/summary"),
 
-  /** POST /internal/uacp/upgrade */
-  upgradeUACP: (body: { target_version: string }) =>
-    api.post("/internal/uacp/upgrade", body),
+  getUacpEvents: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/events", { params }),
+
+  getUacpEventStream: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/event-stream", { params }),
+
+  getEvaluationSurgeon: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/evaluation-surgeon", { params }),
+
+  getGrowthOpportunities: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/growth-opportunities", { params }),
+
+  listUacpWorkspaces: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/workspaces", { params }),
+
+  listUacpRuns: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/runs", { params }),
+
+  searchUacp: (params: { query: string; limit?: number; filter?: string; reranking?: boolean; semantic_weight?: number; input_enrichment?: boolean }) =>
+    api.get("/internal/uacp/search", { params }),
+
+  listDeployments: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/deployments", { params }),
+
+  getBilling: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/billing", { params }),
+
+  listEvidence: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/evidence", { params }),
+
+  getUacpMonitoring: () => api.get("/internal/uacp/monitoring"),
+
+  listSecurityEvents: (params?: { limit?: number }) =>
+    api.get("/internal/uacp/security", { params }),
 };

@@ -40,6 +40,7 @@ import {
   relativeTime,
 } from "@/lib/cn";
 import { isRouteUnavailable } from "@/lib/errors";
+import { fetchMonitoringFirstOverview } from "@/lib/services/runtime-truth.service";
 import type {
   Alert,
   AuditEntry,
@@ -51,14 +52,10 @@ import type {
 } from "@/types/api";
 
 async function fetchOverview(): Promise<OverviewPayload> {
-  try {
-    const resp = await api.get<OverviewPayload>("/monitoring/overview");
-    return resp.data;
-  } catch (err) {
-    if (!isRouteUnavailable(err)) throw err;
-    const resp = await api.get<LegacyWorkspaceOverview>("/workspace/overview");
-    return fromLegacyOverview(resp.data);
-  }
+  return fetchMonitoringFirstOverview<LegacyWorkspaceOverview, OverviewPayload>({
+    convertLegacy: fromLegacyOverview,
+    hasLive: hasLiveOverviewSignal,
+  });
 }
 
 async function fetchPlatformPulse(): Promise<PlatformPulse | null> {
@@ -171,6 +168,19 @@ function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
       p50_ms: 0,
     })),
   };
+}
+
+function hasLiveOverviewSignal(data: OverviewPayload | null | undefined): boolean {
+  if (!data) return false;
+  return Boolean(
+    data.kpi.audit_entries > 0 ||
+    data.recent_runs.length > 0 ||
+    data.kpi.active_models > 0 ||
+    data.policy_events.length > 0 ||
+    data.alerts.length > 0 ||
+    data.kpi.p50_latency_ms > 0 ||
+    data.spend.spend_cents > 0,
+  );
 }
 
 function median(values: number[]): number {
@@ -418,7 +428,7 @@ function SurfaceMap({
           value: state ? `${state.systemCoherence}% coherence` : "syncing",
           detail: "UACP posture, policy stability, escalation pressure, and route authority.",
           tone: state?.tone ?? "neutral",
-          to: "/overview",
+          to: "/",
         },
         {
           title: "Sunnyvale",
@@ -460,7 +470,7 @@ function SurfaceMap({
           value: state ? `${state.systemCoherence}% health` : "syncing",
           detail: "Tenant-scoped health, runs, route posture, reserve usage, and evidence state.",
           tone: state?.tone ?? "neutral",
-          to: "/overview",
+          to: "/",
         },
         {
           title: "Playground",

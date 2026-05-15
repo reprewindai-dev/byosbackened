@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const adminService = {
   // ─── Users ───────────────────────────────────────────────
@@ -16,11 +16,11 @@ export const adminService = {
   /** DELETE /admin/users/{user_id} */
   deleteUser: (user_id: string) => api.delete(`/admin/users/${user_id}`),
 
-  /** POST /admin/users/{user_id}/suspend */
-  suspendUser: (user_id: string) => api.post(`/admin/users/${user_id}/suspend`),
+  /** No route found: POST /admin/users/{user_id}/suspend */
+  suspendUser: (user_id: string) => noRoute(`/admin/users/${user_id}/suspend`),
 
-  /** POST /admin/users/{user_id}/unsuspend */
-  unsuspendUser: (user_id: string) => api.post(`/admin/users/${user_id}/unsuspend`),
+  /** No route found: POST /admin/users/{user_id}/unsuspend */
+  unsuspendUser: (user_id: string) => noRoute(`/admin/users/${user_id}/unsuspend`),
 
   // ─── Workspaces ──────────────────────────────────────────
   /** GET /admin/workspaces */
@@ -39,30 +39,33 @@ export const adminService = {
   /** GET /admin/stats */
   getStats: () => api.get("/admin/stats"),
 
-  /** GET /admin/stats/revenue */
+  /** GET /admin/financials */
   getRevenueStats: (params?: { from?: string; to?: string }) =>
-    api.get("/admin/stats/revenue", { params }),
+    api.get("/admin/financials", { params }),
 
-  /** GET /admin/stats/usage */
+  /** GET /admin/live-ops */
   getUsageStats: (params?: { from?: string; to?: string }) =>
-    api.get("/admin/stats/usage", { params }),
+    api.get("/admin/live-ops", { params }),
+
+  /** POST /admin/impersonate/{user_id} */
+  impersonateUser: (user_id: string) => api.post(`/admin/impersonate/${user_id}`),
 
   // ─── Feature Flags ───────────────────────────────────────
-  /** GET /admin/flags */
-  listFlags: () => api.get("/admin/flags"),
+  /** No route found: GET /admin/flags */
+  listFlags: () => noRoute("/admin/flags"),
 
-  /** PATCH /admin/flags/{flag} */
+  /** No route found: PATCH /admin/flags/{flag} */
   setFlag: (flag: string, enabled: boolean) =>
-    api.patch(`/admin/flags/${flag}`, { enabled }),
+    noRoute(`/admin/flags/${flag}`, enabled),
 
   // ─── Kill Switch ─────────────────────────────────────────
-  /** GET /kill-switch */
-  getKillSwitch: () => api.get("/kill-switch"),
+  /** GET /kill-switch/status */
+  getKillSwitch: () => api.get("/kill-switch/status"),
 
-  /** POST /kill-switch/engage */
+  /** POST /kill-switch/activate */
   engageKillSwitch: (body: { reason: string; scope?: string }) =>
-    api.post("/kill-switch/engage", body),
+    api.post("/kill-switch/activate", body),
 
-  /** POST /kill-switch/disengage */
-  disengageKillSwitch: () => api.post("/kill-switch/disengage"),
+  /** POST /kill-switch/deactivate */
+  disengageKillSwitch: () => api.post("/kill-switch/deactivate"),
 };

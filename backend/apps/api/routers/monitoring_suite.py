@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session, load_only
 
@@ -55,6 +55,16 @@ class MetricPoint(BaseModel):
     value: float
     unit: Optional[str]
     timestamp: str
+
+
+class CreateMonitoringAlertRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=180)
+    description: str | None = Field(None, max_length=4000)
+    severity: str = Field("medium", min_length=1, max_length=20)
+    alert_type: str = Field(..., min_length=2, max_length=120)
+    status: str = Field("open", min_length=1, max_length=20)
+    source: str | None = Field(None, max_length=140)
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 # --- Helpers ------------------------------------------------------------------
@@ -143,6 +153,32 @@ def _health_score(components: dict) -> int:
         if rt and rt > 500:
             score -= 5
     return max(0, score)
+
+
+def _normalize_alert_severity(raw: str | None) -> AlertSeverity | None:
+    if not raw:
+        return None
+    normalized = raw.strip().lower()
+    for severity in AlertSeverity:
+        if severity.value == normalized:
+            return severity
+    return None
+
+
+def _serialize_alert(alert: Alert) -> dict[str, Any]:
+    return {
+        "id": alert.id,
+        "title": alert.title,
+        "description": alert.description,
+        "severity": (alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity)),
+        "type": alert.alert_type,
+        "status": alert.status,
+        "source": alert.source,
+        "details": alert.details or {},
+        "created_at": alert.created_at.isoformat(),
+        "acknowledged_at": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None,
+        "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None,
+    }
 
 
 # --- Routes -------------------------------------------------------------------
@@ -324,6 +360,141 @@ async def metric_history(
         }
         for r in rows
     ]
+
+
+@router.get("/alerts")
+async def list_alerts(
+    status: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List monitoring alerts for the workspace."""
+    query = db.query(Alert).filter(Alert.workspace_id == current_user.workspace_id)
+    if status:
+        query = query.filter(Alert.status == status.strip().lower())
+    normalized_severity = _normalize_alert_severity(severity)
+    if normalized_severity is not None:
+        query = query.filter(Alert.severity == normalized_severity)
+
+    page_size = 50
+    total = query.count()
+    alerts = (
+        query.order_by(desc(Alert.created_at))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "alerts": [_serialize_alert(alert) for alert in alerts],
+    }
+
+
+@router.post("/alerts")
+async def create_alert(
+    payload: CreateMonitoringAlertRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Create a monitoring alert."""
+    normalized_severity = _normalize_alert_severity(payload.severity) or AlertSeverity.MEDIUM
+    alert = Alert(
+        workspace_id=current_user.workspace_id,
+        title=payload.title,
+        description=payload.description,
+        severity=normalized_severity,
+        alert_type=payload.alert_type,
+        status=payload.status.strip().lower(),
+        source=payload.source,
+        details=payload.details,
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return {
+        "ok": True,
+        "alert": _serialize_alert(alert),
+    }
+
+
+@router.get("/logs")
+async def list_logs(
+    from_: Optional[datetime] = Query(None, alias="from"),
+    to: Optional[datetime] = Query(None),
+    level: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Unified monitoring log endpoint for dashboard surfaces."""
+    start = from_
+    end = to
+    query = db.query(AIAuditLog).filter(AIAuditLog.workspace_id == current_user.workspace_id)
+    if start:
+        query = query.filter(AIAuditLog.created_at >= start)
+    if end:
+        query = query.filter(AIAuditLog.created_at <= end)
+    rows = (
+        query.order_by(desc(AIAuditLog.created_at))
+        .limit(limit)
+        .all()
+    )
+    request_rows = (
+        db.query(WorkspaceRequestLog)
+        .filter(
+            WorkspaceRequestLog.workspace_id == current_user.workspace_id,
+            WorkspaceRequestLog.source_table == "ai_audit_logs",
+            WorkspaceRequestLog.source_id.in_([row.id for row in rows] or [""]),
+        )
+        .all()
+    )
+    request_by_source = {row.source_id: row for row in request_rows}
+
+    level_filter = (level or "").strip().lower()
+    entries: list[dict[str, Any]] = []
+    for log in rows:
+        request_row = request_by_source.get(log.id)
+        status_value = (
+            request_row.status.lower()
+            if request_row and isinstance(request_row.status, str)
+            else "success"
+        )
+        if level_filter:
+            normalized = {"warn": "warning", "warning": "warning", "err": "error", "error": "error", "info": "info"}
+            normalized_level = normalized.get(level_filter, level_filter)
+            if normalized_level == "error" and status_value != "error":
+                continue
+            if normalized_level == "warning" and status_value not in {"warning", "warn"}:
+                continue
+        entries.append(
+            {
+                "id": log.id,
+                "operation_type": log.operation_type,
+                "provider": log.provider,
+                "model": log.model,
+                "cost": str(log.cost),
+                "latency_ms": request_row.latency_ms if request_row else None,
+                "status": status_value,
+                "pii_detected": log.pii_detected,
+                "pii_types": log.pii_types,
+                "created_at": log.created_at.isoformat(),
+                "input_preview": log.input_preview,
+                "output_preview": log.output_preview,
+                "log_hash": log.log_hash,
+                "contract": "audit",
+            }
+        )
+
+    return {
+        "source": "audit_logs",
+        "generated_at": datetime.utcnow().isoformat(),
+        "total": len(entries),
+        "entries": entries,
+    }
 
 
 # --- Workspace overview (frontend Overview page) ------------------------------

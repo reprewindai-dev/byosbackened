@@ -4,7 +4,7 @@
  * useExplainability — wires /api/v1/explainability/* (per-decision traces)
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { noRoute } from "@/lib/api";
 
 export type RedactionRule = {
   id: string;
@@ -46,7 +46,7 @@ export type DecisionTrace = {
 export function useRedactionRules() {
   return useQuery({
     queryKey: ["privacy", "rules"],
-    queryFn: async () => (await api.get<RedactionRule[]>("/privacy/rules")).data,
+    queryFn: async () => noRoute<RedactionRule[]>("/privacy/rules"),
   });
 }
 
@@ -54,7 +54,7 @@ export function useCreateRedactionRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Omit<RedactionRule, "id" | "created_at">) =>
-      api.post<RedactionRule>("/privacy/rules", payload),
+      noRoute<RedactionRule>("/privacy/rules", payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["privacy"] }),
   });
 }
@@ -63,7 +63,7 @@ export function useToggleRedactionRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      api.patch(`/privacy/rules/${id}`, { enabled }),
+      noRoute(`/privacy/rules/${id}`, enabled),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["privacy"] }),
   });
 }
@@ -71,7 +71,7 @@ export function useToggleRedactionRule() {
 export function useDeleteRedactionRule() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/privacy/rules/${id}`),
+    mutationFn: (id: string) => noRoute(`/privacy/rules/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["privacy"] }),
   });
 }
@@ -80,15 +80,15 @@ export function useDeleteRedactionRule() {
 export function useContentSafetyRules() {
   return useQuery({
     queryKey: ["content-safety", "rules"],
-    queryFn: async () => (await api.get<ContentSafetyRule[]>("/content-safety/rules")).data,
+    queryFn: async () => noRoute<ContentSafetyRule[]>("/content-safety/rules"),
   });
 }
 
 export function useUpdateContentSafetyRule() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...rest }: Partial<ContentSafetyRule> & { id: string }) =>
-      api.patch(`/content-safety/rules/${id}`, rest),
+    mutationFn: (payload: Partial<ContentSafetyRule> & { id: string }) =>
+      noRoute(`/content-safety/rules/${payload.id}`, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content-safety"] }),
   });
 }
@@ -98,7 +98,7 @@ export function useDecisionTraces(filters?: { operation?: string; policy_decisio
   return useQuery({
     queryKey: ["explainability", "traces", filters],
     queryFn: async () =>
-      (await api.get<DecisionTrace[]>("/explainability/traces", { params: filters })).data,
+      noRoute<DecisionTrace[]>("/explainability/traces", filters),
     refetchInterval: 30_000,
   });
 }
@@ -107,7 +107,7 @@ export function useDecisionTrace(traceId: string | null) {
   return useQuery({
     queryKey: ["explainability", "trace", traceId],
     queryFn: async () =>
-      (await api.get<DecisionTrace>(`/explainability/traces/${traceId}`)).data,
+      noRoute<DecisionTrace>(`/explainability/traces/${traceId}`),
     enabled: !!traceId,
   });
 }

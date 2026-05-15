@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const routingService = {
   // ─── Routing ─────────────────────────────────────────────
@@ -8,21 +8,28 @@ export const routingService = {
   /** POST /routing/rules */
   createRule: (body: Record<string, unknown>) => api.post("/routing/rules", body),
 
-  /** PATCH /routing/rules/{rule_id} */
+  /** No route found: PATCH /routing/rules/{rule_id} */
   updateRule: (rule_id: string, body: Record<string, unknown>) =>
-    api.patch(`/routing/rules/${rule_id}`, body),
+    noRoute(`/routing/rules/${rule_id}`, body),
 
-  /** DELETE /routing/rules/{rule_id} */
-  deleteRule: (rule_id: string) => api.delete(`/routing/rules/${rule_id}`),
+  /** No route found: DELETE /routing/rules/{rule_id} */
+  deleteRule: (rule_id: string) => noRoute(`/routing/rules/${rule_id}`),
 
   /** POST /routing/test */
   testRouting: (body: { input: Record<string, unknown> }) =>
     api.post("/routing/test", body),
 
   // ─── Search ──────────────────────────────────────────────
-  /** GET /search */
-  search: (params: { q: string; type?: string; page?: number; limit?: number }) =>
-    api.get("/search", { params }),
+  /** POST /search */
+  search: (params: { query: string; num_results?: number }) =>
+    api.post("/search", { query: params.query, num_results: params.num_results ?? 10 }),
+
+  /** GET /routing/providers */
+  listProviders: () => api.get("/routing/providers"),
+
+  /** No route found: PUT /routing/providers/{provider_id} */
+  updateProvider: (provider_id: string, body: Record<string, unknown>) =>
+    noRoute(`/routing/providers/${provider_id}`, body),
 
   // ─── Suggestions ─────────────────────────────────────────
   /** GET /suggestions */
@@ -30,24 +37,24 @@ export const routingService = {
     api.get("/suggestions", { params }),
 
   // ─── Explainability ──────────────────────────────────────
-  /** POST /explainability/explain */
-  explain: (body: { request_id: string; detail?: "summary" | "full" }) =>
-    api.post("/explainability/explain", body),
+  /** POST /explain/cost */
+  explain: (body: { predicted_cost: number; input_tokens: number; provider: string }) =>
+    api.post("/explain/cost", body),
 
-  /** GET /explainability/{request_id} */
-  getExplanation: (request_id: string) =>
-    api.get(`/explainability/${request_id}`),
+  /** POST /explain/routing */
+  getExplanation: (body: { selected_provider: string; alternatives: Array<unknown>; constraints: Record<string, unknown> }) =>
+    api.post("/explain/routing", body),
 
   // ─── Autonomous ──────────────────────────────────────────
-  /** POST /autonomous/run */
+  /** No route found: POST /autonomous/run */
   runAutonomousTask: (body: { task: string; context?: Record<string, unknown>; model?: string }) =>
-    api.post("/autonomous/run", body),
+    noRoute("/autonomous/run", body),
 
-  /** GET /autonomous/tasks */
+  /** No route found: GET /autonomous/tasks */
   listAutonomousTasks: (params?: { status?: string; page?: number }) =>
-    api.get("/autonomous/tasks", { params }),
+    noRoute("/autonomous/tasks", params),
 
-  /** DELETE /autonomous/tasks/{task_id} */
+  /** No route found: DELETE /autonomous/tasks/{task_id} */
   cancelAutonomousTask: (task_id: string) =>
-    api.delete(`/autonomous/tasks/${task_id}`),
+    noRoute(`/autonomous/tasks/${task_id}`),
 };

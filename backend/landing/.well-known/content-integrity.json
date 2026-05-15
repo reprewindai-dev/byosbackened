@@ -1,0 +1,1105 @@
+﻿{
+    "site":  "https://veklom.com",
+    "generated_at":  "2026-05-15T03:07:45Z",
+    "algorithm":  "sha256",
+    "hash_scope":  "deployed_static_source_before_cdn_runtime_injection",
+    "content_signal":  {
+                           "search":  "yes",
+                           "ai-input":  "no",
+                           "ai-train":  "no"
+                       },
+    "entries":  [
+                    {
+                        "url":  "https://veklom.com/.well-known/security.txt",
+                        "path":  "/.well-known/security.txt",
+                        "source":  ".well-known/security.txt",
+                        "sha256":  "547161bc2f9a64b791c44fcc54124bfcab80b1ae882c6b1df8369c031e15819f",
+                        "bytes":  296
+                    },
+                    {
+                        "url":  "https://veklom.com/.wrangler/cache/pages.json",
+                        "path":  "/.wrangler/cache/pages.json",
+                        "source":  ".wrangler/cache/pages.json",
+                        "sha256":  "27d9b112729024aa48e3ff74603f2585ef4f76ed038d0f1a5d6278e6af974ec6",
+                        "bytes":  82
+                    },
+                    {
+                        "url":  "https://veklom.com/_headers",
+                        "path":  "/_headers",
+                        "source":  "_headers",
+                        "sha256":  "75dd765cf1b9833c6650b4dd37e9b28000e0f69d3fb3eb8cd3fb5eafd79e8e0d",
+                        "bytes":  618
+                    },
+                    {
+                        "url":  "https://veklom.com/_redirects",
+                        "path":  "/_redirects",
+                        "source":  "_redirects",
+                        "sha256":  "996f982640fb7e2b5aafc32cc2fb6634c5f18d7261cc1557c74b716e442d38d8",
+                        "bytes":  2337
+                    },
+                    {
+                        "url":  "https://veklom.com/accept-invite.html",
+                        "path":  "/accept-invite.html",
+                        "source":  "accept-invite.html",
+                        "sha256":  "716cfc12c3a48499bbe0ff9553a9192a576910a1f89f18b282def9ea97f05000",
+                        "bytes":  978
+                    },
+                    {
+                        "url":  "https://veklom.com/accept-invite/",
+                        "path":  "/accept-invite/",
+                        "source":  "accept-invite/index.html",
+                        "sha256":  "8f8686d02f7bd2c5071f1b91d44ed32103fb0d7391793835d772cf00df127540",
+                        "bytes":  1291
+                    },
+                    {
+                        "url":  "https://veklom.com/advantage/",
+                        "path":  "/advantage/",
+                        "source":  "advantage/index.html",
+                        "sha256":  "037e826df873efe65cc1ad6793c8f55fb564419bd1c73b23ff73c732d99d5445",
+                        "bytes":  926
+                    },
+                    {
+                        "url":  "https://veklom.com/app/app.css",
+                        "path":  "/app/app.css",
+                        "source":  "app/app.css",
+                        "sha256":  "b3142c5e2d7cb6cb115b8d99d2431a6010a0d8ecc01297f4adbae2a2cc509ac6",
+                        "bytes":  7707
+                    },
+                    {
+                        "url":  "https://veklom.com/app/auth.js",
+                        "path":  "/app/auth.js",
+                        "source":  "app/auth.js",
+                        "sha256":  "de53d3dde057c7c10bff2f1ef48c8af925ff2a4a2dbcc123f12e3f2a97d56cfa",
+                        "bytes":  9711
+                    },
+                    {
+                        "url":  "https://veklom.com/apple-touch-icon.png",
+                        "path":  "/apple-touch-icon.png",
+                        "source":  "apple-touch-icon.png",
+                        "sha256":  "c477e75ccb25f0437dc1512df964255cfc955a33247efc7b5fabb85a00246646",
+                        "bytes":  2975
+                    },
+                    {
+                        "url":  "https://veklom.com/auth/github/callback/",
+                        "path":  "/auth/github/callback/",
+                        "source":  "auth/github/callback/index.html",
+                        "sha256":  "f187cf7fbb0297c03c3fd9c71df6565aaa97a06e2d961aabb858958a3bff7757",
+                        "bytes":  4016
+                    },
+                    {
+                        "url":  "https://veklom.com/blog/blog.css",
+                        "path":  "/blog/blog.css",
+                        "source":  "blog/blog.css",
+                        "sha256":  "eb143ff0abb8b450b3463000fea09b597e0b7146d33fc743147b82130fab7e37",
+                        "bytes":  8169
+                    },
+                    {
+                        "url":  "https://veklom.com/blog/hipaa-compliant-ai-pipelines/",
+                        "path":  "/blog/hipaa-compliant-ai-pipelines/",
+                        "source":  "blog/hipaa-compliant-ai-pipelines/index.html",
+                        "sha256":  "3fefc5fbab8ddfa1600f7361ad7fd0fee6bf6870ef870c4f43ba2abefd6d1489",
+                        "bytes":  20725
+                    },
+                    {
+                        "url":  "https://veklom.com/blog/",
+                        "path":  "/blog/",
+                        "source":  "blog/index.html",
+                        "sha256":  "6432b2217a2ecb9cddf84fc41cc2645d5a7059c284490e8913a0acf228701fef",
+                        "bytes":  8397
+                    },
+                    {
+                        "url":  "https://veklom.com/blog/true-cost-of-llm-sprawl/",
+                        "path":  "/blog/true-cost-of-llm-sprawl/",
+                        "source":  "blog/true-cost-of-llm-sprawl/index.html",
+                        "sha256":  "28667baadb911ba0b559d654e4dbb6f6d9c6ed14274e29d5be2c010fe05f2498",
+                        "bytes":  16669
+                    },
+                    {
+                        "url":  "https://veklom.com/blog/why-saas-cannot-serve-regulated-buyers/",
+                        "path":  "/blog/why-saas-cannot-serve-regulated-buyers/",
+                        "source":  "blog/why-saas-cannot-serve-regulated-buyers/index.html",
+                        "sha256":  "63170b18484320d1009f9be9ee233744b7961df1c3bba4ff4f3baa5ebb83bf0c",
+                        "bytes":  20693
+                    },
+                    {
+                        "url":  "https://veklom.com/budget/",
+                        "path":  "/budget/",
+                        "source":  "budget/index.html",
+                        "sha256":  "17e453768926817e999bc5b74dce5a8edc151a68bbdad09aa8532517c3e678e9",
+                        "bytes":  906
+                    },
+                    {
+                        "url":  "https://veklom.com/COM_FREEZE_LOCK.md",
+                        "path":  "/COM_FREEZE_LOCK.md",
+                        "source":  "COM_FREEZE_LOCK.md",
+                        "sha256":  "b1b6fe978e5c53cbad6b5ae4be9f9c9f74f8e79cb2d470a311d3b7c31aa1c9fc",
+                        "bytes":  487
+                    },
+                    {
+                        "url":  "https://veklom.com/competitive/",
+                        "path":  "/competitive/",
+                        "source":  "competitive/index.html",
+                        "sha256":  "037e826df873efe65cc1ad6793c8f55fb564419bd1c73b23ff73c732d99d5445",
+                        "bytes":  926
+                    },
+                    {
+                        "url":  "https://veklom.com/content-safety/",
+                        "path":  "/content-safety/",
+                        "source":  "content-safety/index.html",
+                        "sha256":  "5937b65ad8d44395ade866b0531b7d83b878b597eb00d59b0575899bae3454ec",
+                        "bytes":  938
+                    },
+                    {
+                        "url":  "https://veklom.com/COPY_LOCK_ISSUE1.md",
+                        "path":  "/COPY_LOCK_ISSUE1.md",
+                        "source":  "COPY_LOCK_ISSUE1.md",
+                        "sha256":  "1dcbd3ca6a89f3d970681bfe766700c35bea417e59df889882af1d392f313e62",
+                        "bytes":  1286
+                    },
+                    {
+                        "url":  "https://veklom.com/docs/",
+                        "path":  "/docs/",
+                        "source":  "docs/index.html",
+                        "sha256":  "84bf4b7e465e8f60689079ec166ffdcf99d49a1e769b9deb88ab348f610cfd0e",
+                        "bytes":  16240
+                    },
+                    {
+                        "url":  "https://veklom.com/favicon.ico",
+                        "path":  "/favicon.ico",
+                        "source":  "favicon.ico",
+                        "sha256":  "15b3977a74bd941fe2593e0fce45e7d17352752a60d3d43f7a0d506e50d4bf7d",
+                        "bytes":  15238
+                    },
+                    {
+                        "url":  "https://veklom.com/favicon.svg",
+                        "path":  "/favicon.svg",
+                        "source":  "favicon.svg",
+                        "sha256":  "01f49788a80d950205cad11031949b53dc023792e2fc891106a8b012824d8cb9",
+                        "bytes":  318
+                    },
+                    {
+                        "url":  "https://veklom.com/favicon-16.png",
+                        "path":  "/favicon-16.png",
+                        "source":  "favicon-16.png",
+                        "sha256":  "115e03420fe58aee6e11ea4d373a63b0ef96e86f87283ae58ad752b31b6ccebf",
+                        "bytes":  313
+                    },
+                    {
+                        "url":  "https://veklom.com/favicon-192.png",
+                        "path":  "/favicon-192.png",
+                        "source":  "favicon-192.png",
+                        "sha256":  "ab91203703d6ac103ac9794d965eefd7f1e3b0b42b3a71319682aeec74b77c7a",
+                        "bytes":  3125
+                    },
+                    {
+                        "url":  "https://veklom.com/favicon-32.png",
+                        "path":  "/favicon-32.png",
+                        "source":  "favicon-32.png",
+                        "sha256":  "10701402d75176ed45e624d7325bbd71ba5d381c175d6cdbf0520c19f1949aae",
+                        "bytes":  590
+                    },
+                    {
+                        "url":  "https://veklom.com/favicon-512.png",
+                        "path":  "/favicon-512.png",
+                        "source":  "favicon-512.png",
+                        "sha256":  "d758915f6f92d46b008e8e08290af29d7b8b09df48166db80c2b47ccf15f17c5",
+                        "bytes":  9390
+                    },
+                    {
+                        "url":  "https://veklom.com/",
+                        "path":  "/",
+                        "source":  "index.html",
+                        "sha256":  "7a2f0694fd80c0133f66151637f3409c4376c3aeb6fd8e9da44b2585b5885e65",
+                        "bytes":  56086
+                    },
+                    {
+                        "url":  "https://veklom.com/insights/",
+                        "path":  "/insights/",
+                        "source":  "insights/index.html",
+                        "sha256":  "65d8721791fe80d73e53ff3a04f9e4a06d2d0f8a228349b06485b370844f4a2f",
+                        "bytes":  914
+                    },
+                    {
+                        "url":  "https://veklom.com/jobs/",
+                        "path":  "/jobs/",
+                        "source":  "jobs/index.html",
+                        "sha256":  "b1fd8715c35007daa1607f6d325c856bb25ca4db14e6a446766b89eaf7c402a0",
+                        "bytes":  898
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/acceptable-use.html",
+                        "path":  "/legal/acceptable-use.html",
+                        "source":  "legal/acceptable-use.html",
+                        "sha256":  "56259afad13b85d659cb7c3520777228a4af4bb6ff954371a6e46f5a7af770e7",
+                        "bytes":  8490
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/",
+                        "path":  "/legal/",
+                        "source":  "legal/index.html",
+                        "sha256":  "a2455fcbc29a6e2bc21f0119536362a65421649d4f7d7c3da0ab0455c34ea8e4",
+                        "bytes":  11240
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/legal.css",
+                        "path":  "/legal/legal.css",
+                        "source":  "legal/legal.css",
+                        "sha256":  "727cd7feae4e37a1f4ecfdbb19bd979f2612369bef21c471590830b702081f52",
+                        "bytes":  6824
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/license.html",
+                        "path":  "/legal/license.html",
+                        "source":  "legal/license.html",
+                        "sha256":  "ac81a5d276a7d4e4a012c1a53b7016e1791a760c5ad2f78ab8d6a68604f154c3",
+                        "bytes":  29109
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/privacy.html",
+                        "path":  "/legal/privacy.html",
+                        "source":  "legal/privacy.html",
+                        "sha256":  "07b3cd5699aad79ff44faf08aa3f248a59ac7d5f203b11dd1ad8fdf1ea0eed97",
+                        "bytes":  9371
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/refunds.html",
+                        "path":  "/legal/refunds.html",
+                        "source":  "legal/refunds.html",
+                        "sha256":  "6211f469bd79163e2dc2a2f4fd1d588434882bc9ab314aeb35ce017ef5460392",
+                        "bytes":  7310
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/sla.html",
+                        "path":  "/legal/sla.html",
+                        "source":  "legal/sla.html",
+                        "sha256":  "343f0d59dbeff5e7488a008a528945cef4781d838cb85b30e94edd9eab306bd9",
+                        "bytes":  9480
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/terms.html",
+                        "path":  "/legal/terms.html",
+                        "source":  "legal/terms.html",
+                        "sha256":  "0b1778620d0ae6ff0ed249829599e15a704c904ef82d83f7c3f9fefc6f5ddbea",
+                        "bytes":  6190
+                    },
+                    {
+                        "url":  "https://veklom.com/legal/vendor-agreement.html",
+                        "path":  "/legal/vendor-agreement.html",
+                        "source":  "legal/vendor-agreement.html",
+                        "sha256":  "556f926785cdd2093aa246dd541cf2ee1599c85a575f3e4e697c02eb3f965632",
+                        "bytes":  13679
+                    },
+                    {
+                        "url":  "https://veklom.com/llms.txt",
+                        "path":  "/llms.txt",
+                        "source":  "llms.txt",
+                        "sha256":  "383b499dd8685797d698fbf2dcdb964dc605a6fcb2bee17999cc269efbe1342c",
+                        "bytes":  1392
+                    },
+                    {
+                        "url":  "https://veklom.com/login/",
+                        "path":  "/login/",
+                        "source":  "login/index.html",
+                        "sha256":  "8f8686d02f7bd2c5071f1b91d44ed32103fb0d7391793835d772cf00df127540",
+                        "bytes":  1291
+                    },
+                    {
+                        "url":  "https://veklom.com/logo.svg",
+                        "path":  "/logo.svg",
+                        "source":  "logo.svg",
+                        "sha256":  "cf6cef5eb48756957fff19c00e199e1ea0e051ba91e70d1af392df041540234f",
+                        "bytes":  3090
+                    },
+                    {
+                        "url":  "https://veklom.com/og-image.png",
+                        "path":  "/og-image.png",
+                        "source":  "og-image.png",
+                        "sha256":  "5acd0a5f9b2cc897ad043bdef5bdc2928f38cb3f30a6511c4109bc752bdb1699",
+                        "bytes":  99797
+                    },
+                    {
+                        "url":  "https://veklom.com/og-image.svg",
+                        "path":  "/og-image.svg",
+                        "source":  "og-image.svg",
+                        "sha256":  "4245f25e9f742a7db1af15a9b8f4e8d1b42414f53e65fc62fb8e46fa209ec1ea",
+                        "bytes":  5123
+                    },
+                    {
+                        "url":  "https://veklom.com/onboarding/",
+                        "path":  "/onboarding/",
+                        "source":  "onboarding/index.html",
+                        "sha256":  "d188ad2b86327992b3d1179ca6df2ae2f3c2f13d8734241bd3cea32cb2750ee0",
+                        "bytes":  921
+                    },
+                    {
+                        "url":  "https://veklom.com/plugins/",
+                        "path":  "/plugins/",
+                        "source":  "plugins/index.html",
+                        "sha256":  "4d0e3cffef8595b5f784769f300c136c5f79c4670fa52f32e4ea3f6edda86ffe",
+                        "bytes":  910
+                    },
+                    {
+                        "url":  "https://veklom.com/pricing/",
+                        "path":  "/pricing/",
+                        "source":  "pricing/index.html",
+                        "sha256":  "11f8c4908d709ce290f7b8661a59b7227b84b950ae1176c2af48e74ab6d0c078",
+                        "bytes":  10905
+                    },
+                    {
+                        "url":  "https://veklom.com/privacy/",
+                        "path":  "/privacy/",
+                        "source":  "privacy/index.html",
+                        "sha256":  "428ccbc35fadfcc3fa5191e2a73d34e989249db877c2f54280103ecfb9dd179e",
+                        "bytes":  910
+                    },
+                    {
+                        "url":  "https://veklom.com/README.md",
+                        "path":  "/README.md",
+                        "source":  "README.md",
+                        "sha256":  "c3b131d4fb54617dd721e205763f8ef7e4671701e0bd97223cb1054170d4b1e9",
+                        "bytes":  1383
+                    },
+                    {
+                        "url":  "https://veklom.com/register/",
+                        "path":  "/register/",
+                        "source":  "register/index.html",
+                        "sha256":  "8f8686d02f7bd2c5071f1b91d44ed32103fb0d7391793835d772cf00df127540",
+                        "bytes":  1291
+                    },
+                    {
+                        "url":  "https://veklom.com/robots.txt",
+                        "path":  "/robots.txt",
+                        "source":  "robots.txt",
+                        "sha256":  "c664737f40c07881144f1b09643c169a8ad084fca4aa3cf8f1e296c315e7e9db",
+                        "bytes":  906
+                    },
+                    {
+                        "url":  "https://veklom.com/routing/",
+                        "path":  "/routing/",
+                        "source":  "routing/index.html",
+                        "sha256":  "0c26383665ab41d5044b1e77bd1c82b6ffa3d0485d717683c5231129e3aa328f",
+                        "bytes":  910
+                    },
+                    {
+                        "url":  "https://veklom.com/security/",
+                        "path":  "/security/",
+                        "source":  "security/index.html",
+                        "sha256":  "5d2c1f6920e63241a9c8671d8385984559617f09b87a5f0e6dc6c16327fd6d95",
+                        "bytes":  914
+                    },
+                    {
+                        "url":  "https://veklom.com/signup/",
+                        "path":  "/signup/",
+                        "source":  "signup/index.html",
+                        "sha256":  "e437f944ce899017b8816105fb2c279d1541401df483205eba7056e18c9dfce8",
+                        "bytes":  5754
+                    },
+                    {
+                        "url":  "https://veklom.com/site.webmanifest",
+                        "path":  "/site.webmanifest",
+                        "source":  "site.webmanifest",
+                        "sha256":  "48d4e55134ea460fcee0d5bfd277b05440df68a6869a6dd4a20d19f1b515c6ad",
+                        "bytes":  740
+                    },
+                    {
+                        "url":  "https://veklom.com/sitemap.xml",
+                        "path":  "/sitemap.xml",
+                        "source":  "sitemap.xml",
+                        "sha256":  "60c2c9fe48d1cd5cd4aba17191072d87d613575df1fbfbfbd84f8ab4961b2aad",
+                        "bytes":  2508
+                    },
+                    {
+                        "url":  "https://veklom.com/status.html",
+                        "path":  "/status.html",
+                        "source":  "status.html",
+                        "sha256":  "db3b07845bb15b5518045ca2da0e1bc9566316f420132b4797baf4092ef4dd4a",
+                        "bytes":  20833
+                    },
+                    {
+                        "url":  "https://veklom.com/status/",
+                        "path":  "/status/",
+                        "source":  "status/index.html",
+                        "sha256":  "db3b07845bb15b5518045ca2da0e1bc9566316f420132b4797baf4092ef4dd4a",
+                        "bytes":  20833
+                    },
+                    {
+                        "url":  "https://veklom.com/vendor/",
+                        "path":  "/vendor/",
+                        "source":  "vendor/index.html",
+                        "sha256":  "1f5a225a1d8ed6373c34cd921ff816f1fc7af7e0b8af8dd1fe9dcaff8a760f3c",
+                        "bytes":  9627
+                    },
+                    {
+                        "url":  "https://veklom.com/vendors/",
+                        "path":  "/vendors/",
+                        "source":  "vendors/index.html",
+                        "sha256":  "352f0d04f3930bfffe0e0ee7e210483c7363c1e028eec8f5bdd19c2bc1870cf2",
+                        "bytes":  7048
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-app.html",
+                        "path":  "/workspace-app.html",
+                        "source":  "workspace-app.html",
+                        "sha256":  "8f8686d02f7bd2c5071f1b91d44ed32103fb0d7391793835d772cf00df127540",
+                        "bytes":  1291
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/AcceptInvitePage-DwJFtAHy.js",
+                        "path":  "/workspace-assets/AcceptInvitePage-DwJFtAHy.js",
+                        "source":  "workspace-assets/AcceptInvitePage-DwJFtAHy.js",
+                        "sha256":  "08153288d140494bd9d44d391ab57132974bfb32e11718b4c9c19846db98c18c",
+                        "bytes":  4366
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/activity-Xqc19xa5.js",
+                        "path":  "/workspace-assets/activity-Xqc19xa5.js",
+                        "source":  "workspace-assets/activity-Xqc19xa5.js",
+                        "sha256":  "86419cce848add5359209d599bb1178a1d913ea85d134ed54dfb08af5290898c",
+                        "bytes":  234
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/archive-C3zv0WK8.js",
+                        "path":  "/workspace-assets/archive-C3zv0WK8.js",
+                        "source":  "workspace-assets/archive-C3zv0WK8.js",
+                        "sha256":  "f489f809f058b57a008e40fbef694aea58938fd71dab3eccf59c2338ddf77104",
+                        "bytes":  253
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/arrow-right-C18h_rW4.js",
+                        "path":  "/workspace-assets/arrow-right-C18h_rW4.js",
+                        "source":  "workspace-assets/arrow-right-C18h_rW4.js",
+                        "sha256":  "ce79bcf812b9de8328c9da949d8ac10c35fff1ca43826be500ea2d6d9e484cac",
+                        "bytes":  164
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/arrow-up-right-Yhnast1G.js",
+                        "path":  "/workspace-assets/arrow-up-right-Yhnast1G.js",
+                        "source":  "workspace-assets/arrow-up-right-Yhnast1G.js",
+                        "sha256":  "f0b9f425c73a509336c21eb06e530c7600604d7f1bac4e3890970fd7e1be94f2",
+                        "bytes":  165
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/AutonomyPage-CbRJER2F.js",
+                        "path":  "/workspace-assets/AutonomyPage-CbRJER2F.js",
+                        "source":  "workspace-assets/AutonomyPage-CbRJER2F.js",
+                        "sha256":  "d6370bb13980c495b8c42aabbc69c058ea068d98337b43a509427947187fa8d9",
+                        "bytes":  23328
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/BillingPage-B9iNBV0y.js",
+                        "path":  "/workspace-assets/BillingPage-B9iNBV0y.js",
+                        "source":  "workspace-assets/BillingPage-B9iNBV0y.js",
+                        "sha256":  "40956cb52098b3ca1f8d0a8f5f32c6a32d0038bf91368eb647dac466545ff006",
+                        "bytes":  18617
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/box-B0q7kU38.js",
+                        "path":  "/workspace-assets/box-B0q7kU38.js",
+                        "source":  "workspace-assets/box-B0q7kU38.js",
+                        "sha256":  "74d51b35e60fcfc5cf3070c24ad80dbe686eec70033433e08927955033daba56",
+                        "bytes":  310
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/brain-circuit-CQ15sDZw.js",
+                        "path":  "/workspace-assets/brain-circuit-CQ15sDZw.js",
+                        "source":  "workspace-assets/brain-circuit-CQ15sDZw.js",
+                        "sha256":  "d1d01a154393300c962465acbcfc7a79a805af992a07c60e12c89a81883cf170",
+                        "bytes":  799
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/BudgetPage-DzrW3S12.js",
+                        "path":  "/workspace-assets/BudgetPage-DzrW3S12.js",
+                        "source":  "workspace-assets/BudgetPage-DzrW3S12.js",
+                        "sha256":  "ff82d85af9e48c5a235c9a96d238c51a0e451712f956dbc2b07406db15dd383a",
+                        "bytes":  9284
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/building-2-CIo8oCqN.js",
+                        "path":  "/workspace-assets/building-2-CIo8oCqN.js",
+                        "source":  "workspace-assets/building-2-CIo8oCqN.js",
+                        "sha256":  "16bf83dffab35d575b612260d0d24bc445be718a43ff83f9528522bd866a103f",
+                        "bytes":  438
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/circle-alert-Q9EVuLwb.js",
+                        "path":  "/workspace-assets/circle-alert-Q9EVuLwb.js",
+                        "source":  "workspace-assets/circle-alert-Q9EVuLwb.js",
+                        "sha256":  "927d3b8da8771198982a779841fdb87ab82ec0dc6ef34a5bf09adbbc1e1218da",
+                        "bytes":  249
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/circle-check-big-zCF5cwvr.js",
+                        "path":  "/workspace-assets/circle-check-big-zCF5cwvr.js",
+                        "source":  "workspace-assets/circle-check-big-zCF5cwvr.js",
+                        "sha256":  "d043fad791409668fef1fe8e2b8e219fcbc797e333a8e30b615365431f373062",
+                        "bytes":  192
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/circle-check-BzkC3ABE.js",
+                        "path":  "/workspace-assets/circle-check-BzkC3ABE.js",
+                        "source":  "workspace-assets/circle-check-BzkC3ABE.js",
+                        "sha256":  "eb81a1318a78b7afcb929c31c37719bb180c683f3da0f08dff4a19e318159bc9",
+                        "bytes":  177
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/circle-play-BKWxu174.js",
+                        "path":  "/workspace-assets/circle-play-BKWxu174.js",
+                        "source":  "workspace-assets/circle-play-BKWxu174.js",
+                        "sha256":  "61a1b1905edc07ba8e7917ae003badd29e5079d7c5103d6b0c6035f77efc5145",
+                        "bytes":  192
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/circle-plus-DK3MoAFz.js",
+                        "path":  "/workspace-assets/circle-plus-DK3MoAFz.js",
+                        "source":  "workspace-assets/circle-plus-DK3MoAFz.js",
+                        "sha256":  "8d7830ecd07eba1f5da710a842eaf6a820b3751450e4a09ed6d09432b3022c42",
+                        "bytes":  206
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/circle-x-D2umeeb_.js",
+                        "path":  "/workspace-assets/circle-x-D2umeeb_.js",
+                        "source":  "workspace-assets/circle-x-D2umeeb_.js",
+                        "sha256":  "587cde4487b2e6e2a3f3cbf02568de9923976dcf602640bdfa606f8823d45bc3",
+                        "bytes":  206
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/cn-BTELvfZJ.js",
+                        "path":  "/workspace-assets/cn-BTELvfZJ.js",
+                        "source":  "workspace-assets/cn-BTELvfZJ.js",
+                        "sha256":  "ff697a8e90e8de0c52f15577bf33e77158e3e4311d396be4075499e4d7629fff",
+                        "bytes":  21117
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/CompetitiveAdvantagePage-gR6WwtMt.js",
+                        "path":  "/workspace-assets/CompetitiveAdvantagePage-gR6WwtMt.js",
+                        "source":  "workspace-assets/CompetitiveAdvantagePage-gR6WwtMt.js",
+                        "sha256":  "e519a68d8885e9b6023ed84a25e92682be7dedaaefc361983b6d922294836577",
+                        "bytes":  12988
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/CompliancePage-Cs3ScdGA.js",
+                        "path":  "/workspace-assets/CompliancePage-Cs3ScdGA.js",
+                        "source":  "workspace-assets/CompliancePage-Cs3ScdGA.js",
+                        "sha256":  "efffa4795d30f3a9b88b376f8c8dc427f78bf839efe9541df85b07a75c8541e7",
+                        "bytes":  13364
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/ContentSafetyPage-DRBRvz6p.js",
+                        "path":  "/workspace-assets/ContentSafetyPage-DRBRvz6p.js",
+                        "source":  "workspace-assets/ContentSafetyPage-DRBRvz6p.js",
+                        "sha256":  "7c6e83cb866abf257c31528fd7a3e36666afc25e0dc28707311c278fffa67524",
+                        "bytes":  6984
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/ControlCenterPage-DYn5WG0Y.js",
+                        "path":  "/workspace-assets/ControlCenterPage-DYn5WG0Y.js",
+                        "source":  "workspace-assets/ControlCenterPage-DYn5WG0Y.js",
+                        "sha256":  "6b1c2b582477f22900e47fd7b4c604566309d161ff5d97dc9b85dbfeeabe2f5c",
+                        "bytes":  17171
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/copy-BV-Mnotm.js",
+                        "path":  "/workspace-assets/copy-BV-Mnotm.js",
+                        "source":  "workspace-assets/copy-BV-Mnotm.js",
+                        "sha256":  "954a6adb65f6324ada2558729c7cc3e61b93b985e6d8f31c13a0f8a67a6d4203",
+                        "bytes":  236
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/createLucideIcon-BqBWxOiI.js",
+                        "path":  "/workspace-assets/createLucideIcon-BqBWxOiI.js",
+                        "source":  "workspace-assets/createLucideIcon-BqBWxOiI.js",
+                        "sha256":  "0a5b324c427602936c1b4c07f707b90b75c6652b026ebd88bbb3e7a8802dc840",
+                        "bytes":  946
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/credit-card-ywDE5r2V.js",
+                        "path":  "/workspace-assets/credit-card-ywDE5r2V.js",
+                        "source":  "workspace-assets/credit-card-ywDE5r2V.js",
+                        "sha256":  "93a0f7ece7a67a774e63f6a8aae92657b143ec50170c24efb58e07e1f8aab269",
+                        "bytes":  206
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/DeploymentsPage-D73-MYVO.js",
+                        "path":  "/workspace-assets/DeploymentsPage-D73-MYVO.js",
+                        "source":  "workspace-assets/DeploymentsPage-D73-MYVO.js",
+                        "sha256":  "8e83c2a032e0d21ab5838197c4f1acd70e4c085c3d0f2c4d0d81154b19055ef6",
+                        "bytes":  23924
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/dollar-sign-jLl8CzT3.js",
+                        "path":  "/workspace-assets/dollar-sign-jLl8CzT3.js",
+                        "source":  "workspace-assets/dollar-sign-jLl8CzT3.js",
+                        "sha256":  "4bdd662c4f7080e369f42fc5945c92bf10b67a944e50fb27b24de4723035a675",
+                        "bytes":  218
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/download-DANVs1Ix.js",
+                        "path":  "/workspace-assets/download-DANVs1Ix.js",
+                        "source":  "workspace-assets/download-DANVs1Ix.js",
+                        "sha256":  "2752e2dfdeb6a3a19d492cc082a12272ea49df44dda27ddbbbf29975d85e3c8a",
+                        "bytes":  262
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/ellipsis-DLTIPy1e.js",
+                        "path":  "/workspace-assets/ellipsis-DLTIPy1e.js",
+                        "source":  "workspace-assets/ellipsis-DLTIPy1e.js",
+                        "sha256":  "e37eeae8a800ba139893ceb60a6b497b02608126b5bbd744ad781f0919d741bb",
+                        "bytes":  226
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/errors-CFU7gyhS.js",
+                        "path":  "/workspace-assets/errors-CFU7gyhS.js",
+                        "source":  "workspace-assets/errors-CFU7gyhS.js",
+                        "sha256":  "2ee0ed733222e3efa07b62e32cf3ed7f351b138bcd8cb780f4e6d2f399e1dde1",
+                        "bytes":  1038
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/external-link-CUHWnFLU.js",
+                        "path":  "/workspace-assets/external-link-CUHWnFLU.js",
+                        "source":  "workspace-assets/external-link-CUHWnFLU.js",
+                        "sha256":  "f743087f8c3fcf0733b026f2cfd245ec6ca0c59b94904ef1d04d2abffc5103c9",
+                        "bytes":  250
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/eye-LFnb7G66.js",
+                        "path":  "/workspace-assets/eye-LFnb7G66.js",
+                        "source":  "workspace-assets/eye-LFnb7G66.js",
+                        "sha256":  "6a49af4875dd77d4e76ad04b5721374c2c84bd6c1b44bc64efa2da2334be77f1",
+                        "bytes":  256
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/file-check-2-CKc-Nbbd.js",
+                        "path":  "/workspace-assets/file-check-2-CKc-Nbbd.js",
+                        "source":  "workspace-assets/file-check-2-CKc-Nbbd.js",
+                        "sha256":  "72ef080fb1a77791f8ff7f9405152941d2a733b4bc66c742aa509d3b8dab1596",
+                        "bytes":  255
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/flame-CNjL6mqN.js",
+                        "path":  "/workspace-assets/flame-CNjL6mqN.js",
+                        "source":  "workspace-assets/flame-CNjL6mqN.js",
+                        "sha256":  "9557f11efa5f450229d98b4366a7bf08b1ab4883a4c9328f0f68bcd7e08d588f",
+                        "bytes":  278
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/FlowPrimitives-CjLZADO_.js",
+                        "path":  "/workspace-assets/FlowPrimitives-CjLZADO_.js",
+                        "source":  "workspace-assets/FlowPrimitives-CjLZADO_.js",
+                        "sha256":  "c5f14171b29036d442314e4c6fdbd2d54f7e4349643d444e976329d70e1578e7",
+                        "bytes":  5999
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/git-branch-CoFD3VM7.js",
+                        "path":  "/workspace-assets/git-branch-CoFD3VM7.js",
+                        "source":  "workspace-assets/git-branch-CoFD3VM7.js",
+                        "sha256":  "93ee2e1b07525b6add45c8eaa7808364174af691affa2edddbebecd7b3c74e51",
+                        "bytes":  279
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/GithubCallbackPage-BWCmjShx.js",
+                        "path":  "/workspace-assets/GithubCallbackPage-BWCmjShx.js",
+                        "source":  "workspace-assets/GithubCallbackPage-BWCmjShx.js",
+                        "sha256":  "8457d5975baf8166feedf766d713236a79a6ecb5d4aa64f6b3b2cbcd8d646429",
+                        "bytes":  3008
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/index-C-K5tu-A.css",
+                        "path":  "/workspace-assets/index-C-K5tu-A.css",
+                        "source":  "workspace-assets/index-C-K5tu-A.css",
+                        "sha256":  "92855726b5637810c928dab942384d0badb198b1c603db4a36a34717634fb18a",
+                        "bytes":  65613
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/index-CS55LKkt.js",
+                        "path":  "/workspace-assets/index-CS55LKkt.js",
+                        "source":  "workspace-assets/index-CS55LKkt.js",
+                        "sha256":  "217f6ee2fbe724adf362a6548157dee84c68c36226a183678fb7a0b369609fbe",
+                        "bytes":  67393
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/InsightsPage-BrI4srI7.js",
+                        "path":  "/workspace-assets/InsightsPage-BrI4srI7.js",
+                        "source":  "workspace-assets/InsightsPage-BrI4srI7.js",
+                        "sha256":  "cb02aec6a18c0fae90562f6a0e340bde7fcfce20280c490ed80afa7c12e3df66",
+                        "bytes":  7714
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/internal.service-CtUATfgs.js",
+                        "path":  "/workspace-assets/internal.service-CtUATfgs.js",
+                        "source":  "workspace-assets/internal.service-CtUATfgs.js",
+                        "sha256":  "050467145f1edd66477c265491c185e492b2037f7f79abfc127c42814ed23a7b",
+                        "bytes":  1632
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/JobsPage-D-OSKn4j.js",
+                        "path":  "/workspace-assets/JobsPage-D-OSKn4j.js",
+                        "source":  "workspace-assets/JobsPage-D-OSKn4j.js",
+                        "sha256":  "38167e4e5555bb83a2c01eb2f06ce010d8d4a8c998c4df12d50a0d5fa3bd8176",
+                        "bytes":  7772
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/key-round-BvZNoCbS.js",
+                        "path":  "/workspace-assets/key-round-BvZNoCbS.js",
+                        "source":  "workspace-assets/key-round-BvZNoCbS.js",
+                        "sha256":  "6b01f986c8e8224ad7e921697f53460ad131dd3bf51b66f59d25d9c1050f3d18",
+                        "bytes":  354
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/layers-3-DtBkwbRF.js",
+                        "path":  "/workspace-assets/layers-3-DtBkwbRF.js",
+                        "source":  "workspace-assets/layers-3-DtBkwbRF.js",
+                        "sha256":  "be9d8051b6d849dcf01ac857df892c6f0914c679cb413c5cd701eb601b010d0f",
+                        "bytes":  470
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/loader-circle-B-TaW0Fn.js",
+                        "path":  "/workspace-assets/loader-circle-B-TaW0Fn.js",
+                        "source":  "workspace-assets/loader-circle-B-TaW0Fn.js",
+                        "sha256":  "e979075502b5bc71a8543883eebc32c04f338b2ba66c39daa2626d9ad56e7ab6",
+                        "bytes":  143
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/lock-i-TGBVLj.js",
+                        "path":  "/workspace-assets/lock-i-TGBVLj.js",
+                        "source":  "workspace-assets/lock-i-TGBVLj.js",
+                        "sha256":  "d4c7d0ec30a3800a1c699656e905285e1d57474ab3a92522654b7dcbbb82b0e4",
+                        "bytes":  206
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/lock-keyhole-PmjZ2LBv.js",
+                        "path":  "/workspace-assets/lock-keyhole-PmjZ2LBv.js",
+                        "source":  "workspace-assets/lock-keyhole-PmjZ2LBv.js",
+                        "sha256":  "d77e52a76c66652110e922c4589f820d7e1df459a9b69b5e809363e50e208ec7",
+                        "bytes":  254
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/LoginPage-CJoOIniz.js",
+                        "path":  "/workspace-assets/LoginPage-CJoOIniz.js",
+                        "source":  "workspace-assets/LoginPage-CJoOIniz.js",
+                        "sha256":  "d6c96b0b2131d55999fc0d6dc4e69d697913698bb9727b860085ddad99aa49df",
+                        "bytes":  5496
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/MarketplacePage-DKSNcGr0.js",
+                        "path":  "/workspace-assets/MarketplacePage-DKSNcGr0.js",
+                        "source":  "workspace-assets/MarketplacePage-DKSNcGr0.js",
+                        "sha256":  "b4c1e2520d65ac3e203e99f8e9260623ef3239fcf83608447ab2ce492c396aa8",
+                        "bytes":  34026
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/ModelsPage-Cu_PufiH.js",
+                        "path":  "/workspace-assets/ModelsPage-Cu_PufiH.js",
+                        "source":  "workspace-assets/ModelsPage-Cu_PufiH.js",
+                        "sha256":  "ef6f9d1a3365fe91e302ed736178b338c73c9143f405b5981dd9094d81a3263b",
+                        "bytes":  23170
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/MonitoringPage-HaO6tpCU.js",
+                        "path":  "/workspace-assets/MonitoringPage-HaO6tpCU.js",
+                        "source":  "workspace-assets/MonitoringPage-HaO6tpCU.js",
+                        "sha256":  "1b0f2beaa40b8cf5b7052b874ff0264e350f6efc0d4f47f11e61d7461b9b7d7f",
+                        "bytes":  31627
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/OverviewPage-Dy1PUfOD.js",
+                        "path":  "/workspace-assets/OverviewPage-Dy1PUfOD.js",
+                        "source":  "workspace-assets/OverviewPage-Dy1PUfOD.js",
+                        "sha256":  "8fd5488b98e700cf6a7a0f600b2b2bea9079243d349771d70979a15329b81e73",
+                        "bytes":  27422
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/PipelinesPage-DRpv7cta.js",
+                        "path":  "/workspace-assets/PipelinesPage-DRpv7cta.js",
+                        "source":  "workspace-assets/PipelinesPage-DRpv7cta.js",
+                        "sha256":  "c85893766cca46c6ed2667d542862c74625ae9cd39a1ea59776b5108750cad9d",
+                        "bytes":  63343
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/PlaygroundPage-C-qxmcSR.js",
+                        "path":  "/workspace-assets/PlaygroundPage-C-qxmcSR.js",
+                        "source":  "workspace-assets/PlaygroundPage-C-qxmcSR.js",
+                        "sha256":  "c45ba51f0f7b3559be4935b5c5a37fa5326fce03ff6256aea23b0333c590d7e8",
+                        "bytes":  14138
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/PluginsPage-D66SyVa9.js",
+                        "path":  "/workspace-assets/PluginsPage-D66SyVa9.js",
+                        "source":  "workspace-assets/PluginsPage-D66SyVa9.js",
+                        "sha256":  "140832c9b8e97822212565a2eb1fc61c36b0bf77b9f77a20af5f2edb4aa2c5e2",
+                        "bytes":  4111
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/plus-DiYEG8SF.js",
+                        "path":  "/workspace-assets/plus-DiYEG8SF.js",
+                        "source":  "workspace-assets/plus-DiYEG8SF.js",
+                        "sha256":  "483533c37ed45dd66e65abf066f475775fdb8b4094b7ddbf10a2f6f189e55b97",
+                        "bytes":  153
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/PrivacyPage-1ESZLzhZ.js",
+                        "path":  "/workspace-assets/PrivacyPage-1ESZLzhZ.js",
+                        "source":  "workspace-assets/PrivacyPage-1ESZLzhZ.js",
+                        "sha256":  "2b670ce698943ad018b42f37d0a8d397e8a57d8ca5a272df223a2569bdfb8999",
+                        "bytes":  6072
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/query-A1tBMfoY.js",
+                        "path":  "/workspace-assets/query-A1tBMfoY.js",
+                        "source":  "workspace-assets/query-A1tBMfoY.js",
+                        "sha256":  "a6cda495f2c9649666caae9f62a283e5e02148d462f9a1f1a0b272737d485fe0",
+                        "bytes":  39316
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/react-Dj3fH5p3.js",
+                        "path":  "/workspace-assets/react-Dj3fH5p3.js",
+                        "source":  "workspace-assets/react-Dj3fH5p3.js",
+                        "sha256":  "262bf80932c037bc92b68b225bc6ee5943c9f55775f55a150364153c36673494",
+                        "bytes":  155227
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/refresh-cw-B9wmPqRO.js",
+                        "path":  "/workspace-assets/refresh-cw-B9wmPqRO.js",
+                        "source":  "workspace-assets/refresh-cw-B9wmPqRO.js",
+                        "sha256":  "59c72fa013faf933e86b677ad83329524953887b9d2be6999adb1c3881216de1",
+                        "bytes":  320
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/RegisterPage-DZJy6IDF.js",
+                        "path":  "/workspace-assets/RegisterPage-DZJy6IDF.js",
+                        "source":  "workspace-assets/RegisterPage-DZJy6IDF.js",
+                        "sha256":  "ab7bb3e4defb3fa4c99e4aa31b67d1dad31a23efed01c3faa5215190b7291680",
+                        "bytes":  4935
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/rolldown-runtime-D3WCi_bD.js",
+                        "path":  "/workspace-assets/rolldown-runtime-D3WCi_bD.js",
+                        "source":  "workspace-assets/rolldown-runtime-D3WCi_bD.js",
+                        "sha256":  "5db5ba82eef00d1dee7e86e663098c9427d01183a88d357437daff295aec3e75",
+                        "bytes":  694
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/rotate-ccw-C_PovwmI.js",
+                        "path":  "/workspace-assets/rotate-ccw-C_PovwmI.js",
+                        "source":  "workspace-assets/rotate-ccw-C_PovwmI.js",
+                        "sha256":  "1edfa27c59b15d011bd04822c28272f94d91935f0d4ea8cb319fd6f6b6523c2f",
+                        "bytes":  199
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/route-DSwS7Zj8.js",
+                        "path":  "/workspace-assets/route-DSwS7Zj8.js",
+                        "source":  "workspace-assets/route-DSwS7Zj8.js",
+                        "sha256":  "4c795744c71c9dfdca19c31e99a87c21429de0e7378c9bf448d37aedc4898324",
+                        "bytes":  254
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/RoutingPage-B5dOU-Ow.js",
+                        "path":  "/workspace-assets/RoutingPage-B5dOU-Ow.js",
+                        "source":  "workspace-assets/RoutingPage-B5dOU-Ow.js",
+                        "sha256":  "5862bbbc326703c86d35897b0bbb8088fa9e18eadbdd3efe10c688a4917a2253",
+                        "bytes":  7340
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/runtime-truth.service-C8XvpoIP.js",
+                        "path":  "/workspace-assets/runtime-truth.service-C8XvpoIP.js",
+                        "source":  "workspace-assets/runtime-truth.service-C8XvpoIP.js",
+                        "sha256":  "dd50040924be0017d2dc890473675eae44534b2d3f036802f47ceb32558f7c2b",
+                        "bytes":  1101
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/save-DlZjm1Kl.js",
+                        "path":  "/workspace-assets/save-DlZjm1Kl.js",
+                        "source":  "workspace-assets/save-DlZjm1Kl.js",
+                        "sha256":  "bd15a24d52444b1d203d325f8bb897f223c502828061b19a2a9e4c70c996feff",
+                        "bytes":  327
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/scale-Bm5Y6uVP.js",
+                        "path":  "/workspace-assets/scale-Bm5Y6uVP.js",
+                        "source":  "workspace-assets/scale-Bm5Y6uVP.js",
+                        "sha256":  "0fa866167e8bfedc6c2ac61b680f57558f54a2e06c88c2da99fd7fba191a0fcc",
+                        "bytes":  2332
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/search-CNzYrWEg.js",
+                        "path":  "/workspace-assets/search-CNzYrWEg.js",
+                        "source":  "workspace-assets/search-CNzYrWEg.js",
+                        "sha256":  "7df280c907f19af1f7574c8a0b9b9124f47905762a7b42ef3377d403d6f491d9",
+                        "bytes":  172
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/SecurityPage-ClPQfWxc.js",
+                        "path":  "/workspace-assets/SecurityPage-ClPQfWxc.js",
+                        "source":  "workspace-assets/SecurityPage-ClPQfWxc.js",
+                        "sha256":  "c83520bd551c36748bc03ad42ba21c7c8b9a759022be04ee61629e6f99d27866",
+                        "bytes":  8931
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/SettingsPage-DtqNaziN.js",
+                        "path":  "/workspace-assets/SettingsPage-DtqNaziN.js",
+                        "source":  "workspace-assets/SettingsPage-DtqNaziN.js",
+                        "sha256":  "0a83f1dbb73cc228a0819050df242c660ac0e557d9b218dc245281d8b9ee2fc4",
+                        "bytes":  23383
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/shield-alert-CnCuMR_U.js",
+                        "path":  "/workspace-assets/shield-alert-CnCuMR_U.js",
+                        "source":  "workspace-assets/shield-alert-CnCuMR_U.js",
+                        "sha256":  "8fb6fdc30cce9ed789aa2c2895b85314817e85a835e5e0d316cfb82044b5c342",
+                        "bytes":  352
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/shield-check-D1XcBbVi.js",
+                        "path":  "/workspace-assets/shield-check-D1XcBbVi.js",
+                        "source":  "workspace-assets/shield-check-D1XcBbVi.js",
+                        "sha256":  "140e9f315d98858d8ff2a8707d4e0b884a0e6911a9669ff62d9c5ad84ffd9fd5",
+                        "bytes":  319
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/shield-JAk5Nog-.js",
+                        "path":  "/workspace-assets/shield-JAk5Nog-.js",
+                        "source":  "workspace-assets/shield-JAk5Nog-.js",
+                        "sha256":  "fd373d7f799e5584f94daf5d489e4cc9019ef55dfa4a2f63f2d86b3bdf763f8a",
+                        "bytes":  272
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/shield-x-DC7jajp2.js",
+                        "path":  "/workspace-assets/shield-x-DC7jajp2.js",
+                        "source":  "workspace-assets/shield-x-DC7jajp2.js",
+                        "sha256":  "281e1da8f3369e804e68f515cc01463d6eda1ae06a5f549bf428747f23426835",
+                        "bytes":  356
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/sliders-horizontal-Bdm8Iu7o.js",
+                        "path":  "/workspace-assets/sliders-horizontal-Bdm8Iu7o.js",
+                        "source":  "workspace-assets/sliders-horizontal-Bdm8Iu7o.js",
+                        "sha256":  "4100e45bb42cf70bef540ae06383622757f1dba6be21514c7c93372121d4f669",
+                        "bytes":  707
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/sparkles-CygmOEsd.js",
+                        "path":  "/workspace-assets/sparkles-CygmOEsd.js",
+                        "source":  "workspace-assets/sparkles-CygmOEsd.js",
+                        "sha256":  "6d519375d41a10beb4840fab267085e5194d6072ed27afe08331ed03ed556a9f",
+                        "bytes":  508
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/split-i8c5_qfx.js",
+                        "path":  "/workspace-assets/split-i8c5_qfx.js",
+                        "source":  "workspace-assets/split-i8c5_qfx.js",
+                        "sha256":  "b2470b640ecfbd8f95dda3ff784afbe08597a8c8d55409ca80b0da243b9804db",
+                        "bytes":  449
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/square-terminal-CLyTO-Uc.js",
+                        "path":  "/workspace-assets/square-terminal-CLyTO-Uc.js",
+                        "source":  "workspace-assets/square-terminal-CLyTO-Uc.js",
+                        "sha256":  "e3c95bbf240d88e2d993ba87189afd30ea1db68e09bb97ffe5acfdb7de65db5d",
+                        "bytes":  241
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/TeamPage-DyEE2-OF.js",
+                        "path":  "/workspace-assets/TeamPage-DyEE2-OF.js",
+                        "source":  "workspace-assets/TeamPage-DyEE2-OF.js",
+                        "sha256":  "01959a3943361047480fa1d484d01b4001c1301659e4cfb35047f992580e3b65",
+                        "bytes":  21547
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/trash-2-BIiU9UwS.js",
+                        "path":  "/workspace-assets/trash-2-BIiU9UwS.js",
+                        "source":  "workspace-assets/trash-2-BIiU9UwS.js",
+                        "sha256":  "caaeebdd88c3029b043cb4b7eaff96076ec58a1c8fd2e89b9edf3c19c8277294",
+                        "bytes":  357
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/trending-up-DSNs4aU7.js",
+                        "path":  "/workspace-assets/trending-up-DSNs4aU7.js",
+                        "source":  "workspace-assets/trending-up-DSNs4aU7.js",
+                        "sha256":  "761549ef55eb021e842f9b2b1e7d775564fdfce0b0c59cea269a40a50c412e48",
+                        "bytes":  204
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/triangle-alert-C0_jMmqo.js",
+                        "path":  "/workspace-assets/triangle-alert-C0_jMmqo.js",
+                        "source":  "workspace-assets/triangle-alert-C0_jMmqo.js",
+                        "sha256":  "e5b99ceff7a1eba25fbc1ff0f679e7bdb3665e44af6b168434606d7ffae151b1",
+                        "bytes":  264
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/UacpPage-AY924iom.js",
+                        "path":  "/workspace-assets/UacpPage-AY924iom.js",
+                        "source":  "workspace-assets/UacpPage-AY924iom.js",
+                        "sha256":  "55ad6198856179210abae764e876d5092f045667cabe735374d754b4c6b05d74",
+                        "bytes":  8665
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/usePrivacyAndSafety-DdJQLzbW.js",
+                        "path":  "/workspace-assets/usePrivacyAndSafety-DdJQLzbW.js",
+                        "source":  "workspace-assets/usePrivacyAndSafety-DdJQLzbW.js",
+                        "sha256":  "72b78e1b22ff22d1e2dfd407d6ea64e1b645d09b608041745922894b52e371b3",
+                        "bytes":  1037
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/users-DJf6DKgW.js",
+                        "path":  "/workspace-assets/users-DJf6DKgW.js",
+                        "source":  "workspace-assets/users-DJf6DKgW.js",
+                        "sha256":  "021bf540bd0fb8311bb8ebf3b15be4b70bbd443597afbb2838a174534a58989d",
+                        "bytes":  304
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/VaultPage-DfyRJG5v.js",
+                        "path":  "/workspace-assets/VaultPage-DfyRJG5v.js",
+                        "source":  "workspace-assets/VaultPage-DfyRJG5v.js",
+                        "sha256":  "2be128eab74bbadb300d332de6828224fdd86c859b5641cad9934684f1e31e8f",
+                        "bytes":  19136
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/wallet-CHG3NQbB.js",
+                        "path":  "/workspace-assets/wallet-CHG3NQbB.js",
+                        "source":  "workspace-assets/wallet-CHG3NQbB.js",
+                        "sha256":  "49132d24ec0996277085c03d189293bf5c96e3f022f61bef3c9bd13a7047c85b",
+                        "bytes":  286
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/webhook-DeGaaJcr.js",
+                        "path":  "/workspace-assets/webhook-DeGaaJcr.js",
+                        "source":  "workspace-assets/webhook-DeGaaJcr.js",
+                        "sha256":  "bbaf89f3090c0866995447810b167ac570898f7cf54dc515bdcbb2e4ec8cdfb9",
+                        "bytes":  352
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/workflow-DS_pOkEL.js",
+                        "path":  "/workspace-assets/workflow-DS_pOkEL.js",
+                        "source":  "workspace-assets/workflow-DS_pOkEL.js",
+                        "sha256":  "95c37d86406e0b9899f993d0d72896573b48c099ee6ff3d0f064036a09f01062",
+                        "bytes":  265
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/x-Bbj8VVeL.js",
+                        "path":  "/workspace-assets/x-Bbj8VVeL.js",
+                        "source":  "workspace-assets/x-Bbj8VVeL.js",
+                        "sha256":  "c7745f7af787532322a03b0fd52d8fc88ee5404a1aa5f551852b975d87708289",
+                        "bytes":  154
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-assets/zap-Bpvfs96d.js",
+                        "path":  "/workspace-assets/zap-Bpvfs96d.js",
+                        "source":  "workspace-assets/zap-Bpvfs96d.js",
+                        "sha256":  "55836e65e4c626d4f3bad7a6f25262ad560ac03accc84842fb0335a83c4aec55",
+                        "bytes":  262
+                    },
+                    {
+                        "url":  "https://veklom.com/workspace-config.js",
+                        "path":  "/workspace-config.js",
+                        "source":  "workspace-config.js",
+                        "sha256":  "e41eaa0dc25fcf8776b7f34242b5197edc09ac97718337b381d3e02ae66b30f7",
+                        "bytes":  202
+                    },
+                    {
+                        "url":  "https://veklom.com/wrangler.toml",
+                        "path":  "/wrangler.toml",
+                        "source":  "wrangler.toml",
+                        "sha256":  "38577a446001cb3ac130c51e9b9d5f205cb9d746d2aa687e05b7260bded015fe",
+                        "bytes":  711
+                    }
+                ]
+}

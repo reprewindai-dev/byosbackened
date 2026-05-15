@@ -11,7 +11,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app/app.css">
-</head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4ZBVVR3V33"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4ZBVVR3V33');
+  </script></head>
 <body>
 <main class="app-shell">
   <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
@@ -19,11 +27,38 @@
     <h1 class="app-h1">Signing you in</h1>
     <p class="app-sub">Completing GitHub authorization and creating your secure session.</p>
     <div id="alert"><div class="alert alert-ok"><span class="spinner"></span> Finalizing OAuth...</div></div>
+    <form id="mfa_form" hidden>
+      <div class="field">
+        <label for="mfa_code">MFA or backup code</label>
+        <input id="mfa_code" name="mfa_code" autocomplete="one-time-code" placeholder="123456 or backup code" />
+      </div>
+      <button class="btn btn-primary btn-block" id="mfa_submit" type="submit">Verify MFA</button>
+    </form>
   </div>
 </main>
 <script src="/app/auth.js"></script>
 <script>
 const $alert = document.getElementById("alert");
+const $mfaForm = document.getElementById("mfa_form");
+const $mfaCode = document.getElementById("mfa_code");
+const $mfaSubmit = document.getElementById("mfa_submit");
+let githubMfaChallenge = "";
+
+$mfaForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const mfa_code = $mfaCode.value.trim().replace(/\s+/g, "").toUpperCase();
+  if (!githubMfaChallenge || !mfa_code) return;
+  $mfaSubmit.disabled = true;
+  $mfaSubmit.innerHTML = '<span class="spinner"></span> Verifying...';
+  try {
+    await VK.finishGithubMfa({ challenge_token: githubMfaChallenge, mfa_code });
+    window.location.href = "/login/#/";
+  } catch (err) {
+    $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "GitHub MFA verification failed") + '</div>';
+    $mfaSubmit.disabled = false;
+    $mfaSubmit.innerHTML = "Verify MFA";
+  }
+});
 
 (async function finishOauth() {
   const params = new URLSearchParams(window.location.search);
@@ -45,8 +80,15 @@ const $alert = document.getElementById("alert");
 
   try {
     const out = await VK.finishGithubLogin({ code, state });
+    if (out && out.mfa_required) {
+      githubMfaChallenge = out.mfa_challenge_token || "";
+      $alert.innerHTML = '<div class="alert alert-ok">MFA is required for this GitHub account.</div>';
+      $mfaForm.hidden = false;
+      $mfaCode.focus();
+      return;
+    }
     const isNew = !!(out && out.is_new_user);
-    window.location.href = isNew ? "/dashboard/?welcome=1" : "/dashboard/";
+    window.location.href = isNew ? "/login/#/?welcome=1" : "/login/#/";
   } catch (err) {
     $alert.innerHTML = '<div class="alert alert-error">' + (err.message || "GitHub sign-in failed") + '</div>';
     setTimeout(() => { window.location.href = "/login/"; }, 2200);

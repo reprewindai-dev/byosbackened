@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const uploadService = {
   /** POST /upload - multipart file upload */
@@ -13,28 +13,22 @@ export const uploadService = {
     });
   },
 
-  /** POST /transcribe - audio/video to text */
-  transcribe: (file: File, params?: { language?: string; model?: string }) => {
-    const form = new FormData();
-    form.append("file", file);
-    if (params?.language) form.append("language", params.language);
-    if (params?.model) form.append("model", params.model);
-    return api.post("/transcribe", form, {
-      headers: { "Content-Type": "multipart/form-data" },
+  /** POST /upload, then POST /transcribe with uploaded asset_id */
+  transcribe: async (file: File, params?: { language?: string; model?: string }) => {
+    const uploaded = await uploadService.upload(file);
+    return api.post("/transcribe", {
+      asset_id: uploaded.data.id,
+      language: params?.language,
+      provider: params?.model,
     });
   },
 
-  /** POST /extract - extract text/data from document */
+  /** No route found: POST /extract multipart file; backend expects JSON text extraction */
   extract: (file: File, params?: { format?: string }) => {
-    const form = new FormData();
-    form.append("file", file);
-    if (params?.format) form.append("format", params.format);
-    return api.post("/extract", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return noRoute("/extract multipart file", file, params);
   },
 
-  /** GET /export/{job_id} */
+  /** No route found: GET /export/{job_id} */
   exportJob: (job_id: string, format?: string) =>
-    api.get(`/export/${job_id}`, { params: { format }, responseType: "blob" }),
+    noRoute(`/export/${job_id}`, format),
 };

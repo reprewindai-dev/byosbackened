@@ -9,7 +9,6 @@ import {
   GitBranch,
   Hash,
   Landmark,
-  Layers3,
   LineChart,
   Lock,
   Network,

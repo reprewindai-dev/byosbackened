@@ -31,7 +31,7 @@ export function usePlugins() {
 export function useInstallPlugin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (slug: string) => api.post<Plugin>(`/plugins/${slug}/install`, {}),
+    mutationFn: (slug: string) => api.post<Plugin>(`/plugins/${slug}/enable`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
   });
 }
@@ -39,7 +39,7 @@ export function useInstallPlugin() {
 export function useUninstallPlugin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (slug: string) => api.delete(`/plugins/${slug}`),
+    mutationFn: (slug: string) => api.post<Plugin>(`/plugins/${slug}/disable`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
   });
 }
@@ -48,16 +48,15 @@ export function useTogglePlugin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ slug, enabled }: { slug: string; enabled: boolean }) =>
-      api.patch(`/plugins/${slug}`, { enabled }),
+      enabled ? api.post<Plugin>(`/plugins/${slug}/enable`, {}) : api.post<Plugin>(`/plugins/${slug}/disable`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
   });
 }
 
 export function useUpdatePluginConfig() {
-  const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ slug, config }: { slug: string; config: Record<string, unknown> }) =>
-      api.patch(`/plugins/${slug}/config`, config),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
+    mutationFn: async ({ slug }: { slug: string; config: Record<string, unknown> }) => {
+      throw new Error(`Plugin config update is not exposed by the backend route contract for ${slug}`);
+    },
   });
 }

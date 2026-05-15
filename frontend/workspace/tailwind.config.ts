@@ -13,26 +13,26 @@ export default {
     extend: {
       colors: {
         ink: {
-          DEFAULT: "#070810",
-          1: "#0b0d16",
-          2: "#10131e",
-          3: "#161a28",
+          DEFAULT: "#ffffff",
+          1: "#f8fafc",
+          2: "#f3f4f6",
+          3: "#e5e7eb",
         },
         rule: {
-          DEFAULT: "#1e2230",
-          2: "#272c3e",
+          DEFAULT: "#e5e7eb",
+          2: "#d1d5db",
         },
         bone: {
-          DEFAULT: "#f4f2ed",
-          2: "#c8cbd6",
+          DEFAULT: "#111827",
+          2: "#374151",
         },
         muted: {
-          DEFAULT: "#7b849a",
-          2: "#566077",
+          DEFAULT: "#64748b",
+          2: "#94a3b8",
         },
         brass: {
-          DEFAULT: "#c4925b",
-          2: "#e5b16e",
+          DEFAULT: "#111827",
+          2: "#334155",
         },
         moss: {
           DEFAULT: "#5dd8a5",
@@ -41,7 +41,7 @@ export default {
           DEFAULT: "#6ea8fe",
         },
         amber: {
-          DEFAULT: "#f0b340",
+          DEFAULT: "#64748b",
         },
         crimson: {
           DEFAULT: "#ff6b6b",
@@ -57,8 +57,8 @@ export default {
         "2xs": ["10px", "14px"],
       },
       boxShadow: {
-        soft: "0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px -20px rgba(0,0,0,0.8)",
-        "brass-glow": "0 0 20px rgba(229,177,110,0.35)",
+        soft: "0 1px 0 rgba(255,255,255,0.9) inset, 0 18px 45px -35px rgba(15,23,42,0.35)",
+        "brass-glow": "0 0 0 rgba(0,0,0,0)",
         "moss-glow": "0 0 20px rgba(93,216,165,0.35)",
       },
       animation: {

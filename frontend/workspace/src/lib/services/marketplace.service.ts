@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const marketplaceService = {
   // ─── Listings ────────────────────────────────────────────
@@ -15,7 +15,7 @@ export const marketplaceService = {
   getListing: (listing_id: string) =>
     api.get(`/marketplace/listings/${listing_id}`),
 
-  /** POST /marketplace/listings */
+  /** POST /marketplace/listings/create */
   createListing: (body: Record<string, unknown>) =>
     api.post("/marketplace/listings", body),
 
@@ -23,54 +23,54 @@ export const marketplaceService = {
   updateListing: (listing_id: string, body: Record<string, unknown>) =>
     api.patch(`/marketplace/listings/${listing_id}`, body),
 
-  /** DELETE /marketplace/listings/{listing_id} */
+  /** No route found: DELETE /marketplace/listings/{listing_id} */
   deleteListing: (listing_id: string) =>
-    api.delete(`/marketplace/listings/${listing_id}`),
+    noRoute(`/marketplace/listings/${listing_id}`),
 
-  /** POST /marketplace/listings/{listing_id}/publish */
+  /** No route found: POST /marketplace/listings/{listing_id}/publish */
   publishListing: (listing_id: string) =>
-    api.post(`/marketplace/listings/${listing_id}/publish`),
+    noRoute(`/marketplace/listings/${listing_id}/publish`),
 
   // ─── Purchases / Installs ────────────────────────────────
-  /** POST /marketplace/purchase */
+  /** POST /marketplace/checkout */
   purchase: (body: { listing_id: string; payment_method_id?: string }) =>
-    api.post("/marketplace/purchase", body),
+    api.post("/marketplace/payments/create-checkout", { listing_id: body.listing_id }),
 
-  /** GET /marketplace/purchases */
+  /** GET /marketplace/orders */
   listPurchases: (params?: { page?: number; limit?: number }) =>
-    api.get("/marketplace/purchases", { params }),
+    api.get("/marketplace/orders", { params }),
 
-  /** POST /marketplace/install/{listing_id} */
+  /** POST /marketplace/listings/{listing_id}/install */
   install: (listing_id: string) =>
-    api.post(`/marketplace/install/${listing_id}`),
+    api.post(`/marketplace/listings/${listing_id}/install`),
 
-  /** DELETE /marketplace/install/{listing_id} */
+  /** No route found: DELETE /marketplace/install/{listing_id} */
   uninstall: (listing_id: string) =>
-    api.delete(`/marketplace/install/${listing_id}`),
+    noRoute(`/marketplace/install/${listing_id}`),
 
   // ─── Reviews ─────────────────────────────────────────────
-  /** GET /marketplace/listings/{listing_id}/reviews */
+  /** No route found: GET /marketplace/listings/{listing_id}/reviews */
   listReviews: (listing_id: string) =>
-    api.get(`/marketplace/listings/${listing_id}/reviews`),
+    noRoute(`/marketplace/listings/${listing_id}/reviews`),
 
-  /** POST /marketplace/listings/{listing_id}/reviews */
+  /** No route found: POST /marketplace/listings/{listing_id}/reviews */
   createReview: (listing_id: string, body: { rating: number; comment?: string }) =>
-    api.post(`/marketplace/listings/${listing_id}/reviews`, body),
+    noRoute(`/marketplace/listings/${listing_id}/reviews`, body),
 
   // ─── Automation ──────────────────────────────────────────
-  /** GET /marketplace/automation/jobs */
+  /** No route found: GET /marketplace/automation/jobs */
   listAutomationJobs: (params?: { page?: number; limit?: number; status?: string }) =>
-    api.get("/marketplace/automation/jobs", { params }),
+    noRoute("/marketplace/automation/jobs", params),
 
-  /** POST /marketplace/automation/jobs */
+  /** POST /marketplace/automation/run */
   createAutomationJob: (body: Record<string, unknown>) =>
-    api.post("/marketplace/automation/jobs", body),
+    api.post("/marketplace/automation/run", body),
 
-  /** GET /marketplace/automation/jobs/{job_id} */
+  /** No route found: GET /marketplace/automation/jobs/{job_id} */
   getAutomationJob: (job_id: string) =>
-    api.get(`/marketplace/automation/jobs/${job_id}`),
+    noRoute(`/marketplace/automation/jobs/${job_id}`),
 
-  /** POST /marketplace/automation/jobs/{job_id}/cancel */
+  /** No route found: POST /marketplace/automation/jobs/{job_id}/cancel */
   cancelAutomationJob: (job_id: string) =>
-    api.post(`/marketplace/automation/jobs/${job_id}/cancel`),
+    noRoute(`/marketplace/automation/jobs/${job_id}/cancel`),
 };

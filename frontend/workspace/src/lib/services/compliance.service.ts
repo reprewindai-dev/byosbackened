@@ -11,7 +11,7 @@
  * UI rule: Never show "compliant" with no evidence.
  * Show: "Evidence check passed" / "Evidence gap detected" / "Audit hash verified".
  */
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export interface AuditLogEntry {
   id: string;
@@ -66,9 +66,9 @@ export const complianceService = {
   }) => api.get<AuditLogEntry[]>("/audit/logs", { params }),
 
   /**
-   * GET /api/v1/audit/logs/{log_id}
+   * No route found: GET /api/v1/audit/logs/{log_id}
    */
-  getLog: (log_id: string) => api.get<AuditLogEntry>(`/audit/logs/${log_id}`),
+  getLog: (log_id: string) => noRoute(`/audit/logs/${log_id}`),
 
   /**
    * GET /api/v1/audit/verify/{id}
@@ -81,64 +81,70 @@ export const complianceService = {
   // ─── Compliance Evidence ──────────────────────────────────────────────────
 
   /**
-   * GET /api/v1/compliance/status
+   * No route found: GET /api/v1/compliance/status
    * Compliance Center overview.
    */
-  getStatus: () => api.get("/compliance/status"),
+  getStatus: () => noRoute("/compliance/status"),
 
   /**
-   * GET /api/v1/compliance/reports
+   * POST /api/v1/compliance/check
    */
-  listReports: () => api.get<ComplianceEvidenceBundle[]>("/compliance/reports"),
+  runCheck: (body: Record<string, unknown>) =>
+    api.post("/compliance/check", body),
 
   /**
-   * GET /api/v1/compliance/evidence
+   * No route found: GET /api/v1/compliance/reports
+   */
+  listReports: () => noRoute("/compliance/reports"),
+
+  /**
+   * No route found: GET /api/v1/compliance/evidence
    * Pull evidence bundle for a period.
    */
   getEvidence: (params?: { from?: string; to?: string; type?: string }) =>
-    api.get("/compliance/evidence", { params }),
+    noRoute("/compliance/evidence", params),
 
   /**
-   * POST /api/v1/compliance/evidence/export
+   * No route found: POST /api/v1/compliance/evidence/export
    * Generate and download evidence package.
    * Use for: enterprise proof-of-compliance, HIPAA/GDPR audit packages.
    */
   exportEvidence: (body: { type: string; from: string; to: string; format?: "pdf" | "json" }) =>
-    api.post("/compliance/evidence/export", body, { responseType: "blob" }),
+    noRoute("/compliance/evidence/export", body),
 
   /**
-   * POST /api/v1/compliance/reports/generate
+   * POST /api/v1/compliance/report
    */
   generateReport: (body: { type: string; from?: string; to?: string }) =>
-    api.post("/compliance/reports/generate", body),
+    api.post("/compliance/report", body),
 
   // ─── Privacy (PII + GDPR) ─────────────────────────────────────────────────
 
   /**
-   * GET /api/v1/privacy/settings
+   * No route found: GET /api/v1/privacy/settings
    */
-  getPrivacySettings: () => api.get("/privacy/settings"),
+  getPrivacySettings: () => noRoute("/privacy/settings"),
 
   /**
-   * PATCH /api/v1/privacy/settings
+   * No route found: PATCH /api/v1/privacy/settings
    * Powers: auto-redact toggle in Playground.
    */
   updatePrivacySettings: (body: {
     auto_redact_pii?: boolean;
     data_residency?: string;
     retention_days?: number;
-  }) => api.patch("/privacy/settings", body),
+  }) => noRoute("/privacy/settings", body),
 
   /**
-   * POST /api/v1/privacy/data-request
+   * POST /api/v1/privacy/export or POST /api/v1/privacy/delete
    * GDPR export / delete request.
    */
   submitDataRequest: (body: { type: "export" | "delete"; user_id?: string }) =>
-    api.post("/privacy/data-request", body),
+    api.post(body.type === "delete" ? "/privacy/delete" : "/privacy/export", body),
 
   /**
-   * GET /api/v1/privacy/data-requests
+   * No route found: GET /api/v1/privacy/data-requests
    */
   listDataRequests: (params?: { status?: string }) =>
-    api.get("/privacy/data-requests", { params }),
+    noRoute("/privacy/data-requests", params),
 };

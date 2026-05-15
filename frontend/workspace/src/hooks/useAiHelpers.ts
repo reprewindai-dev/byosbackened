@@ -3,7 +3,7 @@
  * useExec — wires /v1/exec (top-level unified prompt execution)
  */
 import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, apiRoot, noRoute } from "@/lib/api";
 
 export type AiGeneratePayload = {
   prompt: string;
@@ -67,27 +67,27 @@ export type ExecResult = {
   trace_id: string;
 };
 
-/** POST /api/v1/ai/generate */
+/** POST /api/v1/ai/complete */
 export function useAiGenerate() {
   return useMutation({
     mutationFn: (payload: AiGeneratePayload) =>
-      api.post<AiGenerateResult>("/ai/generate", payload).then((r) => r.data),
+      api.post<AiGenerateResult>("/ai/complete", payload).then((r) => r.data),
   });
 }
 
-/** POST /api/v1/ai/extract */
+/** POST /api/v1/extract */
 export function useAiExtract() {
   return useMutation({
     mutationFn: (payload: AiExtractPayload) =>
-      api.post<Record<string, unknown>>("/ai/extract", payload).then((r) => r.data),
+      api.post<Record<string, unknown>>("/extract", payload).then((r) => r.data),
   });
 }
 
-/** POST /api/v1/ai/classify */
+/** No route found: POST /api/v1/ai/classify */
 export function useAiClassify() {
   return useMutation({
     mutationFn: (payload: AiClassifyPayload) =>
-      api.post<AiClassifyResult>("/ai/classify", payload).then((r) => r.data),
+      noRoute<AiClassifyResult>("/ai/classify", payload),
   });
 }
 
@@ -98,6 +98,6 @@ export function useAiClassify() {
 export function useExec() {
   return useMutation({
     mutationFn: (payload: ExecPayload) =>
-      api.post<ExecResult>("/v1/exec", payload, { baseURL: "/" }).then((r) => r.data),
+      apiRoot.post<ExecResult>("/v1/exec", payload).then((r) => r.data),
   });
 }

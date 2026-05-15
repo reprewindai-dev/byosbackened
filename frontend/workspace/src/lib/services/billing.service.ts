@@ -1,29 +1,29 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const billingService = {
-  /** GET /billing/summary */
-  getSummary: () => api.get("/billing/summary"),
+  /** GET /billing/report */
+  getSummary: () => api.get("/billing/report"),
 
-  /** GET /billing/invoices */
+  /** No route found: GET /billing/invoices */
   listInvoices: (params?: { page?: number; limit?: number }) =>
-    api.get("/billing/invoices", { params }),
+    noRoute("/billing/invoices", params),
 
-  /** GET /billing/invoices/{invoice_id} */
-  getInvoice: (invoice_id: string) => api.get(`/billing/invoices/${invoice_id}`),
+  /** No route found: GET /billing/invoices/{invoice_id} */
+  getInvoice: (invoice_id: string) => noRoute(`/billing/invoices/${invoice_id}`),
 
-  /** GET /billing/payment-methods */
-  listPaymentMethods: () => api.get("/billing/payment-methods"),
+  /** No route found: GET /billing/payment-methods */
+  listPaymentMethods: () => noRoute("/billing/payment-methods"),
 
-  /** POST /billing/payment-methods */
+  /** No route found: POST /billing/payment-methods */
   addPaymentMethod: (body: { payment_method_id: string }) =>
-    api.post("/billing/payment-methods", body),
+    noRoute("/billing/payment-methods", body),
 
-  /** DELETE /billing/payment-methods/{pm_id} */
+  /** No route found: DELETE /billing/payment-methods/{pm_id} */
   deletePaymentMethod: (pm_id: string) =>
-    api.delete(`/billing/payment-methods/${pm_id}`),
+    noRoute(`/billing/payment-methods/${pm_id}`),
 
-  /** GET /subscriptions */
-  getSubscription: () => api.get("/subscriptions"),
+  /** GET /subscriptions/current */
+  getSubscription: () => api.get("/subscriptions/current"),
 
   /** POST /subscriptions/checkout */
   createCheckout: (body: { price_id: string; success_url: string; cancel_url: string }) =>
@@ -33,30 +33,37 @@ export const billingService = {
   createPortalSession: (body: { return_url: string }) =>
     api.post("/subscriptions/portal", body),
 
-  /** POST /subscriptions/cancel */
-  cancelSubscription: () => api.post("/subscriptions/cancel"),
+  /** No route found: POST /subscriptions/cancel */
+  cancelSubscription: () => noRoute("/subscriptions/cancel"),
 
   /** GET /subscriptions/plans */
   listPlans: () => api.get("/subscriptions/plans"),
 
-  /** GET /token-wallet */
-  getWallet: () => api.get("/token-wallet"),
+  /** GET /billing/wallet */
+  getWallet: () => api.get("/billing/wallet"),
 
-  /** GET /token-wallet/transactions */
+  /** GET /billing/transactions */
   getTransactions: (params?: { page?: number; limit?: number }) =>
-    api.get("/token-wallet/transactions", { params }),
+    api.get("/billing/transactions", { params }),
 
-  /** POST /token-wallet/topup */
+  /** POST /billing/topup */
   topUp: (body: { amount: number; payment_method_id?: string }) =>
-    api.post("/token-wallet/topup", body),
+    api.post("/billing/topup", body),
 
-  /** GET /cost/breakdown */
+  /** GET /billing/breakdown */
   getCostBreakdown: (params?: { from?: string; to?: string }) =>
-    api.get("/cost/breakdown", { params }),
+    api.get("/billing/breakdown", { params }),
 
-  /** GET /cost/estimate */
+  /** POST /cost/predict */
   estimateCost: (params: { model: string; tokens: number; provider?: string }) =>
-    api.get("/cost/estimate", { params }),
+    params.provider
+      ? api.post("/cost/predict", {
+          operation_type: "generation",
+          provider: params.provider,
+          model: params.model,
+          input_tokens: params.tokens,
+        })
+      : noRoute("/cost/predict requires provider"),
 
   /** GET /budget */
   getBudget: () => api.get("/budget"),
@@ -65,7 +72,7 @@ export const billingService = {
   setBudget: (body: { monthly_limit: number; alert_threshold?: number }) =>
     api.post("/budget", body),
 
-  /** PATCH /budget */
+  /** POST /budget */
   updateBudget: (body: { monthly_limit?: number; alert_threshold?: number }) =>
-    api.patch("/budget", body),
+    api.post("/budget", body),
 };

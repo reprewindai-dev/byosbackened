@@ -28,8 +28,8 @@ export type UploadedFile = {
 
 export function useJob(jobId: string | null) {
   return useQuery({
-    queryKey: ["job", jobId],
-    queryFn: async () => (await api.get<JobStatus>(`/job/${jobId}`)).data,
+    queryKey: ["jobs", jobId],
+    queryFn: async () => (await api.get<JobStatus>(`/jobs/${jobId}`)).data,
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
@@ -42,7 +42,21 @@ export function useJob(jobId: string | null) {
 export function useListJobs() {
   return useQuery({
     queryKey: ["jobs"],
-    queryFn: async () => (await api.get<JobStatus[]>("/job")).data,
+    queryFn: async () => {
+      const resp = await api.get<Array<{ id: string; job_type: string; status: string; output_data: string | null; error_message: string | null; created_at: string; updated_at: string; workspace_id?: string }>>("/job");
+      const rows = resp.data ?? [];
+      return rows.map((row) => ({
+        id: row.id,
+        type: row.job_type,
+        status: mapJobStatus(row.status),
+        progress_pct: row.status === "completed" ? 100 : row.status === "running" ? 50 : 0,
+        result_url: null,
+        error: row.error_message ?? null,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        workspace_id: row.workspace_id ?? "",
+      }));
+    },
     refetchInterval: 10_000,
   });
 }
@@ -50,9 +64,18 @@ export function useListJobs() {
 export function useCancelJob() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (jobId: string) => api.post(`/job/${jobId}/cancel`, {}),
+    mutationFn: async (jobId: string) => {
+      return api.post(`/job/${jobId}/cancel`);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
+}
+
+function mapJobStatus(status: string): JobStatus["status"] {
+  if (status === "pending") return "queued";
+  if (status === "running") return "running";
+  if (status === "completed") return "done";
+  return "failed";
 }
 
 export function useUploadFile() {

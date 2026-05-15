@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, AlertTriangle, RefreshCw, Route, Shield, ToggleLeft, ToggleRight, Zap } from "lucide-react";
+import { Activity, AlertTriangle, RefreshCw, Route, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { useCircuitBreakerStatus, useProviderRoutes, useResetCircuitBreaker, useUpdateProviderPriority } from "@/hooks/useRouting";
 import { cn } from "@/lib/cn";
 
@@ -38,7 +38,7 @@ export function RoutingPage() {
             ))}
           </div>
         ) : routesQ.isError ? (
-          <ErrorBanner message="Could not load provider routes. Backend /routing/providers may not be deployed yet." />
+          <ErrorBanner message="Could not load routing policy. Backend route is /routing/policy." />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {(routesQ.data ?? []).map((route) => (

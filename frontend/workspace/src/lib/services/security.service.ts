@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const securityService = {
   // ─── Security Suite ──────────────────────────────────────
@@ -6,93 +6,93 @@ export const securityService = {
   listThreats: (params?: { status?: string; severity?: string; page?: number }) =>
     api.get("/security/threats", { params }),
 
-  /** GET /security/threats/{threat_id} */
-  getThreat: (threat_id: string) => api.get(`/security/threats/${threat_id}`),
+  /** GET /security/events/{threat_id} */
+  getThreat: (threat_id: string) => api.get(`/security/events/${threat_id}`),
 
-  /** POST /security/threats/{threat_id}/resolve */
+  /** PUT /security/events/{threat_id}/resolve */
   resolveThreat: (threat_id: string, body?: { notes?: string }) =>
-    api.post(`/security/threats/${threat_id}/resolve`, body),
+    api.put(`/security/events/${threat_id}/resolve`, body),
 
-  /** GET /security/policies */
-  listPolicies: () => api.get("/security/policies"),
+  /** GET /security/zero-trust/policies */
+  listPolicies: () => api.get("/security/zero-trust/policies"),
 
-  /** POST /security/policies */
+  /** No route found: POST /security/zero-trust/policies */
   createPolicy: (body: Record<string, unknown>) =>
-    api.post("/security/policies", body),
+    noRoute("/security/zero-trust/policies", body),
 
-  /** PATCH /security/policies/{policy_id} */
+  /** No route found: PATCH /security/zero-trust/policies/{policy_id} */
   updatePolicy: (policy_id: string, body: Record<string, unknown>) =>
-    api.patch(`/security/policies/${policy_id}`, body),
+    noRoute(`/security/zero-trust/policies/${policy_id}`, body),
 
-  /** DELETE /security/policies/{policy_id} */
+  /** No route found: DELETE /security/zero-trust/policies/{policy_id} */
   deletePolicy: (policy_id: string) =>
-    api.delete(`/security/policies/${policy_id}`),
+    noRoute(`/security/zero-trust/policies/${policy_id}`),
 
-  /** GET /security/score */
-  getSecurityScore: () => api.get("/security/score"),
+  /** GET /security/stats */
+  getSecurityScore: () => api.get("/security/stats"),
 
-  /** GET /security/scan */
-  runScan: () => api.post("/security/scan"),
+  /** No route found: POST /security/scan */
+  runScan: () => noRoute("/security/scan"),
 
   // ─── Content Safety ──────────────────────────────────────
-  /** POST /content-safety/check */
+  /** POST /content-safety/test */
   checkContent: (body: { content: string; categories?: string[] }) =>
-    api.post("/content-safety/check", body),
+    api.post("/content-safety/test", body),
 
-  /** GET /content-safety/rules */
-  listSafetyRules: () => api.get("/content-safety/rules"),
+  /** No route found: GET /content-safety/rules */
+  listSafetyRules: () => noRoute("/content-safety/rules"),
 
-  /** POST /content-safety/rules */
+  /** No route found: POST /content-safety/rules */
   createSafetyRule: (body: Record<string, unknown>) =>
-    api.post("/content-safety/rules", body),
+    noRoute("/content-safety/rules", body),
 
-  /** PATCH /content-safety/rules/{rule_id} */
+  /** No route found: PATCH /content-safety/rules/{rule_id} */
   updateSafetyRule: (rule_id: string, body: Record<string, unknown>) =>
-    api.patch(`/content-safety/rules/${rule_id}`, body),
+    noRoute(`/content-safety/rules/${rule_id}`, body),
 
-  /** DELETE /content-safety/rules/{rule_id} */
+  /** No route found: DELETE /content-safety/rules/{rule_id} */
   deleteSafetyRule: (rule_id: string) =>
-    api.delete(`/content-safety/rules/${rule_id}`),
+    noRoute(`/content-safety/rules/${rule_id}`),
 
   // ─── Locker Security ─────────────────────────────────────
-  /** GET /locker/security/status */
-  getLockerStatus: () => api.get("/locker/security/status"),
+  /** GET /security/locker */
+  getLockerStatus: () => api.get("/security/locker"),
 
-  /** GET /locker/security/incidents */
+  /** GET /security/threats */
   listLockerIncidents: (params?: { from?: string; to?: string }) =>
-    api.get("/locker/security/incidents", { params }),
+    api.get("/security/threats", { params }),
 
-  /** POST /locker/security/lockdown */
+  /** No route found: POST /locker/security/lockdown */
   triggerLockdown: (body?: { reason?: string }) =>
-    api.post("/locker/security/lockdown", body),
+    noRoute("/locker/security/lockdown", body),
 
-  /** POST /locker/security/unlock */
-  releaseLockdown: () => api.post("/locker/security/unlock"),
+  /** No route found: POST /locker/security/unlock */
+  releaseLockdown: () => noRoute("/locker/security/unlock"),
 
   // ─── Compliance ──────────────────────────────────────────
-  /** GET /compliance/status */
-  getComplianceStatus: () => api.get("/compliance/status"),
+  /** No route found: GET /compliance/status */
+  getComplianceStatus: () => noRoute("/compliance/status"),
 
-  /** GET /compliance/reports */
-  listComplianceReports: () => api.get("/compliance/reports"),
+  /** No route found: GET /compliance/reports */
+  listComplianceReports: () => noRoute("/compliance/reports"),
 
-  /** POST /compliance/reports/generate */
+  /** POST /compliance/report */
   generateReport: (body: { type: string; from?: string; to?: string }) =>
-    api.post("/compliance/reports/generate", body),
+    api.post("/compliance/report", body),
 
   // ─── Privacy ─────────────────────────────────────────────
-  /** GET /privacy/settings */
-  getPrivacySettings: () => api.get("/privacy/settings"),
+  /** No route found: GET /privacy/settings */
+  getPrivacySettings: () => noRoute("/privacy/settings"),
 
-  /** PATCH /privacy/settings */
+  /** No route found: PATCH /privacy/settings */
   updatePrivacySettings: (body: Record<string, unknown>) =>
-    api.patch("/privacy/settings", body),
+    noRoute("/privacy/settings", body),
 
-  /** POST /privacy/data-request */
+  /** POST /privacy/export or POST /privacy/delete */
   submitDataRequest: (body: { type: "export" | "delete"; user_id?: string }) =>
-    api.post("/privacy/data-request", body),
+    api.post(body.type === "delete" ? "/privacy/delete" : "/privacy/export", body),
 
-  /** GET /privacy/data-requests */
+  /** No route found: GET /privacy/data-requests */
   listDataRequests: (params?: { status?: string }) =>
-    api.get("/privacy/data-requests", { params }),
+    noRoute("/privacy/data-requests", params),
 };

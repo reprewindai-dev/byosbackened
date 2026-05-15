@@ -16,9 +16,8 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // If already authenticated, redirect to login so the user gets the
-  // explicit escape hatch (continue / sign out & switch).
-  if (status === "authenticated") return <Navigate to="/login" replace />;
+  // If already authenticated, keep the canonical workspace hash root.
+  if (status === "authenticated") return <Navigate to="/" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,7 +35,7 @@ export function RegisterPage() {
         utm_source: params.get("utm_source") || undefined,
         utm_campaign: params.get("utm_campaign") || undefined,
       });
-      navigate("/overview", { replace: true });
+      navigate("/", { replace: true });
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
@@ -165,7 +164,7 @@ export function RegisterPage() {
 
           <div className="mt-4 text-center font-mono text-[11px] text-muted">
             Already have a workspace?{" "}
-            <Link to="/login" className="hover:text-bone">Sign in</Link>
+            <Link to="/" className="hover:text-bone">Sign in</Link>
           </div>
         </form>
 

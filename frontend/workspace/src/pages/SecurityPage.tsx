@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck, XCircle, Zap } from "lucide-react";
+import { CheckCircle, ShieldAlert, ShieldCheck, XCircle, Zap } from "lucide-react";
 import { useActivateKillSwitch, useDeactivateKillSwitch, useKillSwitchState, useResolveThreat, useThreatEvents, useZeroTrustStatus } from "@/hooks/useSecuritySuite";
 import { cn } from "@/lib/cn";
 

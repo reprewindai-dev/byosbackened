@@ -3,10 +3,11 @@ import json
 import logging
 from contextlib import asynccontextmanager
 import os
+from pathlib import Path
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from core.config import get_settings
 from core.auth import get_current_workspace
@@ -73,6 +74,7 @@ from apps.api.routers.marketplace_automation import router as marketplace_automa
 from apps.api.routers.platform_pulse import router as platform_pulse_router
 from apps.api.routers.internal_operators import router as internal_operators_router
 from apps.api.routers.internal_uacp import router as internal_uacp_router
+from apps.api.routers.source_of_truth_bridge import router as source_of_truth_bridge_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
@@ -204,6 +206,7 @@ app.include_router(admin_router, prefix=settings.api_prefix)
 app.include_router(subscriptions_router, prefix=settings.api_prefix)
 app.include_router(content_safety_router, prefix=settings.api_prefix)
 app.include_router(kill_switch_router, prefix=settings.api_prefix)
+app.include_router(source_of_truth_bridge_router, prefix=settings.api_prefix)
 
 # LockerPhycer Security Routers (now fully integrated into BYOS)
 app.include_router(locker_security_router, prefix=settings.api_prefix)
@@ -305,8 +308,119 @@ async def protected_openapi(request: Request, workspace_id: str = Depends(get_cu
     )
 
 
+# Workspace SPA (React) - serve the Veklom Sovereign Control Node without
+# shadowing the public landing page or any /api/v1 backend route.
+landing_dir_path = Path(__file__).resolve().parents[2] / "landing"
+workspace_app = landing_dir_path / "workspace-app.html"
+workspace_assets = landing_dir_path / "workspace-assets"
+
+_ROOT_WORKSPACE_REDIRECTS = {
+    "/overview": "/login/#/",
+    "/playground": "/login/#/playground",
+    "/marketplace": "/login/#/marketplace",
+    "/models": "/login/#/models",
+    "/pipelines": "/login/#/pipelines",
+    "/deployments": "/login/#/deployments",
+    "/vault": "/login/#/vault",
+    "/compliance": "/login/#/compliance",
+    "/monitoring": "/login/#/monitoring",
+    "/billing": "/login/#/billing",
+    "/team": "/login/#/team",
+    "/setting": "/login/#/settings",
+    "/settings": "/login/#/settings",
+    "/dashboard": "/login/#/",
+    "/control-center": "/login/#/",
+    "/competitive": "/login/#/competitive",
+    "/advantage": "/login/#/competitive",
+    "/routing": "/login/#/routing",
+    "/budget": "/login/#/budget",
+    "/security": "/login/#/security",
+    "/privacy": "/login/#/privacy",
+    "/content-safety": "/login/#/content-safety",
+    "/insights": "/login/#/insights",
+    "/plugins": "/login/#/plugins",
+    "/jobs": "/login/#/jobs",
+    "/onboarding": "/login/#/onboarding",
+    "/uacp": "/login/#/gpc",
+    "/gpc": "/login/#/gpc",
+}
+
+_WORKSPACE_ROUTES = (
+    "/login",
+    "/register",
+    "/accept-invite",
+)
+
+if workspace_assets.is_dir():
+    app.mount(
+        "/workspace-assets",
+        StaticFiles(directory=str(workspace_assets)),
+        name="workspace-assets",
+    )
+
+
+@app.get("/workspace-config.js", include_in_schema=False)
+async def workspace_config():
+    config_path = landing_dir_path / "workspace-config.js"
+    fallback_path = landing_dir_path / "config.js"
+    if config_path.exists():
+        return FileResponse(
+            str(config_path),
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    if fallback_path.exists():
+        return FileResponse(
+            str(fallback_path),
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    return Response(
+        content=(
+            'window.__VEKLOM_API_BASE__="https://api.veklom.com/api/v1";'
+            'window.__UACP_BACKEND_BASE_URL__="https://api.veklom.com/api/v1";'
+            'window.__VEKLOM_ENV__="production";'
+            'window.__VEKLOM_STRIPE_PK__="";'
+        ),
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+async def _serve_workspace_spa(request: Request) -> FileResponse:
+    if workspace_app.exists():
+        return FileResponse(str(workspace_app), media_type="text/html")
+    raise HTTPException(status_code=404, detail="Workspace SPA not built")
+
+
+async def _redirect_root_workspace_route(request: Request) -> RedirectResponse:
+    target = _ROOT_WORKSPACE_REDIRECTS.get(request.url.path.rstrip("/") or request.url.path)
+    if not target:
+        target = "/login/#/"
+    return RedirectResponse(url=target, status_code=302)
+
+
+async def _serve_github_callback(request: Request) -> FileResponse:
+    callback_path = landing_dir_path / "auth" / "github" / "callback" / "index.html"
+    if callback_path.exists():
+        return FileResponse(str(callback_path), media_type="text/html")
+    return await _serve_workspace_spa(request)
+
+
+for _path in _ROOT_WORKSPACE_REDIRECTS:
+    app.add_api_route(_path, _redirect_root_workspace_route, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"{_path}/", _redirect_root_workspace_route, methods=["GET"], include_in_schema=False)
+
+app.add_api_route("/auth/github/callback", _serve_github_callback, methods=["GET"], include_in_schema=False)
+app.add_api_route("/auth/github/callback/", _serve_github_callback, methods=["GET"], include_in_schema=False)
+
+for _prefix in _WORKSPACE_ROUTES:
+    app.add_api_route(_prefix, _serve_workspace_spa, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"{_prefix}/{{_sub:path}}", _serve_workspace_spa, methods=["GET"], include_in_schema=False)
+
+
 # Serve landing + self-serve UI assets from backend/landing.
-# Mounted last so API and health routes stay authoritative.
-landing_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "landing"))
+# Mounted last so API, health, and workspace routes stay authoritative.
+landing_dir = str(landing_dir_path)
 if os.path.isdir(landing_dir):
     app.mount("/", StaticFiles(directory=landing_dir, html=True), name="landing")

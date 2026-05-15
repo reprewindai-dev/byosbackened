@@ -8,7 +8,7 @@
 //
 // After a run completes, call recordOutcome() to close the learning loop —
 // this posts actual observed latency, token count, and a quality flag back
-// to /autonomous/quality/outcome so the ML models improve over time.
+// to /autonomous/routing/update so the ML routing model improves over time.
 //
 // Usage:
 //   const { preflight, runPreflight, recordOutcome } = usePreflightCheck();
@@ -136,26 +136,26 @@ export function usePreflightCheck() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // recordOutcome — closes the ML learning loop.
+  // recordOutcome — closes the autonomous routing learning loop.
   // Call this after every run completes (success or failure).
   // Best-effort: errors are swallowed so they never block the UI.
   // ---------------------------------------------------------------------------
   const recordOutcome = useCallback(async (input: OutcomeInput) => {
     try {
       await api.post(
-        "/autonomous/quality/outcome",
+        "/autonomous/routing/update",
+        null,
         {
-          operation_type: "generation",
-          provider: input.provider,
-          model: input.modelId,
-          input_text: input.prompt.slice(0, 2000),
-          actual_latency_ms: input.actualLatencyMs,
-          actual_tokens: input.actualTokens,
-          success: input.success,
-          cost_usd: input.costUsd,
-          billing_event_type: input.billingEventType,
+          params: {
+            operation_type: "generation",
+            provider: input.provider,
+            actual_cost: input.costUsd ? Number(input.costUsd) : 0,
+            actual_quality: input.success ? 1 : 0,
+            actual_latency_ms: input.actualLatencyMs,
+            baseline_cost: input.costUsd ? Number(input.costUsd) : 0,
+          },
+          timeout: 10_000,
         },
-        { timeout: 10_000 },
       );
     } catch {
       // Best-effort — never surface outcome recording errors to the user.

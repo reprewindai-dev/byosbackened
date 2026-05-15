@@ -19,7 +19,7 @@ export function AcceptInvitePage() {
         password,
         full_name: fullName.trim() || undefined,
       }),
-    onSuccess: () => navigate("/overview", { replace: true }),
+    onSuccess: () => navigate("/", { replace: true }),
   });
 
   const missingInvite = !inviteSecret;
@@ -119,7 +119,7 @@ export function AcceptInvitePage() {
 
         <div className="mt-5 border-t border-rule pt-4 text-center text-xs text-muted">
           Already have access?{" "}
-          <Link className="text-brass-2 hover:underline" to="/login">
+          <Link className="text-brass-2 hover:underline" to="/">
             Sign in
           </Link>
         </div>

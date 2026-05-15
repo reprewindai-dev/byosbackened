@@ -20,7 +20,7 @@
  *   - Deployment test preview
  */
 import { useState, useCallback } from "react";
-import { costIntelligenceService, type CostPredictRequest } from "@/lib/services/cost-intelligence.service";
+import { costIntelligenceService } from "@/lib/services/cost-intelligence.service";
 import { autonomousService } from "@/lib/services/autonomous.service";
 
 export interface PreflightInput {

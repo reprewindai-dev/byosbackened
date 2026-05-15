@@ -10,8 +10,8 @@ This directory is the Cloudflare Pages production deploy directory for `veklom.c
 
 The accepted black/orange Veklom workspace loads from:
 
-- `workspace-assets/index-EUKZeqk4.js`
-- `workspace-assets/index-WqgIFi2m.css`
+- `workspace-assets/index-CS55LKkt.js`
+- `workspace-assets/index-C-K5tu-A.css`
 
 The route shell is:
 
@@ -21,20 +21,25 @@ All workspace routes under this directory must load those two exact assets.
 
 ## Workspace routes
 
-- `/overview/`
-- `/playground/`
-- `/marketplace/`
-- `/models/`
-- `/pipelines/`
-- `/deployments/`
-- `/vault/`
-- `/compliance/`
-- `/monitoring/`
-- `/billing/`
-- `/team/`
-- `/settings/`
+The deployed workspace app is one artifact under `/login/`.
 
-`/monitoring/` is the canonical verification route and must show `Real-time observability`.
+- `/login/#/`
+- `/login/#/playground`
+- `/login/#/marketplace`
+- `/login/#/models`
+- `/login/#/pipelines`
+- `/login/#/deployments`
+- `/login/#/vault`
+- `/login/#/compliance`
+- `/login/#/monitoring`
+- `/login/#/billing`
+- `/login/#/team`
+- `/login/#/settings`
+- `/login/#/gpc`
+
+Root clean paths redirect to the matching `/login/#/...` route and must not
+serve separate workspace artifacts. `/login/#/monitoring` is the canonical
+verification route and must show `Real-time observability`.
 
 ## Rejected files / states
 

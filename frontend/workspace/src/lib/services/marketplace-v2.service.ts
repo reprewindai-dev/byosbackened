@@ -10,7 +10,7 @@
  * Marketplace is NOT a list of external links.
  * It is where Veklom's advantages become buyable.
  */
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export interface MarketplaceListing {
   id: string;
@@ -112,11 +112,10 @@ export const marketplaceV2Service = {
     api.post(`/marketplace/listings/${listing_id}/install`),
 
   /**
-   * DELETE /api/v1/marketplace/listings/{listing_id}/install
-   * Uninstall from workspace.
+   * No route found: DELETE /api/v1/marketplace/listings/{listing_id}/install
    */
   uninstall: (listing_id: string) =>
-    api.delete(`/marketplace/listings/${listing_id}/install`),
+    noRoute(`/marketplace/listings/${listing_id}/install`),
 
   // ─── Publishing pipeline ──────────────────────────────────────────────────
 
@@ -150,7 +149,7 @@ export const marketplaceV2Service = {
     api.post("/marketplace/listings/from-plugin", body),
 
   /**
-   * POST /api/v1/marketplace/listings
+   * POST /api/v1/marketplace/listings/create
    * Create listing manually.
    */
   createListing: (body: Record<string, unknown>) =>
@@ -163,30 +162,30 @@ export const marketplaceV2Service = {
     api.patch(`/marketplace/listings/${listing_id}`, body),
 
   /**
-   * POST /api/v1/marketplace/listings/{listing_id}/publish
+   * No route found: POST /api/v1/marketplace/listings/{listing_id}/publish
    */
   publishListing: (listing_id: string) =>
-    api.post(`/marketplace/listings/${listing_id}/publish`),
+    noRoute(`/marketplace/listings/${listing_id}/publish`),
 
   /**
-   * DELETE /api/v1/marketplace/listings/{listing_id}
+   * No route found: DELETE /api/v1/marketplace/listings/{listing_id}
    */
   deleteListing: (listing_id: string) =>
-    api.delete(`/marketplace/listings/${listing_id}`),
+    noRoute(`/marketplace/listings/${listing_id}`),
 
   // ─── Reviews ──────────────────────────────────────────────────────────────
 
   listReviews: (listing_id: string) =>
-    api.get(`/marketplace/listings/${listing_id}/reviews`),
+    noRoute(`/marketplace/listings/${listing_id}/reviews`),
 
   createReview: (listing_id: string, body: { rating: number; comment?: string }) =>
-    api.post(`/marketplace/listings/${listing_id}/reviews`, body),
+    noRoute(`/marketplace/listings/${listing_id}/reviews`, body),
 
   // ─── Purchases ────────────────────────────────────────────────────────────
 
   purchase: (body: { listing_id: string; payment_method_id?: string }) =>
-    api.post("/marketplace/purchase", body),
+    api.post("/marketplace/checkout", { listing_id: body.listing_id }),
 
   listPurchases: (params?: { page?: number; limit?: number }) =>
-    api.get("/marketplace/purchases", { params }),
+    api.get("/marketplace/orders", { params }),
 };

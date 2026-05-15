@@ -1,6 +1,7 @@
 """Job router."""
 import json
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,6 +11,51 @@ from apps.api.schemas.job import JobResponse
 from db.models import Job, JobStatus, SecurityAuditLog
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.get("", response_model=list[JobResponse])
+async def list_jobs(
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    workspace_id: str = Depends(get_current_workspace_id),
+    db: Session = Depends(get_db),
+):
+    """List jobs for the active workspace."""
+    query = db.query(Job).filter(Job.workspace_id == workspace_id)
+
+    if status:
+        normalized_status = status.lower()
+        query = query.filter(Job.status == normalized_status)
+
+    if page < 1:
+        page = 1
+    if limit < 1:
+        limit = 50
+
+    offset = (page - 1) * limit
+
+    rows = (
+        query.order_by(Job.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return [
+        JobResponse(
+            id=job.id,
+            job_type=job.job_type,
+            status=job.status,
+            input_data=job.input_data,
+            output_data=job.output_data,
+            error_message=job.error_message,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+            started_at=job.started_at,
+            completed_at=job.completed_at,
+        )
+        for job in rows
+    ]
 
 
 @router.post("/process")
@@ -85,6 +131,48 @@ async def get_job(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found",
         )
+    return JobResponse(
+        id=job.id,
+        job_type=job.job_type,
+        status=job.status,
+        input_data=job.input_data,
+        output_data=job.output_data,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+
+
+@router.post("/{job_id}/cancel", response_model=JobResponse)
+async def cancel_job(
+    job_id: str,
+    workspace_id: str = Depends(get_current_workspace_id),
+    db: Session = Depends(get_db),
+):
+    """Cancel a job for the active workspace."""
+    job = db.query(Job).filter(Job.id == job_id, Job.workspace_id == workspace_id).first()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
+
+    if job.status in {JobStatus.COMPLETED}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Completed jobs cannot be canceled",
+        )
+
+    job.status = JobStatus.FAILED
+    job.error_message = "Canceled by user request"
+    job.completed_at = datetime.utcnow()
+    job.updated_at = datetime.utcnow()
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
     return JobResponse(
         id=job.id,
         job_type=job.job_type,

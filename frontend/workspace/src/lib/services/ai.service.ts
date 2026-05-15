@@ -1,7 +1,7 @@
-import { api, sseUrl } from "@/lib/api";
+import { api, apiRoot, noRoute } from "@/lib/api";
 
 export const aiService = {
-  /** POST /ai/chat */
+  /** No route found: POST /ai/chat */
   chat: (body: {
     messages: { role: string; content: string }[];
     model?: string;
@@ -10,39 +10,59 @@ export const aiService = {
     workspace_id?: string;
     temperature?: number;
     max_tokens?: number;
-  }) => api.post("/ai/chat", body),
+  }) => noRoute("/ai/chat", body),
 
-  /** SSE /ai/chat/stream - returns a URL for EventSource */
+  /** No route found: SSE /ai/chat/stream */
   chatStreamUrl: (params?: Record<string, string | number | boolean>) =>
-    sseUrl("/ai/chat/stream", params),
+    (() => {
+      void params;
+      throw new Error("No route found: /ai/chat/stream");
+    })(),
 
   /** POST /ai/complete */
   complete: (body: { prompt: string; model?: string; provider?: string }) =>
     api.post("/ai/complete", body),
 
-  /** POST /ai/embed */
+  /** POST /ai/exec */
+  exec: (body: { prompt: string; model?: string; provider?: string; stream?: boolean; workspace_id?: string }) =>
+    api.post("/ai/exec", body),
+
+  /** POST /v1/exec */
+  execV1: (body: { prompt: string; model?: string; provider?: string; stream?: boolean; workspace_id?: string }) =>
+    apiRoot.post("/v1/exec", body),
+
+  /** No route found: POST /ai/embed */
   embed: (body: { input: string | string[]; model?: string; provider?: string }) =>
-    api.post("/ai/embed", body),
+    noRoute("/ai/embed", body),
 
-  /** GET /ai/models */
+  /** GET /workspace/models */
   listModels: (params?: { provider?: string }) =>
-    api.get("/ai/models", { params }),
+    api.get("/workspace/models", { params }),
 
-  /** GET /ai/providers */
-  listProviders: () => api.get("/ai/providers"),
+  /** GET /routing/providers */
+  listProviders: () => api.get("/routing/providers"),
 
-  /** POST /ai/route */
-  routeRequest: (body: Record<string, unknown>) => api.post("/ai/route", body),
+  /** POST /routing/test */
+  routeRequest: (body: Record<string, unknown>) => api.post("/routing/test", body),
 
-  /** POST /ai/summarize */
+  /** GET /ai/conversation/{id} */
+  getConversation: (id: string) => noRoute(`/ai/conversation/${id}`),
+
+  /** POST /ai/conversation/{id} */
+  deleteConversation: (id: string) => noRoute(`/ai/conversation/${id}`),
+
+  /** POST /ai/stream */
+  stream: (body: Record<string, unknown>) => noRoute("/ai/stream", body),
+
+  /** No route found: POST /ai/summarize */
   summarize: (body: { text: string; max_length?: number; model?: string }) =>
-    api.post("/ai/summarize", body),
+    noRoute("/ai/summarize", body),
 
-  /** POST /ai/classify */
+  /** No route found: POST /ai/classify */
   classify: (body: { text: string; labels: string[]; model?: string }) =>
-    api.post("/ai/classify", body),
+    noRoute("/ai/classify", body),
 
-  /** POST /ai/translate */
+  /** No route found: POST /ai/translate */
   translate: (body: { text: string; target_language: string; source_language?: string }) =>
-    api.post("/ai/translate", body),
+    noRoute("/ai/translate", body),
 };

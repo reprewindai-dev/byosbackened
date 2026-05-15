@@ -1,11 +1,11 @@
-import { api } from "@/lib/api";
+import { api, apiRoot, noRoute } from "@/lib/api";
 
 export const workspaceService = {
-  /** GET /workspace */
+  /** GET /workspace/ */
   get: () => api.get("/workspace"),
 
-  /** PATCH /workspace */
-  update: (body: Record<string, unknown>) => api.patch("/workspace", body),
+  /** PATCH /workspace/profile */
+  update: (body: Record<string, unknown>) => api.patch("/workspace/profile", body),
 
   /** GET /workspace/members */
   listMembers: () => api.get("/workspace/members"),
@@ -17,41 +17,41 @@ export const workspaceService = {
   /** DELETE /workspace/members/{user_id} */
   removeMember: (user_id: string) => api.delete(`/workspace/members/${user_id}`),
 
-  /** PATCH /workspace/members/{user_id}/role */
+  /** No route found: PATCH /workspace/members/{user_id}/role */
   updateMemberRole: (user_id: string, role: string) =>
-    api.patch(`/workspace/members/${user_id}/role`, { role }),
+    noRoute(`/workspace/members/${user_id}/role`, role),
 
   /** GET /workspace/usage */
   getUsage: () => api.get("/workspace/usage"),
 
-  /** GET /workspace/settings */
-  getSettings: () => api.get("/workspace/settings"),
+  /** GET /workspace/overview */
+  getSettings: () => api.get("/workspace/overview"),
 
-  /** PATCH /workspace/settings */
-  updateSettings: (body: Record<string, unknown>) => api.patch("/workspace/settings", body),
+  /** PATCH /workspace/profile */
+  updateSettings: (body: Record<string, unknown>) => api.patch("/workspace/profile", body),
 
-  /** GET /workspace/providers */
-  listProviders: () => api.get("/workspace/providers"),
+  /** GET /routing/providers (source-of-truth bridge) */
+  listProviders: () => api.get("/routing/providers"),
 
-  /** POST /workspace/providers */
-  addProvider: (body: Record<string, unknown>) => api.post("/workspace/providers", body),
+  /** No route found: POST /workspace/providers */
+  addProvider: (body: Record<string, unknown>) => noRoute("/workspace/providers", body),
 
-  /** PATCH /workspace/providers/{provider_id} */
+  /** No route found: PATCH /workspace/providers/{provider_id} */
   updateProvider: (provider_id: string, body: Record<string, unknown>) =>
-    api.patch(`/workspace/providers/${provider_id}`, body),
+    noRoute(`/workspace/providers/${provider_id}`, body),
 
-  /** DELETE /workspace/providers/{provider_id} */
+  /** No route found: DELETE /workspace/providers/{provider_id} */
   deleteProvider: (provider_id: string) =>
-    api.delete(`/workspace/providers/${provider_id}`),
+    noRoute(`/workspace/providers/${provider_id}`),
 
-  /** POST /workspace/providers/{provider_id}/test */
+  /** POST /routing/test */
   testProvider: (provider_id: string) =>
-    api.post(`/workspace/providers/${provider_id}/test`),
+    api.post("/routing/test", { provider_id }),
 
-  /** GET /workspace/locker */
-  getLockerConfig: () => api.get("/workspace/locker"),
+  /** GET /security/locker */
+  getLockerConfig: () => api.get("/security/locker"),
 
-  /** GET /workspace/status (public, no prefix) */
+  /** GET /status/data (public, no /api/v1 prefix) */
   publicStatus: (workspace_slug: string) =>
-    api.get(`/public/workspace/${workspace_slug}/status`),
+    apiRoot.get("/status/data", { params: { workspace_slug } }),
 };

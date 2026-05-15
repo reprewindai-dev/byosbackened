@@ -1,12 +1,7 @@
 // Veklom self-serve auth client.
 // Stores access + refresh tokens in localStorage, exposes a small API.
-const _hostname = window.location.hostname;
 if (!window.VEKLOM_API) {
-  if (_hostname.endsWith(".veklom.dev")) {
-    window.VEKLOM_API = "https://api.veklom.dev/api/v1";
-  } else {
-    window.VEKLOM_API = "https://api.veklom.com/api/v1";
-  }
+  window.VEKLOM_API = "https://api.veklom.com/api/v1";
 }
 
 const VK = {
@@ -141,6 +136,18 @@ const VK = {
       "/auth/github/callback?code=" + encodeURIComponent(code) + "&state=" + encodeURIComponent(state),
       { method: "POST" }
     );
+    if (t && t.mfa_required) {
+      return t;
+    }
+    this.saveTokens(t);
+    return t;
+  },
+
+  async finishGithubMfa({ challenge_token, mfa_code }) {
+    const t = await this.request("/auth/github/mfa/complete", {
+      method: "POST",
+      body: JSON.stringify({ challenge_token, mfa_code })
+    });
     this.saveTokens(t);
     return t;
   },
@@ -308,8 +315,8 @@ const VK = {
       body: JSON.stringify({
         plan,
         billing_cycle,
-        success_url: success_url || (window.location.origin + "/dashboard/?checkout=success"),
-        cancel_url: cancel_url || (window.location.origin + "/dashboard/?checkout=cancel")
+        success_url: success_url || (window.location.origin + "/login/#/?checkout=success"),
+        cancel_url: cancel_url || (window.location.origin + "/login/#/billing?checkout=cancel")
       })
     });
   },

@@ -147,7 +147,7 @@ def _serialize_run(r: PipelineRun) -> dict:
     }
 
 
-def _debit_pipeline_test_reserve(db: Session, workspace_id: str, run_id: str) -> tuple[str, int, str, int | None]:
+def _debit_pipeline_test_reserve(db: Session, workspace_id: str, pipeline_id: str, run_id: str) -> tuple[str, int, str, int | None]:
     pricing_tier = _pricing_tier(db, workspace_id)
     billing_event_type = "pipeline_test"
     reserve_units_debited = _reserve_units_for_event(billing_event_type, pricing_tier)
@@ -170,7 +170,7 @@ def _debit_pipeline_test_reserve(db: Session, workspace_id: str, run_id: str) ->
         amount=-reserve_units_debited,
         balance_before=balance_before,
         balance_after=balance_after,
-        endpoint_path="/api/v1/pipelines/execute",
+        endpoint_path=f"/api/v1/pipelines/{pipeline_id}/execute",
         endpoint_method="POST",
         request_id=run_id,
         description=f"Pipeline Test ({pricing_tier})",
@@ -178,6 +178,7 @@ def _debit_pipeline_test_reserve(db: Session, workspace_id: str, run_id: str) ->
             {
                 "billing_event_type": billing_event_type,
                 "pricing_tier": pricing_tier,
+                "pipeline_id": pipeline_id,
                 "pipeline_run_id": run_id,
                 "reserve_units_debited": reserve_units_debited,
                 "reserve_units_per_usd": int(RESERVE_UNITS_PER_USD),
@@ -456,6 +457,7 @@ async def execute_pipeline(
     billing_event_type, reserve_units_debited, reserve_cost_usd, free_evaluation_remaining = _debit_pipeline_test_reserve(
         db,
         current_user.workspace_id,
+        p.id,
         run_id,
     )
 

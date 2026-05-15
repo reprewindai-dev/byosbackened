@@ -9,7 +9,7 @@
  *   Call predictCost() BEFORE every run in Playground, Marketplace preflight,
  *   Pipeline preview, Deployment test. Never after. Never hardcode prices in UI.
  */
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export interface CostPredictRequest {
   operation_type: "generation" | "embedding" | "classification" | "transcription" | string;
@@ -73,18 +73,25 @@ export const costIntelligenceService = {
     api.get<CostHistoryEntry[]>("/cost/history", { params }),
 
   /**
-   * GET /api/v1/cost/breakdown
+   * GET /api/v1/billing/breakdown
    * Powers Billing overview and cost allocation panels.
    */
   getBreakdown: (params?: { from?: string; to?: string; provider?: string }) =>
-    api.get<CostBreakdown>("/cost/breakdown", { params }),
+    api.get<CostBreakdown>("/billing/breakdown", { params }),
 
   /**
-   * GET /api/v1/cost/estimate
+   * POST /api/v1/cost/predict
    * Quick estimate by model/token count without full prediction pipeline.
    */
   getEstimate: (params: { model: string; tokens: number; provider?: string }) =>
-    api.get("/cost/estimate", { params }),
+    params.provider
+      ? api.post("/cost/predict", {
+          operation_type: "generation",
+          provider: params.provider,
+          model: params.model,
+          input_tokens: params.tokens,
+        })
+      : noRoute("/cost/predict requires provider"),
 
   /**
    * GET /api/v1/budget
@@ -99,8 +106,8 @@ export const costIntelligenceService = {
     api.post("/budget", body),
 
   /**
-   * PATCH /api/v1/budget
+   * POST /api/v1/budget
    */
   updateBudget: (body: { monthly_limit?: number; alert_threshold?: number }) =>
-    api.patch("/budget", body),
+    api.post("/budget", body),
 };

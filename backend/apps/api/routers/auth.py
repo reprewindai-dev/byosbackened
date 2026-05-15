@@ -1124,6 +1124,7 @@ async def github_login():
     return {"auth_url": url, "state": state}
 
 
+@router.get("/github/callback")
 @router.post("/github/callback")
 async def github_callback(
     request: Request,

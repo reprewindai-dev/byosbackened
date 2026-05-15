@@ -1,4 +1,4 @@
-import { api, sseUrl } from "@/lib/api";
+import { api, noRoute, sseUrl } from "@/lib/api";
 
 export const pipelinesService = {
   // ─── Pipelines ───────────────────────────────────────────
@@ -23,20 +23,34 @@ export const pipelinesService = {
   run: (pipeline_id: string, body?: Record<string, unknown>) =>
     api.post(`/pipelines/${pipeline_id}/run`, body),
 
-  /** POST /pipelines/{pipeline_id}/stop */
-  stop: (pipeline_id: string) => api.post(`/pipelines/${pipeline_id}/stop`),
+  /** POST /pipelines/{pipeline_id}/execute */
+  execute: (pipeline_id: string, body?: Record<string, unknown>) =>
+    api.post(`/pipelines/${pipeline_id}/execute`, body),
+
+  /** No route found: POST /pipelines/{pipeline_id}/stop */
+  stop: (pipeline_id: string) => noRoute(`/pipelines/${pipeline_id}/stop`),
+
+  /** GET /pipelines/runs/recent */
+  recentRuns: (params?: { limit?: number }) => api.get("/pipelines/runs/recent", { params }),
 
   /** GET /pipelines/{pipeline_id}/runs */
   listRuns: (pipeline_id: string, params?: { page?: number; limit?: number }) =>
     api.get(`/pipelines/${pipeline_id}/runs`, { params }),
 
-  /** GET /pipelines/{pipeline_id}/runs/{run_id} */
-  getRun: (pipeline_id: string, run_id: string) =>
-    api.get(`/pipelines/${pipeline_id}/runs/${run_id}`),
+  /** GET /pipelines/{pipeline_id}/versions */
+  listVersions: (pipeline_id: string) => api.get(`/pipelines/${pipeline_id}/versions`),
 
-  /** SSE /pipelines/{pipeline_id}/runs/{run_id}/stream */
+  /** POST /pipelines/{pipeline_id}/versions */
+  createVersion: (pipeline_id: string, body: Record<string, unknown>) =>
+    api.post(`/pipelines/${pipeline_id}/versions`, body),
+
+  /** No route found: GET /pipelines/{pipeline_id}/runs/{run_id} */
+  getRun: (pipeline_id: string, run_id: string) =>
+    noRoute(`/pipelines/${pipeline_id}/runs/${run_id}`),
+
+  /** No route found: SSE /pipelines/{pipeline_id}/runs/{run_id}/stream */
   runStreamUrl: (pipeline_id: string, run_id: string) =>
-    sseUrl(`/pipelines/${pipeline_id}/runs/${run_id}/stream`),
+    noRoute(`/pipelines/${pipeline_id}/runs/${run_id}/stream`),
 
   // ─── Deployments ─────────────────────────────────────────
   /** GET /deployments */
@@ -59,28 +73,40 @@ export const pipelinesService = {
   deleteDeployment: (deployment_id: string) =>
     api.delete(`/deployments/${deployment_id}`),
 
-  /** POST /deployments/{deployment_id}/scale */
+  /** POST /deployments/{deployment_id}/promote */
+  promoteDeployment: (deployment_id: string, body?: { target_traffic_percent?: number }) =>
+    api.post(`/deployments/${deployment_id}/promote`, body),
+
+  /** POST /deployments/{deployment_id}/rollback */
+  rollbackDeployment: (deployment_id: string, body?: Record<string, unknown>) =>
+    api.post(`/deployments/${deployment_id}/rollback`, body),
+
+  /** POST /deployments/{deployment_id}/test */
+  testDeployment: (deployment_id: string, body: Record<string, unknown>) =>
+    api.post(`/deployments/${deployment_id}/test`, body),
+
+  /** No route found: POST /deployments/{deployment_id}/scale */
   scaleDeployment: (deployment_id: string, body: { replicas: number }) =>
-    api.post(`/deployments/${deployment_id}/scale`, body),
+    noRoute(`/deployments/${deployment_id}/scale`, body),
 
-  /** POST /deployments/{deployment_id}/restart */
+  /** No route found: POST /deployments/{deployment_id}/restart */
   restartDeployment: (deployment_id: string) =>
-    api.post(`/deployments/${deployment_id}/restart`),
+    noRoute(`/deployments/${deployment_id}/restart`),
 
-  /** GET /deployments/{deployment_id}/logs */
+  /** No route found: GET /deployments/{deployment_id}/logs */
   getDeploymentLogs: (deployment_id: string, params?: { from?: string; limit?: number }) =>
-    api.get(`/deployments/${deployment_id}/logs`, { params }),
+    noRoute(`/deployments/${deployment_id}/logs`, params),
 
   // ─── Jobs ────────────────────────────────────────────────
-  /** GET /jobs */
+  /** GET /job */
   listJobs: (params?: { status?: string; page?: number; limit?: number }) =>
-    api.get("/jobs", { params }),
+    api.get("/job", { params }),
 
-  /** GET /jobs/{job_id} */
-  getJob: (job_id: string) => api.get(`/jobs/${job_id}`),
+  /** GET /job/{job_id} */
+  getJob: (job_id: string) => api.get(`/job/${job_id}`),
 
-  /** DELETE /jobs/{job_id} */
-  cancelJob: (job_id: string) => api.delete(`/jobs/${job_id}`),
+  /** POST /job/{job_id}/cancel */
+  cancelJob: (job_id: string) => api.post(`/job/${job_id}/cancel`),
 
   // ─── Demo Pipeline ───────────────────────────────────────
   /** SSE /demo/pipeline/stream - public, no auth */

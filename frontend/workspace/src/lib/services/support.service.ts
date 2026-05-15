@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const supportService = {
   // ─── Support Bot ─────────────────────────────────────────
@@ -6,52 +6,55 @@ export const supportService = {
   chat: (body: { message: string; session_id?: string; context?: Record<string, unknown> }) =>
     api.post("/support/chat", body),
 
-  /** GET /support/sessions */
+  /** No route found: GET /support/sessions */
   listSessions: (params?: { page?: number; limit?: number }) =>
-    api.get("/support/sessions", { params }),
+    noRoute("/support/sessions", params),
 
-  /** GET /support/sessions/{session_id} */
+  /** No route found: GET /support/sessions/{session_id} */
   getSession: (session_id: string) =>
-    api.get(`/support/sessions/${session_id}`),
+    noRoute(`/support/sessions/${session_id}`),
 
-  /** POST /support/sessions/{session_id}/close */
+  /** No route found: POST /support/sessions/{session_id}/close */
   closeSession: (session_id: string) =>
-    api.post(`/support/sessions/${session_id}/close`),
+    noRoute(`/support/sessions/${session_id}/close`),
 
-  /** POST /support/tickets */
+  /** No route found: POST /support/tickets */
   createTicket: (body: { subject: string; description: string; priority?: "low" | "medium" | "high" }) =>
-    api.post("/support/tickets", body),
+    noRoute("/support/tickets", body),
 
-  /** GET /support/tickets */
+  /** No route found: GET /support/tickets */
   listTickets: (params?: { status?: string; page?: number; limit?: number }) =>
-    api.get("/support/tickets", { params }),
+    noRoute("/support/tickets", params),
 
-  /** GET /support/tickets/{ticket_id} */
+  /** No route found: GET /support/tickets/{ticket_id} */
   getTicket: (ticket_id: string) =>
-    api.get(`/support/tickets/${ticket_id}`),
+    noRoute(`/support/tickets/${ticket_id}`),
 
-  /** PATCH /support/tickets/{ticket_id} */
+  /** No route found: PATCH /support/tickets/{ticket_id} */
   updateTicket: (ticket_id: string, body: Record<string, unknown>) =>
-    api.patch(`/support/tickets/${ticket_id}`, body),
+    noRoute(`/support/tickets/${ticket_id}`, body),
 
   // ─── Plugins ─────────────────────────────────────────────
   /** GET /plugins */
   listPlugins: (params?: { category?: string; installed?: boolean }) =>
     api.get("/plugins", { params }),
 
+  /** GET /plugins/available */
+  listAvailablePlugins: () => api.get("/plugins/available"),
+
   /** POST /plugins/{plugin_id}/install */
   installPlugin: (plugin_id: string) =>
     api.post(`/plugins/${plugin_id}/install`),
 
-  /** DELETE /plugins/{plugin_id}/install */
+  /** DELETE /plugins/{plugin_id}/uninstall */
   uninstallPlugin: (plugin_id: string) =>
-    api.delete(`/plugins/${plugin_id}/install`),
+    api.delete(`/plugins/${plugin_id}/uninstall`),
 
-  /** GET /plugins/{plugin_id}/config */
+  /** GET /plugins/{plugin_id}/docs */
   getPluginConfig: (plugin_id: string) =>
-    api.get(`/plugins/${plugin_id}/config`),
+    api.get(`/plugins/${plugin_id}/docs`),
 
-  /** PATCH /plugins/{plugin_id}/config */
+  /** No route found: PATCH /plugins/{plugin_id}/config */
   updatePluginConfig: (plugin_id: string, body: Record<string, unknown>) =>
-    api.patch(`/plugins/${plugin_id}/config`, body),
+    noRoute(`/plugins/${plugin_id}/config`, body),
 };

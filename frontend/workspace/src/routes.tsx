@@ -15,6 +15,7 @@ const DeploymentsPage = lazy(() => import("@/pages/DeploymentsPage").then((m) =>
 const VaultPage = lazy(() => import("@/pages/VaultPage").then((m) => ({ default: m.VaultPage })));
 const CompliancePage = lazy(() => import("@/pages/CompliancePage").then((m) => ({ default: m.CompliancePage })));
 const MonitoringPage = lazy(() => import("@/pages/MonitoringPage").then((m) => ({ default: m.MonitoringPage })));
+const AutonomyPage = lazy(() => import("@/pages/AutonomyPage").then((m) => ({ default: m.AutonomyPage })));
 const BillingPage = lazy(() => import("@/pages/BillingPage").then((m) => ({ default: m.BillingPage })));
 const TeamPage = lazy(() => import("@/pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
@@ -59,12 +60,15 @@ export function AppRoutes() {
         <Route path="/" element={<RequireAuth><Navigate to="/overview" replace /></RequireAuth>} />
         <Route path="/overview" element={<RequireAuth><OverviewPage /></RequireAuth>} />
         <Route path="/playground" element={<RequireAuth><PlaygroundPage /></RequireAuth>} />
+        <Route path="/gpc" element={<RequireAuth><UacpPage /></RequireAuth>} />
         <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
         <Route path="/models" element={<RequireAuth><ModelsPage /></RequireAuth>} />
         <Route path="/pipelines" element={<RequireAuth><PipelinesPage /></RequireAuth>} />
         <Route path="/deployments" element={<RequireAuth><DeploymentsPage /></RequireAuth>} />
         <Route path="/vault" element={<RequireAuth><VaultPage /></RequireAuth>} />
         <Route path="/compliance" element={<RequireAuth><CompliancePage /></RequireAuth>} />
+        <Route path="/autonomy" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
+        <Route path="/automation" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
         <Route path="/monitoring" element={<RequireAuth><MonitoringPage /></RequireAuth>} />
         <Route path="/billing" element={<RequireAuth><BillingPage /></RequireAuth>} />
         <Route path="/team" element={<RequireAuth><TeamPage /></RequireAuth>} />

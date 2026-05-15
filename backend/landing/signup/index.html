@@ -13,7 +13,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app/app.css">
-</head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4ZBVVR3V33"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4ZBVVR3V33');
+  </script></head>
 <body>
 <main class="app-shell">
   <div class="app-brand"><img src="/logo.svg" alt="Veklom" /> Veklom</div>
@@ -66,8 +74,8 @@ async function redirectToCheckout(plan) {
   const out = await VK.createCheckout({
     plan,
     billing_cycle: wantedBillingCycle,
-    success_url: window.location.origin + "/dashboard/?checkout=success&plan=" + encodeURIComponent(plan),
-    cancel_url: window.location.origin + "/dashboard/?checkout=cancel&plan=" + encodeURIComponent(plan)
+    success_url: window.location.origin + "/login/#/?checkout=success&plan=" + encodeURIComponent(plan),
+    cancel_url: window.location.origin + "/login/#/billing?checkout=cancel&plan=" + encodeURIComponent(plan)
   });
   window.location.href = out.checkout_url;
 }
@@ -78,10 +86,10 @@ async function afterAuthRedirect() {
     return;
   }
   if (wantedPlan === "enterprise") {
-    window.location.href = "/dashboard/?plan=enterprise";
+    window.location.href = "/login/#/billing?plan=enterprise";
     return;
   }
-  window.location.href = "/dashboard/?welcome=1";
+  window.location.href = "/login/#/?welcome=1";
 }
 
 if (VK.isLoggedIn()) {

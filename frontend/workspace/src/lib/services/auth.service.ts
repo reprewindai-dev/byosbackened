@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export const authService = {
   /** POST /auth/register */
@@ -19,22 +19,22 @@ export const authService = {
   /** GET /auth/me */
   me: () => api.get("/auth/me"),
 
-  /** POST /auth/forgot-password */
-  forgotPassword: (email: string) => api.post("/auth/forgot-password", { email }),
+  /** No route found: POST /auth/password/reset */
+  forgotPassword: (email: string) => noRoute("/auth/password/reset", email),
 
-  /** POST /auth/reset-password */
+  /** No route found: POST /auth/password/change */
   resetPassword: (token: string, new_password: string) =>
-    api.post("/auth/reset-password", { token, new_password }),
+    noRoute("/auth/password/change", token, new_password),
 
-  /** POST /auth/verify-email */
-  verifyEmail: (token: string) => api.post("/auth/verify-email", { token }),
+  /** No route found: POST /auth/verify-email */
+  verifyEmail: (token: string) => noRoute("/auth/verify-email", token),
 
-  /** GET /auth/github */
-  githubOAuth: () => api.get("/auth/github"),
+  /** GET /auth/github/login */
+  githubOAuth: () => api.get("/auth/github/login"),
 
-  /** GET /auth/github/callback */
+  /** POST /auth/github/callback */
   githubCallback: (code: string, state?: string) =>
-    api.get("/auth/github/callback", { params: { code, state } }),
+    api.post("/auth/github/callback", { code, state }),
 
   /** POST /auth/api-keys */
   createApiKey: (body: { name: string; scopes?: string[]; expires_at?: string }) =>

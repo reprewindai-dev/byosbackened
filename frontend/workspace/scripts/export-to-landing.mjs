@@ -16,21 +16,6 @@ const routeShells = [
   "login",
   "register",
   "accept-invite",
-  "overview",
-  "control-center",
-  "dashboard",
-  "uacp",
-  "playground",
-  "marketplace",
-  "models",
-  "pipelines",
-  "deployments",
-  "monitoring",
-  "vault",
-  "compliance",
-  "billing",
-  "team",
-  "settings",
 ];
 
 if (!existsSync(resolve(distRoot, "index.html"))) {

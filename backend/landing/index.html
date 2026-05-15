@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -645,7 +645,15 @@
       body::before, body::after { animation: none !important; }
     }
   </style>
-</head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-4ZBVVR3V33"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-4ZBVVR3V33');
+  </script></head>
 <body>
 
 <header class="nav">
@@ -660,8 +668,9 @@
       <a href="#theater">Live demo</a>
       <a href="#why">Hub modules</a>
       <a href="#pricing">Pricing</a>
-      <a href="/marketplace">Tools</a>
-      <a href="/overview">Workspace</a>
+      <a href="/docs/">Docs</a>
+      <a href="/login/#/marketplace">Tools</a>
+      <a href="/login/#/">Workspace</a>
       <a class="cta-ghost" href="/login/">Sign in</a>
       <a class="cta-primary" href="/signup/">Start free trial</a>
     </nav>
@@ -679,8 +688,8 @@
           Veklom Sovereign AI Hub turns AI experiments into governed private workflows with Playground, GPC, Pipelines, Governance, Monitoring, Billing, and replayable evidence in one tenant-scoped workspace.
         </p>
         <div class="actions">
-          <a class="cta-primary" href="#theater">Try the GPC Demo</a>
-          <a class="cta-ghost" href="https://veklom.dev/demo/" target="_blank" rel="noopener noreferrer">View BYOS Backend Demo</a>
+          <a class="cta-primary" href="/signup/">Start free evaluation</a>
+          <a class="cta-ghost" href="/login/#/playground">Open Playground</a>
           <a class="cta-ghost" href="#pricing">View pricing</a>
         </div>
         <div class="hub-flow" aria-label="Veklom product flow">
@@ -707,8 +716,8 @@
           <div class="proof-line"><span class="proof-index">03</span><span>Private runtime, monitoring, replay, and buyer proof are prepared before rollout</span><span class="proof-state">provable</span></div>
         </div>
         <div class="actions" style="margin-top:22px;">
-          <a class="cta-primary" href="#theater">Run the demo</a>
-          <a class="cta-ghost" href="https://veklom.dev/demo/" target="_blank" rel="noopener noreferrer">Developer backend proof</a>
+          <a class="cta-primary" href="#theater">View live workspace</a>
+          <a class="cta-ghost" href="/docs/">Read docs</a>
         </div>
       </div>
       <div class="trust-row" role="status" aria-live="polite">
@@ -725,13 +734,13 @@
   <section class="theater-wrap" id="theater">
     <div class="container">
       <div class="section-head" style="margin-bottom:22px;">
-        <span class="section-eyebrow">GPC â€” Governed Plan Compiler</span>
+        <span class="section-eyebrow">GPC — Governed Plan Compiler</span>
         <h2 class="section-title">Turn messy AI ideas into governed plans before they become pipelines.</h2>
         <p class="section-copy">Most teams can get a model to answer. The hard part is turning that answer into a workflow security, compliance, operations, and finance can approve. The demo shows workflow, risks, policy requirements, approvals, evidence, cost controls, and deployment path before engineering time is wasted.</p>
       </div>
       <iframe
         title="Veklom Real-time Observability Workspace"
-        src="/monitoring/"
+        src="/login/#/monitoring"
         loading="eager"
         style="width:100%;height:min(860px,88vh);border:1px solid rgba(255,255,255,.14);background:#050505;border-radius:18px;box-shadow:0 32px 120px rgba(0,0,0,.45);"
       ></iframe>
@@ -1057,7 +1066,8 @@
   <div class="container f-inner">
     <div>
       <a href="/status.html">Status</a>
-      <a href="/marketplace">Tools</a>
+      <a href="/docs/">Docs</a>
+      <a href="/login/#/marketplace">Tools</a>
       <a href="/legal/terms">Terms</a>
       <a href="/legal/privacy">Privacy</a>
       <a href="/login/">Sign In</a>

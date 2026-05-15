@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.deps import APIKeyPrincipal, get_current_user, get_current_workspace_id, require_api_key_scope
 from core.cost_intelligence import CostCalculator
+from core.services.marketplace_catalog import real_marketplace_catalog
 from db.models import (
     Listing,
     Pipeline,
@@ -829,7 +830,20 @@ async def listing_preflight(
     """
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
-        raise HTTPException(404, "Listing not found")
+        catalog_listing = next((row for row in real_marketplace_catalog() if row.get("id") == listing_id), None)
+        if not catalog_listing:
+            raise HTTPException(404, "Listing not found")
+        badges = catalog_listing.get("compliance_badges") or catalog_listing.get("compliance") or catalog_listing.get("badges") or []
+        return PreflightResponse(
+            listing_id=str(catalog_listing["id"]),
+            predicted_cost_per_run_usd=0.0,
+            confidence_lower_usd=0.0,
+            confidence_upper_usd=0.0,
+            predicted_quality=None,
+            failure_risk=None,
+            alternative_providers=[],
+            compliance_badges=[str(badge) for badge in badges],
+        )
 
     prediction = cost_calculator.predict_cost(
         operation_type="generation",

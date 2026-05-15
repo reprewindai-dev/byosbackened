@@ -16,6 +16,8 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
 
+from core.config import get_settings
+
 router = APIRouter(tags=["source-of-truth-bridge"])
 
 
@@ -57,6 +59,18 @@ def _clean_response_headers(response_headers: httpx.Headers) -> dict[str, str]:
     }
 
 
+def _mounted_target_path(target_path: str) -> str:
+    settings = get_settings()
+    api_prefix = settings.api_prefix.rstrip("/")
+    if not target_path.startswith("/"):
+        return f"{api_prefix}/{target_path}"
+    if target_path == api_prefix or target_path.startswith(f"{api_prefix}/"):
+        return target_path
+    if target_path.startswith("/api/"):
+        return target_path
+    return f"{api_prefix}{target_path}"
+
+
 async def _proxy_request(
     request: Request,
     target_path: str,
@@ -65,6 +79,7 @@ async def _proxy_request(
 ) -> Response:
     start = time.perf_counter()
 
+    mounted_target_path = _mounted_target_path(target_path)
     method = (method or request.method).upper()
     headers = _clean_headers(request)
     body: bytes | None = None
@@ -84,7 +99,7 @@ async def _proxy_request(
     ) as client:
         proxied = await client.request(
             method=method,
-            url=target_path,
+            url=mounted_target_path,
             headers=headers,
             params=request.query_params,
             content=body,
@@ -94,7 +109,7 @@ async def _proxy_request(
     response_headers = _clean_response_headers(proxied.headers)
     response_headers["x-route-source"] = "source-of-truth-bridge"
     response_headers["x-route-source-time-ms"] = str(elapsed_ms)
-    response_headers["x-route-mapped-to"] = target_path
+    response_headers["x-route-mapped-to"] = mounted_target_path
 
     if proxied.status_code == status.HTTP_404_NOT_FOUND:
         return Response(
@@ -283,19 +298,14 @@ async def matrix_marketplace_download(request: Request, download_id: str) -> Res
     )
 
 
-@router.post("/marketplace/listings")
-async def matrix_marketplace_listing_create(request: Request) -> Response:
-    return await _proxy_request(request=request, target_path="/marketplace/listings/create")
-
-
-@router.get("/marketplace/listings")
-async def matrix_marketplace_listing_list(request: Request) -> Response:
+@router.get("/listings")
+async def matrix_public_listing_list(request: Request) -> Response:
     return await _proxy_request(request=request, target_path="/marketplace/listings")
 
 
-@router.get("/marketplace/listings/{listing_id}")
-async def matrix_marketplace_listing_get(request: Request, listing_id: str) -> Response:
-    return await _proxy_request(request=request, target_path=f"/marketplace/listings/{listing_id}")
+@router.post("/marketplace/listings")
+async def matrix_marketplace_listing_create(request: Request) -> Response:
+    return await _proxy_request(request=request, target_path="/marketplace/listings/create")
 
 
 @router.post("/marketplace/checkout")

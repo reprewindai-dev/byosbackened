@@ -18,7 +18,7 @@ from apps.api.main import app
 from apps.api.deps import get_current_user
 from core.services.marketplace_catalog import real_marketplace_catalog
 from core.security import create_access_token
-from db.models import Listing, MarketplaceOrder, User, Vendor, Workspace
+from db.models import Listing, MarketplaceOrder, MarketplaceOrderItem, User, Vendor, Workspace
 from db.session import Base, SessionLocal, engine
 from db.session import get_db
 
@@ -34,6 +34,9 @@ class _ListingQuery:
 
     def all(self):
         return []
+
+    def first(self):
+        return None
 
 
 class _FakeDB:
@@ -85,6 +88,33 @@ def test_public_marketplace_aliases_return_real_catalog():
     assert any(row["label"] == "SDK Extensions" for row in categories.json())
 
 
+def test_curated_marketplace_listing_preflight_does_not_404():
+    current_user = SimpleNamespace(
+        id="catalog-user",
+        workspace_id="catalog-ws",
+        email="buyer@example.com",
+        role="user",
+        is_superuser=False,
+    )
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    token = create_access_token({"user_id": current_user.id, "workspace_id": current_user.workspace_id, "role": "user"})
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/v1/marketplace/listings/github-actions-checkout/preflight",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["listing_id"] == "github-actions-checkout"
+    assert payload["predicted_cost_per_run_usd"] == 0.0
+    assert "SOC2" in payload["compliance_badges"]
+
+
 def test_curated_marketplace_catalog_uses_live_official_sources():
     catalog = {row["id"]: row for row in real_marketplace_catalog()}
     slack = catalog["slack-send-github-action"]
@@ -102,6 +132,20 @@ def test_curated_marketplace_catalog_uses_live_official_sources():
 def _seed_paid_listing():
     db = SessionLocal()
     try:
+        db.query(MarketplaceOrderItem).filter(MarketplaceOrderItem.listing_id == "checkout-listing").delete(
+            synchronize_session=False
+        )
+        db.query(MarketplaceOrder).filter(MarketplaceOrder.workspace_id == "checkout-ws").delete(
+            synchronize_session=False
+        )
+        db.query(Listing).filter(Listing.id == "checkout-listing").delete(synchronize_session=False)
+        db.query(Vendor).filter(Vendor.id == "checkout-vendor").delete(synchronize_session=False)
+        db.query(User).filter(User.id.in_(["checkout-user", "checkout-vendor-user"])).delete(
+            synchronize_session=False
+        )
+        db.query(Workspace).filter(Workspace.id == "checkout-ws").delete(synchronize_session=False)
+        db.commit()
+
         workspace = Workspace(id="checkout-ws", name="Checkout Workspace", slug="checkout-ws")
         user = User(
             id="checkout-user",

@@ -26,12 +26,12 @@ export const billingService = {
   getSubscription: () => api.get("/subscriptions/current"),
 
   /** POST /subscriptions/checkout */
-  createCheckout: (body: { price_id: string; success_url: string; cancel_url: string }) =>
+  createCheckout: (body: { plan: "starter" | "pro"; billing_cycle?: "activation"; success_url: string; cancel_url: string }) =>
     api.post("/subscriptions/checkout", body),
 
   /** POST /subscriptions/portal */
   createPortalSession: (body: { return_url: string }) =>
-    api.post("/subscriptions/portal", body),
+    api.post("/subscriptions/portal", null, { params: { return_url: body.return_url } }),
 
   /** No route found: POST /subscriptions/cancel */
   cancelSubscription: () => noRoute("/subscriptions/cancel"),
@@ -39,16 +39,19 @@ export const billingService = {
   /** GET /subscriptions/plans */
   listPlans: () => api.get("/subscriptions/plans"),
 
-  /** GET /billing/wallet */
-  getWallet: () => api.get("/billing/wallet"),
+  /** GET /wallet/balance */
+  getWallet: () => api.get("/wallet/balance"),
 
-  /** GET /billing/transactions */
-  getTransactions: (params?: { page?: number; limit?: number }) =>
-    api.get("/billing/transactions", { params }),
+  /** GET /wallet/transactions */
+  getTransactions: (params?: { limit?: number; offset?: number; transaction_type?: string }) =>
+    api.get("/wallet/transactions", { params }),
 
-  /** POST /billing/topup */
-  topUp: (body: { amount: number; payment_method_id?: string }) =>
-    api.post("/billing/topup", body),
+  /** GET /wallet/topup/options */
+  listTopupOptions: () => api.get("/wallet/topup/options"),
+
+  /** POST /wallet/topup/checkout */
+  topUp: (body: { pack_name: string; success_url: string; cancel_url: string }) =>
+    api.post("/wallet/topup/checkout", body),
 
   /** GET /billing/breakdown */
   getCostBreakdown: (params?: { from?: string; to?: string }) =>

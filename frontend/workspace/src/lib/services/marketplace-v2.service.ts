@@ -153,7 +153,7 @@ export const marketplaceV2Service = {
    * Create listing manually.
    */
   createListing: (body: Record<string, unknown>) =>
-    api.post("/marketplace/listings", body),
+    api.post("/marketplace/listings/create", body),
 
   /**
    * PATCH /api/v1/marketplace/listings/{listing_id}
@@ -184,8 +184,8 @@ export const marketplaceV2Service = {
   // ─── Purchases ────────────────────────────────────────────────────────────
 
   purchase: (body: { listing_id: string; payment_method_id?: string }) =>
-    api.post("/marketplace/checkout", { listing_id: body.listing_id }),
+    api.post("/marketplace/payments/create-checkout", { listing_id: body.listing_id }),
 
   listPurchases: (params?: { page?: number; limit?: number }) =>
-    api.get("/marketplace/orders", { params }),
+    api.get("/marketplace/orders/me", { params }),
 };

@@ -17,7 +17,7 @@ export const marketplaceService = {
 
   /** POST /marketplace/listings/create */
   createListing: (body: Record<string, unknown>) =>
-    api.post("/marketplace/listings", body),
+    api.post("/marketplace/listings/create", body),
 
   /** PATCH /marketplace/listings/{listing_id} */
   updateListing: (listing_id: string, body: Record<string, unknown>) =>
@@ -36,9 +36,9 @@ export const marketplaceService = {
   purchase: (body: { listing_id: string; payment_method_id?: string }) =>
     api.post("/marketplace/payments/create-checkout", { listing_id: body.listing_id }),
 
-  /** GET /marketplace/orders */
-  listPurchases: (params?: { page?: number; limit?: number }) =>
-    api.get("/marketplace/orders", { params }),
+  /** GET /marketplace/orders/me */
+  listPurchases: (params?: { limit?: number }) =>
+    api.get("/marketplace/orders/me", { params }),
 
   /** POST /marketplace/listings/{listing_id}/install */
   install: (listing_id: string) =>

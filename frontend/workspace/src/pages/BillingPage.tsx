@@ -454,10 +454,12 @@ export function BillingPage() {
                 <button
                   className={cn("mt-auto w-full", active ? "v-btn-primary" : "v-btn-ghost")}
                   onClick={() => {
+                    if (!reserveTopupAllowed || topup.isPending) return;
                     setSelectedPack(p.pack_name);
                     topup.mutate(p.pack_name);
                   }}
-                  disabled={topup.isPending}
+                  disabled={!reserveTopupAllowed || topup.isPending}
+                  title={reserveTopupAllowed ? "Add operating reserve" : "Activation is required before reserve can be funded"}
                 >
                   {topup.isPending && active ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

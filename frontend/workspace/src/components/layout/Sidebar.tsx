@@ -32,7 +32,6 @@ function buildSections(isSuperuser: boolean): { title?: string; items: NavItem[]
     {
       title: "Workspace",
       items: [
-        { to: "/", label: "Overview Center", icon: Gauge, badge: "LIVE" },
         { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
         { to: "/gpc", label: "GPC", icon: Sparkles, badge: "PAID" },
       ],

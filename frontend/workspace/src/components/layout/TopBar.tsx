@@ -55,8 +55,6 @@ interface OperatorDigest {
 }
 
 const JUMP_ROUTES = [
-  { label: "overview", to: "/" },
-  { label: "overview center", to: "/" },
   { label: "dashboard", to: "/control-center" },
   { label: "control center", to: "/control-center" },
   { label: "owner console", to: "/control-center" },
@@ -429,7 +427,7 @@ export function TopBar() {
                 }}
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
-                {isSuperuser ? "Owner console" : "Workspace overview"}
+                {isSuperuser ? "Owner console" : "Workspace hub"}
               </button>
               <button
                 type="button"

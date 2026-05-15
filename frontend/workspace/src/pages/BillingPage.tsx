@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { billingService } from "@/lib/services/billing.service";
 import { cn, fmtCents, fmtNumber, formatApiDate, relativeTime } from "@/lib/cn";
 import { LiveErrorBox, ProofStrip } from "@/components/workspace/FlowPrimitives";
 
@@ -72,6 +73,10 @@ interface PlanDefinition {
   pricing?: Record<string, number | string | null>;
 }
 
+interface CheckoutPlan {
+  plan: "starter" | "pro";
+}
+
 interface PlansResponse {
   plans: PlanDefinition[];
 }
@@ -123,6 +128,17 @@ async function createTopup(pack: string) {
   return resp.data;
 }
 
+async function createPlanCheckout(plan: CheckoutPlan["plan"]) {
+  const origin = window.location.origin;
+  const resp = await billingService.createCheckout({
+    plan,
+    billing_cycle: "activation",
+    success_url: `${origin}/login/#/billing?activation=success`,
+    cancel_url: `${origin}/login/#/billing?activation=cancel`,
+  });
+  return resp.data;
+}
+
 function fmtReserveUsd(balance: WalletBalance): string {
   const amount = Number(balance.reserve_balance_usd ?? balance.balance / 1000);
   return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -148,6 +164,12 @@ export function BillingPage() {
       if (data.checkout_url) window.location.href = data.checkout_url;
     },
   });
+  const planCheckout = useMutation({
+    mutationFn: createPlanCheckout,
+    onSuccess: (data) => {
+      if (data.checkout_url) window.location.href = data.checkout_url;
+    },
+  });
 
   const evaluationRunsUsed = useMemo(() => {
     return (txns.data?.transactions ?? []).filter((txn) => {
@@ -169,6 +191,11 @@ export function BillingPage() {
     if (!firstReservePack || !reserveTopupAllowed || topup.isPending) return;
     setSelectedPack(firstReservePack);
     topup.mutate(firstReservePack);
+  };
+
+  const startPlanCheckout = (plan: CheckoutPlan["plan"]) => {
+    if (planCheckout.isPending) return;
+    planCheckout.mutate(plan);
   };
 
   return (
@@ -273,9 +300,13 @@ export function BillingPage() {
                         {topup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                         Add reserve
                       </button>
-                      <a className="v-btn-ghost" href="https://veklom.com/pricing/">
-                        Start activation
-                      </a>
+                      <button
+                        className="v-btn-ghost"
+                        onClick={() => startPlanCheckout("starter")}
+                        disabled={planCheckout.isPending}
+                      >
+                        {planCheckout.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start activation"}
+                      </button>
                       <a className="v-btn-ghost" href="https://veklom.com/#contact">
                         Request regulated access
                       </a>
@@ -354,6 +385,7 @@ export function BillingPage() {
                   <th className="px-5 py-2 text-left font-medium">Reserve</th>
                   <th className="px-5 py-2 text-left font-medium">Governed run</th>
                   <th className="px-5 py-2 text-left font-medium">Evidence package</th>
+                  <th className="px-5 py-2 text-left font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -378,6 +410,26 @@ export function BillingPage() {
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.reserve}</td>
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.runs}</td>
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.evidence}</td>
+                    <td className="px-5 py-2.5">
+                      {row.rawTier === "free" ? (
+                        <span className="v-chip v-chip-warn">No checkout</span>
+                      ) : subscription.data?.plan === row.rawTier ? (
+                        <span className="v-chip v-chip-ok">Current plan</span>
+                      ) : row.selfServe ? (
+                        <button
+                          className="v-btn-ghost"
+                          onClick={() => startPlanCheckout(row.rawTier === "starter" || row.rawTier === "pro" ? row.rawTier : "starter")}
+                          disabled={planCheckout.isPending}
+                          title="Start paid activation for workspace"
+                        >
+                          {planCheckout.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Activate"}
+                        </button>
+                      ) : (
+                        <a className="v-btn-ghost" href="https://veklom.com/#contact">
+                          Contact sales
+                        </a>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -563,6 +615,7 @@ function buildPricingRows(plans: PlanDefinition[]) {
   return [...plans].sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier)).map((plan) => {
     const limits = plan.free_evaluation_limits ?? {};
     return {
+      rawTier: plan.tier,
       tier: planLabel(plan),
       activation: plan.activation_cents == null ? "Contact" : plan.activation_cents === 0 ? "$0" : `${fmtCents(plan.activation_cents)} one-time`,
       reserve: plan.minimum_reserve_cents == null ? "Private" : plan.minimum_reserve_cents === 0 ? "$0" : `${fmtCents(plan.minimum_reserve_cents)} min`,
@@ -571,6 +624,7 @@ function buildPricingRows(plans: PlanDefinition[]) {
           ? `${limits.governed_playground_runs ?? FREE_EVALUATION_RUNS} governed runs`
           : fmtEventCents(plan, "playground_run_cents", "/ run"),
       evidence: plan.features?.compliance_reports || plan.features?.audit_exports ? "available" : "activation required",
+      selfServe: plan.self_serve_checkout,
     };
   });
 }

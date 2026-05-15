@@ -175,7 +175,7 @@ export function UacpPage() {
             <Link className="v-btn-primary h-9 px-3 text-xs" to="/billing">
               Activate workspace <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
-            <Link className="v-btn-ghost h-9 px-3 text-xs" to="/overview">
+            <Link className="v-btn-ghost h-9 px-3 text-xs" to="/gpc">
               Back to overview
             </Link>
           </div>

@@ -160,7 +160,7 @@ export function ControlCenterPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-eyebrow">Locked tenant spine</div>
-              <div className="mt-2 text-sm font-semibold text-bone">Overview Center / Playground / GPC</div>
+              <div className="mt-2 text-sm font-semibold text-bone">Command Center / Playground / GPC</div>
               <div className="mt-1 text-xs leading-5 text-muted">
                 {data?.workspace_spine.policy ??
                   "Hetzner-first policy evaluation. Approved fallback only when tenant rules allow it."}

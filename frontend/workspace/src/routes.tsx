@@ -6,7 +6,6 @@ const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default:
 const RegisterPage = lazy(() => import("@/pages/RegisterPage").then((m) => ({ default: m.RegisterPage })));
 const AcceptInvitePage = lazy(() => import("@/pages/AcceptInvitePage").then((m) => ({ default: m.AcceptInvitePage })));
 const GithubCallbackPage = lazy(() => import("@/pages/GithubCallbackPage").then((m) => ({ default: m.GithubCallbackPage })));
-const OverviewPage = lazy(() => import("@/pages/OverviewPage").then((m) => ({ default: m.OverviewPage })));
 const PlaygroundPage = lazy(() => import("@/pages/PlaygroundPage").then((m) => ({ default: m.PlaygroundPage })));
 const MarketplacePage = lazy(() => import("@/pages/MarketplacePage").then((m) => ({ default: m.MarketplacePage })));
 const ModelsPage = lazy(() => import("@/pages/ModelsPage").then((m) => ({ default: m.ModelsPage })));
@@ -57,8 +56,7 @@ export function AppRoutes() {
         <Route path="/auth/github/callback" element={<GithubCallbackPage />} />
 
         {/* Protected workspace */}
-        <Route path="/" element={<RequireAuth><Navigate to="/overview" replace /></RequireAuth>} />
-        <Route path="/overview" element={<RequireAuth><OverviewPage /></RequireAuth>} />
+        <Route path="/" element={<RequireAuth><Navigate to="/playground" replace /></RequireAuth>} />
         <Route path="/playground" element={<RequireAuth><PlaygroundPage /></RequireAuth>} />
         <Route path="/gpc" element={<RequireAuth><UacpPage /></RequireAuth>} />
         <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
@@ -90,7 +88,7 @@ export function AppRoutes() {
         <Route path="/jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/overview" replace />} />
+        <Route path="*" element={<Navigate to="/playground" replace />} />
       </Routes>
     </Suspense>
   );

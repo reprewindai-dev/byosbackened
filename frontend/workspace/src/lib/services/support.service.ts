@@ -3,7 +3,7 @@ import { api, noRoute } from "@/lib/api";
 export const supportService = {
   // ─── Support Bot ─────────────────────────────────────────
   /** POST /support/chat */
-  chat: (body: { message: string; session_id?: string; context?: Record<string, unknown> }) =>
+  chat: (body: { message: string; conversation_id?: string; context?: Record<string, unknown> }) =>
     api.post("/support/chat", body),
 
   /** No route found: GET /support/sessions */

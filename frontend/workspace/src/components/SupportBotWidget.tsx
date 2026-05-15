@@ -1,12 +1,7 @@
-/**
- * SupportBotWidget — wires /api/v1/support-bot/* (in-app support chat)
- * Renders as a floating chat button in the bottom-right corner.
- * Available on every authenticated page via layout injection.
- */
 import { useRef, useState } from "react";
 import { MessageSquare, Send, X } from "lucide-react";
-import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { supportService } from "@/lib/services/support.service";
 
 type Message = {
   id: string;
@@ -22,6 +17,7 @@ export function SupportBotWidget() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sessionRef = useRef<string | null>(null);
 
   async function send() {
     const text = input.trim();
@@ -32,14 +28,22 @@ export function SupportBotWidget() {
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
     try {
-      const res = await api.post<{ reply: string; message_id: string }>("/support-bot/message", {
+      const res = await supportService.chat({
         message: text,
-        history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+        conversation_id: sessionRef.current ?? undefined,
       });
-      const botMsg: Message = { id: res.data.message_id, role: "assistant", content: res.data.reply, created_at: new Date().toISOString() };
+      if (res.data.conversation_id) {
+        sessionRef.current = res.data.conversation_id;
+      }
+      const botMsg: Message = {
+        id: res.data.conversation_id || crypto.randomUUID(),
+        role: "assistant",
+        content: res.data.response,
+        created_at: new Date().toISOString(),
+      };
       setMessages((prev) => [...prev, botMsg]);
     } catch {
-      setError("Support bot unavailable — /support-bot/message may not be deployed yet.");
+      setError("Support bot unavailable. Try again in a moment or use support@veklom.com.");
     } finally {
       setLoading(false);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
@@ -50,7 +54,6 @@ export function SupportBotWidget() {
     <div className="fixed bottom-6 right-6 z-50">
       {open && (
         <div className="mb-3 flex w-80 flex-col overflow-hidden rounded-xl border border-rule bg-ink-2 shadow-2xl">
-          {/* Header */}
           <div className="flex items-center justify-between border-b border-rule bg-ink-1 px-4 py-3">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-brass" />
@@ -61,12 +64,9 @@ export function SupportBotWidget() {
             </button>
           </div>
 
-          {/* Messages */}
           <div className="flex max-h-72 flex-col gap-2 overflow-y-auto p-3">
             {messages.length === 0 && (
-              <div className="py-4 text-center text-xs text-muted">
-                Ask anything about Veklom — features, pricing, integrations.
-              </div>
+              <div className="py-4 text-center text-xs text-muted">Ask anything about Veklom features, pricing, integrations.</div>
             )}
             {messages.map((msg) => (
               <div
@@ -92,19 +92,23 @@ export function SupportBotWidget() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
           <div className="flex items-center gap-2 border-t border-rule px-3 py-2">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Type a message…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder="Type a message..."
               className="flex-1 bg-transparent text-xs text-bone outline-none placeholder:text-muted"
               disabled={loading}
             />
             <button
               type="button"
-              onClick={send}
+              onClick={() => void send()}
               disabled={!input.trim() || loading}
               aria-label="Send message"
               className="text-muted hover:text-brass disabled:opacity-40"
@@ -115,7 +119,6 @@ export function SupportBotWidget() {
         </div>
       )}
 
-      {/* FAB */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -39,23 +39,23 @@ export const billingService = {
   /** GET /subscriptions/plans */
   listPlans: () => api.get("/subscriptions/plans"),
 
-  /** GET /wallet/balance */
-  getWallet: () => api.get("/wallet/balance"),
+  /** GET /billing/wallet */
+  getWallet: () => api.get("/billing/wallet"),
 
-  /** GET /wallet/transactions */
+  /** GET /billing/transactions */
   getTransactions: (params?: { limit?: number; offset?: number; transaction_type?: string }) =>
-    api.get("/wallet/transactions", { params }),
+    api.get("/billing/transactions", { params }),
 
-  /** GET /wallet/topup/options */
-  listTopupOptions: () => api.get("/wallet/topup/options"),
+  /** GET /billing/topup */
+  listTopupOptions: () => api.get("/billing/topup"),
 
-  /** POST /wallet/topup/checkout */
+  /** POST /billing/topup */
   topUp: (body: { pack_name: string; success_url: string; cancel_url: string }) =>
-    api.post("/wallet/topup/checkout", body),
+    api.post("/billing/topup", body),
 
   /** GET /billing/breakdown */
   getCostBreakdown: (params?: { from?: string; to?: string }) =>
-    api.get("/billing/breakdown", { params }),
+    api.get("/cost/breakdown", { params }),
 
   /** POST /cost/predict */
   estimateCost: (params: { model: string; tokens: number; provider?: string }) =>
@@ -69,13 +69,13 @@ export const billingService = {
       : noRoute("/cost/predict requires provider"),
 
   /** GET /budget */
-  getBudget: () => api.get("/budget"),
+  getBudget: () => api.get("/budget/caps"),
 
   /** POST /budget */
   setBudget: (body: { monthly_limit: number; alert_threshold?: number }) =>
-    api.post("/budget", body),
+    api.post("/budget/caps", body),
 
   /** POST /budget */
   updateBudget: (body: { monthly_limit?: number; alert_threshold?: number }) =>
-    api.post("/budget", body),
+    api.post("/budget/caps", body),
 };

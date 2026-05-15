@@ -34,11 +34,11 @@ export const marketplaceService = {
   // ─── Purchases / Installs ────────────────────────────────
   /** POST /marketplace/checkout */
   purchase: (body: { listing_id: string; payment_method_id?: string }) =>
-    api.post("/marketplace/payments/create-checkout", { listing_id: body.listing_id }),
+    api.post("/marketplace/checkout", { listing_id: body.listing_id }),
 
-  /** GET /marketplace/orders/me */
+  /** GET /marketplace/orders */
   listPurchases: (params?: { limit?: number }) =>
-    api.get("/marketplace/orders/me", { params }),
+    api.get("/marketplace/orders", { params }),
 
   /** POST /marketplace/listings/{listing_id}/install */
   install: (listing_id: string) =>

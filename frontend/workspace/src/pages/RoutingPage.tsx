@@ -38,7 +38,7 @@ export function RoutingPage() {
             ))}
           </div>
         ) : routesQ.isError ? (
-          <ErrorBanner message="Could not load routing policy. Backend route is /routing/policy." />
+          <ErrorBanner message="Could not load routing policy. Backend route is /routing/rules." />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {(routesQ.data ?? []).map((route) => (

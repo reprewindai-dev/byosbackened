@@ -15,7 +15,7 @@ import {
   ShieldX,
   X,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 import { cn, dateFromApiTimestamp, fmtNumber, formatApiDateTime, relativeTime } from "@/lib/cn";
 import type { OverviewPayload } from "@/types/api";
 import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
@@ -170,8 +170,7 @@ async function fetchOverview() {
 }
 
 async function verifyLog(id: string) {
-  const resp = await api.get<VerifyResp>(`/audit/verify/${encodeURIComponent(id)}`);
-  return resp.data;
+  return noRoute<VerifyResp>(`/audit/verify/${encodeURIComponent(id)}`);
 }
 
 const OP_TYPES = ["all", "exec", "chat", "completion", "embedding", "tool"] as const;

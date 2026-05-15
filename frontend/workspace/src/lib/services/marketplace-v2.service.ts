@@ -184,8 +184,8 @@ export const marketplaceV2Service = {
   // ─── Purchases ────────────────────────────────────────────────────────────
 
   purchase: (body: { listing_id: string; payment_method_id?: string }) =>
-    api.post("/marketplace/payments/create-checkout", { listing_id: body.listing_id }),
+    api.post("/marketplace/checkout", { listing_id: body.listing_id }),
 
   listPurchases: (params?: { page?: number; limit?: number }) =>
-    api.get("/marketplace/orders/me", { params }),
+    api.get("/marketplace/orders", { params }),
 };

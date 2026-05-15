@@ -23,9 +23,9 @@ export const pipelinesService = {
   run: (pipeline_id: string, body?: Record<string, unknown>) =>
     api.post(`/pipelines/${pipeline_id}/run`, body),
 
-  /** POST /pipelines/{pipeline_id}/execute */
+  /** No route found: POST /pipelines/{pipeline_id}/execute */
   execute: (pipeline_id: string, body?: Record<string, unknown>) =>
-    api.post(`/pipelines/${pipeline_id}/execute`, body),
+    noRoute(`/pipelines/${pipeline_id}/execute`, body),
 
   /** No route found: POST /pipelines/{pipeline_id}/stop */
   stop: (pipeline_id: string) => noRoute(`/pipelines/${pipeline_id}/stop`),

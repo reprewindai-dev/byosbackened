@@ -44,7 +44,7 @@ export function useZeroTrustStatus() {
       const resp = await api.get<{
         stats?: { open?: number; last_24h?: number; security_score?: number };
         controls?: { name: string; enabled: boolean }[];
-      }>("/security/dashboard");
+      }>("/security/zero-trust/status");
       const stats = resp.data.stats ?? {};
       const controls = resp.data.controls ?? [];
       const enabled = (name: string) => controls.some((control) => control.name === name && control.enabled);
@@ -78,7 +78,7 @@ export function useThreatEvents() {
         created_at: string;
         status: string;
         resolved_at: string | null;
-      }>>("/security/events");
+      }>>("/security/threats");
       return resp.data.map((event) => ({
         id: event.id,
         severity: event.security_level,
@@ -112,7 +112,7 @@ export function useKillSwitchState() {
     queryKey: ["kill-switch"],
     queryFn: async () => {
       const resp = await api.get<{ killed: boolean; reason?: string | null; activated_by?: string | null; activated_at?: string | null }>(
-        "/cost/kill-switch/status",
+        "/kill-switch/status",
       );
       return {
         active: resp.data.killed,
@@ -130,7 +130,7 @@ export function useActivateKillSwitch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (reason: string) =>
-      api.post("/cost/kill-switch", { reason }),
+      api.post("/kill-switch/activate", { reason }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["kill-switch"] }),
   });
 }
@@ -138,7 +138,7 @@ export function useActivateKillSwitch() {
 export function useDeactivateKillSwitch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.delete("/cost/kill-switch"),
+    mutationFn: () => api.post("/kill-switch/deactivate"),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["kill-switch"] }),
   });
 }

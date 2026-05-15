@@ -29,20 +29,20 @@ export const authService = {
   /** No route found: POST /auth/verify-email */
   verifyEmail: (token: string) => noRoute("/auth/verify-email", token),
 
-  /** GET /auth/github/login */
-  githubOAuth: () => api.get("/auth/github/login"),
+  /** GET /auth/github */
+  githubOAuth: () => api.get("/auth/github"),
 
   /** POST /auth/github/callback */
   githubCallback: (code: string, state?: string) =>
     api.post("/auth/github/callback", { code, state }),
 
-  /** POST /auth/api-keys */
+  /** POST /workspace/api-keys */
   createApiKey: (body: { name: string; scopes?: string[]; expires_at?: string }) =>
-    api.post("/auth/api-keys", body),
+    api.post("/workspace/api-keys", body),
 
-  /** GET /auth/api-keys */
-  listApiKeys: () => api.get("/auth/api-keys"),
+  /** GET /workspace/api-keys */
+  listApiKeys: () => api.get("/workspace/api-keys"),
 
-  /** DELETE /auth/api-keys/{key_id} */
-  deleteApiKey: (key_id: string) => api.delete(`/auth/api-keys/${key_id}`),
+  /** DELETE /workspace/api-keys/{key_id} */
+  deleteApiKey: (key_id: string) => api.delete(`/workspace/api-keys/${key_id}`),
 };

@@ -99,7 +99,7 @@ export function TopBar() {
   });
   const wallet = useQuery({
     queryKey: ["topbar-wallet"],
-    queryFn: async () => (await api.get<WalletBalance>("/wallet/balance")).data,
+    queryFn: async () => (await api.get<WalletBalance>("/billing/wallet")).data,
     refetchInterval: 30_000,
     retry: false,
   });
@@ -111,7 +111,7 @@ export function TopBar() {
   });
   const operatorDigest = useQuery({
     queryKey: ["topbar-operator-digest"],
-    queryFn: async () => (await api.get<OperatorDigest>("/internal/operators/digest")).data,
+    queryFn: async () => (await api.get<OperatorDigest>("/operators/digest")).data,
     enabled: Boolean(user?.is_superuser),
     refetchInterval: 60_000,
     retry: false,

@@ -71,12 +71,12 @@ export const complianceService = {
   getLog: (log_id: string) => noRoute(`/audit/logs/${log_id}`),
 
   /**
-   * GET /api/v1/audit/verify/{id}
+   * No route found: GET /api/v1/audit/verify/{id}
    * Verify button in Monitoring UI.
    * Show: "Evidence check passed" / "Audit hash verified" / "Tamper detected".
    */
   verifyLog: (log_id: string) =>
-    api.get<AuditVerifyResult>(`/audit/verify/${log_id}`),
+    noRoute<AuditVerifyResult>(`/audit/verify/${log_id}`),
 
   // ─── Compliance Evidence ──────────────────────────────────────────────────
 

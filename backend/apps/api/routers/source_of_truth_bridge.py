@@ -225,6 +225,11 @@ async def matrix_billing_topup(request: Request) -> Response:
     return await _proxy_request(request=request, target_path="/wallet/topup/checkout")
 
 
+@router.get("/billing/topup")
+async def matrix_billing_topup_options(request: Request) -> Response:
+    return await _proxy_request(request=request, target_path="/wallet/topup/options")
+
+
 @router.get("/token-wallet/balance")
 async def matrix_token_wallet_balance(request: Request) -> Response:
     return await _proxy_request(request=request, target_path="/wallet/balance")
@@ -258,6 +263,11 @@ async def matrix_subscriptions_webhook(request: Request) -> Response:
 @router.post("/ai/exec")
 async def matrix_ai_exec(request: Request) -> Response:
     return await _proxy_request(request=request, target_path="/ai/complete")
+
+
+@router.post("/v1/exec")
+async def matrix_v1_exec(request: Request) -> Response:
+    return await _proxy_request(request=request, target_path="/v1/exec")
 
 
 @router.get("/ai/models")

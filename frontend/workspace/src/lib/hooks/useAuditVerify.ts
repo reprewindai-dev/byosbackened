@@ -34,7 +34,7 @@ export function useAuditVerify() {
     setState((s) => ({ ...s, loading: true, error: null }));
 
     try {
-      const { data } = await complianceService.verifyLog(log_id);
+      const data = await complianceService.verifyLog(log_id);
 
       let label: string;
       let labelVariant: AuditVerifyState["labelVariant"];

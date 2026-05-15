@@ -77,7 +77,7 @@ export const costIntelligenceService = {
    * Powers Billing overview and cost allocation panels.
    */
   getBreakdown: (params?: { from?: string; to?: string; provider?: string }) =>
-    api.get<CostBreakdown>("/billing/breakdown", { params }),
+    api.get<CostBreakdown>("/cost/breakdown", { params }),
 
   /**
    * POST /api/v1/cost/predict
@@ -97,17 +97,17 @@ export const costIntelligenceService = {
    * GET /api/v1/budget
    * Budget cap state — show risk level on Overview.
    */
-  getBudget: () => api.get("/budget"),
+  getBudget: () => api.get("/budget/caps"),
 
   /**
    * POST /api/v1/budget
    */
   setBudget: (body: { monthly_limit: number; alert_threshold?: number }) =>
-    api.post("/budget", body),
+    api.post("/budget/caps", body),
 
   /**
    * POST /api/v1/budget
    */
   updateBudget: (body: { monthly_limit?: number; alert_threshold?: number }) =>
-    api.post("/budget", body),
+    api.post("/budget/caps", body),
 };

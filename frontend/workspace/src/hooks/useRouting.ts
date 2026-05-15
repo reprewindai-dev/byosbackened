@@ -2,7 +2,7 @@
  * useRouting — wires /api/v1/routing/* (provider routing config + circuit breaker state)
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, noRoute } from "@/lib/api";
 
 export type ProviderRoute = {
   id: string;
@@ -36,7 +36,7 @@ export function useProviderRoutes() {
         policy_id?: string;
         strategy: string;
         constraints?: { max_latency_ms?: number | string | null; max_cost?: number | string | null };
-      }>("/routing/policy")).data;
+      }>("/routing/rules")).data;
       return [{
         id: policy.policy_id ?? "workspace-routing-policy",
         name: (policy.strategy || "cost_optimized").replace(/_/g, " "),
@@ -80,7 +80,7 @@ export function useUpdateProviderPriority() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: { provider_id: string; priority: number; enabled: boolean }) =>
-      api.post("/routing/policy", {
+      noRoute(`/routing/providers/${payload.provider_id}`, {
         strategy: payload.enabled ? "cost_optimized" : "manual_review",
         constraints: { priority: payload.priority, provider_id: payload.provider_id },
       }),

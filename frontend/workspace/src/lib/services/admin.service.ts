@@ -59,13 +59,13 @@ export const adminService = {
     noRoute(`/admin/flags/${flag}`, enabled),
 
   // ─── Kill Switch ─────────────────────────────────────────
-  /** GET /cost/kill-switch/status */
-  getKillSwitch: () => api.get("/cost/kill-switch/status"),
+  /** GET /kill-switch/status */
+  getKillSwitch: () => api.get("/kill-switch/status"),
 
-  /** POST /cost/kill-switch */
+  /** POST /kill-switch/activate */
   engageKillSwitch: (body: { reason: string; scope?: string }) =>
-    api.post("/cost/kill-switch", body),
+    api.post("/kill-switch/activate", body),
 
-  /** DELETE /cost/kill-switch */
-  disengageKillSwitch: () => api.delete("/cost/kill-switch"),
+  /** POST /kill-switch/deactivate */
+  disengageKillSwitch: () => api.post("/kill-switch/deactivate"),
 };

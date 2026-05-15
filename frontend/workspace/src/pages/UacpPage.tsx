@@ -30,11 +30,11 @@ const UACP_EVENT_PRICES = [
 ] as const;
 
 const UACP_ROUTE_SPINE = [
-  { label: "v0 summary", path: "/uacp/v0", target: "/internal/uacp/summary" },
-  { label: "v1 events", path: "/uacp/v1", target: "/internal/uacp/events" },
-  { label: "v2 stream", path: "/uacp/v2", target: "/internal/uacp/event-stream" },
-  { label: "v3 monitoring", path: "/uacp/v3", target: "/internal/uacp/monitoring" },
-  { label: "v4 security", path: "/uacp/v4", target: "/internal/uacp/security" },
+  { label: "v0 summary", path: "/uacp/v0", target: "/uacp/v0" },
+  { label: "v1 events", path: "/uacp/v1", target: "/uacp/v1" },
+  { label: "v2 stream", path: "/uacp/v2", target: "/uacp/v2" },
+  { label: "v3 monitoring", path: "/uacp/v3", target: "/uacp/v3" },
+  { label: "v4 security", path: "/uacp/v4", target: "/uacp/v4" },
 ] as const;
 
 async function fetchCurrentSubscription(): Promise<CurrentSubscription> {

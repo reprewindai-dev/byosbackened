@@ -8,32 +8,32 @@ export const internalService = {
   // ---------------------------------------------------------
   // Operators
   // ---------------------------------------------------------
-  operatorOverview: () => api.get("/internal/operators/overview"),
+  operatorOverview: () => api.get("/operators"),
 
-  operatorDigest: () => api.get("/internal/operators/digest"),
+  operatorDigest: () => api.get("/operators/digest"),
 
-  runOperatorWatch: () => api.post("/internal/operators/watch"),
+  runOperatorWatch: () => api.post("/operators/watch"),
 
   queueQstashJob: (body: Record<string, unknown>) =>
-    api.post("/internal/operators/qstash/enqueue", body),
+    api.post("/operators/qstash/enqueue", body),
 
   triggerMaintenanceWorkflow: (body: Record<string, unknown>) =>
-    api.post("/internal/operators/workflows/uacp-maintenance/trigger", body),
+    api.post("/operators/workflows/uacp-maintenance/trigger", body),
 
-  listWorkers: (params?: { limit?: number }) => api.get("/internal/operators/workers", { params }),
+  listWorkers: (params?: { limit?: number }) => api.get("/operators/workers", { params }),
 
-  getWorkerRegistry: () => api.get("/internal/operators/registry"),
+  getWorkerRegistry: () => api.get("/operators/registry"),
 
-  getWorker: (workerId: string) => api.get(`/internal/operators/workers/${encodeURIComponent(workerId)}`),
+  getWorker: (workerId: string) => api.get(`/operators/workers/${encodeURIComponent(workerId)}`),
 
   workerHeartbeat: (workerId: string, body: Record<string, unknown>) =>
-    api.post(`/internal/operators/workers/${encodeURIComponent(workerId)}/heartbeat`, body),
+    api.post(`/operators/workers/${encodeURIComponent(workerId)}/heartbeat`, body),
 
   createWorkerRun: (body: Record<string, unknown>) =>
-    api.post("/internal/operators/runs", body),
+    api.post("/operators/runs", body),
 
   listWorkerRuns: (params?: { limit?: number }) =>
-    api.get("/internal/operators/runs", { params }),
+    api.get("/operators/runs", { params }),
 
   // ---------------------------------------------------------
   // Internal UACP bridge

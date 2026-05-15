@@ -101,13 +101,13 @@ const EVENT_PRICES = [
 ];
 
 async function fetchBalance() {
-  return (await api.get<WalletBalance>("/wallet/balance")).data;
+  return (await billingService.getWallet()).data;
 }
-async function fetchTransactions() {
-  return (await api.get<TxnList>("/wallet/transactions", { params: { limit: 25, offset: 0 } })).data;
+async function fetchTransactions(): Promise<TxnList> {
+  return (await billingService.getTransactions({ limit: 25, offset: 0 })).data;
 }
-async function fetchTopupOptions() {
-  return (await api.get<TopupOptions>("/wallet/topup/options")).data;
+async function fetchTopupOptions(): Promise<TopupOptions> {
+  return (await billingService.listTopupOptions()).data;
 }
 
 async function fetchPlans() {
@@ -120,7 +120,7 @@ async function fetchCurrentSubscription() {
 
 async function createTopup(pack: string) {
   const origin = window.location.origin;
-  const resp = await api.post<{ checkout_url: string; session_id: string }>("/wallet/topup/checkout", {
+  const resp = await billingService.topUp({
     pack_name: pack,
     success_url: `${origin}/login/#/billing?topup=success`,
     cancel_url: `${origin}/login/#/billing?topup=cancel`,
@@ -213,7 +213,7 @@ export function BillingPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              live · <span className="font-mono">/api/v1/wallet</span>
+              live · <span className="font-mono">/api/v1/billing</span>
             </span>
             <span className="v-chip v-chip-brass">Stripe Checkout</span>
           </div>
@@ -359,9 +359,9 @@ export function BillingPage() {
         items={[
           { label: "pricing source", value: plans.data ? "/api/v1/subscriptions/plans" : plans.isError ? "unavailable" : "loading" },
           { label: "activation source", value: subscription.data ? "/api/v1/subscriptions/current" : subscription.isError ? "unavailable" : "loading" },
-          { label: "reserve source", value: balance.data ? "/api/v1/wallet/balance" : balance.isError ? "unavailable" : "loading" },
-          { label: "ledger source", value: txns.data ? "/api/v1/wallet/transactions" : txns.isError ? "unavailable" : "loading" },
-          { label: "checkout source", value: packs.data ? "/api/v1/wallet/topup/options" : packs.isError ? "unavailable" : "loading" },
+          { label: "reserve source", value: balance.data ? "/api/v1/billing/wallet" : balance.isError ? "unavailable" : "loading" },
+          { label: "ledger source", value: txns.data ? "/api/v1/billing/transactions" : txns.isError ? "unavailable" : "loading" },
+          { label: "checkout source", value: packs.data ? "/api/v1/billing/topup" : packs.isError ? "unavailable" : "loading" },
         ]}
       />
 

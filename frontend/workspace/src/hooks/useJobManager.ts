@@ -29,7 +29,7 @@ export type UploadedFile = {
 export function useJob(jobId: string | null) {
   return useQuery({
     queryKey: ["jobs", jobId],
-    queryFn: async () => (await api.get<JobStatus>(`/jobs/${jobId}`)).data,
+    queryFn: async () => (await api.get<JobStatus>(`/job/${jobId}`)).data,
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;

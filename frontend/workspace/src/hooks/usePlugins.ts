@@ -31,7 +31,7 @@ export function usePlugins() {
 export function useInstallPlugin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (slug: string) => api.post<Plugin>(`/plugins/${slug}/enable`, {}),
+    mutationFn: (slug: string) => api.post<Plugin>(`/plugins/${slug}/install`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
   });
 }
@@ -39,7 +39,7 @@ export function useInstallPlugin() {
 export function useUninstallPlugin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (slug: string) => api.post<Plugin>(`/plugins/${slug}/disable`, {}),
+    mutationFn: (slug: string) => api.delete<Plugin>(`/plugins/${slug}/uninstall`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
   });
 }
@@ -48,7 +48,7 @@ export function useTogglePlugin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ slug, enabled }: { slug: string; enabled: boolean }) =>
-      enabled ? api.post<Plugin>(`/plugins/${slug}/enable`, {}) : api.post<Plugin>(`/plugins/${slug}/disable`, {}),
+      enabled ? api.post<Plugin>(`/plugins/${slug}/install`, {}) : api.delete<Plugin>(`/plugins/${slug}/uninstall`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["plugins"] }),
   });
 }

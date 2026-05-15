@@ -39,7 +39,7 @@ interface ApiKeyCreateResponse extends ApiKey {
 const AVAILABLE_SCOPES = ["read", "exec", "write", "admin"] as const;
 
 async function listKeys(): Promise<ApiKey[]> {
-  const resp = await api.get<ApiKey[]>("/auth/api-keys");
+  const resp = await api.get<ApiKey[]>("/workspace/api-keys");
   return resp.data;
 }
 
@@ -49,12 +49,12 @@ async function createKey(payload: {
   rate_limit_per_minute: number;
   expires_in_days: number | null;
 }) {
-  const resp = await api.post<ApiKeyCreateResponse>("/auth/api-keys", payload);
+  const resp = await api.post<ApiKeyCreateResponse>("/workspace/api-keys", payload);
   return resp.data;
 }
 
 async function revokeKey(id: string) {
-  await api.delete(`/auth/api-keys/${encodeURIComponent(id)}`);
+  await api.delete(`/workspace/api-keys/${encodeURIComponent(id)}`);
 }
 
 export function VaultPage() {
@@ -96,7 +96,7 @@ export function VaultPage() {
         status={create.isPending || revoke.isPending || keys.isFetching ? "running" : create.isError || revoke.isError || keys.isError ? "failed" : justCreated ? "succeeded" : "idle"}
         summary="Vault uses the live API-key route. Newly issued secrets are shown once, active keys stay visible, and revoke updates the same ledger."
         steps={[
-          { label: "Key inventory", status: keys.isFetching ? "running" : keys.isError ? "failed" : "succeeded", detail: "/api/v1/auth/api-keys" },
+          { label: "Key inventory", status: keys.isFetching ? "running" : keys.isError ? "failed" : "succeeded", detail: "/api/v1/workspace/api-keys" },
           { label: "Create key", status: create.isPending ? "running" : justCreated ? "succeeded" : create.isError ? "failed" : "idle", detail: justCreated?.key_prefix ?? "not issued" },
           { label: "Revoke or rotate", status: revoke.isPending ? "running" : revoke.isError ? "failed" : "idle", detail: "live revoke route" },
         ]}
@@ -117,7 +117,7 @@ export function VaultPage() {
       <ProofStrip
         className="mb-4"
         items={[
-          { label: "inventory", value: keys.data ? "/api/v1/auth/api-keys" : keys.isError ? "unavailable" : "loading" },
+          { label: "inventory", value: keys.data ? "/api/v1/workspace/api-keys" : keys.isError ? "unavailable" : "loading" },
           { label: "created", value: justCreated?.key_prefix ?? "none this session" },
           { label: "active", value: String(active) },
           { label: "scope", value: "workspace" },
@@ -200,7 +200,7 @@ function PageHeader({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone="ok" dot>
-            live · <span className="font-mono">/api/v1/auth/api-keys</span>
+            live · <span className="font-mono">/api/v1/workspace/api-keys</span>
           </Badge>
           <Badge tone="primary">
             <Lock className="h-3 w-3" /> AES-256

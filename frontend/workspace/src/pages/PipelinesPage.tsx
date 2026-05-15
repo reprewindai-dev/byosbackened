@@ -311,7 +311,7 @@ export function PipelinesPage() {
   const executeMut = useMutation({
     mutationFn: async (id: string) => {
       setCreating(id);
-      const r = await api.post<PipelineRun>(`/pipelines/${id}/execute`, { inputs: { prompt: testPrompt } });
+      const r = await api.post<PipelineRun>(`/pipelines/${id}/run`, { inputs: { prompt: testPrompt } });
       return r.data;
     },
     onSettled: () => {

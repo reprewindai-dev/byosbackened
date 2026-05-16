@@ -27,6 +27,7 @@ from apps.api.middleware.performance import PerformanceMiddleware, GzipMiddlewar
 from apps.api.middleware.fast_path import FastPathMiddleware
 from apps.api.middleware.exception_handler import GlobalExceptionMiddleware
 from apps.api.middleware.csp_headers import CSPHeadersMiddleware
+from apps.api.middleware.input_sanitization import InputSanitizationMiddleware
 from apps.api.routers import (
     upload,
     transcribe,
@@ -176,6 +177,8 @@ app.add_middleware(
     allow_methods=settings.cors_allow_methods,
     allow_headers=settings.cors_allow_headers,
 )
+# Input sanitization (SQL injection, XSS, path traversal detection)
+app.add_middleware(InputSanitizationMiddleware)
 # Security headers (CSP, X-Frame-Options, etc.)
 app.add_middleware(CSPHeadersMiddleware)
 # Performance optimization layer (for 777ms latency target)

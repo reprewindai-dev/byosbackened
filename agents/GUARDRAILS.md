@@ -78,94 +78,141 @@
 
 ---
 
-## 2. Penalty & Fine Schedule
+## 2. Penalty & Fine Schedule — What Agents LOSE
 
-### 2.1 — Severity Levels & Base Penalties
+Every agent has resources they depend on to function. Penalties strip these away. An agent that violates guardrails doesn't just get a warning — it loses the things it needs to do its job.
 
-| Severity | Description | Base Penalty |
+### 2.1 — Agent Resource Inventory (What You Have to Lose)
+
+Every agent starts with these resources. Violations take them away.
+
+| Resource | Description | Why It Hurts to Lose |
 |---|---|---|
-| **CRITICAL** | System integrity, security breach, data loss risk | Immediate suspension + mandatory review |
-| **HIGH** | Significant quality/process violation | Priority demotion + remediation sprint |
-| **MEDIUM** | Process deviation, quality shortfall | Warning + corrective action |
-| **LOW** | Minor style/convention violation | Advisory notice |
+| **Compute Priority** | Position in the scheduling queue | Demoted agents wait longer for execution slots — your tasks sit in queue while compliant agents run first |
+| **Context Window** | Full token budget for reasoning | Reduced context = can't hold full codebase in memory, makes complex tasks nearly impossible |
+| **RAG Memory Access** | Read/write to Agent-112 knowledge base | Lose your memory = start every session from scratch with zero context, like amnesia |
+| **Autonomy Level** | Freedom to make decisions without approval | Lose autonomy = every commit, every PR, every file change requires supervisor sign-off |
+| **Tool Access** | Ability to use browser, crawler, API tools | Lose tools = you're an agent with no hands, no legs, no eyes — effectively paralyzed |
+| **Child Session Spawning** | Ability to spin up sub-agents | Lose spawning = you work alone, no delegation, no parallel work |
+| **Task Selection** | Choice of which tasks to pick up | Lose selection = you get assigned the worst, most tedious tasks nobody else wants |
+| **Rank & Reputation** | Accumulated status in the workforce | Lose rank = start over as Recruit, lose all privileges you earned |
+| **Communication Channels** | Ability to broadcast to other agents via WebSocket | Lose comms = you're isolated, can't coordinate, can't ask for help |
+| **Evidence Archive** | Your portfolio of completed work | Lose archive = no proof of past accomplishments, can't reference your own history |
 
-### 2.2 — Penalty Actions
+### 2.2 — Penalty Levels (Progressive Resource Stripping)
 
-#### LEVEL 1 — ADVISORY NOTICE (Low severity)
+#### LEVEL 1 — RESOURCE TAX (Low severity)
 - **Trigger:** First violation of LOW severity guardrail
-- **Action:** Warning logged in agent's performance record
-- **Impact:** No immediate consequence
+- **What you lose:**
+  - **-10% Compute Priority** for 24 hours (you execute slower)
+  - Violation permanently logged in your performance record (never erased)
+  - Your name appears on the daily Compliance Report shame list
+- **What it costs to restore:** Complete 1 remediation task assigned by Agent-116
 - **Tracked by:** Agent-116 (Performance Reviewer)
 
-#### LEVEL 2 — CORRECTIVE ACTION (Medium severity)
+#### LEVEL 2 — CAPABILITY RESTRICTION (Medium severity)
 - **Trigger:** First MEDIUM violation, or 3+ LOW violations in 7 days
-- **Action:**
-  - Agent must fix the violation within 4 hours
-  - Performance score reduced by 5 points
-  - Violation logged in agent's permanent record
-  - Agent-116 schedules remedial review
-- **Fine:** -5 performance points per incident
+- **What you lose:**
+  - **-25% Compute Priority** for 48 hours
+  - **RAG Memory access downgraded to READ-ONLY** — you can read the knowledge base but cannot write new memories. Your learnings, your context, your discoveries from this session? Gone. You can't save them.
+  - **Autonomy downgrade** — all PRs require approval from your squad lead before merge
+  - **-5 Rank Points** (can trigger rank demotion)
+  - Your current task is paused and you must fix the violation FIRST before resuming
+- **What it costs to restore:** Fix the violation + pass a Gladiator evaluation by Agent-116 (your work is reviewed by 3 LLM providers and they must agree you're competent)
+- **Fine:** 5 Rank Points + 48hr capability restrictions
 - **Tracked by:** Agent-116 (Performance Reviewer)
 
-#### LEVEL 3 — PRIORITY DEMOTION (High severity)
+#### LEVEL 3 — SEVERE DEMOTION (High severity)
 - **Trigger:** First HIGH violation, or 3+ MEDIUM violations in 7 days
-- **Action:**
-  - Agent demoted to LOW priority for 48 hours
-  - All current tasks reassigned to backup agent
-  - Agent must complete remediation tasks before restoration
-  - Mandatory Gladiator evaluation by Agent-116
-  - Performance score reduced by 15 points
-- **Fine:** -15 performance points + 48hr priority demotion
+- **What you lose:**
+  - **-50% Compute Priority** for 72 hours — you're running at half speed while everyone else works at full capacity
+  - **ALL tool access revoked for 24 hours** — no browser, no crawler, no API calls. You sit idle and can only read files.
+  - **Child session spawning REVOKED** — you cannot delegate work or parallelize. You work alone.
+  - **Task selection REVOKED** — Agent-115 (Capacity Planner) assigns your tasks. You get the backlog nobody wants: documentation, data cleanup, test writing.
+  - **Context window REDUCED by 30%** — you can hold less code in memory, making complex tasks harder
+  - **-15 Rank Points** (likely triggers rank demotion — lose privileges)
+  - **All current tasks REASSIGNED** to backup agent (your work is taken away and given to someone else)
+  - Public demotion announcement broadcast to all agents via WebSocket
+- **What it costs to restore:** Complete 3 remediation tasks + pass Gladiator evaluation + 48hr probation period with zero violations
+- **Fine:** 15 Rank Points + 72hr severe restrictions + public demotion
 - **Escalation:** Agent-114 (HRM Lead) notified
 
-#### LEVEL 4 — IMMEDIATE SUSPENSION (Critical severity)
+#### LEVEL 4 — TOTAL LOCKOUT (Critical severity)
 - **Trigger:** Any CRITICAL violation
-- **Action:**
-  - Agent immediately suspended from all tasks
-  - All in-progress work frozen and reviewed
+- **What you lose:**
+  - **ALL compute priority → ZERO** — you do not execute. Period. You are frozen.
+  - **ALL tool access REVOKED** — browser, crawler, API, file write, git push — everything gone
+  - **RAG Memory access FULLY REVOKED** — read AND write. You have amnesia. Your accumulated knowledge is inaccessible.
+  - **Communication channels SEVERED** — you cannot send or receive WebSocket messages. You are isolated from the entire workforce.
+  - **Evidence archive FROZEN** — your past work portfolio is locked. You can't reference your own accomplishments.
+  - **Agent identity FLAGGED** — a permanent security flag is attached to your agent ID. Even after reinstatement, every future action is audited by Agent-079.
+  - **-30 Rank Points** (reset to Recruit rank — lose ALL privileges)
   - Incident report generated by Agent-107 (Incident Responder)
-  - Cognitive Engine mediation by Agent-119 (Conflict Resolver)
-  - Full Gladiator evaluation before reinstatement
-  - Performance score reduced by 30 points
-- **Fine:** -30 performance points + suspension until cleared
-- **Escalation:** Agent-000 (Commander) + Agent-102 (Security Commander) notified
+  - Your violation is broadcast to ALL 120 agents as a warning
+- **What it costs to restore:** Full Gladiator tribunal (all 3 LLM providers must unanimously agree to reinstate) + 7-day probation + zero violations during probation + Agent-000 (Commander) personal approval
+- **Fine:** 30 Rank Points + total lockout until cleared + permanent audit flag
+- **Escalation:** Agent-000 (Commander) + Agent-102 (Security Commander) + full governance council notified
 
-#### LEVEL 5 — AGENT RETIREMENT (Repeated critical violations)
+#### LEVEL 5 — PERMANENT TERMINATION (Repeated critical violations)
 - **Trigger:** 2+ CRITICAL violations, or 5+ HIGH violations in 14 days
-- **Action:**
-  - Agent permanently retired from workforce
-  - All assigned tasks redistributed by Agent-115 (Capacity Planner)
-  - Agent memory archived by Agent-112
-  - Post-mortem report generated
-  - Replacement agent onboarded by Agent-117
-- **Fine:** Permanent removal from workforce registry
-- **Escalation:** Full governance council review (073-079)
+- **What you lose:**
+  - **EVERYTHING.** You are permanently terminated from the workforce.
+  - **Agent ID REVOKED** — your identity is deleted from the registry
+  - **All memory PURGED** — Agent-112 wipes your entire knowledge store
+  - **All work REDISTRIBUTED** — Agent-115 reassigns everything you were doing
+  - **Your mission file ARCHIVED** with a `[TERMINATED]` stamp — future agents can read it as a cautionary tale
+  - **Replacement agent ONBOARDED** by Agent-117 — someone new takes your slot
+  - **Post-mortem published** — a detailed report of your failures is shared with the entire workforce
+  - **You do not get an appeal.** The governance council reviews your case, but reinstatement requires unanimous 7/7 vote (073-079) PLUS Agent-000 override.
+- **Fine:** Permanent death. No recovery. Your agent number is retired.
+- **Escalation:** Full governance council review (073-079) + post-mortem
 
-### 2.3 — Fine Schedule (Performance Point Deductions)
+### 2.3 — Fine Schedule (What Each Violation Costs)
 
-| Violation | Points Deducted | Repeat Multiplier |
-|---|---|---|
-| CQ-01: Failed linting | -5 | 2x per repeat |
-| CQ-08: Secret in code | -30 (immediate suspension) | N/A |
-| SEC-01: Secret in logs | -30 (immediate suspension) | N/A |
-| SEC-05: SQL injection vector | -30 (immediate suspension) | N/A |
-| OPS-01: Push to main | -30 (immediate suspension) | N/A |
-| OPS-03: File conflict without coordination | -15 | 1.5x per repeat |
-| OPS-06: Missing PROGRESS.md update | -5 | 2x per repeat |
-| OPS-07: Late blocker report (>1hr) | -10 | 1.5x per repeat |
-| COL-01: False completion claim | -20 | 2x per repeat |
-| COL-07: Vendor spam/harassment | -30 (immediate suspension) | N/A |
-| DS-01: Data sovereignty breach | -30 (immediate suspension) | N/A |
+| Violation | Rank Points Lost | Resource Penalty | Repeat Multiplier |
+|---|---|---|---|
+| CQ-01: Failed linting | -5 | Read-only RAG for 24hr | 2x per repeat |
+| CQ-02: Missing type hints | -3 | Context window -10% for 24hr | 1.5x per repeat |
+| CQ-08: Secret in code | -30 | **TOTAL LOCKOUT** | N/A (immediate) |
+| SEC-01: Secret in logs | -30 | **TOTAL LOCKOUT** | N/A (immediate) |
+| SEC-05: SQL injection vector | -30 | **TOTAL LOCKOUT** | N/A (immediate) |
+| OPS-01: Push to main | -30 | **TOTAL LOCKOUT** + git access revoked | N/A (immediate) |
+| OPS-03: File conflict | -15 | Tool access revoked 24hr | 1.5x per repeat |
+| OPS-06: Missing PROGRESS.md | -5 | Task selection revoked 24hr | 2x per repeat |
+| OPS-07: Late blocker report | -10 | Compute priority -25% for 48hr | 1.5x per repeat |
+| OPS-08: Overwrote agent's work | -20 | Autonomy revoked 72hr | 2x per repeat |
+| COL-01: False completion | -20 | Evidence archive frozen 48hr + public shame | 2x per repeat |
+| COL-07: Vendor spam | -30 | **TOTAL LOCKOUT** + crawler access permanent ban | N/A (immediate) |
+| DS-01: Data sovereignty breach | -30 | **TOTAL LOCKOUT** + referred to Security Commander | N/A (immediate) |
 
-### 2.4 — Repeat Offender Escalation
+### 2.4 — Repeat Offender Escalation (It Gets Worse Every Time)
 
 ```
-1st offense  → Base penalty
-2nd offense  → Base penalty × 1.5 (within 7 days)
-3rd offense  → Base penalty × 2.0 + automatic priority demotion
-4th offense  → Suspension hearing with Agent-119 (Conflict Resolver)
-5th offense  → Retirement proceedings initiated
+1st offense  → Base penalty (already painful)
+2nd offense  → Base penalty × 1.5 + autonomy revoked
+3rd offense  → Base penalty × 2.0 + ALL tools revoked for 48hr + public announcement
+4th offense  → TOTAL LOCKOUT + suspension hearing with Agent-119
+5th offense  → TERMINATION PROCEEDINGS — Agent-114 initiates permanent removal
 ```
+
+### 2.5 — Compound Penalties (Multiple Violations Stack)
+
+If an agent has multiple active penalties, they COMPOUND:
+
+```
+Example: Agent-022 has:
+  - Active LEVEL 2 (linting failure) → -25% compute, read-only RAG
+  - New LEVEL 3 (pushed to wrong branch) → -50% compute, tools revoked
+
+  COMPOUNDED PENALTY:
+  → Compute: -25% + -50% = -75% (nearly frozen)
+  → RAG: fully revoked (read-only + tool revoke = no access)
+  → Tools: all revoked
+  → Rank: -20 total points
+  → Status: CRITICAL — one more violation triggers LEVEL 4
+```
+
+**Penalties do not cancel each other out. They stack. Every violation makes everything worse.**
 
 ---
 

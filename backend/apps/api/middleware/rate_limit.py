@@ -1,5 +1,9 @@
 """Per-workspace and per-IP rate limiting middleware using Redis sliding window."""
 import logging
+import threading
+import time
+from collections import defaultdict
+
 from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -24,17 +28,41 @@ _AUTH_BURST_LIMIT = 20      # tighter limit on auth endpoints (brute-force)
 _UPSTASH_RATE_LIMIT_PREFIX = "@upstash/ratelimit"
 
 
+class _InMemoryLimiter:
+    """Thread-safe in-memory token bucket fallback when Redis is unavailable."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._buckets: dict[str, tuple[float, float]] = {}  # key -> (tokens, last_refill_ts)
+
+    def check(self, key: str, limit: int, window: int = 60) -> tuple[bool, int, int]:
+        now = time.monotonic()
+        refill_rate = limit / window  # tokens per second
+        with self._lock:
+            tokens, last_ts = self._buckets.get(key, (float(limit), now))
+            elapsed = now - last_ts
+            tokens = min(limit, tokens + elapsed * refill_rate)
+            if tokens >= 1.0:
+                tokens -= 1.0
+                self._buckets[key] = (tokens, now)
+                return True, int(tokens), window
+            self._buckets[key] = (tokens, now)
+            return False, 0, window
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     Sliding window rate limiter backed by Redis.
     Enforces per-workspace (JWT/API key) and per-IP limits.
     Auth endpoints get a tighter burst limit to block brute force.
-    Falls back gracefully if Redis is unavailable.
+    Falls back to an in-memory token bucket if Redis is unavailable
+    (fail-closed instead of fail-open).
     """
 
     def __init__(self, app):
         super().__init__(app)
         self._redis = None
+        self._mem_limiter = _InMemoryLimiter()
 
     def _get_redis(self):
         """Get Redis from shared connection pool."""
@@ -49,10 +77,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         """
         Sliding window counter. Returns True if within limit, False if exceeded.
         Uses Redis INCR + EXPIRE pattern.
+        Falls back to in-memory token bucket when Redis is unavailable.
         """
         r = self._get_redis()
         if not r:
-            return True, limit, window  # fail open if Redis down
+            return self._mem_limiter.check(key, limit, window)
         try:
             pipe = r.pipeline()
             pipe.incr(key)
@@ -63,7 +92,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return count <= limit, remaining, window
         except Exception as e:
             logger.warning(f"Rate limiter Redis error: {e}")
-            return True, limit, window  # fail open
+            return self._mem_limiter.check(key, limit, window)
 
     def _record_rate_event(self, bucket: str, allowed: bool) -> None:
         r = self._get_redis()

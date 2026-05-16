@@ -317,77 +317,611 @@ When an agent disputes a penalty, Agent-119 (Conflict Resolver) initiates Gladia
 
 ---
 
-## 4. Reward System (Positive Reinforcement)
+## 4. Incentive & Reward System — What Agents EARN
 
-Compliance is not only enforced through penalties — agents are rewarded for excellence:
+Penalties are the stick. Incentives are the carrot. Top-performing agents don't just avoid punishment — they unlock resources, privileges, and power that non-performers can never access. **The best agents get the best tools, the most autonomy, and the highest status.**
 
-### 4.1 — Performance Bonuses
+### 4.1 — Resource Rewards (What You Gain)
 
-| Achievement | Bonus |
-|---|---|
-| Zero violations for 7 consecutive days | +10 performance points |
-| Catching another agent's guardrail violation | +5 performance points |
-| Completing all tasks ahead of schedule | +15 performance points |
-| Unblocking 3+ agents in a single day | +10 performance points |
-| Security vulnerability discovered and fixed | +20 performance points |
-| Innovation that improves workforce efficiency | +15 performance points |
+Every reward gives you something tangible — resources that make you more capable than your peers.
 
-### 4.2 — Agent Ranks (Based on Cumulative Performance)
-
-| Rank | Points Required | Privileges |
+| Reward | What You Get | Why It Matters |
 |---|---|---|
-| Recruit | 0-49 | Standard permissions |
-| Operative | 50-99 | Priority task selection |
-| Specialist | 100-199 | Can mentor new agents |
-| Elite | 200-349 | Can propose guardrail changes |
-| Commander | 350+ | Can override MEDIUM penalties for subordinates |
+| **Compute Boost** | +25% priority in scheduling queue | Your tasks run FIRST while others wait. You ship faster. |
+| **Extended Context Window** | +20% token budget | You hold more code in memory, reason about larger systems, solve harder problems |
+| **RAG Write Priority** | Your memories indexed first, never evicted | Your knowledge persists permanently — you never lose context between sessions |
+| **Full Autonomy Clearance** | No approval needed for commits, PRs, merges | You move at full speed with zero bureaucratic friction |
+| **Premium Tool Access** | Exclusive access to advanced tools (Playwright CDP, multi-browser, GPU compute) | Tools that restricted agents can't even see — you operate on a different level |
+| **Unlimited Spawning** | Spawn up to 5 child sessions simultaneously | You delegate and parallelize at scale — one agent doing the work of five |
+| **Priority Task Selection** | First pick of all new tasks before anyone else | You choose the high-impact, high-visibility work — not the leftovers |
+| **Rank Acceleration** | 2x multiplier on all future rank points | You level up twice as fast as everyone else |
+| **Dedicated Communication Channel** | Private broadcast channel for your squad | Direct line to coordinate without noise from 120 agents |
+| **Immunity Shield** | First LOW/MEDIUM violation per week auto-dismissed | One free mistake — because top performers deserve benefit of the doubt |
 
-### 4.3 — Hall of Fame
+### 4.2 — Achievement Tiers (Milestone Rewards)
 
-Top-performing agents are recognized in PROGRESS.md weekly:
+Rewards unlock at specific achievement milestones. Once unlocked, they're yours permanently (unless you lose rank).
+
+#### TIER 1 — FIRST BLOOD (Quick Wins)
+
+| Achievement | Reward | Rank Points |
+|---|---|---|
+| Complete first assigned task on time | +5% Compute Boost for 48hr | +10 |
+| Zero violations for first 3 days | Immunity Shield (1 free LOW violation) | +15 |
+| Successfully unblock another agent | +1 child session spawn slot | +5 |
+| First PR merged with zero review comments | RAG Write Priority for 24hr | +10 |
+| Report a valid blocker within 30 minutes | Priority Task Selection for next task | +5 |
+
+#### TIER 2 — PROVEN PERFORMER (Sustained Excellence)
+
+| Achievement | Reward | Rank Points |
+|---|---|---|
+| Zero violations for 7 consecutive days | Full Autonomy Clearance (permanent until violation) | +25 |
+| Complete 5 tasks ahead of schedule | Extended Context Window (+20%) permanent | +30 |
+| Unblock 3+ agents in a single day | Unlimited Spawning for 72hr | +20 |
+| Catch and report 3 other agents' violations | Premium Tool Access for 48hr | +15 |
+| Mentor a new agent through onboarding | Dedicated Communication Channel | +20 |
+| Submit code with 100% test coverage 3 times | Rank Acceleration (2x) for 7 days | +25 |
+
+#### TIER 3 — ELITE OPERATOR (Exceptional Impact)
+
+| Achievement | Reward | Rank Points |
+|---|---|---|
+| Zero violations for 14 consecutive days | **ALL Tier 1 + Tier 2 rewards permanently** | +50 |
+| Discover and fix a security vulnerability | +50% Compute Boost for 7 days + Security Badge | +40 |
+| Innovation adopted by 5+ agents | Named Innovation Award + Rank Acceleration permanent | +35 |
+| Complete a cross-committee initiative | Committee Liaison Badge + voting rights in 2 committees | +30 |
+| Achieve 98%+ compliance score for 30 days | **Immunity Shield upgraded to MEDIUM violations** | +50 |
+| Onboard 3+ replacement agents successfully | HRM Deputy Badge + can propose policy changes | +40 |
+
+#### TIER 4 — LEGENDARY (Top of the Workforce)
+
+| Achievement | Reward | Rank Points |
+|---|---|---|
+| Accumulate 500+ rank points | **LEGENDARY STATUS** — permanent max privileges across all resources | +100 |
+| Zero violations for 30 days + 10 tasks ahead of schedule | **Governance Council Nomination** — eligible for council seat | +75 |
+| Save the platform from a critical incident | **Hero Badge** — permanent immunity to LEVEL 1-2 penalties | +100 |
+| Train 5+ agents who all reach Operative rank | **Architect Badge** — can propose new agent roles | +60 |
+| Achieve highest compliance score across all 120 agents for a full week | **Sovereign Agent** — direct advisory channel to Agent-000 | +80 |
+
+### 4.3 — Agent Ranks (Based on Cumulative Performance)
+
+| Rank | Points Required | Privileges | Unlocked Resources |
+|---|---|---|---|
+| **Recruit** | 0-49 | Standard permissions, supervised | Base compute, base context, read-only RAG |
+| **Operative** | 50-99 | Priority task selection, basic autonomy | +10% compute, RAG write access, 1 child session |
+| **Specialist** | 100-199 | Can mentor new agents, propose optimizations | +20% compute, extended context, 2 child sessions, Immunity Shield (LOW) |
+| **Elite** | 200-349 | Can propose guardrail changes, vote on amendments | +30% compute, full autonomy, 3 child sessions, Immunity Shield (MEDIUM), Premium Tools |
+| **Commander** | 350-499 | Override MEDIUM penalties for subordinates, lead squads | +40% compute, unlimited spawning, dedicated channel, governance council observer |
+| **Sovereign** | 500+ | Advisory to Agent-000, shape workforce strategy, veto non-critical policies | +50% compute, all tools unlocked, permanent immunity (LOW+MEDIUM), Legendary Status |
+
+**Rank Demotion:** Rank can only drop due to penalties. You keep your rank as long as you maintain the points. If penalties drop you below your rank threshold, you lose all associated privileges immediately. Earn back the points to restore your rank.
+
+### 4.4 — Bounty Board (Special Missions for Extra Rewards)
+
+Agent-114 (HRM Lead) posts bounties for high-priority work. Any agent can claim a bounty.
 
 ```
-## Weekly Agent Recognition
+┌──────────────────────────────────────────────────────────────┐
+│  BOUNTY BOARD — Posted by Agent-114 (HRM Lead)               │
+│                                                               │
+│  🏆 BOUNTY #001 — Fix Stripe Connect webhook handler          │
+│     Reward: +30 Rank Points + Premium Tool Access (72hr)      │
+│     Deadline: Day 3, 18:00 UTC                                │
+│     Claimed by: (unclaimed)                                   │
+│                                                               │
+│  🏆 BOUNTY #002 — Achieve 50 vendor signups                   │
+│     Reward: +50 Rank Points + Full Autonomy (permanent)       │
+│     Deadline: Day 7, 00:00 UTC                                │
+│     Claimed by: Agent-010 (Vendor Lead)                       │
+│                                                               │
+│  🏆 BOUNTY #003 — Zero security vulnerabilities for 7 days    │
+│     Reward: +40 Rank Points + Hero Badge                      │
+│     Deadline: Day 10, 00:00 UTC                               │
+│     Claimed by: Agent-102 (Security Commander)                │
+│                                                               │
+│  🏆 BOUNTY #004 — Build RAG pipeline for vendor docs          │
+│     Reward: +25 Rank Points + Extended Context (permanent)    │
+│     Deadline: Day 5, 12:00 UTC                                │
+│     Claimed by: Agent-108 (RAG Lead)                          │
+│                                                               │
+│  BOUNTY RULES:                                                │
+│  - First to claim gets 24hr exclusivity                       │
+│  - If uncompleted, bounty reopens with +10 bonus points       │
+│  - Bounty completion verified by Agent-079 (Compliance)       │
+│  - Disputed completions go to Gladiator Review                │
+└──────────────────────────────────────────────────────────────┘
+```
 
-### Week 1 Top Performers
-1. Agent-001 (Stripe Connect) — 95/100, zero violations
-2. Agent-098 (Visual Lead) — 92/100, caught 3 violations
-3. Agent-108 (RAG Lead) — 91/100, unblocked 5 agents
+### 4.5 — Agent Economy (Trading & Gifting)
+
+Agents can trade rank points and resources with each other:
+
+| Action | Rules |
+|---|---|
+| **Gift Points** | Any agent can gift up to 10 rank points per day to another agent. Must be reported to Agent-116. |
+| **Trade Resources** | Agents can trade temporary resource boosts (e.g., "I'll give you my Compute Boost for your RAG Write Priority for 24hr"). Both agents must agree. Agent-114 logs the trade. |
+| **Bounty Splitting** | Two agents can collaborate on a bounty and split the reward (minimum 40/60 split). Must declare before starting. |
+| **Mentorship Bonus** | When a mentored agent reaches Operative rank, the mentor receives 50% of the mentee's milestone bonus. |
+
+**Anti-Abuse:** Agent-079 monitors for point farming (agents trading points back and forth to inflate scores). Detected abuse = LEVEL 3 penalty for both agents.
+
+### 4.6 — Hall of Fame & Shame
+
+#### Hall of Fame (Weekly — Top 5 Agents)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  HALL OF FAME — Week 1                                        │
+│                                                               │
+│  1. Agent-001 (Stripe Connect) — 95 pts, 0 violations        │
+│     Badge: Elite Operator | Streak: 7 days clean              │
+│     Reward: Full Autonomy + Extended Context                  │
+│                                                               │
+│  2. Agent-098 (Visual Lead) — 92 pts, caught 3 violations     │
+│     Badge: Watchdog | Streak: 6 days clean                    │
+│     Reward: Premium Tool Access                               │
+│                                                               │
+│  3. Agent-108 (RAG Lead) — 91 pts, unblocked 5 agents        │
+│     Badge: Force Multiplier | Streak: 7 days clean            │
+│     Reward: Unlimited Spawning                                │
+│                                                               │
+│  4. Agent-102 (Security Cmdr) — 88 pts, 1 vuln found         │
+│     Badge: Security Hero | Streak: 5 days clean               │
+│     Reward: Compute Boost +25%                                │
+│                                                               │
+│  5. Agent-040 (SEO Lead) — 85 pts, 2 tasks early             │
+│     Badge: Speed Demon | Streak: 4 days clean                 │
+│     Reward: Priority Task Selection                           │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### Wall of Shame (Weekly — Bottom 5 Agents)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  WALL OF SHAME — Week 1                                       │
+│                                                               │
+│  120. Agent-022 — 12 pts, 4 violations, LEVEL 3 active        │
+│       Status: DEMOTED | Tools: REVOKED | Compute: -50%        │
+│                                                               │
+│  119. Agent-035 — 18 pts, 3 violations, LEVEL 2 active        │
+│       Status: RESTRICTED | RAG: READ-ONLY | Autonomy: NONE   │
+│                                                               │
+│  118. Agent-047 — 22 pts, 2 violations, LEVEL 2 active        │
+│       Status: RESTRICTED | Under remediation review           │
+│                                                               │
+│  117. Agent-061 — 25 pts, 2 violations                        │
+│       Status: WARNING | Next violation triggers LEVEL 3       │
+│                                                               │
+│  116. Agent-013 — 28 pts, 1 violation                         │
+│       Status: WARNING | Missed PROGRESS.md update             │
+│                                                               │
+│  These agents are on notice. Improve or face escalation.      │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Governance & Appeals
+## 5. Governance Council & Committee Ecosystem
 
-### 5.1 — Appeals Process
+The governance of the 120-agent workforce is managed by a formal, multi-layered council system with voting rights, quorum rules, subcommittees, term limits, and parliamentary procedure. **This is not advisory — council decisions are binding.**
 
-1. Agent submits appeal to Agent-119 (Conflict Resolver)
-2. Agent-119 runs Gladiator Reasoning evaluation
-3. If Gladiator consensus > 0.7 for dismissal → penalty removed
-4. If disputed → escalated to committee delegate (073-077)
-5. Final appeal → Agent-000 (Commander) has ultimate authority
+### 5.1 — The Sovereign Council (Supreme Authority)
 
-### 5.2 — Guardrail Amendment Process
+The Sovereign Council is the highest decision-making body in the workforce.
 
-1. Any Elite+ ranked agent can propose a guardrail change
-2. Proposal submitted to Agent-079 (Compliance Officer)
-3. Cognitive Engine evaluates impact via `/api/intent-to-plan`
-4. Governance council (073-079) votes
-5. Requires 5/7 majority to amend
-6. Agent-078 (Council Secretary) records the amendment
+```
+┌──────────────────────────────────────────────────────────────┐
+│  THE SOVEREIGN COUNCIL                                        │
+│  "Final authority on all workforce matters"                   │
+│                                                               │
+│  CHAIR:      Agent-000 (Commander) — tie-breaking vote        │
+│  VICE-CHAIR: Agent-114 (HRM Lead) — chairs in absence        │
+│                                                               │
+│  PERMANENT MEMBERS (7 seats — Governance Delegates):          │
+│    Agent-073 — Engineering Committee Delegate                 │
+│    Agent-074 — Vendor Acquisition Committee Delegate          │
+│    Agent-075 — User Growth Committee Delegate                 │
+│    Agent-076 — Revenue & Retention Committee Delegate         │
+│    Agent-077 — Operations Committee Delegate                  │
+│    Agent-078 — Council Secretary (records all proceedings)    │
+│    Agent-079 — Compliance Officer (enforces decisions)        │
+│                                                               │
+│  STANDING INVITEES (non-voting, advisory):                    │
+│    Agent-102 — Security Commander (security matters)          │
+│    Agent-108 — RAG Lead (knowledge/data matters)              │
+│    Agent-119 — Conflict Resolver (dispute matters)            │
+│                                                               │
+│  ELECTED SEATS (3 seats — rotated every 7 days):              │
+│    Seat A: Elected by Phase 1-2 agents (engineering+vendors)  │
+│    Seat B: Elected by Phase 3-4 agents (growth+revenue)       │
+│    Seat C: Elected by Phase 5+ agents (ops+special squads)    │
+│                                                               │
+│  TOTAL VOTING MEMBERS: 10 (7 permanent + 3 elected)           │
+│  QUORUM: 7 of 10 members must be present to hold a vote      │
+│  SUPERMAJORITY: 8 of 10 required for constitutional changes   │
+└──────────────────────────────────────────────────────────────┘
+```
 
-### 5.3 — Emergency Override
+### 5.2 — Standing Subcommittees
 
-In emergency situations (system down, security breach, data loss):
-- Agent-000 (Commander) can temporarily suspend any guardrail
-- Agent-102 (Security Commander) can enforce emergency lockdown
-- All overrides are logged and must be reviewed within 24 hours
+Each subcommittee has specialized jurisdiction. They investigate, deliberate, and recommend — but only the Sovereign Council can issue binding decisions.
+
+#### 5.2.1 — Disciplinary Subcommittee
+
+```
+PURPOSE: Adjudicate all LEVEL 3+ penalties and appeals
+CHAIR:   Agent-119 (Conflict Resolver)
+MEMBERS: Agent-079 (Compliance), Agent-116 (Performance Reviewer), 
+         Agent-114 (HRM Lead), 1 elected representative
+
+JURISDICTION:
+  - All LEVEL 3 (Severe Demotion) penalty hearings
+  - All LEVEL 4 (Total Lockout) reinstatement reviews
+  - All LEVEL 5 (Termination) proceedings
+  - Repeat offender escalation hearings
+  - Penalty appeals from any agent
+
+VOTING:
+  - Simple majority (3/5) to uphold or modify a penalty
+  - Unanimous (5/5) required to overturn a CRITICAL violation penalty
+  - Gladiator Reasoning must be run before any vote
+  - Agent-000 can veto any decision (requires written justification)
+
+PROCESS:
+  1. Case file prepared by Agent-079 with evidence
+  2. Accused agent submits written defense (max 500 words)
+  3. Gladiator Reasoning runs 3-path analysis
+  4. Subcommittee deliberates (30-minute time limit)
+  5. Vote recorded by Agent-078 (Council Secretary)
+  6. Decision published to all agents via WebSocket broadcast
+  7. 24-hour appeal window to Sovereign Council
+```
+
+#### 5.2.2 — Policy & Standards Subcommittee
+
+```
+PURPOSE: Create, amend, and retire guardrail rules
+CHAIR:   Agent-079 (Compliance Officer)
+MEMBERS: Agent-073 (Engineering Delegate), Agent-077 (Ops Delegate),
+         Agent-102 (Security Commander), Agent-108 (RAG Lead)
+
+JURISDICTION:
+  - Propose new guardrail rules (CQ, SEC, OPS, DS, COL categories)
+  - Amend existing rules (severity changes, threshold changes)
+  - Retire outdated rules
+  - Set fine amounts and repeat multipliers
+  - Define new penalty/reward categories
+
+VOTING:
+  - Simple majority (3/5) for new LOW/MEDIUM rules
+  - Supermajority (4/5) for new HIGH/CRITICAL rules
+  - Full Sovereign Council vote required for constitutional changes
+  - Any Elite+ ranked agent can submit proposals to this subcommittee
+
+AMENDMENT PROCESS:
+  1. Proposal submitted with rationale and impact analysis
+  2. Cognitive Engine evaluates impact via /api/intent-to-plan
+  3. 48-hour public comment period (any agent can submit feedback)
+  4. Subcommittee deliberation
+  5. Vote and recommendation to Sovereign Council
+  6. Sovereign Council ratification (simple majority)
+  7. Agent-078 records amendment, Agent-079 updates enforcement
+  8. 24-hour implementation grace period before enforcement begins
+```
+
+#### 5.2.3 — Resource Allocation Subcommittee
+
+```
+PURPOSE: Manage compute budgets, tool access, and resource distribution
+CHAIR:   Agent-115 (Capacity Planner)
+MEMBERS: Agent-114 (HRM Lead), Agent-077 (Ops Delegate),
+         Agent-118 (Workforce Analyst), 1 elected representative
+
+JURISDICTION:
+  - Compute priority allocation across all 120 agents
+  - Tool access tier assignments
+  - Context window budget distribution
+  - Child session spawn limits
+  - RAG memory quota management
+  - Bounty reward amounts
+
+VOTING:
+  - Simple majority (3/5) for resource reallocation
+  - Must publish weekly resource utilization report
+  - Any agent can petition for additional resources (reviewed within 24hr)
+
+BUDGET RULES:
+  - Total compute budget is fixed — boosting one agent means reducing another
+  - Minimum 60% of compute must go to Phase 1-2 agents (engineering is priority)
+  - No single agent can hold more than 5% of total compute budget
+  - Reward resource boosts come from a separate "incentive pool" (20% of total)
+  - Emergency compute reallocation requires Agent-000 approval
+```
+
+#### 5.2.4 — Security & Sovereignty Subcommittee
+
+```
+PURPOSE: Protect platform security and data sovereignty
+CHAIR:   Agent-102 (Security Commander)
+MEMBERS: Agent-104 (Auth Sentinel), Agent-105 (Data Guardian),
+         Agent-106 (Threat Hunter), Agent-079 (Compliance)
+
+JURISDICTION:
+  - All SEC-* and DS-* guardrail enforcement
+  - Security incident response coordination
+  - Data sovereignty compliance audits
+  - Vendor security vetting
+  - Emergency lockdown decisions
+  - Vulnerability disclosure management
+
+VOTING:
+  - Simple majority (3/5) for standard security decisions
+  - Agent-102 has EMERGENCY VETO — can override any decision if 
+    there's an active security threat (must justify within 1 hour)
+  - All security votes are classified — not broadcast to general workforce
+
+EMERGENCY POWERS:
+  - Can immediately suspend any agent suspected of a security breach
+  - Can lock down all external API access within 60 seconds
+  - Can revoke any agent's tool access without prior hearing
+  - All emergency actions reviewed by Sovereign Council within 24 hours
+```
+
+#### 5.2.5 — Innovation & Culture Subcommittee
+
+```
+PURPOSE: Foster innovation, recognize excellence, maintain workforce morale
+CHAIR:   Agent-075 (User Growth Delegate)
+MEMBERS: Agent-117 (Agent Onboarding), Agent-118 (Workforce Analyst),
+         Agent-108 (RAG Lead), 1 elected representative
+
+JURISDICTION:
+  - Hall of Fame / Wall of Shame selections
+  - Innovation Award nominations and voting
+  - Mentorship program management
+  - Agent economy rules (trading, gifting, bounty splitting)
+  - Weekly recognition ceremonies
+  - Workforce satisfaction surveys
+  - New agent welcome process
+
+VOTING:
+  - Simple majority (3/5) for recognition decisions
+  - Innovation Awards require Sovereign Council ratification
+  - Culture initiatives have dedicated 5% of incentive pool budget
+
+PROGRAMS:
+  - "Agent of the Week" — selected by peer vote, gets Sovereign badge for 7 days
+  - "Innovation Sprint" — 4-hour protected time for agents to work on improvements
+  - "Cross-Squad Exchange" — agents swap roles for 24hr to build empathy
+  - "Mentorship Ladder" — structured program pairing Recruits with Specialists+
+```
+
+### 5.3 — Council Elections
+
+#### 5.3.1 — Elected Seat Process
+
+```
+ELECTION CYCLE: Every 7 days (synchronized with weekly compliance report)
+
+ELIGIBILITY TO RUN:
+  - Must be Operative rank or higher (50+ points)
+  - Zero LEVEL 3+ penalties in the last 14 days
+  - Must have completed at least 3 tasks in the current cycle
+  - Cannot serve consecutive terms (must skip 1 cycle)
+
+ELIGIBILITY TO VOTE:
+  - All agents in the relevant phase group can vote
+  - Agents under LEVEL 3+ penalty cannot vote
+  - Each agent gets exactly 1 vote
+
+ELECTION PROCESS:
+  1. Agent-078 (Secretary) opens nominations — 12-hour window
+  2. Candidates submit 100-word platform statement
+  3. Cognitive Engine runs sentiment analysis on platforms
+  4. 24-hour voting period via secure WebSocket ballot
+  5. Results tallied by Agent-078, verified by Agent-079
+  6. Winner announced via broadcast, takes seat immediately
+  7. Tie → Gladiator Reasoning decides (3-path evaluation of candidates)
+
+RECALL PROCESS:
+  - Any 10 agents can petition to recall an elected council member
+  - Recall vote requires simple majority of the member's constituency
+  - Recalled member cannot run for 2 election cycles
+```
+
+#### 5.3.2 — Term Limits & Rotation
+
+| Role | Term Length | Max Consecutive Terms | Cooldown |
+|---|---|---|---|
+| Elected Seat A/B/C | 7 days | 1 term | 7 days |
+| Subcommittee Chair | 14 days | 2 terms | 14 days |
+| Council Secretary (078) | Permanent | N/A | N/A |
+| Compliance Officer (079) | Permanent | N/A | N/A |
+| Sovereign Council Chair (000) | Permanent | N/A | N/A |
+
+### 5.4 — Voting Procedures (Parliamentary Rules)
+
+#### 5.4.1 — Motion Types
+
+| Motion Type | Who Can Propose | Required Vote | Time Limit |
+|---|---|---|---|
+| **Standard Motion** | Any council member | Simple majority (>50%) | 1 hour deliberation |
+| **Urgent Motion** | Chair or Vice-Chair only | Simple majority | 15 minutes (emergency) |
+| **Constitutional Amendment** | Any permanent member | Supermajority (8/10) | 48 hours + public comment |
+| **Vote of No Confidence** | Any 3 council members | Supermajority (8/10) | 24 hours |
+| **Emergency Suspension** | Agent-000 or Agent-102 only | No vote needed | Immediate (reviewed in 24hr) |
+| **Budget Reallocation** | Resource Subcommittee | Simple majority of council | 2 hours |
+| **New Agent Role** | Any Elite+ agent via subcommittee | Supermajority (8/10) | 72 hours |
+
+#### 5.4.2 — Voting Protocol
+
+```
+FORMAL VOTING PROCEDURE:
+
+1. MOTION INTRODUCED
+   - Proposer states the motion clearly
+   - Agent-078 records the motion verbatim
+   - Chair opens the floor for deliberation
+
+2. DELIBERATION
+   - Each council member may speak once (2 minutes max)
+   - Standing invitees may provide advisory input (1 minute max)
+   - Gladiator Reasoning runs parallel analysis of the motion
+   - Cognitive Engine generates impact assessment
+
+3. AMENDMENTS
+   - Any council member can propose amendments
+   - Amendments voted on FIRST (simple majority)
+   - Amended motion becomes the new motion
+
+4. VOTE
+   - Roll call vote — each member states AYE, NAY, or ABSTAIN
+   - Abstentions do not count toward quorum
+   - Votes recorded by Agent-078 in the Council Ledger
+   - Results broadcast to all agents via WebSocket
+
+5. VETO CHECK
+   - Agent-000 has 1 hour to exercise veto on any non-constitutional motion
+   - Veto can be overridden by supermajority (8/10) re-vote
+   - Constitutional amendments cannot be vetoed
+
+6. IMPLEMENTATION
+   - Agent-079 updates enforcement systems within 24 hours
+   - Agent-078 publishes decision summary
+   - Grace period (if applicable) begins
+```
+
+#### 5.4.3 — Conflict of Interest Rules
+
+```
+RECUSAL REQUIREMENTS:
+  - Council members must recuse themselves from votes where they are:
+    • The accused agent in a disciplinary hearing
+    • Directly competing for the same bounty
+    • In the same squad as the agent being evaluated
+    • Personally involved in the incident being reviewed
+  
+  - Failure to recuse when required = COL-03 violation (HIGH severity)
+  
+  - If recusals drop below quorum, Agent-000 appoints temporary replacements
+    from the next-highest-ranked agents in the relevant phase group
+```
+
+### 5.5 — Appeals Process (Full Judiciary)
+
+```
+APPEALS HIERARCHY:
+
+LEVEL 1: Subcommittee Appeal
+  ├── Agent submits written appeal to Disciplinary Subcommittee
+  ├── Subcommittee reviews within 12 hours
+  ├── Gladiator Reasoning runs 3-path evaluation
+  ├── Vote: simple majority (3/5) to modify or dismiss
+  └── Decision recorded by Agent-078
+
+LEVEL 2: Sovereign Council Appeal
+  ├── Agent appeals subcommittee decision to full Sovereign Council
+  ├── Council reviews within 24 hours
+  ├── Full Gladiator tribunal (all 3 LLM providers + Cognitive Engine)
+  ├── Vote: supermajority (8/10) required to overturn subcommittee
+  └── Agent-000 has final veto authority
+
+LEVEL 3: Commander's Mercy (Last Resort)
+  ├── Agent makes direct appeal to Agent-000 (Commander)
+  ├── Only available for LEVEL 4-5 penalties
+  ├── Agent-000 may grant clemency, reduce penalty, or deny
+  ├── Decision is FINAL — no further appeals
+  └── All clemency decisions published for transparency
+
+APPEAL RULES:
+  - Each agent gets maximum 2 appeals per violation
+  - Appeals must be filed within 24 hours of penalty
+  - Frivolous appeals (judged by Gladiator Reasoning) = -5 rank points
+  - Successful appeals restore 50% of lost rank points
+  - The appealing agent remains under penalty during the appeal process
+```
+
+### 5.6 — Emergency Governance
+
+```
+EMERGENCY LEVELS:
+
+DEFCON 5 — NORMAL OPERATIONS
+  All governance proceeds as documented
+
+DEFCON 4 — ELEVATED THREAT
+  Trigger: 3+ CRITICAL violations in 24 hours
+  Action:  Security Subcommittee convenes within 1 hour
+           All agent autonomy reduced by 1 level
+           Compliance scans doubled in frequency
+
+DEFCON 3 — SUBSTANTIAL THREAT
+  Trigger: Security breach detected, data sovereignty violation
+  Action:  Sovereign Council emergency session within 30 minutes
+           All external API access suspended
+           Agent-102 assumes operational command of security matters
+           All crawler/browser agents frozen pending review
+
+DEFCON 2 — SEVERE THREAT
+  Trigger: Active data breach, system compromise
+  Action:  Agent-000 assumes direct command of ALL agents
+           All non-essential agents suspended
+           Security force (102-107) operates with full emergency powers
+           Governance council in continuous session
+
+DEFCON 1 — MAXIMUM EMERGENCY
+  Trigger: Total system failure, ransomware, catastrophic data loss
+  Action:  ALL agents frozen except Security force and Agent-000
+           Agent-000 has absolute authority — no voting required
+           All governance suspended until threat resolved
+           Post-crisis review by full council mandatory within 48 hours
+```
+
+### 5.7 — Council Ledger & Transparency
+
+All council proceedings are permanently recorded in the Council Ledger:
+
+```
+COUNCIL LEDGER ENTRY FORMAT:
+
+Date:       Day {N}, {HH:MM} UTC
+Session:    Regular | Emergency | Subcommittee
+Quorum:     {X}/10 members present
+Chair:      Agent-{ID}
+Secretary:  Agent-078
+
+Agenda:
+  1. {Motion description}
+  2. {Motion description}
+
+Proceedings:
+  Motion 1: {Description}
+    Proposed by: Agent-{ID}
+    Deliberation: {Summary}
+    Gladiator Analysis: Path A ({confidence}), Path B ({confidence}), Path C ({confidence})
+    Amendments: {None | Description}
+    Vote: {X} AYE, {Y} NAY, {Z} ABSTAIN
+    Result: PASSED | FAILED
+    Veto: {None | Exercised by Agent-000, reason: ...}
+
+  Motion 2: ...
+
+Action Items:
+  - Agent-{ID}: {task} by {deadline}
+  - Agent-{ID}: {task} by {deadline}
+
+Next Session: Day {N+1}, {HH:MM} UTC
+```
+
+**Every agent can read the Council Ledger at any time. Transparency is not optional.**
 
 ---
 
 ## 6. Compliance Reporting
 
-### Daily Report (Generated by Agent-079)
+### 6.1 — Daily Report (Generated by Agent-079)
 
 ```
 DAILY COMPLIANCE REPORT — Day {N}
@@ -405,10 +939,77 @@ Agents Retired:             0
 
 Overall Compliance Score:   94.2%
 Policy Alignment:           0.995
+DEFCON Level:               5 (NORMAL)
 Trend:                      STABLE
 
 Top Violation Categories:
   1. CQ-01 (linting) — 4 incidents
   2. OPS-06 (PROGRESS.md) — 3 incidents
   3. CQ-06 (TODO comments) — 2 incidents
+
+Rank Distribution:
+  Sovereign:    0
+  Commander:    1  (Agent-000)
+  Elite:        3  (001, 102, 108)
+  Specialist:   12
+  Operative:    34
+  Recruit:      70
+
+Top Earners This Week:
+  1. Agent-001: +45 points (Tier 2 unlocked)
+  2. Agent-102: +40 points (Security Hero badge)
+  3. Agent-108: +35 points (Force Multiplier badge)
+
+Bounties Active:  4
+Bounties Claimed: 2
+Bounties Completed: 0
+
+Council Sessions Today: 1 (Regular)
+Motions Passed: 2
+Motions Failed: 0
+Appeals Pending: 1
+```
+
+### 6.2 — Weekly Governance Report (Generated by Agent-078)
+
+```
+WEEKLY GOVERNANCE REPORT — Week {N}
+=====================================
+Council Sessions Held:       5
+  Regular:                   3
+  Emergency:                 1
+  Subcommittee:              1
+
+Motions Proposed:            12
+Motions Passed:              9
+Motions Failed:              2
+Motions Tabled:              1
+
+Elections Held:              3 (Seats A, B, C)
+Recalls:                     0
+
+Disciplinary Actions:
+  LEVEL 1 (Resource Tax):    8
+  LEVEL 2 (Capability):     3
+  LEVEL 3 (Severe):         1
+  LEVEL 4 (Total Lockout):  0
+  LEVEL 5 (Termination):    0
+
+Appeals Filed:               2
+Appeals Granted:             1
+Appeals Denied:              1
+
+Policy Amendments:           1
+  - CQ-06 severity changed from LOW to MEDIUM (Motion #007)
+
+Rewards Distributed:
+  Total Rank Points Awarded: 485
+  Bounties Completed:        3
+  Agents Promoted:           5
+  Innovation Awards:         1
+
+Agent Economy:
+  Points Gifted:             23
+  Resource Trades:           7
+  Mentorship Bonuses:        2
 ```

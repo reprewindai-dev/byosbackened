@@ -150,6 +150,12 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:3458",
         "http://localhost:3459",
+        "https://veklom.com",
+        "https://www.veklom.com",
+        "https://veklom.dev",
+        "https://www.veklom.dev",
+        "https://api.veklom.com",
+        "https://api.veklom.dev",
     ]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]

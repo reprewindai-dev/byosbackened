@@ -80,6 +80,7 @@ from apps.api.routers.source_of_truth_bridge import router as source_of_truth_br
 from apps.api.routers.pipeline_interactive import router as pipeline_interactive_router
 from apps.api.routers.referrals import router as referrals_router
 from apps.api.routers.onboarding import router as onboarding_router
+from apps.api.routers.stripe_connect import router as stripe_connect_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
@@ -247,6 +248,7 @@ app.include_router(internal_uacp_router, prefix=settings.api_prefix)
 app.include_router(pipeline_interactive_router, prefix=settings.api_prefix)
 app.include_router(referrals_router, prefix=settings.api_prefix)
 app.include_router(onboarding_router, prefix=settings.api_prefix)
+app.include_router(stripe_connect_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)

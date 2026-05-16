@@ -141,6 +141,28 @@ Or use the playbooks in `.agents/skills/` to invoke agents with pre-configured c
 | 114–119 | HRM Workforce | 6 |
 | **TOTAL** | | **100** |
 
+## Enterprise Production Readiness
+
+The full 3-tier enterprise audit is documented in [ENTERPRISE_AUDIT.md](./ENTERPRISE_AUDIT.md).
+
+| Tier | Track | Score | Verdict |
+|------|-------|-------|---------|
+| Tier 1 | Code Quality & Security | 78/100 | CONDITIONAL PASS |
+| Tier 2 | Infrastructure & DevOps | 82/100 | CONDITIONAL PASS |
+| Tier 3 | Architecture & Data Pipeline | 85/100 | PASS |
+| **Overall** | Enterprise Production Readiness | **81/100** | CONDITIONAL PASS |
+
+## Interactive Pipeline (Railway-Style)
+
+The full Railway-style interactive pipeline specification is in [PIPELINE.md](./PIPELINE.md).
+
+Key features:
+- 7-stage pipeline: Source → Build → Validate → Test → Stage → Gate → Deploy
+- Canary deployments with progressive rollout (10% → 25% → 50% → 100%)
+- Council voting gate for production deploys
+- Live log streaming, rollback buttons, service graph
+- Integration with agent workforce enforcement system
+
 ## Integration with Workforce-Control
 
 These agents align with the `workforce-control` package's 70-agent registry (`agent_registry_70.yaml`).

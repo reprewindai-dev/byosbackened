@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -15,11 +15,10 @@ import {
   ShieldX,
   X,
 } from "lucide-react";
-import { api, noRoute } from "@/lib/api";
+import { api } from "@/lib/api";
 import { cn, dateFromApiTimestamp, fmtNumber, formatApiDateTime, relativeTime } from "@/lib/cn";
 import type { OverviewPayload } from "@/types/api";
 import { ProofStrip, RunStatePanel } from "@/components/workspace/FlowPrimitives";
-import { fetchMonitoringFirstOverview } from "@/lib/services/runtime-truth.service";
 
 interface AuditLog {
   id: string;
@@ -39,85 +38,11 @@ interface AuditLog {
   request_id?: string | null;
 }
 
-interface MonitoringAlert {
-  id: string;
-  title: string;
-  description?: string | null;
-  severity: string;
-  type: string;
-  status: string;
-  created_at: string;
-  acknowledged_at?: string | null;
-  resolved_at?: string | null;
-}
-
-interface MonitoringAlertsResponse {
-  page: number;
-  page_size: number;
-  total: number;
-  alerts: MonitoringAlert[];
-}
-
-interface MonitoringLogEntry {
-  id: string;
-  operation_type: string;
-  provider: string;
-  model: string;
-  status: string;
-  cost: string;
-  pii_detected: boolean;
-  input_preview: string;
-  output_preview: string;
-  created_at: string;
-  latency_ms?: number | null;
-}
-
-interface MonitoringLogsResponse {
-  source: string;
-  generated_at: string;
-  total: number;
-  entries: MonitoringLogEntry[];
-}
-
 interface AuditLogsResp {
   total: number;
   offset: number;
   limit: number;
   logs: AuditLog[];
-}
-
-interface MonitoringHealthResp {
-  status: string;
-  score: number;
-  uptime_seconds: number;
-  components: Record<string, { status: string; response_time_ms?: number }>;
-  timestamp: string;
-}
-
-interface MonitoringMetricsResp {
-  timestamp: string;
-  period?: {
-    start: string;
-    end: string;
-  };
-}
-
-interface LegacyWorkspaceOverview {
-  period_start?: string;
-  period_end?: string;
-  total_api_calls?: number;
-  total_tokens_used?: number;
-  total_cost_usd?: number;
-  active_models?: string[];
-  live_feed?: Array<{
-    id: string;
-    kind?: string;
-    model?: string | null;
-    latency_ms?: number;
-    tokens?: number;
-    status?: string;
-    created_at?: string;
-  }>;
 }
 
 interface VerifyResp {
@@ -142,35 +67,14 @@ async function fetchLogs(params: { operation_type?: string; limit: number; offse
   return resp.data;
 }
 
-async function fetchMonitoringAlerts(params?: { status?: string; severity?: string; page?: number }) {
-  const resp = await api.get<MonitoringAlertsResponse>("/monitoring/alerts", { params });
-  return resp.data;
-}
-
-async function fetchMonitoringLogs() {
-  const resp = await api.get<MonitoringLogsResponse>("/monitoring/logs");
-  return resp.data;
-}
-
-async function fetchMonitoringHealth() {
-  const resp = await api.get<MonitoringHealthResp>("/monitoring/health");
-  return resp.data;
-}
-
-async function fetchMonitoringMetrics() {
-  const resp = await api.get<MonitoringMetricsResp>("/monitoring/metrics");
-  return resp.data;
-}
-
 async function fetchOverview() {
-  return fetchMonitoringFirstOverview<LegacyWorkspaceOverview, OverviewPayload>({
-    convertLegacy: fromLegacyOverview,
-    hasLive: hasLiveOverviewSignal,
-  });
+  const resp = await api.get<OverviewPayload>("/monitoring/overview");
+  return resp.data;
 }
 
 async function verifyLog(id: string) {
-  return noRoute<VerifyResp>(`/audit/verify/${encodeURIComponent(id)}`);
+  const resp = await api.get<VerifyResp>(`/audit/verify/${encodeURIComponent(id)}`);
+  return resp.data;
 }
 
 const OP_TYPES = ["all", "exec", "chat", "completion", "embedding", "tool"] as const;
@@ -192,35 +96,8 @@ export function MonitoringPage() {
     queryFn: fetchOverview,
     refetchInterval: 20_000,
   });
-  const alertsQuery = useQuery({
-    queryKey: ["monitoring-alerts"],
-    queryFn: () => fetchMonitoringAlerts({ page: 1 }),
-    refetchInterval: 20_000,
-  });
-  const monitoringLogs = useQuery({
-    queryKey: ["monitoring-logs"],
-    queryFn: fetchMonitoringLogs,
-    refetchInterval: 30_000,
-  });
-  const monitoringHealth = useQuery({
-    queryKey: ["monitoring-health"],
-    queryFn: fetchMonitoringHealth,
-    refetchInterval: 20_000,
-  });
-  const monitoringMetrics = useQuery({
-    queryKey: ["monitoring-metrics"],
-    queryFn: fetchMonitoringMetrics,
-    refetchInterval: 60_000,
-  });
 
   const logs = query.data?.logs ?? [];
-  const monitoringRouteUpdatedAt = Math.max(
-    query.dataUpdatedAt || 0,
-    overview.dataUpdatedAt || 0,
-    alertsQuery.dataUpdatedAt || 0,
-    monitoringHealth.dataUpdatedAt || 0,
-    monitoringMetrics.dataUpdatedAt || 0,
-  );
   const filteredLogs = useMemo(() => filterLogs(logs, logSearch), [logs, logSearch]);
   const stats = useMemo(() => summarize(logs, overview.data), [logs, overview.data]);
   const throughput = useMemo(() => buildBuckets(logs, overview.data), [logs, overview.data]);
@@ -237,14 +114,7 @@ export function MonitoringPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
-      <PageHeader
-        fetching={query.isFetching || overview.isFetching || alertsQuery.isFetching || monitoringHealth.isFetching || monitoringLogs.isFetching}
-        updatedAt={monitoringRouteUpdatedAt}
-        healthStatus={monitoringHealth.data?.status}
-        healthScore={monitoringHealth.data?.score}
-        alertsCount={alertsQuery.data?.total ?? 0}
-        monitoringLogSource={monitoringLogs.data?.source}
-      />
+      <PageHeader fetching={query.isFetching || overview.isFetching} updatedAt={query.dataUpdatedAt || overview.dataUpdatedAt} />
 
       <section>
         <KpiStrip stats={stats} />
@@ -274,31 +144,6 @@ export function MonitoringPage() {
           items={[
             { label: "logs", value: "/api/v1/audit/logs" },
             { label: "overview", value: overview.data ? "/api/v1/monitoring/overview" : overview.isError ? "unavailable" : "loading" },
-            {
-              label: "health",
-              value: monitoringHealth.data
-                ? `/api/v1/monitoring/health ${monitoringHealth.data.status} (${monitoringHealth.data.score})`
-                : monitoringHealth.isError
-                  ? "No route found"
-                  : "loading",
-            },
-            {
-              label: "alerts",
-              value: alertsQuery.data
-                ? `/api/v1/monitoring/alerts (${alertsQuery.data.total})`
-                : alertsQuery.isError
-                  ? "No route found"
-                  : "loading",
-            },
-            {
-              label: "logs",
-              value: monitoringLogs.data
-                ? `/api/v1/monitoring/logs (${monitoringLogs.data.total})`
-                : monitoringLogs.isError
-                  ? "No route found"
-                  : "loading",
-            },
-            { label: "metrics", value: monitoringMetrics.data ? "/api/v1/monitoring/metrics" : "loading" },
             { label: "freshness", value: query.dataUpdatedAt ? new Date(query.dataUpdatedAt).toLocaleTimeString() : "pending" },
             { label: "verification", value: "per-row hash check" },
           ]}
@@ -319,7 +164,7 @@ export function MonitoringPage() {
           <AuditRailPanel logs={filteredLogs} loading={query.isLoading} onSelect={setSelected} />
         </div>
 
-        <AlertsPanel alerts={alertsQuery.data?.alerts ?? []} loading={alertsQuery.isLoading} error={alertsQuery.error as Error | null} />
+        <AlertsPanel />
       </section>
 
       <nav className="frame mt-4 flex flex-wrap gap-1 p-1">
@@ -357,26 +202,12 @@ export function MonitoringPage() {
   );
 }
 
-function PageHeader({
-  fetching,
-  updatedAt,
-  healthStatus,
-  healthScore,
-  alertsCount,
-  monitoringLogSource,
-}: {
-  fetching: boolean;
-  updatedAt: number;
-  healthStatus?: string;
-  healthScore?: number;
-  alertsCount: number;
-  monitoringLogSource?: string;
-}) {
+function PageHeader({ fetching, updatedAt }: { fetching: boolean; updatedAt: number }) {
   const updated = updatedAt ? new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "pending";
   return (
     <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <div className="text-eyebrow">Monitoring Â· APM</div>
+        <div className="text-eyebrow">Monitoring · APM</div>
         <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">
           Real-time observability
         </h1>
@@ -385,38 +216,33 @@ function PageHeader({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone="ok" dot>
-            live Â· <span className="font-mono">/api/v1/audit/logs</span>
-          </Badge>
-          <Badge tone={healthStatus === "healthy" ? "ok" : "warn"}>
-            health {healthStatus ?? "unknown"} {healthScore != null ? `(${healthScore})` : ""}
-          </Badge>
-          <Badge tone="info">alerts {alertsCount}</Badge>
-          <Badge tone={monitoringLogSource ? "ok" : "muted"}>
-            logs {monitoringLogSource ? monitoringLogSource : "unavailable"}
+            live · <span className="font-mono">/api/v1/audit/logs</span>
           </Badge>
           <Badge tone={fetching ? "primary" : "muted"} icon={fetching ? <Activity className="h-3 w-3 animate-spin" /> : undefined}>
             refresh 20s - {updated}
           </Badge>
-          <Badge tone={healthStatus === "healthy" ? "ok" : "muted"}>
-            health {healthScore ?? 0} - {healthStatus ?? "unknown"}
-          </Badge>
-          <Badge tone={alertsCount > 0 ? "warn" : "ok"}>
-            {alertsCount} alerts
-          </Badge>
-          <Badge tone="muted">{monitoringLogSource ?? "audit-log"}</Badge>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <a className="v-btn-ghost h-8 px-3 text-xs" href="/monitoring">
+        <button
+          className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70"
+          disabled
+          title="Alert-rule persistence is not wired yet."
+        >
           <Bell className="h-3.5 w-3.5" /> Alerts
-        </a>
-        <a className="v-btn-primary h-8 px-3 text-xs" href="/compliance">
+        </button>
+        <button
+          className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70"
+          disabled
+          title="Activation required. Free evaluation can inspect runs but cannot export compliance-grade evidence."
+        >
           <Download className="h-3.5 w-3.5" /> Export Evidence Pack
-        </a>
+        </button>
       </div>
     </header>
   );
 }
+
 function KpiStrip({ stats }: { stats: ReturnType<typeof summarize> }) {
   const cards = [
     { label: "Requests / min", value: stats.requestsPerMinute.toFixed(2), delta: `${stats.total} shown`, data: stats.activitySeries },
@@ -589,52 +415,21 @@ function AuditRailPanel({
   );
 }
 
-function AlertsPanel({
-  alerts,
-  loading,
-  error,
-}: {
-  alerts: MonitoringAlert[];
-  loading: boolean;
-  error: Error | null;
-}) {
-  if (error) {
-    const message = (error as { response?: { status: number } }).response?.status === 404 ? "No route found" : (error as Error).message;
-    return (
-      <div className="frame mt-4 p-4">
-        <div className="rounded-md border border-crimson/35 bg-crimson/8 px-3 py-2 text-sm text-crimson">
-          Monitoring alerts endpoint unavailable: {message}
-        </div>
-      </div>
-    );
-  }
-
+function AlertsPanel() {
   return (
     <div className="frame mt-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-eyebrow">Monitoring alerts</div>
-          <div className="font-display text-[14px] text-bone">Realtime route health and operations alerts</div>
+          <div className="text-eyebrow">Alerts · routes & thresholds</div>
+          <div className="font-display text-[14px] text-bone">Email · Slack · PagerDuty</div>
         </div>
-        <button className="v-btn-ghost h-7 px-2 text-xs" disabled>
-          + Alert creation
+        <button className="v-btn-ghost h-7 cursor-not-allowed px-2 text-xs opacity-70" disabled title="Alert-rule backend is not wired yet.">
+          + New alert
         </button>
       </div>
       <div className="mt-3 rounded-md border border-dashed border-rule bg-ink-1/40 px-4 py-5 text-sm text-bone-2">
-        {loading && "loading..."}
-        {!loading && alerts.length === 0 && "No active alerts in this workspace."}
-        {!loading &&
-          alerts.length > 0 &&
-          alerts.map((alert) => (
-            <div key={alert.id} className="mb-2 flex items-center justify-between border-b border-rule/50 py-2 last:mb-0 last:border-0 last:pb-0">
-              <div className="flex items-center gap-2">
-                <Badge tone={alert.status === "open" ? "warn" : "ok"}>{alert.status}</Badge>
-                <span className="font-medium text-bone-2">{alert.title}</span>
-                <span className="text-xs text-muted">[{alert.severity}]</span>
-              </div>
-              <span className="text-xs text-muted">{relativeTime(alert.created_at)}</span>
-            </div>
-          ))}
+        No live alert-rule endpoint is wired yet. This panel is intentionally empty until real alert rules can be read
+        and saved.
       </div>
     </div>
   );
@@ -884,129 +679,6 @@ function buildBuckets(logs: AuditLog[], overview?: OverviewPayload): Bucket[] {
   return buckets;
 }
 
-function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
-  const calls = Number(data.total_api_calls ?? 0);
-  const tokens = Number(data.total_tokens_used ?? 0);
-  const costUsd = Number(data.total_cost_usd ?? 0);
-  const periodStart = data.period_start ? (dateFromApiTimestamp(data.period_start)?.getTime() ?? Date.now()) : Date.now();
-  const periodEnd = data.period_end ? (dateFromApiTimestamp(data.period_end)?.getTime() ?? Date.now()) : Date.now();
-  const minutes = Math.max(1, Math.round((periodEnd - periodStart) / 60000));
-  const activeModels = data.active_models ?? [];
-  const recent = data.live_feed ?? [];
-
-  return {
-    kpi: {
-      requests_per_minute: Number((calls / minutes).toFixed(2)),
-      requests_delta_pct: 0,
-      p50_latency_ms: percentile(recent.map((row) => Number(row.latency_ms ?? 0)).filter(Boolean), 0.5),
-      p50_delta_ms: 0,
-      tokens_per_second: Number((tokens / Math.max(1, minutes * 60)).toFixed(2)),
-      tokens_delta_pct: 0,
-      spend_today_cents: Math.round(costUsd * 100),
-      spend_cap_pct: 0,
-      requests_series: bucketLegacySeries(recent, (row) => Number(row.tokens ?? 1)),
-      tokens_series: bucketLegacySeries(recent, (row) => Number(row.tokens ?? 0)),
-      spend_series: bucketLegacySeries(recent, () => 0),
-      active_models: activeModels.length,
-      active_models_quantized: activeModels.filter((model) => /q[0-9]/i.test(model)).length,
-      audit_entries: recent.length,
-      audit_verified_pct: recent.length ? 100 : 0,
-    },
-    routing: {
-      primary_plane: "Hetzner primary",
-      burst_plane: "Approved fallback",
-      primary_util_pct: calls ? 100 : 0,
-      burst_util_pct: 0,
-      primary_hosts: [{ name: "hetzner-fsn1", util_pct: calls ? 100 : 0, detail: `${calls} live call(s)` }],
-      series: legacyRoutingSeries(recent),
-    },
-    spend: {
-      spend_cents: Math.round(costUsd * 100),
-      cap_cents: 0,
-      inference_cents: Math.round(costUsd * 100),
-      embeddings_cents: 0,
-      gpu_burst_cents: 0,
-      storage_cents: 0,
-      burn_rate_per_min_cents: minutes ? Math.round((costUsd * 100) / minutes) : 0,
-      forecast_eod_cents: Math.round(costUsd * 100),
-      forecast_cap_pct: 0,
-    },
-    recent_runs: recent.map((row) => ({
-      id: row.id,
-      model: row.model ?? "unknown",
-      route: "primary",
-      latency_ms: Number(row.latency_ms ?? 0),
-      tokens: Number(row.tokens ?? 0),
-      cost_cents: 0,
-      policy: row.status === "error" ? "blocked" : "passed",
-      when: row.created_at ?? new Date().toISOString(),
-    })),
-    policy_events: [],
-    alerts: [],
-    audit_trail: recent.map((row) => ({
-      id: row.id,
-      kind: row.kind ?? "request",
-      subject: row.model ?? "workspace call",
-      actor: "workspace",
-      ts: row.created_at ?? new Date().toISOString(),
-      hash_prefix: row.id.slice(0, 12),
-    })),
-    fleet: activeModels.map((model) => ({
-      id: model,
-      name: model,
-      quant: /q[0-9]/i.exec(model)?.[0] ?? "fp16",
-      replicas: 1,
-      route: "primary",
-      p50_ms: 0,
-    })),
-  };
-}
-
-function hasLiveOverviewSignal(data: OverviewPayload | null | undefined): boolean {
-  if (!data) return false;
-  return Boolean(
-    data.kpi.audit_entries > 0 ||
-    data.recent_runs.length > 0 ||
-    data.kpi.active_models > 0 ||
-    data.policy_events.length > 0 ||
-    data.alerts.length > 0 ||
-    data.kpi.p50_latency_ms > 0 ||
-    data.spend.spend_cents > 0,
-  );
-}
-
-function bucketLegacySeries<T extends { created_at?: string }>(rows: T[], valueFor: (row: T) => number): number[] {
-  const buckets = Array.from({ length: 20 }, () => 0);
-  if (!rows.length) return buckets;
-  const sorted = [...rows].sort((a, b) => {
-    const at = dateFromApiTimestamp(a.created_at ?? "")?.getTime() ?? 0;
-    const bt = dateFromApiTimestamp(b.created_at ?? "")?.getTime() ?? 0;
-    return at - bt;
-  });
-  sorted.forEach((row, index) => {
-    const bucket = Math.min(19, Math.floor((index / Math.max(1, sorted.length)) * 20));
-    buckets[bucket] += Math.max(0, valueFor(row));
-  });
-  return buckets;
-}
-
-function legacyRoutingSeries(rows: NonNullable<LegacyWorkspaceOverview["live_feed"]>): OverviewPayload["routing"]["series"] {
-  if (!rows.length) return [];
-  const buckets = Array.from({ length: 24 }, (_, i) => ({ t: `${String(i).padStart(2, "0")}:00`, primary: 0, burst: 0 }));
-  rows.forEach((row, index) => {
-    const bucket = Math.min(23, Math.floor((index / Math.max(1, rows.length)) * 24));
-    const provider = (row.model ?? "").toLowerCase();
-    if (provider.includes("groq") || provider.includes("aws") || provider.includes("bedrock")) buckets[bucket].burst += 1;
-    else buckets[bucket].primary += 1;
-  });
-  const max = Math.max(1, ...buckets.map((bucket) => bucket.primary + bucket.burst));
-  return buckets.map((bucket) => ({
-    ...bucket,
-    primary: Math.round((bucket.primary / max) * 100),
-    burst: Math.round((bucket.burst / max) * 100),
-  }));
-}
-
 function bucketFlag(logs: AuditLog[], predicate: (log: AuditLog) => boolean): number[] {
   const buckets = Array.from({ length: 20 }, () => 0);
   logs.forEach((log, index) => {
@@ -1201,4 +873,3 @@ function Badge({
     </span>
   );
 }
-

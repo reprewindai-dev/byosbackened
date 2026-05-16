@@ -136,7 +136,7 @@ async function fetchPreflight(listingId: string): Promise<Preflight> {
 }
 
 async function fetchMyOrders(): Promise<MarketplaceOrder[]> {
-  const r = await api.get<{ items: MarketplaceOrder[] }>("/marketplace/orders", { params: { limit: 25 } });
+  const r = await api.get<{ items: MarketplaceOrder[] }>("/marketplace/orders/me", { params: { limit: 25 } });
   return r.data.items ?? [];
 }
 
@@ -265,7 +265,7 @@ export function MarketplacePage() {
   const checkoutMut = useMutation({
     mutationFn: async (id: string) => {
       const r = await api.post<{ checkout_url: string; order_id?: string }>(
-        "/marketplace/checkout",
+        "/marketplace/payments/create-checkout",
         {
           listing_id: id,
           success_url: window.location.href,
@@ -639,7 +639,7 @@ export function MarketplacePage() {
                 { label: "listing", value: selected.id },
                 { label: "source", value: selected.source_verified ? "verified" : "pending" },
                 { label: "preflight", value: preflightQ.data ? "returned" : preflightQ.isError ? "unavailable" : "loading" },
-                { label: "orders", value: "/api/v1/marketplace/orders" },
+                { label: "orders", value: "/api/v1/marketplace/orders/me" },
               ]}
             />
 

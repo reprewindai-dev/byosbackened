@@ -343,7 +343,7 @@ function IdentityTab() {
         {!user?.mfa_enabled && (
           <a
             className="mt-4 inline-flex items-center gap-2 rounded-lg border border-brass/35 bg-brass/10 px-3 py-2 text-[12px] font-semibold text-brass-2 hover:bg-brass/15"
-            href="#/team"
+            href="/team"
           >
             Set up MFA in Team <ExternalLink className="h-3.5 w-3.5" />
           </a>
@@ -410,7 +410,7 @@ function ApiKeysTab() {
             Live workspace keys used in the <span className="font-mono text-brass-2">X-API-Key</span> header
           </h3>
         </div>
-        <a className="v-btn-ghost" href="#/vault">
+        <a className="v-btn-ghost" href="/vault">
           Open Vault <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </header>

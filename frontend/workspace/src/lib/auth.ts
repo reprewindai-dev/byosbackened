@@ -35,7 +35,7 @@ export async function fetchMe(): Promise<User> {
 }
 
 export async function beginGithubLogin(): Promise<{ auth_url: string; state: string }> {
-  const resp = await api.get<{ auth_url: string; state: string }>("/auth/github");
+  const resp = await api.get<{ auth_url: string; state: string }>("/auth/github/login");
   return resp.data;
 }
 

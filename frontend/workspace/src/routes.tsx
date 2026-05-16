@@ -1,101 +1,77 @@
-import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
+import { AppShell } from "./components/layout/AppShell";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { GithubCallbackPage } from "./pages/GithubCallbackPage";
+import { AcceptInvitePage } from "./pages/AcceptInvitePage";
+import { ControlCenterPage } from "./pages/ControlCenterPage";
+import { OverviewPage } from "./pages/OverviewPage";
+import { UacpPage } from "./pages/UacpPage";
+import { PlaygroundPage } from "./pages/PlaygroundPage";
+import { MarketplacePage } from "./pages/MarketplacePage";
+import { BillingPage } from "./pages/BillingPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { MonitoringPage } from "./pages/MonitoringPage";
+import { VaultPage } from "./pages/VaultPage";
+import { TeamPage } from "./pages/TeamPage";
+import { CompliancePage } from "./pages/CompliancePage";
+import { ModelsPage } from "./pages/ModelsPage";
+import { PipelinesPage } from "./pages/PipelinesPage";
+import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { useAuthStore } from "@/store/auth-store";
 
-const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import("@/pages/RegisterPage").then((m) => ({ default: m.RegisterPage })));
-const AcceptInvitePage = lazy(() => import("@/pages/AcceptInvitePage").then((m) => ({ default: m.AcceptInvitePage })));
-const GithubCallbackPage = lazy(() => import("@/pages/GithubCallbackPage").then((m) => ({ default: m.GithubCallbackPage })));
-const PlaygroundPage = lazy(() => import("@/pages/PlaygroundPage").then((m) => ({ default: m.PlaygroundPage })));
-const MarketplacePage = lazy(() => import("@/pages/MarketplacePage").then((m) => ({ default: m.MarketplacePage })));
-const ModelsPage = lazy(() => import("@/pages/ModelsPage").then((m) => ({ default: m.ModelsPage })));
-const PipelinesPage = lazy(() => import("@/pages/PipelinesPage").then((m) => ({ default: m.PipelinesPage })));
-const DeploymentsPage = lazy(() => import("@/pages/DeploymentsPage").then((m) => ({ default: m.DeploymentsPage })));
-const VaultPage = lazy(() => import("@/pages/VaultPage").then((m) => ({ default: m.VaultPage })));
-const CompliancePage = lazy(() => import("@/pages/CompliancePage").then((m) => ({ default: m.CompliancePage })));
-const MonitoringPage = lazy(() => import("@/pages/MonitoringPage").then((m) => ({ default: m.MonitoringPage })));
-const AutonomyPage = lazy(() => import("@/pages/AutonomyPage").then((m) => ({ default: m.AutonomyPage })));
-const BillingPage = lazy(() => import("@/pages/BillingPage").then((m) => ({ default: m.BillingPage })));
-const TeamPage = lazy(() => import("@/pages/TeamPage").then((m) => ({ default: m.TeamPage })));
-const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
-const ControlCenterPage = lazy(() => import("@/pages/ControlCenterPage").then((m) => ({ default: m.ControlCenterPage })));
-const CompetitiveAdvantagePage = lazy(() => import("@/pages/CompetitiveAdvantagePage").then((m) => ({ default: m.CompetitiveAdvantagePage })));
-const UacpPage = lazy(() => import("@/pages/UacpPage").then((m) => ({ default: m.UacpPage })));
-
-// --- NEW: previously unwired router groups ---
-const RoutingPage = lazy(() => import("@/pages/RoutingPage").then((m) => ({ default: m.RoutingPage })));
-const BudgetPage = lazy(() => import("@/pages/BudgetPage").then((m) => ({ default: m.BudgetPage })));
-const SecurityPage = lazy(() => import("@/pages/SecurityPage").then((m) => ({ default: m.SecurityPage })));
-const PrivacyPage = lazy(() => import("@/pages/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
-const ContentSafetyPage = lazy(() => import("@/pages/ContentSafetyPage").then((m) => ({ default: m.ContentSafetyPage })));
-const InsightsPage = lazy(() => import("@/pages/InsightsPage").then((m) => ({ default: m.InsightsPage })));
-const PluginsPage = lazy(() => import("@/pages/PluginsPage").then((m) => ({ default: m.PluginsPage })));
-const JobsPage = lazy(() => import("@/pages/JobsPage").then((m) => ({ default: m.JobsPage })));
-
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((s) => s.accessToken);
-  return token ? <>{children}</> : <Navigate to="/login" replace />;
+function SuperuserOnly({ children }: { children: ReactNode }) {
+  const user = useAuthStore((s) => s.user);
+  return user?.is_superuser ? <>{children}</> : <Navigate to="/overview" replace />;
 }
 
-function Fallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-brass border-t-transparent" />
-    </div>
-  );
+function HomeRoute() {
+  return <Navigate to="/overview" replace />;
+}
+
+function OverviewRoute() {
+  return <OverviewPage />;
+}
+
+function MfaProtected({ children }: { children: ReactNode }) {
+  const user = useAuthStore((s) => s.user);
+  const location = useLocation();
+  if (!user?.mfa_enabled) {
+    return <Navigate to="/team" replace state={{ from: location.pathname, mfaRequired: true }} />;
+  }
+  return <>{children}</>;
 }
 
 export function AppRoutes() {
   return (
-    <Suspense fallback={<Fallback />}>
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/accept-invite" element={<AcceptInvitePage />} />
-        <Route path="/auth/github/callback" element={<GithubCallbackPage />} />
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/auth/github/callback" element={<GithubCallbackPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-        {/* Protected workspace */}
-        <Route path="/" element={<RequireAuth><Navigate to="/playground" replace /></RequireAuth>} />
-        <Route path="/playground" element={<RequireAuth><PlaygroundPage /></RequireAuth>} />
-        <Route path="/gpc" element={<RequireAuth><UacpPage /></RequireAuth>} />
-        <Route path="/uacp/v0" element={<RequireAuth><UacpPage /></RequireAuth>} />
-        <Route path="/uacp/v1" element={<RequireAuth><UacpPage /></RequireAuth>} />
-        <Route path="/uacp/v2" element={<RequireAuth><UacpPage /></RequireAuth>} />
-        <Route path="/uacp/v3" element={<RequireAuth><UacpPage /></RequireAuth>} />
-        <Route path="/uacp/v4" element={<RequireAuth><UacpPage /></RequireAuth>} />
-        <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
-        <Route path="/models" element={<RequireAuth><ModelsPage /></RequireAuth>} />
-        <Route path="/pipelines" element={<RequireAuth><PipelinesPage /></RequireAuth>} />
-        <Route path="/deployments" element={<RequireAuth><DeploymentsPage /></RequireAuth>} />
-        <Route path="/vault" element={<RequireAuth><VaultPage /></RequireAuth>} />
-        <Route path="/compliance" element={<RequireAuth><CompliancePage /></RequireAuth>} />
-        <Route path="/autonomy" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
-        <Route path="/automation" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
-        <Route path="/operators" element={<RequireAuth><AutonomyPage /></RequireAuth>} />
-        <Route path="/monitoring" element={<RequireAuth><MonitoringPage /></RequireAuth>} />
-        <Route path="/billing" element={<RequireAuth><BillingPage /></RequireAuth>} />
-        <Route path="/team" element={<RequireAuth><TeamPage /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+      <Route element={<AppShell />}>
+        <Route index element={<HomeRoute />} />
+        <Route path="/dashboard" element={<MfaProtected><SuperuserOnly><ControlCenterPage /></SuperuserOnly></MfaProtected>} />
+        <Route path="/control-center" element={<MfaProtected><SuperuserOnly><ControlCenterPage /></SuperuserOnly></MfaProtected>} />
+        <Route path="/overview" element={<OverviewRoute />} />
+        <Route path="/uacp" element={<UacpPage />} />
+        <Route path="/playground" element={<PlaygroundPage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/marketplace/:slug" element={<MarketplacePage />} />
+        <Route path="/models" element={<ModelsPage />} />
+        <Route path="/pipelines" element={<PipelinesPage />} />
+        <Route path="/deployments" element={<DeploymentsPage />} />
+        <Route path="/vault" element={<MfaProtected><VaultPage /></MfaProtected>} />
+        <Route path="/compliance" element={<CompliancePage />} />
+        <Route path="/monitoring" element={<MonitoringPage />} />
+        <Route path="/billing" element={<MfaProtected><BillingPage /></MfaProtected>} />
+        <Route path="/team" element={<TeamPage />} />
+        <Route path="/settings" element={<MfaProtected><SettingsPage /></MfaProtected>} />
+      </Route>
 
-        {/* Superuser / internal */}
-        <Route path="/control-center" element={<RequireAuth><ControlCenterPage /></RequireAuth>} />
-        <Route path="/competitive" element={<RequireAuth><CompetitiveAdvantagePage /></RequireAuth>} />
-        <Route path="/uacp" element={<RequireAuth><UacpPage /></RequireAuth>} />
-
-        {/* NEW routes — previously 0% wired */}
-        <Route path="/routing" element={<RequireAuth><RoutingPage /></RequireAuth>} />
-        <Route path="/budget" element={<RequireAuth><BudgetPage /></RequireAuth>} />
-        <Route path="/security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
-        <Route path="/privacy" element={<RequireAuth><PrivacyPage /></RequireAuth>} />
-        <Route path="/content-safety" element={<RequireAuth><ContentSafetyPage /></RequireAuth>} />
-        <Route path="/insights" element={<RequireAuth><InsightsPage /></RequireAuth>} />
-        <Route path="/plugins" element={<RequireAuth><PluginsPage /></RequireAuth>} />
-        <Route path="/jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/playground" replace />} />
-      </Routes>
-    </Suspense>
+      <Route path="*" element={<HomeRoute />} />
+    </Routes>
   );
 }

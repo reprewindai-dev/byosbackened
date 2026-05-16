@@ -11,8 +11,7 @@ declare global {
 }
 
 function normalizeBaseUrl(value?: string | null): string {
-  if (!value) return "";
-  return value.replace(/\/+$/, "").replace(/\/api\/v1$/i, "");
+  return value ? value.replace(/\/+$/, "") : "";
 }
 
 export function resolveApiBase(): string {
@@ -27,6 +26,7 @@ export function resolveApiBase(): string {
   if (typeof location !== "undefined") {
     const h = location.hostname;
     if (/^localhost$|^127\.|^0\.0\.0\.0$/.test(h)) return "";
+    if (/veklom\.dev$/i.test(h)) return "https://api.veklom.dev";
     if (/veklom\.com$/i.test(h)) return "https://api.veklom.com";
   }
   return "";
@@ -54,11 +54,6 @@ export const apiRoot: AxiosInstance = axios.create({
   timeout: DEFAULT_API_TIMEOUT_MS,
   transitional: { clarifyTimeoutError: true },
 });
-
-export function noRoute<T = unknown>(path: string, ...context: unknown[]): Promise<T> {
-  void context;
-  return Promise.reject(new Error(`No route found: ${path}`));
-}
 
 function attachAuthHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
   const token = useAuthStore.getState().accessToken;

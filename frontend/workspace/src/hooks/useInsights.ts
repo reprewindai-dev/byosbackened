@@ -35,7 +35,7 @@ export function useInsights() {
         savings?: { total?: string; percent?: number; projected_next_month?: string };
         performance?: { latency_reduction_ms?: number; cache_hit_rate_improvement?: number };
         operations?: { count?: number };
-      }>("/insights");
+      }>("/insights/summary");
       return [
         {
           id: "insights-summary",
@@ -87,7 +87,7 @@ export function useSuggestions() {
     queryFn: async () => {
       const { data } = await api.get<{
         suggestions: Array<{ type: string; title: string; description: string; impact: string; priority: number }>;
-      }>("/insights/recommendations");
+      }>("/suggestions");
       const rows: WorkspaceSuggestion[] = (data.suggestions ?? []).map((s, index) => ({
         id: `${s.type}-${index}`,
         type: s.type as WorkspaceSuggestion["type"],

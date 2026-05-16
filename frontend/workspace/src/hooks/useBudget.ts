@@ -41,7 +41,7 @@ export function useBudgetCaps() {
         current_spend: string;
         percent_used: number;
         period_end: string;
-      }>>("/budget/caps");
+      }>>("/budget");
       return data.map((budget) => ({
         id: budget.id,
         scope: "workspace",
@@ -73,7 +73,7 @@ export function useCreateBudgetCap() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Omit<BudgetCap, "id" | "spent_usd" | "utilization_pct" | "status" | "resets_at">) =>
-      api.post<BudgetCap>("/budget/caps", {
+      api.post<BudgetCap>("/budget", {
         budget_type: payload.period,
         amount: payload.limit_usd,
         alert_thresholds: [payload.alert_threshold_pct],

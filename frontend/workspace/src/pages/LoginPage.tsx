@@ -19,7 +19,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const from =
     (location.state as { from?: string } | null)?.from ??
-    (currentUser?.is_superuser ? "/control-center" : "/");
+    (currentUser?.is_superuser ? "/control-center" : "/overview");
 
   if (status === "authenticated") {
     return (

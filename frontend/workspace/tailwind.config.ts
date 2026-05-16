@@ -1,38 +1,31 @@
 import type { Config } from "tailwindcss";
 
-// =============================================================
-// VEKLOM DESIGN SYSTEM — Black + Brass/Orange
-// LOCKED PALETTE — Do NOT add violet, purple, indigo, or any
-// light-mode colors. This is a dark-only app.
-// Accent hierarchy: brass (primary) → moss (success) → crimson (error) → amber (warn)
-// =============================================================
-
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
         ink: {
-          DEFAULT: "#ffffff",
-          1: "#f8fafc",
-          2: "#f3f4f6",
-          3: "#e5e7eb",
+          DEFAULT: "#070810",
+          1: "#0b0d16",
+          2: "#10131e",
+          3: "#161a28",
         },
         rule: {
-          DEFAULT: "#e5e7eb",
-          2: "#d1d5db",
+          DEFAULT: "#1e2230",
+          2: "#272c3e",
         },
         bone: {
-          DEFAULT: "#111827",
-          2: "#374151",
+          DEFAULT: "#f4f2ed",
+          2: "#c8cbd6",
         },
         muted: {
-          DEFAULT: "#64748b",
-          2: "#94a3b8",
+          DEFAULT: "#7b849a",
+          2: "#566077",
         },
         brass: {
-          DEFAULT: "#111827",
-          2: "#334155",
+          DEFAULT: "#c4925b",
+          2: "#e5b16e",
         },
         moss: {
           DEFAULT: "#5dd8a5",
@@ -41,13 +34,14 @@ export default {
           DEFAULT: "#6ea8fe",
         },
         amber: {
-          DEFAULT: "#64748b",
+          DEFAULT: "#f0b340",
         },
         crimson: {
           DEFAULT: "#ff6b6b",
         },
-        // ❌ violet PERMANENTLY REMOVED — was leaking #a78bfa purple into UI
-        // ❌ Do NOT re-add violet, purple, indigo, or any light-mode surface color
+        violet: {
+          DEFAULT: "#a78bfa",
+        },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
@@ -57,8 +51,8 @@ export default {
         "2xs": ["10px", "14px"],
       },
       boxShadow: {
-        soft: "0 1px 0 rgba(255,255,255,0.9) inset, 0 18px 45px -35px rgba(15,23,42,0.35)",
-        "brass-glow": "0 0 0 rgba(0,0,0,0)",
+        soft: "0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px -20px rgba(0,0,0,0.8)",
+        "brass-glow": "0 0 20px rgba(229,177,110,0.35)",
         "moss-glow": "0 0 20px rgba(93,216,165,0.35)",
       },
       animation: {

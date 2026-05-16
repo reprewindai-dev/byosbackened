@@ -31,7 +31,7 @@ export function GithubCallbackPage() {
           setLoading(false);
           return;
         }
-        navigate("/", { replace: true });
+        navigate("/overview", { replace: true });
       } catch (err: unknown) {
         const detail =
           (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
@@ -49,7 +49,7 @@ export function GithubCallbackPage() {
     setError(null);
     try {
       await completeGithubMfa(challengeToken, mfaCode);
-      navigate("/", { replace: true });
+      navigate("/overview", { replace: true });
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??

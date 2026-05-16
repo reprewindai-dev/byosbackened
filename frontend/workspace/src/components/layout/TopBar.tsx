@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   User as UserIcon,
 } from "lucide-react";
-import { api, apiRoot } from "@/lib/api";
+import { api } from "@/lib/api";
 import { logout } from "@/lib/auth";
 import { cn, fmtCents } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
@@ -27,55 +27,19 @@ interface WalletBalance {
   monthly_credits_used: number;
 }
 
-interface StatusFeedItem {
-  id?: string;
-  title?: string;
-  description?: string;
-  severity?: string;
-  status?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface StatusPayload {
-  timestamp?: string;
-  overall_status?: string;
-  current_status?: string;
-  incidents?: StatusFeedItem[];
-  maintenance?: StatusFeedItem[];
-}
-
-interface OperatorDigest {
-  findings?: Array<{
-    code: string;
-    title: string;
-    severity: string;
-    operator_action: string;
-  }>;
-}
-
 const JUMP_ROUTES = [
+  { label: "overview", to: "/overview" },
   { label: "dashboard", to: "/control-center" },
   { label: "control center", to: "/control-center" },
   { label: "owner console", to: "/control-center" },
   { label: "playground", to: "/playground" },
-  { label: "gpc", to: "/gpc" },
   { label: "marketplace", to: "/marketplace" },
   { label: "models", to: "/models" },
   { label: "pipelines", to: "/pipelines" },
   { label: "deployments", to: "/deployments" },
-  { label: "routing", to: "/routing" },
   { label: "vault", to: "/vault" },
   { label: "api keys", to: "/vault" },
   { label: "compliance", to: "/compliance" },
-  { label: "security", to: "/security" },
-  { label: "privacy", to: "/privacy" },
-  { label: "content safety", to: "/content-safety" },
-  { label: "insights", to: "/insights" },
-  { label: "budget", to: "/budget" },
-  { label: "plugins", to: "/plugins" },
-  { label: "jobs", to: "/jobs" },
-  { label: "autonomy", to: "/autonomy" },
   { label: "monitoring", to: "/monitoring" },
   { label: "billing", to: "/billing" },
   { label: "team", to: "/team" },
@@ -99,21 +63,8 @@ export function TopBar() {
   });
   const wallet = useQuery({
     queryKey: ["topbar-wallet"],
-    queryFn: async () => (await api.get<WalletBalance>("/billing/wallet")).data,
+    queryFn: async () => (await api.get<WalletBalance>("/wallet/balance")).data,
     refetchInterval: 30_000,
-    retry: false,
-  });
-  const statusFeed = useQuery({
-    queryKey: ["topbar-status-feed"],
-    queryFn: async () => (await apiRoot.get<StatusPayload>("/status/data")).data,
-    refetchInterval: 60_000,
-    retry: false,
-  });
-  const operatorDigest = useQuery({
-    queryKey: ["topbar-operator-digest"],
-    queryFn: async () => (await api.get<OperatorDigest>("/operators/digest")).data,
-    enabled: Boolean(user?.is_superuser),
-    refetchInterval: 60_000,
     retry: false,
   });
 
@@ -150,8 +101,6 @@ export function TopBar() {
 
   const policyEvents = overview.data?.policy_events ?? [];
   const alerts = overview.data?.alerts ?? [];
-  const statusItems = [...(statusFeed.data?.incidents ?? []), ...(statusFeed.data?.maintenance ?? [])];
-  const operatorFindings = operatorDigest.data?.findings ?? [];
   const notifications = useMemo(() => {
     const merged: Array<{ id: string; title: string; detail?: string; ts: string; severity: "info" | "warn" | "error" }> = [];
     for (const a of alerts) {
@@ -172,28 +121,10 @@ export function TopBar() {
         severity: "info",
       });
     }
-    for (const item of statusItems.slice(0, 4)) {
-      merged.push({
-        id: `status-${item.id ?? item.title ?? "item"}`,
-        title: item.title || "Status update",
-        detail: item.description,
-        ts: item.updated_at || item.created_at || statusFeed.data?.timestamp || new Date().toISOString(),
-        severity: item.severity === "critical" ? "error" : item.severity === "warning" ? "warn" : "info",
-      });
-    }
-    for (const finding of operatorFindings.slice(0, 4)) {
-      merged.push({
-        id: `operator-${finding.code}`,
-        title: finding.title,
-        detail: finding.operator_action,
-        ts: new Date().toISOString(),
-        severity: finding.severity === "critical" ? "error" : finding.severity === "high" ? "warn" : "info",
-      });
-    }
     return merged
       .sort((left, right) => new Date(right.ts).getTime() - new Date(left.ts).getTime())
       .slice(0, 8);
-  }, [alerts, operatorFindings, policyEvents, statusFeed.data?.timestamp, statusItems]);
+  }, [alerts, policyEvents]);
   const notifCount = notifications.length;
 
   const submitJump = () => {
@@ -211,7 +142,7 @@ export function TopBar() {
     try {
       await logout();
     } finally {
-      navigate("/", { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 
@@ -274,8 +205,8 @@ export function TopBar() {
         <span className="v-chip hidden 2xl:inline-flex">
           <span className="text-amber">{budgetPct != null ? `${budgetPct}%` : "--"}</span> policy
         </span>
-        <span className={degraded || (statusFeed.data?.incidents?.length ?? 0) > 0 ? "v-chip v-chip-warn" : "v-chip v-chip-ok"}>
-          {degraded ? "degraded" : statusFeed.data?.overall_status ?? statusFeed.data?.current_status ?? "healthy"}
+        <span className={degraded ? "v-chip v-chip-warn" : "v-chip v-chip-ok"}>
+          {degraded ? "degraded" : "healthy"}
         </span>
         <span className="v-chip v-chip-brass">tenant-scoped</span>
       </div>
@@ -375,10 +306,10 @@ export function TopBar() {
                   className="w-full text-left font-mono text-[11px] text-muted hover:text-bone"
                   onClick={() => {
                     setNotifOpen(false);
-                    navigate("/autonomy");
+                    navigate("/monitoring");
                   }}
                 >
-                  View all in Autonomy {"->"}
+                  View all in Monitoring →
                 </button>
               </div>
             </div>
@@ -427,7 +358,7 @@ export function TopBar() {
                 }}
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
-                {isSuperuser ? "Owner console" : "Workspace hub"}
+                {isSuperuser ? "Owner console" : "Workspace overview"}
               </button>
               <button
                 type="button"

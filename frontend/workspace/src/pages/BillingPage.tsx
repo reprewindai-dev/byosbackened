@@ -12,7 +12,6 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { billingService } from "@/lib/services/billing.service";
 import { cn, fmtCents, fmtNumber, formatApiDate, relativeTime } from "@/lib/cn";
 import { LiveErrorBox, ProofStrip } from "@/components/workspace/FlowPrimitives";
 
@@ -73,10 +72,6 @@ interface PlanDefinition {
   pricing?: Record<string, number | string | null>;
 }
 
-interface CheckoutPlan {
-  plan: "starter" | "pro";
-}
-
 interface PlansResponse {
   plans: PlanDefinition[];
 }
@@ -101,13 +96,13 @@ const EVENT_PRICES = [
 ];
 
 async function fetchBalance() {
-  return (await billingService.getWallet()).data;
+  return (await api.get<WalletBalance>("/wallet/balance")).data;
 }
-async function fetchTransactions(): Promise<TxnList> {
-  return (await billingService.getTransactions({ limit: 25, offset: 0 })).data;
+async function fetchTransactions() {
+  return (await api.get<TxnList>("/wallet/transactions", { params: { limit: 25, offset: 0 } })).data;
 }
-async function fetchTopupOptions(): Promise<TopupOptions> {
-  return (await billingService.listTopupOptions()).data;
+async function fetchTopupOptions() {
+  return (await api.get<TopupOptions>("/wallet/topup/options")).data;
 }
 
 async function fetchPlans() {
@@ -120,21 +115,10 @@ async function fetchCurrentSubscription() {
 
 async function createTopup(pack: string) {
   const origin = window.location.origin;
-  const resp = await billingService.topUp({
+  const resp = await api.post<{ checkout_url: string; session_id: string }>("/wallet/topup/checkout", {
     pack_name: pack,
-    success_url: `${origin}/login/#/billing?topup=success`,
-    cancel_url: `${origin}/login/#/billing?topup=cancel`,
-  });
-  return resp.data;
-}
-
-async function createPlanCheckout(plan: CheckoutPlan["plan"]) {
-  const origin = window.location.origin;
-  const resp = await billingService.createCheckout({
-    plan,
-    billing_cycle: "activation",
-    success_url: `${origin}/login/#/billing?activation=success`,
-    cancel_url: `${origin}/login/#/billing?activation=cancel`,
+    success_url: `${origin}/billing?topup=success`,
+    cancel_url: `${origin}/billing?topup=cancel`,
   });
   return resp.data;
 }
@@ -164,12 +148,6 @@ export function BillingPage() {
       if (data.checkout_url) window.location.href = data.checkout_url;
     },
   });
-  const planCheckout = useMutation({
-    mutationFn: createPlanCheckout,
-    onSuccess: (data) => {
-      if (data.checkout_url) window.location.href = data.checkout_url;
-    },
-  });
 
   const evaluationRunsUsed = useMemo(() => {
     return (txns.data?.transactions ?? []).filter((txn) => {
@@ -193,11 +171,6 @@ export function BillingPage() {
     topup.mutate(firstReservePack);
   };
 
-  const startPlanCheckout = (plan: CheckoutPlan["plan"]) => {
-    if (planCheckout.isPending) return;
-    planCheckout.mutate(plan);
-  };
-
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -213,7 +186,7 @@ export function BillingPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="v-chip v-chip-ok">
               <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              live · <span className="font-mono">/api/v1/billing</span>
+              live · <span className="font-mono">/api/v1/wallet</span>
             </span>
             <span className="v-chip v-chip-brass">Stripe Checkout</span>
           </div>
@@ -300,13 +273,9 @@ export function BillingPage() {
                         {topup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                         Add reserve
                       </button>
-                      <button
-                        className="v-btn-ghost"
-                        onClick={() => startPlanCheckout("starter")}
-                        disabled={planCheckout.isPending}
-                      >
-                        {planCheckout.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start activation"}
-                      </button>
+                      <a className="v-btn-ghost" href="https://veklom.com/pricing/">
+                        Start activation
+                      </a>
                       <a className="v-btn-ghost" href="https://veklom.com/#contact">
                         Request regulated access
                       </a>
@@ -350,7 +319,7 @@ export function BillingPage() {
           </button>
           <div className="mt-4 rounded-lg border border-rule p-3 text-[11px] text-bone-2">
             <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Burn-rate guard</div>
-            <div>Spend caps, alerts, and auto-throttle live in <a href="#/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
+            <div>Spend caps, alerts, and auto-throttle live in <a href="/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
           </div>
         </div>
       </section>
@@ -359,9 +328,9 @@ export function BillingPage() {
         items={[
           { label: "pricing source", value: plans.data ? "/api/v1/subscriptions/plans" : plans.isError ? "unavailable" : "loading" },
           { label: "activation source", value: subscription.data ? "/api/v1/subscriptions/current" : subscription.isError ? "unavailable" : "loading" },
-          { label: "reserve source", value: balance.data ? "/api/v1/billing/wallet" : balance.isError ? "unavailable" : "loading" },
-          { label: "ledger source", value: txns.data ? "/api/v1/billing/transactions" : txns.isError ? "unavailable" : "loading" },
-          { label: "checkout source", value: packs.data ? "/api/v1/billing/topup" : packs.isError ? "unavailable" : "loading" },
+          { label: "reserve source", value: balance.data ? "/api/v1/wallet/balance" : balance.isError ? "unavailable" : "loading" },
+          { label: "ledger source", value: txns.data ? "/api/v1/wallet/transactions" : txns.isError ? "unavailable" : "loading" },
+          { label: "checkout source", value: packs.data ? "/api/v1/wallet/topup/options" : packs.isError ? "unavailable" : "loading" },
         ]}
       />
 
@@ -385,7 +354,6 @@ export function BillingPage() {
                   <th className="px-5 py-2 text-left font-medium">Reserve</th>
                   <th className="px-5 py-2 text-left font-medium">Governed run</th>
                   <th className="px-5 py-2 text-left font-medium">Evidence package</th>
-                  <th className="px-5 py-2 text-left font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -410,26 +378,6 @@ export function BillingPage() {
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.reserve}</td>
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.runs}</td>
                     <td className="px-5 py-2.5 font-mono text-bone-2">{row.evidence}</td>
-                    <td className="px-5 py-2.5">
-                      {row.rawTier === "free" ? (
-                        <span className="v-chip v-chip-warn">No checkout</span>
-                      ) : subscription.data?.plan === row.rawTier ? (
-                        <span className="v-chip v-chip-ok">Current plan</span>
-                      ) : row.selfServe ? (
-                        <button
-                          className="v-btn-ghost"
-                          onClick={() => startPlanCheckout(row.rawTier === "starter" || row.rawTier === "pro" ? row.rawTier : "starter")}
-                          disabled={planCheckout.isPending}
-                          title="Start paid activation for workspace"
-                        >
-                          {planCheckout.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Activate"}
-                        </button>
-                      ) : (
-                        <a className="v-btn-ghost" href="https://veklom.com/#contact">
-                          Contact sales
-                        </a>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -506,12 +454,10 @@ export function BillingPage() {
                 <button
                   className={cn("mt-auto w-full", active ? "v-btn-primary" : "v-btn-ghost")}
                   onClick={() => {
-                    if (!reserveTopupAllowed || topup.isPending) return;
                     setSelectedPack(p.pack_name);
                     topup.mutate(p.pack_name);
                   }}
-                  disabled={!reserveTopupAllowed || topup.isPending}
-                  title={reserveTopupAllowed ? "Add operating reserve" : "Activation is required before reserve can be funded"}
+                  disabled={topup.isPending}
                 >
                   {topup.isPending && active ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -615,7 +561,6 @@ function buildPricingRows(plans: PlanDefinition[]) {
   return [...plans].sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier)).map((plan) => {
     const limits = plan.free_evaluation_limits ?? {};
     return {
-      rawTier: plan.tier,
       tier: planLabel(plan),
       activation: plan.activation_cents == null ? "Contact" : plan.activation_cents === 0 ? "$0" : `${fmtCents(plan.activation_cents)} one-time`,
       reserve: plan.minimum_reserve_cents == null ? "Private" : plan.minimum_reserve_cents === 0 ? "$0" : `${fmtCents(plan.minimum_reserve_cents)} min`,
@@ -624,7 +569,6 @@ function buildPricingRows(plans: PlanDefinition[]) {
           ? `${limits.governed_playground_runs ?? FREE_EVALUATION_RUNS} governed runs`
           : fmtEventCents(plan, "playground_run_cents", "/ run"),
       evidence: plan.features?.compliance_reports || plan.features?.audit_exports ? "available" : "activation required",
-      selfServe: plan.self_serve_checkout,
     };
   });
 }

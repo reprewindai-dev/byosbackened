@@ -269,7 +269,7 @@ export function PipelinesPage() {
   const [actionError, setActionError] = useState<unknown>(null);
   const [draftGraph, setDraftGraph] = useState<PipelineGraph | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(true);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [testPanelOpen, setTestPanelOpen] = useState(false);
   const [testPrompt, setTestPrompt] = useState("Reply with exactly: OK");
@@ -278,8 +278,7 @@ export function PipelinesPage() {
 
   const pipelines = useQuery({ queryKey: ["pipelines"], queryFn: fetchPipelines, refetchInterval: 30_000 });
   const runs = useQuery({ queryKey: ["pipelines-runs"], queryFn: fetchRecentRuns, refetchInterval: 15_000 });
-  const pipelineRoutesUnavailable = isRouteUnavailable(pipelines.error);
-  const recentRunsRouteUnavailable = isRouteUnavailable(runs.error);
+  const pipelineRoutesUnavailable = isRouteUnavailable(pipelines.error) || isRouteUnavailable(runs.error);
   const selectedPipeline = useMemo(() => {
     const rows = pipelines.data ?? [];
     return rows.find((row) => row.id === selectedId) ?? rows[0] ?? null;
@@ -311,7 +310,7 @@ export function PipelinesPage() {
   const executeMut = useMutation({
     mutationFn: async (id: string) => {
       setCreating(id);
-      const r = await api.post<PipelineRun>(`/pipelines/${id}/run`, { inputs: { prompt: testPrompt } });
+      const r = await api.post<PipelineRun>(`/pipelines/${id}/execute`, { inputs: { prompt: testPrompt } });
       return r.data;
     },
     onSettled: () => {
@@ -393,6 +392,7 @@ export function PipelinesPage() {
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <PageHeader
+        pipelineCount={pipelines.data?.length ?? 0}
         routeUnavailable={pipelineRoutesUnavailable}
         onNew={() => setShowNew(true)}
         onTemplates={() => setShowTemplates(true)}
@@ -402,7 +402,8 @@ export function PipelinesPage() {
         <div className="frame mb-4 flex items-start gap-3 border-brass/40 bg-brass/5 p-4 text-sm text-brass-2">
           <AlertCircle className="mt-0.5 h-4 w-4" />
           <div>
-            No route found: GET /api/v1/pipelines. Builder controls re-enable automatically when the backend responds.
+            Pipeline write routes are currently unavailable from the live API. Existing data remains readable, and write
+            controls re-enable automatically when the backend responds.
           </div>
         </div>
       )}
@@ -464,7 +465,6 @@ export function PipelinesPage() {
           loading={pipelines.isLoading}
           selectedId={selectedPipeline?.id ?? null}
           runCounts={runCountByPipeline}
-          runsUnavailable={recentRunsRouteUnavailable}
           routeUnavailable={pipelineRoutesUnavailable}
           executingId={creating}
           executing={executeMut.isPending}
@@ -473,15 +473,13 @@ export function PipelinesPage() {
           onExecute={(id) => executeMut.mutate(id)}
         />
 
-        {(runs.isLoading || visibleRuns.length > 0 || selectedRunId) && (
-          <RecentRunsPanel
-            runs={visibleRuns}
-            loading={runs.isLoading}
-            selectedRunId={selectedRunId}
-            pricingTier={user?.plan}
-            onSelectRun={setSelectedRunId}
-          />
-        )}
+        <RecentRunsPanel
+          runs={visibleRuns}
+          loading={runs.isLoading}
+          selectedRunId={selectedRunId}
+          pricingTier={user?.plan}
+          onSelectRun={setSelectedRunId}
+        />
 
         {testPanelOpen && (
           <PipelineTestResultPanel
@@ -564,10 +562,12 @@ export function PipelinesPage() {
 }
 
 function PageHeader({
+  pipelineCount,
   routeUnavailable,
   onNew,
   onTemplates,
 }: {
+  pipelineCount: number;
   routeUnavailable: boolean;
   onNew: () => void;
   onTemplates: () => void;
@@ -583,6 +583,12 @@ function PageHeader({
           Drag-and-drop graphs that chain models, retrieval, memory, tools, and routing - every node gated by your
           policy engine.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge tone="ok" dot>
+            live · <span className="font-mono">/api/v1/pipelines</span>
+          </Badge>
+          <Badge tone="primary">{pipelineCount} pipelines</Badge>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
         <button
@@ -647,20 +653,18 @@ function BuilderPanel({
             {selected?.name ?? "starter-governed-pipeline"}
           </span>
           <Badge tone={selected?.status === "active" ? "ok" : "muted"}>
-            V{selected?.current_version ?? 1} / {(selected?.status ?? "draft").toUpperCase()}
+            v{selected?.current_version ?? 1} · {selected?.status ?? "draft"}
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          {(dirty || saving) && (
-            <button
-              className="v-btn-ghost h-7 px-2 text-xs"
-              disabled={!selected || routeUnavailable || !dirty || saving}
-              onClick={onSave}
-              title="Save this canvas as the next immutable pipeline version."
-            >
-              <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save version"}
-            </button>
-          )}
+          <button
+            className="v-btn-ghost h-7 px-2 text-xs"
+            disabled={!selected || routeUnavailable || !dirty || saving}
+            onClick={onSave}
+            title="Save this canvas as the next immutable pipeline version."
+          >
+            <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save version"}
+          </button>
           <button
             className="v-btn-ghost h-7 px-2 text-xs"
             disabled={!selected || routeUnavailable || executing}
@@ -698,13 +702,13 @@ function BuilderPanel({
           </div>
         )}
       </div>
-      {dirty && proof && <PreflightProofPanel proof={proof} />}
+      {proof && <PreflightProofPanel proof={proof} />}
       <div className="flex items-center justify-between border-t border-rule/80 px-4 py-2 text-[11px] text-muted">
         <span>
           <Badge tone="primary">POLICY ENGINE INLINE</Badge>
         </span>
         <span className="font-mono">
-          {nodeCount} nodes / {edgeCount} edges / est. p50 - {estimatedPipelineP50Ms(graph)}ms
+          {nodeCount} nodes · {edgeCount} edges · audit-gated execution
         </span>
       </div>
     </div>
@@ -1090,7 +1094,6 @@ function PipelinesTable({
   loading,
   selectedId,
   runCounts,
-  runsUnavailable,
   routeUnavailable,
   executingId,
   executing,
@@ -1102,7 +1105,6 @@ function PipelinesTable({
   loading: boolean;
   selectedId: string | null;
   runCounts: Map<string, number>;
-  runsUnavailable: boolean;
   routeUnavailable: boolean;
   executingId: string | null;
   executing: boolean;
@@ -1114,13 +1116,13 @@ function PipelinesTable({
     <div className="frame mt-4 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule/80 px-4 py-3">
         <div>
-          <div className="text-eyebrow">Pipelines / deployed & draft</div>
+          <div className="text-eyebrow">Pipelines · deployed & draft</div>
           <div className="font-display text-[14px] text-bone">{pipelines.length} pipelines</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="primary">RAG / PGVECTOR</Badge>
-          <Badge tone="info">QDRANT</Badge>
-          <Badge tone="info">WEAVIATE</Badge>
+          <Badge tone="primary">policy gated</Badge>
+          <Badge tone="info">versioned</Badge>
+          <Badge tone="info">auditable</Badge>
         </div>
       </div>
 
@@ -1143,9 +1145,9 @@ function PipelinesTable({
               <tr>
                 <th className="px-4 py-2 text-left">Name</th>
                 <th className="px-4 py-2 text-left">Template</th>
-                <th className="px-4 py-2 text-left">Vector store</th>
+                <th className="px-4 py-2 text-left">Policy refs</th>
                 <th className="px-4 py-2 text-right">Nodes</th>
-                <th className="px-4 py-2 text-right">Invocations</th>
+                <th className="px-4 py-2 text-right">Recent runs</th>
                 <th className="px-4 py-2 text-left">Last run</th>
                 <th className="px-4 py-2 text-left">Status</th>
                 <th className="px-4 py-2 text-right" />
@@ -1164,15 +1166,14 @@ function PipelinesTable({
                     <button className="text-left font-semibold text-bone hover:text-brass-2" onClick={() => onSelect(pipeline.id)}>
                       {pipeline.name}
                     </button>
+                    <div className="font-mono text-[10.5px] text-muted">{pipeline.slug}</div>
                   </td>
-                  <td className="px-4 py-2 text-muted">{pipelineTemplateLabel(pipeline)}</td>
+                  <td className="px-4 py-2 text-muted">{pipeline.description || "workspace graph"}</td>
                   <td className="px-4 py-2">
-                    <Badge tone="muted">{pipelineVectorStore(pipeline)}</Badge>
+                    <Badge tone="muted">{pipeline.latest_version?.policy_refs?.[0] ?? "default"}</Badge>
                   </td>
                   <td className="px-4 py-2 text-right font-mono">{pipeline.latest_version?.node_count ?? 0}</td>
-                  <td className="px-4 py-2 text-right font-mono">
-                    {runsUnavailable ? "No route found" : formatInvocationCount(runCounts.get(pipeline.id) ?? 0)}
-                  </td>
+                  <td className="px-4 py-2 text-right font-mono">{runCounts.get(pipeline.id) ?? 0}</td>
                   <td className="px-4 py-2 text-muted">{relativeTime(pipeline.updated_at)}</td>
                   <td className="px-4 py-2">
                     <Badge tone={pipeline.status === "active" ? "ok" : pipeline.status === "draft" ? "warn" : "muted"} dot>
@@ -2251,10 +2252,14 @@ function clamp(value: number, min: number, max: number): number {
 function paletteGroups(): Array<{ name: string; items: Array<{ name: string; type: PipelineNode["type"]; icon: ReactNode }> }> {
   return [
     {
+      name: "Input",
+      items: [{ type: "prompt", icon: <FileJson className="h-3.5 w-3.5" />, name: "Prompt input" }],
+    },
+    {
       name: "Models",
       items: [
         { type: "model", icon: <BrainCircuit className="h-3.5 w-3.5" />, name: "LLM (deployed)" },
-        { type: "model", icon: <Database className="h-3.5 w-3.5" />, name: "Embedding" },
+        { type: "model", icon: <Database className="h-3.5 w-3.5" />, name: "Embedding vectorizer" },
         { type: "model", icon: <Route className="h-3.5 w-3.5" />, name: "Reranker" },
       ],
     },
@@ -2378,36 +2383,7 @@ function defaultDeployDraft(pipeline: PipelineSummary): PipelineDeployDraft {
 function pipelineEndpointUrl(endpoint: PipelineEndpointDeployment): string {
   const serviceType = endpoint.service_type || "pipeline";
   const slug = endpoint.slug || endpoint.name || endpoint.id;
-  return `https://api.veklom.com/api/v1/${serviceType}/${slug}`;
-}
-
-function pipelineTemplateLabel(pipeline: PipelineSummary): string {
-  const text = `${pipeline.slug} ${pipeline.name} ${pipeline.description ?? ""}`.toLowerCase();
-  if (text.includes("clinical") || text.includes("rag")) return "RAG / pgvector";
-  if (text.includes("patient") || text.includes("intake")) return "Intake form -> triage";
-  if (text.includes("redact") || text.includes("legal")) return "PII strip -> redline";
-  if (text.includes("risk") || text.includes("classif")) return "Multi-label classifier";
-  return pipeline.description?.trim() || "workspace graph";
-}
-
-function pipelineVectorStore(pipeline: PipelineSummary): string {
-  const text = `${pipeline.slug} ${pipeline.name} ${pipeline.description ?? ""} ${(pipeline.latest_version?.policy_refs ?? []).join(" ")}`.toLowerCase();
-  if (text.includes("qdrant")) return "QDRANT";
-  if (text.includes("weaviate")) return "WEAVIATE";
-  if (text.includes("pgvector") || text.includes("rag") || text.includes("clinical") || text.includes("risk")) return "PGVECTOR";
-  return "No route found";
-}
-
-function formatInvocationCount(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function estimatedPipelineP50Ms(graph?: PipelineGraph): number {
-  if (!graph) return 0;
-  const modelCost = graph.nodes.filter((node) => node.type === "model").length * 96;
-  const toolCost = graph.nodes.filter((node) => node.type === "tool").length * 18;
-  const gateCost = graph.nodes.filter((node) => node.type === "gate" || node.type === "condition").length * 12;
-  return Math.max(24, Math.round(modelCost + toolCost + gateCost));
+  return `https://api.veklom.com/v1/${serviceType}/${slug}`;
 }
 
 function governedRunPrice(pricingTier?: string): { label: string; value: string } {

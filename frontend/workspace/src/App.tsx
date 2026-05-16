@@ -3,7 +3,6 @@ import { AppRoutes } from "./routes";
 import { useAuthStore } from "./store/auth-store";
 import { fetchMe } from "./lib/auth";
 import { useProductTelemetry } from "./lib/product-telemetry";
-import { SupportBotWidget } from "./components/SupportBotWidget";
 
 export default function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
@@ -20,10 +19,5 @@ export default function App() {
     }
   }, [status]);
 
-  return (
-    <>
-      <AppRoutes />
-      {status === "authenticated" && <SupportBotWidget />}
-    </>
-  );
+  return <AppRoutes />;
 }

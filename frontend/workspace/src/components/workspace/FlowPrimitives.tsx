@@ -195,13 +195,6 @@ function FlowActionButton({ action }: { action: FlowAction }) {
       </Link>
     );
   }
-  if (action.href?.startsWith("/")) {
-    return (
-      <Link className={className} to={action.href}>
-        {content}
-      </Link>
-    );
-  }
   if (action.href) {
     return (
       <a className={className} href={action.href}>

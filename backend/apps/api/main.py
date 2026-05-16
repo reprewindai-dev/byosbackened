@@ -78,6 +78,8 @@ from apps.api.routers.internal_operators import router as internal_operators_rou
 from apps.api.routers.internal_uacp import router as internal_uacp_router
 from apps.api.routers.source_of_truth_bridge import router as source_of_truth_bridge_router
 from apps.api.routers.pipeline_interactive import router as pipeline_interactive_router
+from apps.api.routers.referrals import router as referrals_router
+from apps.api.routers.onboarding import router as onboarding_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
@@ -243,6 +245,8 @@ app.include_router(platform_pulse_router, prefix=settings.api_prefix)
 app.include_router(internal_operators_router, prefix=settings.api_prefix)
 app.include_router(internal_uacp_router, prefix=settings.api_prefix)
 app.include_router(pipeline_interactive_router, prefix=settings.api_prefix)
+app.include_router(referrals_router, prefix=settings.api_prefix)
+app.include_router(onboarding_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)
@@ -253,8 +257,41 @@ app.include_router(demo_pipeline_router, prefix=settings.api_prefix)
 
 @app.get("/health")
 async def health():
-    """Health check."""
-    return {"status": "ok", "version": settings.app_version, "service": settings.app_name}
+    """Health check with DB and Redis connectivity."""
+    checks: dict[str, str] = {}
+    overall = "ok"
+
+    # Database check
+    try:
+        db = SessionLocal()
+        db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        db.close()
+        checks["database"] = "ok"
+    except Exception:
+        checks["database"] = "unavailable"
+        overall = "degraded"
+
+    # Redis check
+    try:
+        from apps.api.middleware.rate_limit import RateLimiter
+        limiter = RateLimiter()
+        r = limiter._get_redis()
+        if r:
+            r.ping()
+            checks["redis"] = "ok"
+        else:
+            checks["redis"] = "unavailable"
+            overall = "degraded"
+    except Exception:
+        checks["redis"] = "unavailable"
+        overall = "degraded"
+
+    return {
+        "status": overall,
+        "version": settings.app_version,
+        "service": settings.app_name,
+        "checks": checks,
+    }
 
 
 @app.get("/", include_in_schema=False)

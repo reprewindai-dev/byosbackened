@@ -5,16 +5,16 @@ import { fileURLToPath } from "node:url";
 // ---------------------------------------------------------------------------
 // The accepted production workspace artifact is FROZEN.
 //
-// workspace-app.html  → references index-EUKZeqk4.js + index-WqgIFi2m.css
+// workspace-app.html  → references index-B1GQM7aA.js + index-CcFQfCmo.css
 // workspace-assets/   → contains the frozen JS + CSS bundles
 //
-// This script now VALIDATES the freeze instead of overwriting it.
+// This script VALIDATES the freeze instead of overwriting it.
 // If you need to ship a new build, update the FROZEN_* constants below
 // in the same commit as the new assets.
 // ---------------------------------------------------------------------------
 
-const FROZEN_JS = "index-EUKZeqk4.js";
-const FROZEN_CSS = "index-WqgIFi2m.css";
+const FROZEN_JS = "index-B1GQM7aA.js";
+const FROZEN_CSS = "index-CcFQfCmo.css";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(here, "..");
@@ -30,13 +30,13 @@ const cssPath = resolve(assetTarget, FROZEN_CSS);
 if (!existsSync(jsPath)) {
   throw new Error(
     `Frozen workspace JS missing: ${FROZEN_JS}\n` +
-    `Restore it with: git checkout be84be06 -- backend/landing/workspace-assets/${FROZEN_JS}`
+    `Copy it from: frontend/workspace/dist/workspace-assets/${FROZEN_JS}`
   );
 }
 if (!existsSync(cssPath)) {
   throw new Error(
     `Frozen workspace CSS missing: ${FROZEN_CSS}\n` +
-    `Restore it with: git checkout be84be06 -- backend/landing/workspace-assets/${FROZEN_CSS}`
+    `Copy it from: frontend/workspace/dist/workspace-assets/${FROZEN_CSS}`
   );
 }
 

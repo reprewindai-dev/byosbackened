@@ -4,10 +4,12 @@ import {
   Box,
   ChevronLeft,
   CircuitBoard,
+  Command,
   CreditCard,
   FileCheck2,
   Gauge,
   KeyRound,
+  LayoutDashboard,
   LineChart,
   Settings2,
   ShieldCheck,
@@ -24,11 +26,12 @@ interface NavItem {
   badge?: string;
 }
 
-const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
+const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Workspace",
     items: [
-      { to: "/overview", label: "Overview", icon: Gauge },
+      { to: "/control-center", label: "Control Center", icon: Command, badge: "NEW" },
+      { to: "/overview", label: "Overview", icon: LayoutDashboard },
       { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
       { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],
@@ -38,7 +41,7 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: "/models", label: "Models", icon: Box },
       { to: "/pipelines", label: "Pipelines", icon: CircuitBoard },
-      { to: "/deployments", label: "Endpoints", icon: Gauge },
+      { to: "/deployments", label: "Deployments", icon: Gauge },
     ],
   },
   {
@@ -53,18 +56,13 @@ const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: "/monitoring", label: "Monitoring", icon: LineChart },
       { to: "/billing", label: "Billing", icon: CreditCard },
-    ],
-  },
-  {
-    title: "Access",
-    items: [
       { to: "/team", label: "Team", icon: Users },
       { to: "/settings", label: "Settings", icon: Settings2 },
     ],
   },
 ];
 
-export function Sidebar({ collapsed = false, onToggle = () => {} }: { collapsed?: boolean; onToggle?: () => void } = {}) {
+export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
     <aside
       className={cn(
@@ -80,7 +78,7 @@ export function Sidebar({ collapsed = false, onToggle = () => {} }: { collapsed?
           {!collapsed && (
             <div className="flex flex-col leading-none">
               <span className="text-[13px] font-semibold tracking-tight">Veklom</span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign control node</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign</span>
             </div>
           )}
         </NavLink>
@@ -94,9 +92,9 @@ export function Sidebar({ collapsed = false, onToggle = () => {} }: { collapsed?
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
-        {CUSTOMER_SECTIONS.map((section) => (
-          <div key={section.title ?? section.items.map((item) => item.to).join("-")} className="px-2">
-            {!collapsed && section.title && <div className="v-sidebar-section">{section.title}</div>}
+        {SECTIONS.map((section) => (
+          <div key={section.title} className="px-2">
+            {!collapsed && <div className="v-sidebar-section">{section.title}</div>}
             {section.items.map(({ to, label, icon: Icon, badge }) => (
               <NavLink
                 key={to}
@@ -129,18 +127,18 @@ export function Sidebar({ collapsed = false, onToggle = () => {} }: { collapsed?
             <span className="text-muted">Sovereign Mode</span>
             <span className="inline-flex items-center gap-1 text-moss">
               <Activity className="h-3 w-3" />
-              ON-PREM
+              on-prem
             </span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
-            All requests evaluated by policy on Hetzner. AWS burst gated by tenant rule.
+            All runs are evaluated by policy on Hetzner first. Approved fallback is gated by tenant rule.
           </p>
           <div className="mt-2 flex gap-1.5">
             <span className="rounded border border-brass/30 bg-brass/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-brass-2">
               Hetzner
             </span>
             <span className="rounded border border-electric/30 bg-electric/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-electric">
-              AWS
+              Fallback
             </span>
           </div>
         </div>
@@ -149,7 +147,7 @@ export function Sidebar({ collapsed = false, onToggle = () => {} }: { collapsed?
       {!collapsed && (
         <div className="border-t border-rule px-3 py-2 text-[10px] text-muted">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
-          mTLS internal - v1.42.0
+          tenant-scoped session
         </div>
       )}
     </aside>

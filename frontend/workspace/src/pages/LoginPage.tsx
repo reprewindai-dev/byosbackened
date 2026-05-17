@@ -1,79 +1,97 @@
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
-import { login, beginGithubLogin } from "@/lib/auth";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ShieldCheck, Loader2, LogOut } from "lucide-react";
+import { login, logout } from "@/lib/auth";
+import { useAuthStore } from "@/store/auth-store";
 
 export function LoginPage() {
+  const status = useAuthStore((s) => s.status);
+  const currentUser = useAuthStore((s) => s.user);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mfaCode, setMfaCode] = useState("");
-  const [mfaRequired, setMfaRequired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
   const navigate = useNavigate();
+  const from = (location.state as { from?: string } | null)?.from ?? "/overview";
+
+  // If already signed in, don't slam-redirect. Offer an explicit escape
+  // hatch so the user can swap accounts (the previous hard <Navigate />
+  // made it impossible to log in as a different user).
+  if (status === "authenticated") {
+    return (
+      <div className="grid min-h-screen place-items-center px-4">
+        <div className="w-full max-w-sm">
+          <div className="mb-6 flex flex-col items-center gap-2 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brass/15">
+              <ShieldCheck className="h-5 w-5 text-brass-2" />
+            </div>
+            <h1 className="text-xl font-semibold tracking-tight">You're already signed in</h1>
+            <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted">
+              {currentUser?.email ?? currentUser?.full_name ?? "current session"}
+            </p>
+          </div>
+          <div className="v-card p-6">
+            <button
+              type="button"
+              className="v-btn-primary mb-3 w-full"
+              onClick={() => navigate(from, { replace: true })}
+            >
+              Continue to {from}
+            </button>
+            <button
+              type="button"
+              className="v-btn-ghost w-full justify-center text-crimson hover:text-crimson"
+              onClick={async () => {
+                await logout();
+                // After clearing session, fall through to the form on the
+                // next render — status flips to "unauthenticated".
+              }}
+            >
+              <LogOut className="h-4 w-4" /> Sign out and use a different account
+            </button>
+            <div className="mt-4 text-center">
+              <Link to="/register" className="font-mono text-[11px] text-muted hover:text-bone">
+                Create a new workspace instead
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const user = await login({ email, password, mfa_code: mfaCode || undefined });
-      navigate(user?.is_superuser ? "/overview" : "/overview", { replace: true });
+      await login({ email, password });
+      navigate(from, { replace: true });
     } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { detail?: string } }; message?: string; code?: string };
-      const detail = axErr.response?.data?.detail;
-      const status = axErr.response?.status;
-      const code = axErr.code;
-      let message: string;
-      if (detail && typeof detail === "string") {
-        message = detail;
-      } else if (status) {
-        message = `Server returned ${status}`;
-      } else if (code === "ERR_NETWORK") {
-        message = "Network error — backend may be unreachable";
-      } else {
-        message = axErr.message || "Login failed";
-      }
-      if (message.toLowerCase().includes("mfa")) setMfaRequired(true);
-      setError(message);
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        (err as Error)?.message ??
+        "Login failed";
+      setError(typeof detail === "string" ? detail : "Login failed");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function onGithub() {
-    try {
-      const { auth_url } = await beginGithubLogin();
-      window.location.href = auth_url;
-    } catch {
-      setError("GitHub sign-in unavailable");
-    }
-  }
-
   return (
-    <div className="relative grid min-h-screen place-items-center overflow-hidden bg-ink px-4">
-      {/* Background grid effect */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.03]" style={{
-        backgroundImage: "linear-gradient(rgba(229,177,110,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(229,177,110,0.3) 1px, transparent 1px)",
-        backgroundSize: "60px 60px",
-      }} />
-
-      <div className="relative w-full max-w-sm">
-        {/* Logo */}
-        <div className="mb-8 flex flex-col items-center">
-          <svg viewBox="0 0 48 48" className="mb-4 h-14 w-14">
-            <path d="M24 6 L10 38 L16 38 L24 20 L32 38 L38 38 Z" fill="#e5a832" />
-            <circle cx="24" cy="30" r="3.5" fill="#e5a832" />
-          </svg>
-          <h1 className="text-2xl font-bold tracking-tight text-bone">Veklom</h1>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-            Sovereign Control Plane
-          </p>
+    <div className="grid min-h-screen place-items-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-2 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brass/15">
+            <ShieldCheck className="h-5 w-5 text-brass-2" />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to Veklom</h1>
+          <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted">Sovereign Control Node</p>
         </div>
 
-        {/* Card */}
-        <form onSubmit={onSubmit} className="v-card space-y-4">
-          <div>
+        <form onSubmit={onSubmit} className="v-card p-6">
+          <div className="mb-4">
             <label className="v-label" htmlFor="email">Email</label>
             <input
               id="email"
@@ -86,7 +104,7 @@ export function LoginPage() {
               placeholder="you@company.com"
             />
           </div>
-          <div>
+          <div className="mb-4">
             <label className="v-label" htmlFor="password">Password</label>
             <input
               id="password"
@@ -100,45 +118,26 @@ export function LoginPage() {
             />
           </div>
 
-          {mfaRequired && (
-            <div>
-              <label className="v-label" htmlFor="mfa">MFA Code</label>
-              <input
-                id="mfa"
-                type="text"
-                autoComplete="one-time-code"
-                value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value.replace(/\s/g, ""))}
-                className="v-input"
-                placeholder="123456"
-              />
-            </div>
-          )}
-
           {error && (
-            <div className="rounded-md border border-crimson/30 bg-crimson/8 px-3 py-2 text-xs text-crimson">
+            <div className="mb-4 rounded-md border border-crimson/30 bg-crimson/10 px-3 py-2 text-[12px] text-crimson">
               {error}
             </div>
           )}
 
           <button type="submit" disabled={submitting} className="v-btn-primary w-full">
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting ? "Signing in..." : "Sign in"}
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {submitting ? "Signing in…" : "Sign in"}
           </button>
 
-          <button type="button" onClick={onGithub} className="v-btn-ghost w-full">
-            Continue with GitHub
-          </button>
-
-          <div className="flex items-center justify-between pt-2 font-mono text-[10px] text-muted">
-            <Link to="/register" className="hover:text-bone transition-colors">Create workspace</Link>
-            <span className="cursor-pointer hover:text-bone transition-colors">Forgot password</span>
+          <div className="mt-4 flex items-center justify-between font-mono text-[11px] text-muted">
+            <Link to="/register" className="hover:text-bone">Create workspace</Link>
+            <a href="/auth/reset" className="hover:text-bone">Forgot password</a>
           </div>
         </form>
 
-        <p className="mt-6 text-center font-mono text-[9px] uppercase tracking-[0.18em] text-muted-2">
-          Governed AI execution · Policy enforced · Evidence ready
-        </p>
+        <div className="mt-4 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-muted">
+          mTLS internal · SOC2-ready · EU-sovereign
+        </div>
       </div>
     </div>
   );

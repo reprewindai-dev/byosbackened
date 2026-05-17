@@ -1,328 +1,821 @@
-import { useEffect, useState, useCallback } from "react";
-import { Activity, Zap, DollarSign, Cpu, ShieldCheck, TrendingUp } from "lucide-react";
-import { MiniChart } from "@/components/MiniChart";
-import { api, rawApi } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import type { ComponentType, ReactNode } from "react";
+import {
+  AlertCircle,
+  Archive,
+  ArrowRight,
+  BadgeCheck,
+  BrainCircuit,
+  CircleDot,
+  CircuitBoard,
+  Cpu,
+  Database,
+  FileCheck2,
+  GitBranch,
+  Hash,
+  Landmark,
+  Layers3,
+  Network,
+  OctagonAlert,
+  RadioTower,
+  Scale,
+  ShieldCheck,
+  Split,
+  Vote,
+  Workflow,
+} from "lucide-react";
+import { Sparkline } from "@/components/overview/Sparkline";
+import { useAuthStore } from "@/store/auth-store";
+import { api } from "@/lib/api";
+import {
+  cn,
+  dateFromApiTimestamp,
+  fmtCents,
+  fmtNumber,
+  formatApiTime,
+  relativeTime,
+} from "@/lib/cn";
+import { isRouteUnavailable } from "@/lib/errors";
+import type {
+  Alert,
+  AuditEntry,
+  FleetModel,
+  OverviewPayload,
+  PlatformPulse,
+  PolicyEvent,
+  RecentRun,
+} from "@/types/api";
 
-interface StatusData {
-  status?: string;
-  db_ok?: boolean;
-  redis_ok?: boolean;
-  llm_ok?: boolean;
-  requests_per_min?: number;
-  tokens_per_sec?: number;
-  error_rate?: number;
-  gpu_util?: number;
-  active_models?: number;
-  audit_entries?: number;
+async function fetchOverview(): Promise<OverviewPayload> {
+  try {
+    const resp = await api.get<OverviewPayload>("/monitoring/overview");
+    return resp.data;
+  } catch (err) {
+    if (!isRouteUnavailable(err)) throw err;
+    const resp = await api.get<LegacyWorkspaceOverview>("/workspace/overview");
+    return fromLegacyOverview(resp.data);
+  }
 }
 
-interface WalletData {
-  balance_usd?: string;
-  daily_spend_usd?: string;
-  daily_cap_usd?: string;
-  burn_rate_per_min?: string;
-  forecast_eod_usd?: string;
+async function fetchPlatformPulse(): Promise<PlatformPulse | null> {
+  try {
+    const resp = await api.get<PlatformPulse>("/platform/pulse");
+    return resp.data;
+  } catch (err) {
+    if (isRouteUnavailable(err)) return null;
+    throw err;
+  }
 }
 
-const POLICY_EVENTS = [
-  { icon: "📥", label: "Inbound prompt", detail: "user · session pri_421 · 384 tokens", time: "07:24:11" },
-  { icon: "✅", label: "Policy match", detail: "outbound.public.v3 · PHI scan run · 0 hits", time: "07:24:11" },
-  { icon: "🔀", label: "Route decision", detail: "Hetzner FSN1 · llama3-70b · circuit closed", time: "07:24:11" },
-  { icon: "⚡", label: "Inference complete", detail: "1,240 tokens · 142 ms · $0.00091", time: "07:24:12" },
-  { icon: "🔏", label: "Audit signed", detail: "SHA-256 9f4e...ac21 · evidence appended", time: "07:24:12" },
-];
+interface LegacyWorkspaceOverview {
+  period_start?: string;
+  period_end?: string;
+  total_api_calls?: number;
+  total_tokens_used?: number;
+  total_cost_usd?: number;
+  active_models?: string[];
+  live_feed?: Array<{
+    id: string;
+    kind?: string;
+    model?: string | null;
+    latency_ms?: number;
+    tokens?: number;
+    status?: string;
+    created_at?: string;
+  }>;
+}
+
+function fromLegacyOverview(data: LegacyWorkspaceOverview): OverviewPayload {
+  const calls = Number(data.total_api_calls ?? 0);
+  const tokens = Number(data.total_tokens_used ?? 0);
+  const costUsd = Number(data.total_cost_usd ?? 0);
+  const periodStart = data.period_start ? (dateFromApiTimestamp(data.period_start)?.getTime() ?? Date.now()) : Date.now();
+  const periodEnd = data.period_end ? (dateFromApiTimestamp(data.period_end)?.getTime() ?? Date.now()) : Date.now();
+  const minutes = Math.max(1, Math.round((periodEnd - periodStart) / 60000));
+  const activeModels = data.active_models ?? [];
+  const recent = data.live_feed ?? [];
+
+  return {
+    kpi: {
+      requests_per_minute: Number((calls / minutes).toFixed(2)),
+      requests_delta_pct: 0,
+      p50_latency_ms: median(recent.map((row) => Number(row.latency_ms ?? 0)).filter(Boolean)),
+      p50_delta_ms: 0,
+      tokens_per_second: Number((tokens / Math.max(1, minutes * 60)).toFixed(2)),
+      tokens_delta_pct: 0,
+      spend_today_cents: Math.round(costUsd * 100),
+      spend_cap_pct: 0,
+      requests_series: bucketSeries(recent, (row) => Number(row.tokens ?? 1)),
+      tokens_series: bucketSeries(recent, (row) => Number(row.tokens ?? 0)),
+      spend_series: bucketSeries(recent, () => 0),
+      active_models: activeModels.length,
+      active_models_quantized: activeModels.filter((model) => /q[0-9]/i.test(model)).length,
+      audit_entries: recent.length,
+      audit_verified_pct: recent.length ? 100 : 0,
+    },
+    routing: {
+      primary_plane: "Hetzner primary",
+      burst_plane: "Approved fallback",
+      primary_util_pct: calls ? 100 : 0,
+      burst_util_pct: 0,
+      primary_hosts: [{ name: "hetzner-fsn1", util_pct: calls ? 100 : 0, detail: `${calls} live call(s)` }],
+      series: routingFromRuns(recent),
+    },
+    spend: {
+      spend_cents: Math.round(costUsd * 100),
+      cap_cents: 0,
+      inference_cents: Math.round(costUsd * 100),
+      embeddings_cents: 0,
+      gpu_burst_cents: 0,
+      storage_cents: 0,
+      burn_rate_per_min_cents: minutes ? Math.round((costUsd * 100) / minutes) : 0,
+      forecast_eod_cents: Math.round(costUsd * 100),
+      forecast_cap_pct: 0,
+    },
+    recent_runs: recent.map((row) => ({
+      id: row.id,
+      model: row.model ?? "unknown",
+      route: "primary",
+      latency_ms: Number(row.latency_ms ?? 0),
+      tokens: Number(row.tokens ?? 0),
+      cost_cents: 0,
+      policy: row.status === "error" ? "blocked" : "passed",
+      when: row.created_at ?? new Date().toISOString(),
+    })),
+    policy_events: recent.slice(0, 5).map((row) => ({
+      id: `policy-${row.id}`,
+      ts: row.created_at ?? new Date().toISOString(),
+      kind: "audit_signed",
+      summary: row.status === "error" ? "Backend rejected request" : "Audit entry available",
+      detail: `${row.kind ?? "request"} - ${row.model ?? "unknown"}`,
+    })),
+    alerts: [],
+    audit_trail: recent.map((row) => ({
+      id: row.id,
+      kind: row.kind ?? "request",
+      subject: row.model ?? "workspace call",
+      actor: "workspace",
+      ts: row.created_at ?? new Date().toISOString(),
+      hash_prefix: row.id.slice(0, 12),
+    })),
+    fleet: activeModels.map((model) => ({
+      id: model,
+      name: model,
+      quant: /q[0-9]/i.exec(model)?.[0] ?? "fp16",
+      replicas: 1,
+      route: "primary",
+      p50_ms: 0,
+    })),
+  };
+}
+
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
+}
+
+function bucketSeries<T extends { created_at?: string }>(rows: T[], valueFor: (row: T) => number): number[] {
+  const buckets = Array.from({ length: 20 }, () => 0);
+  if (!rows.length) return buckets;
+  const sorted = [...rows].sort((a, b) => {
+    const at = dateFromApiTimestamp(a.created_at ?? "")?.getTime() ?? 0;
+    const bt = dateFromApiTimestamp(b.created_at ?? "")?.getTime() ?? 0;
+    return at - bt;
+  });
+  sorted.forEach((row, index) => {
+    const bucket = Math.min(19, Math.floor((index / Math.max(1, sorted.length)) * 20));
+    buckets[bucket] += Math.max(0, valueFor(row));
+  });
+  return buckets;
+}
+
+function routingFromRuns(rows: NonNullable<LegacyWorkspaceOverview["live_feed"]>): OverviewPayload["routing"]["series"] {
+  if (!rows.length) return [];
+  const buckets = Array.from({ length: 24 }, (_, i) => ({ t: `${String(i).padStart(2, "0")}:00`, primary: 0, burst: 0 }));
+  rows.forEach((row, index) => {
+    const bucket = Math.min(23, Math.floor((index / Math.max(1, rows.length)) * 24));
+    const provider = (row.model ?? "").toLowerCase();
+    if (provider.includes("groq") || provider.includes("aws") || provider.includes("bedrock")) {
+      buckets[bucket].burst += 1;
+    } else {
+      buckets[bucket].primary += 1;
+    }
+  });
+  const max = Math.max(1, ...buckets.map((bucket) => bucket.primary + bucket.burst));
+  return buckets.map((bucket) => ({
+    ...bucket,
+    primary: Math.round((bucket.primary / max) * 100),
+    burst: Math.round((bucket.burst / max) * 100),
+  }));
+}
 
 export function OverviewPage() {
-  const [status, setStatus] = useState<StatusData | null>(null);
-  const [wallet, setWallet] = useState<WalletData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const user = useAuthStore((state) => state.user);
+  const overview = useQuery({
+    queryKey: ["overview"],
+    queryFn: fetchOverview,
+    refetchInterval: 15_000,
+  });
+  const pulse = useQuery({
+    queryKey: ["platform-pulse"],
+    queryFn: fetchPlatformPulse,
+    refetchInterval: 30_000,
+  });
 
-  const fetchData = useCallback(async () => {
-    const results = await Promise.allSettled([
-      api.get("/monitoring/health").then(r => r.data).catch(() =>
-        rawApi.get("/status").then(r => r.data).catch(() =>
-          rawApi.get("/health").then(r => r.data)
-        )
-      ),
-      api.get("/wallet/balance").then(r => r.data),
-    ]);
-    if (results[0].status === "fulfilled") setStatus(results[0].value);
-    if (results[1].status === "fulfilled") setWallet(results[1].value);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const METRICS = [
-    { label: "Requests / min", value: status?.requests_per_min?.toLocaleString() ?? "2,418", delta: "+8.4%", color: "text-moss", icon: Activity },
-    { label: "P50 Latency", value: "112 ms", delta: "-14 ms", color: "text-electric", icon: Zap },
-    { label: "Tokens / sec", value: status?.tokens_per_sec ? `${(status.tokens_per_sec / 1000).toFixed(0)}k` : "184k", delta: "+22%", color: "text-brass-2", icon: TrendingUp },
-    { label: "Spend today", value: wallet?.daily_spend_usd ? `$${wallet.daily_spend_usd}` : "$1,284", delta: "68% cap", color: "text-amber", icon: DollarSign },
-    { label: "Active Models", value: status?.active_models?.toString() ?? "12", delta: "4 quantized", color: "text-violet", icon: Cpu },
-    { label: "Audit Entries", value: status?.audit_entries?.toLocaleString() ?? "9,412", delta: "100% verified", color: "text-moss", icon: ShieldCheck },
-  ];
-
-  const spendUsd = wallet?.daily_spend_usd ?? "1,284.80";
-  const capUsd = wallet?.daily_cap_usd ?? "1,900";
-  const burnRate = wallet?.burn_rate_per_min ?? "0.0154";
-  const forecastEod = wallet?.forecast_eod_usd ?? "1,802";
+  const data = overview.data;
+  const pulseData = pulse.data ?? null;
+  const state = data ? deriveInstitutionalState(data, pulseData) : null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="command-wall">
+      <CommandHeader
+        userScope={user?.is_superuser ? "Veklom Superuser" : "Tenant Command Center"}
+        workspace={user?.workspace_name ?? user?.workspace_id ?? "workspace"}
+        state={state}
+        isLoading={overview.isLoading}
+      />
+      <CommandOpsDock />
+
+      {overview.isError && (
+        <div className="command-alert">
+          <AlertCircle className="h-4 w-4" />
+          <span>{(overview.error as Error)?.message ?? "Unable to load command center telemetry"}</span>
+        </div>
+      )}
+
+      <ScopeRail isSuperuser={Boolean(user?.is_superuser)} />
+
+      <section className="sv-chamber">
+        <SectionTitle
+          eyebrow="Hello, Silicon Valley"
+          title="Institutional consciousness"
+          text="Strategic posture, route integrity, memory continuity, and unresolved pressure from live control-plane telemetry."
+        />
+        <SiliconValleyWall data={data} pulse={pulseData} state={state} isLoading={overview.isLoading} />
+      </section>
+
+      <section className="sunnyvale-floor">
+        <SectionTitle
+          eyebrow="Hello, Sunnyvale"
+          title="Operational execution"
+          text="Agent runs, committee decisions, intervention requests, blocked workflows, evidence, and execution traces."
+        />
+        <SunnyvaleFloor data={data} state={state} isLoading={overview.isLoading} />
+      </section>
+
+      <ArchivesLayer data={data} isLoading={overview.isLoading} />
+    </div>
+  );
+}
+
+function CommandOpsDock() {
+  const routes = [
+    { label: "Control", to: "#/control-center" },
+    { label: "Playground", to: "#/playground" },
+    { label: "Marketplace", to: "#/marketplace" },
+    { label: "Monitoring", to: "#/monitoring" },
+    { label: "Billing", to: "#/billing" },
+    { label: "Vault", to: "#/vault" },
+    { label: "Settings", to: "#/settings" },
+  ];
+
+  return (
+    <nav className="command-ops-dock" aria-label="Return to workspace operations">
+      <span>App ingress</span>
       <div>
-        <p className="v-section-label">Workspace · Overview</p>
-        <h1 className="mt-1 text-2xl font-bold text-bone">Sovereign control plane</h1>
-        <p className="mt-1 text-sm text-muted">
-          Every prompt routed, policed, and audited — across Hetzner primary and AWS burst — without leaving your perimeter.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="v-badge-green">● {loading ? "Connecting..." : (status?.status === "ok" || status?.status === "healthy" || (status?.db_ok && status?.redis_ok)) ? "Live Backend Connected" : status ? "Backend Active" : "Connecting..."}</span>
-          <span className="v-badge-muted">SOC2-Ready</span>
-          <span className="v-badge-muted">HIPAA-Aware</span>
-          <span className="v-badge-muted">EU-Sovereign</span>
+        {routes.map((route) => (
+          <a key={route.to} href={route.to}>
+            {route.label}
+            <ArrowRight className="h-3 w-3" />
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function CommandHeader({
+  userScope,
+  workspace,
+  state,
+  isLoading,
+}: {
+  userScope: string;
+  workspace: string;
+  state: InstitutionalState | null;
+  isLoading: boolean;
+}) {
+  return (
+    <header className="command-header">
+      <div>
+        <div className="command-kicker">Veklom sovereign command center</div>
+        <h1>Hello, Silicon Valley / Hello, Sunnyvale</h1>
+        <p>{userScope} - {workspace}</p>
+      </div>
+      <div className="command-status-strip">
+        <StatusDatum label="Institutional state" value={isLoading ? "synchronizing" : state?.posture ?? "no signal"} tone={state?.tone ?? "neutral"} />
+        <StatusDatum label="Execution confidence" value={state ? `${state.executionConfidence}%` : "-"} tone={state?.executionConfidence && state.executionConfidence >= 80 ? "stable" : "watch"} />
+        <StatusDatum label="Route integrity" value={state ? `${state.routeIntegrity}%` : "-"} tone={state?.routeIntegrity && state.routeIntegrity >= 80 ? "stable" : "watch"} />
+        <StatusDatum label="Memory continuity" value={state ? `${state.memoryContinuity}%` : "-"} tone="stable" />
+      </div>
+    </header>
+  );
+}
+
+function ScopeRail({ isSuperuser }: { isSuperuser: boolean }) {
+  const superuser = ["Silicon Valley", "Global UACP", "Global Agents", "Archives", "Tenants", "Risk", "Marketplace", "Billing", "Backend Deployments"];
+  const tenant = ["Sunnyvale", "My Runs", "My Agents", "My Evidence", "My Routes", "My Usage", "My Tasks", "My Marketplace"];
+  const enterprise = ["Own deployment", "Command shell", "Policies", "Agents", "Archives"];
+  return (
+    <nav className="scope-rail" aria-label="Command center scope">
+      <ScopeGroup title={isSuperuser ? "Veklom Superuser" : "Superuser scope"} items={superuser} active={isSuperuser ? "Silicon Valley" : undefined} locked={!isSuperuser} />
+      <ScopeGroup title="Tenant User" items={tenant} active="Sunnyvale" />
+      <ScopeGroup title="Enterprise Deployment" items={enterprise} active={undefined} />
+    </nav>
+  );
+}
+
+function ScopeGroup({ title, items, active, locked }: { title: string; items: string[]; active?: string; locked?: boolean }) {
+  return (
+    <div className={cn("scope-group", locked && "opacity-55")}>
+      <span>{title}</span>
+      <div>
+        {items.map((item) => (
+          <b key={item} className={cn(item === active && "active")}>{item}</b>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SiliconValleyWall({
+  data,
+  pulse,
+  state,
+  isLoading,
+}: {
+  data?: OverviewPayload;
+  pulse: PlatformPulse | null;
+  state: InstitutionalState | null;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="sv-grid">
+      <InstitutionalStatePanel state={state} data={data} isLoading={isLoading} />
+      <StrategicTrajectory data={data} state={state} />
+      <AgentAlignment data={data} />
+      <InstitutionalEvents data={data} pulse={pulse} isLoading={isLoading} />
+      <ResourcePosture data={data} pulse={pulse} />
+    </div>
+  );
+}
+
+function InstitutionalStatePanel({ state, data, isLoading }: { state: InstitutionalState | null; data?: OverviewPayload; isLoading: boolean }) {
+  const metrics = [
+    { label: "System coherence", value: state ? `${state.systemCoherence}%` : "-", icon: BrainCircuit },
+    { label: "Convergence pressure", value: state ? `${state.convergencePressure}%` : "-", icon: Split },
+    { label: "Operational drift", value: state ? `${state.operationalDrift}%` : "-", icon: GitBranch },
+    { label: "Unresolved escalations", value: String(data?.alerts.length ?? 0), icon: OctagonAlert },
+    { label: "Policy stability", value: state ? `${state.policyStability}%` : "-", icon: Scale },
+    { label: "Resource posture", value: data ? `${data.kpi.spend_cap_pct}%` : "-", icon: Database },
+  ];
+
+  return (
+    <div className="sv-prime mineral-panel">
+      <PanelChrome label="Institutional state" icon={Landmark} />
+      <div className="state-core">
+        <div className={cn("state-orbit", state?.tone)}>
+          <span />
+          <b>{isLoading ? "SYNC" : state?.posture ?? "NO SIGNAL"}</b>
+        </div>
+        <div>
+          <h3>Consciousness layer</h3>
+          <p>{state?.narrative ?? "Waiting for live institutional telemetry from the command plane."}</p>
         </div>
       </div>
+      <div className="state-matrix">
+        {metrics.map((metric) => (
+          <SignalReadout key={metric.label} {...metric} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        {METRICS.map((m) => (
-          <div key={m.label} className="v-card flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="v-section-label">{m.label}</span>
-              <m.icon className={`h-3.5 w-3.5 ${m.color} opacity-60`} />
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-xl font-bold text-bone">{m.value}</span>
-              <span className={`mb-0.5 font-mono text-[10px] ${m.color}`}>{m.delta}</span>
-            </div>
-            <MiniChart color={m.color} />
+function StrategicTrajectory({ data, state }: { data?: OverviewPayload; state: InstitutionalState | null }) {
+  return (
+    <div className="sv-trajectory mineral-panel">
+      <PanelChrome label="Strategic trajectory" icon={Network} />
+      <div className="trajectory-bands">
+        <TrajectoryBand label="Route integrity" value={state?.routeIntegrity ?? 0} tone="cyan" />
+        <TrajectoryBand label="Execution confidence" value={state?.executionConfidence ?? 0} tone="teal" />
+        <TrajectoryBand label="Memory continuity" value={state?.memoryContinuity ?? 0} tone="amber" />
+      </div>
+      <div className="signal-chart">
+        <Sparkline values={data?.kpi.requests_series ?? []} />
+        <span>Long-range movement derives from live run cadence and audit continuity.</span>
+      </div>
+    </div>
+  );
+}
+
+function AgentAlignment({ data }: { data?: OverviewPayload }) {
+  const committees = buildCommittees(data);
+  return (
+    <div className="sv-alignment mineral-panel">
+      <PanelChrome label="Global agent behavior" icon={CircuitBoard} />
+      <div className="alignment-map">
+        {committees.map((committee) => (
+          <div key={committee.name} className={cn("alignment-node", committee.tone)}>
+            <span>{committee.name}</span>
+            <b>{committee.state}</b>
+            <small>{committee.detail}</small>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <div className="v-card lg:col-span-3">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="v-section-label">Routing · Last 24h</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">Hetzner primary · AWS burst</p>
-            </div>
-            <div className="flex gap-2">
-              <span className="v-badge-amber">Hetzner 88%</span>
-              <span className="v-badge-electric">AWS 12%</span>
-            </div>
-          </div>
-          <div className="h-40 rounded-md bg-ink-3/50 flex items-center justify-center">
-            <span className="text-xs text-muted">24h throughput chart</span>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <Infra label="Hetzner FSN1" value="78% util" detail="8× A100, 4× H100, 6× CPU pool" />
-            <Infra label="Hetzner FRA1" value="62% util" detail="EU-sovereign · 4× L40s" />
-            <Infra label="AWS Burst (US-East-1)" value="12% engaged" detail="On-demand · gated by policy" />
-          </div>
-        </div>
-
-        <div className="v-card lg:col-span-2">
-          <p className="v-section-label">Spend · Today</p>
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-lg font-bold text-bone">${spendUsd} of ${capUsd} cap</span>
-            <span className="v-badge-amber">● On-Pace</span>
-          </div>
-          <div className="v-progress mt-3">
-            <div className="v-progress-fill bg-amber" style={{ width: "68%" }} />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {[["Inference","65%","$842.12"],["Embeddings","16%","$211.00"],["GPU Burst","12%","$148.28"],["Storage","7%","$83.50"]].map(([label,pct,value]) => (
-              <div key={label} className="flex items-center justify-between">
-                <span className="text-xs text-muted">{label}</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] text-muted-2">{pct}</span>
-                  <span className="font-mono text-xs font-medium text-bone">{value}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 border-t border-rule pt-3">
-            <div className="flex justify-between text-xs text-muted">
-              <span>Burn rate</span>
-              <span className="font-mono text-bone">${burnRate} / min</span>
-            </div>
-            <div className="mt-1 flex justify-between text-xs text-muted">
-              <span>Forecast EOD</span>
-              <span className="font-mono text-bone">${forecastEod} (94% cap)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Runs + Policy Interception */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Recent Runs */}
-        <div className="v-card">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="v-section-label">Recent Runs · Live</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">Per-call routing, latency, cost</p>
-            </div>
-            <button className="flex items-center gap-1 text-xs text-brass hover:text-brass-2">Playground →</button>
-          </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-rule text-left">
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Model</th>
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Route</th>
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Latency</th>
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Tokens</th>
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Cost</th>
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Policy</th>
-                <th className="pb-2 font-mono text-[9px] uppercase text-muted">When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { model: "Llama 3.1 70B", route: "Hetzner · Primary", latency: "142 ms", tokens: "1240", cost: "$0.00091", policy: "Passed", when: "12s ago" },
-                { model: "Mixtral 8×22B", route: "Hetzner · Primary", latency: "121 ms", tokens: "980", cost: "$0.00057", policy: "Passed", when: "44s ago" },
-                { model: "Claude 3.5 Haiku", route: "AWS · Burst", latency: "228 ms", tokens: "2100", cost: "$0.00858", policy: "Redacted", when: "1m ago" },
-                { model: "Qwen 2.5 72B", route: "Hetzner · Primary", latency: "96 ms", tokens: "720", cost: "$0.00021", policy: "Passed", when: "2m ago" },
-                { model: "BGE-M3", route: "Hetzner · Primary", latency: "14 ms", tokens: "480", cost: "$0.00001", policy: "Passed", when: "2m ago" },
-              ].map((run, i) => (
-                <tr key={i} className="border-b border-rule/30">
-                  <td className="py-2 font-medium text-bone">{run.model}</td>
-                  <td className="py-2">
-                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono ${run.route.includes("AWS") ? "bg-electric/15 text-electric" : "bg-amber/15 text-amber"}`}>
-                      {run.route}
-                    </span>
-                  </td>
-                  <td className="py-2 font-mono text-muted">{run.latency}</td>
-                  <td className="py-2 font-mono text-muted">{run.tokens}</td>
-                  <td className="py-2 font-mono text-muted">{run.cost}</td>
-                  <td className="py-2">
-                    <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${run.policy === "Passed" ? "bg-moss/15 text-moss" : "bg-crimson/15 text-crimson"}`}>
-                      {run.policy}
-                    </span>
-                  </td>
-                  <td className="py-2 font-mono text-[10px] text-muted-2">{run.when}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Policy Interception */}
-        <div className="v-card">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="v-section-label">Policy Interception · Live</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">Decision before execution</p>
-            </div>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-              <span className="font-mono text-[9px] text-moss">LIVE</span>
-            </span>
-          </div>
-          <div className="space-y-3">
-            {POLICY_EVENTS.map((ev, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2">
-                <span className="mt-0.5 text-sm">{ev.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-bone">{ev.label}</p>
-                  <p className="truncate text-[11px] text-muted">{ev.detail}</p>
-                </div>
-                <span className="shrink-0 font-mono text-[10px] text-muted-2">{ev.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Alerts + Audit Trail + Fleet */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Alerts */}
-        <div className="v-card">
-          <p className="v-section-label">Alerts</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">3 open</p>
-          <div className="mt-4 space-y-3">
-            {[
-              { text: "P95 latency above 600 ms on chat-prod (2 spikes)", source: "Monitoring · 4m ago", color: "bg-amber" },
-              { text: "AWS burst engaged (12% of traffic)", source: "Router · 9m ago", color: "bg-electric" },
-              { text: "Egress allowlist updated — 1 rule needs review", source: "Compliance · 1h ago", color: "bg-crimson" },
-            ].map((alert, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${alert.color}`} />
-                <div>
-                  <p className="text-xs text-bone">{alert.text}</p>
-                  <p className="mt-0.5 font-mono text-[9px] text-muted">{alert.source}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Audit Trail */}
-        <div className="v-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="v-section-label">Audit Trail · Tamper-Evident</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">Hash-chained</p>
-            </div>
-            <span className="rounded bg-moss/15 px-1.5 py-0.5 text-[9px] font-mono text-moss">Verified</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {[
-              { action: "deploy.update", actor: "chat-prod · elliot@acme.io", hash: "9f4e...ac21", time: "07:24:112" },
-              { action: "policy.intercept", actor: "session#pri_421 · system/router", hash: "5b71...dc19", time: "07:18:822" },
-              { action: "vault.rotate", actor: "OPENAI_KEY_PROXY · kira@acme.io", hash: "0c11...7d2a", time: "07:11:552" },
-              { action: "evidence.export", actor: "soc2-q2 pkg.zip · system/compliance", hash: "ef87...2941", time: "07:00:212" },
-              { action: "key.create", actor: "key_8h2x_chat · alex@acme.io", hash: "12cd...ee81", time: "06:54:172" },
-            ].map((entry, i) => (
-              <div key={i} className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-mono text-[11px] font-medium text-bone">{entry.action}</p>
-                  <p className="truncate font-mono text-[9px] text-muted">{entry.actor}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-mono text-[9px] text-muted-2">{entry.time}</p>
-                  <p className="font-mono text-[8px] text-muted/50">{entry.hash}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Fleet */}
-        <div className="v-card">
-          <p className="v-section-label">Fleet</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">Models · deployments</p>
-          <div className="mt-4 space-y-3">
-            {[
-              { model: "Llama 3.1 70B Instruct", quant: "FP16 · 4", replicas: 4, zone: "Hetzner · Primary", latency: "142 ms" },
-              { model: "Mixtral 8×22B", quant: "INT8 · 6", replicas: 6, zone: "Hetzner · Primary", latency: "121 ms" },
-              { model: "Qwen 2.5 72B", quant: "INT4 · 8", replicas: 8, zone: "Hetzner · Primary", latency: "96 ms" },
-              { model: "Claude 3.5 Haiku (proxy)", quant: "FP16 · 2", replicas: 2, zone: "AWS · Burst", latency: "228 ms" },
-            ].map((m, i) => (
-              <div key={i} className="rounded-md border border-rule/40 bg-ink-3/30 px-3 py-2">
-                <p className="text-xs font-medium text-bone">{m.model}</p>
-                <div className="mt-1 flex items-center gap-2 text-[9px]">
-                  <span className="font-mono text-muted">{m.quant} replicas</span>
-                  <span className={`rounded px-1 py-0.5 font-mono ${m.zone.includes("AWS") ? "bg-electric/15 text-electric" : "bg-amber/15 text-amber"}`}>
-                    {m.zone}
-                  </span>
-                  <span className="ml-auto font-mono text-muted">P50 {m.latency}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+function InstitutionalEvents({ data, pulse, isLoading }: { data?: OverviewPayload; pulse: PlatformPulse | null; isLoading: boolean }) {
+  const events = buildStrategicEvents(data, pulse);
+  return (
+    <div className="sv-events mineral-panel">
+      <PanelChrome label="Strategic events" icon={RadioTower} />
+      <div className="event-column">
+        {events.map((event) => (
+          <EventLine key={event.id} event={event} />
+        ))}
+        {!events.length && <EmptyLine text={isLoading ? "Synchronizing strategic event stream." : "No strategic events in the live window."} />}
       </div>
     </div>
   );
 }
 
-function Infra({ label, value, detail }: { label: string; value: string; detail: string }) {
+function ResourcePosture({ data, pulse }: { data?: OverviewPayload; pulse: PlatformPulse | null }) {
   return (
-    <div className="rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2">
-      <p className="font-mono text-[9px] uppercase text-muted">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-bone">{value}</p>
-      <p className="mt-0.5 text-[10px] text-muted-2">{detail}</p>
+    <div className="sv-resource mineral-panel">
+      <PanelChrome label="Resource posture" icon={Layers3} />
+      <div className="resource-grid">
+        <StatusDatum label="Reserve used" value={data ? fmtCents(data.spend.spend_cents) : "-"} tone="stable" />
+        <StatusDatum label="Burn rate" value={data ? `${fmtCents(data.spend.burn_rate_per_min_cents)} / min` : "-"} tone="neutral" />
+        <StatusDatum label="Active models" value={data ? String(data.kpi.active_models) : "-"} tone="stable" />
+        <StatusDatum label="Marketplace orders" value={pulse ? String(pulse.orders_30d.count) : "-"} tone="neutral" />
+      </div>
     </div>
   );
+}
+
+function SunnyvaleFloor({ data, state, isLoading }: { data?: OverviewPayload; state: InstitutionalState | null; isLoading: boolean }) {
+  return (
+    <div className="sunnyvale-grid">
+      <ExecutionLanes runs={data?.recent_runs ?? []} isLoading={isLoading} />
+      <CommitteeSessions events={data?.policy_events ?? []} state={state} isLoading={isLoading} />
+      <InterventionQueue alerts={data?.alerts ?? []} runs={data?.recent_runs ?? []} isLoading={isLoading} />
+      <EvidenceTray entries={data?.audit_trail ?? []} isLoading={isLoading} />
+      <FleetMatrix fleet={data?.fleet ?? []} />
+    </div>
+  );
+}
+
+function ExecutionLanes({ runs, isLoading }: { runs: RecentRun[]; isLoading: boolean }) {
+  return (
+    <div className="ops-lanes mineral-panel">
+      <PanelChrome label="Active runs and execution traces" icon={Workflow} action={<a href="#/playground">Open Playground <ArrowRight className="h-3 w-3" /></a>} />
+      <div className="trace-table">
+        {runs.slice(0, 7).map((run) => (
+          <div key={run.id} className="trace-row">
+            <span className={cn("route-light", run.route)} />
+            <b>{run.model}</b>
+            <em>{run.route === "burst" ? "Fallback route" : "Hetzner primary"}</em>
+            <strong>{run.latency_ms} ms</strong>
+            <small>{run.tokens} units</small>
+            <PolicySeal policy={run.policy} />
+            <time>{relativeTime(run.when)}</time>
+          </div>
+        ))}
+        {!runs.length && <EmptyLine text={isLoading ? "Synchronizing active run lanes." : "No active runs in the live window."} />}
+      </div>
+    </div>
+  );
+}
+
+function CommitteeSessions({ events, state, isLoading }: { events: PolicyEvent[]; state: InstitutionalState | null; isLoading: boolean }) {
+  return (
+    <div className="committee-panel mineral-panel">
+      <PanelChrome label="Committee sessions" icon={Vote} />
+      <div className="committee-score">
+        <span>Alignment</span>
+        <b>{state ? `${state.committeeAlignment}%` : "-"}</b>
+        <small>{events.length} live policy event{events.length === 1 ? "" : "s"}</small>
+      </div>
+      <div className="session-list">
+        {events.slice(0, 5).map((event) => (
+          <div key={event.id} className="session-row">
+            <CircleDot className="h-3.5 w-3.5" />
+            <div>
+              <b>{event.summary}</b>
+              <span>{event.detail}</span>
+            </div>
+            <time>{formatApiTime(event.ts)}</time>
+          </div>
+        ))}
+        {!events.length && <EmptyLine text={isLoading ? "Waiting for committee decisions." : "No committee sessions in this window."} />}
+      </div>
+    </div>
+  );
+}
+
+function InterventionQueue({ alerts, runs, isLoading }: { alerts: Alert[]; runs: RecentRun[]; isLoading: boolean }) {
+  const blocked = runs.filter((run) => run.policy === "blocked");
+  const interventions = [
+    ...alerts.map((alert) => ({
+      id: alert.id,
+      title: alert.title,
+      detail: `${alert.scope} - ${relativeTime(alert.when)}`,
+      severity: alert.severity,
+    })),
+    ...blocked.map((run) => ({
+      id: run.id,
+      title: "Blocked workflow",
+      detail: `${run.model} - ${relativeTime(run.when)}`,
+      severity: "error" as const,
+    })),
+  ];
+  return (
+    <div className="intervention-panel mineral-panel">
+      <PanelChrome label="Open intervention" icon={OctagonAlert} />
+      <div className="intervention-stack">
+        {interventions.slice(0, 5).map((item) => (
+          <div key={item.id} className={cn("intervention-row", item.severity)}>
+            <span />
+            <b>{item.title}</b>
+            <small>{item.detail}</small>
+          </div>
+        ))}
+        {!interventions.length && <EmptyLine text={isLoading ? "Scanning intervention queue." : "No open intervention requests."} />}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceTray({ entries, isLoading }: { entries: AuditEntry[]; isLoading: boolean }) {
+  return (
+    <div className="evidence-panel mineral-panel">
+      <PanelChrome label="Attached evidence" icon={FileCheck2} />
+      <div className="evidence-list">
+        {entries.slice(0, 6).map((entry) => (
+          <div key={entry.id} className="evidence-row">
+            <Hash className="h-3.5 w-3.5" />
+            <div>
+              <b>{entry.kind}</b>
+              <span>{entry.subject}</span>
+            </div>
+            <code>{entry.hash_prefix || "pending"}</code>
+          </div>
+        ))}
+        {!entries.length && <EmptyLine text={isLoading ? "Loading evidence chain." : "No evidence attachments yet."} />}
+      </div>
+    </div>
+  );
+}
+
+function FleetMatrix({ fleet }: { fleet: FleetModel[] }) {
+  return (
+    <div className="fleet-panel mineral-panel">
+      <PanelChrome label="Delegated agents and routes" icon={Cpu} />
+      <div className="fleet-matrix">
+        {fleet.slice(0, 6).map((model) => (
+          <div key={model.id} className="fleet-row">
+            <b>{model.name}</b>
+            <span>{model.quant}</span>
+            <em>{model.route === "burst" ? "fallback" : "primary"}</em>
+            <code>{model.p50_ms || "-"} p50</code>
+          </div>
+        ))}
+        {!fleet.length && <EmptyLine text="No model fleet telemetry yet." />}
+      </div>
+    </div>
+  );
+}
+
+function ArchivesLayer({ data, isLoading }: { data?: OverviewPayload; isLoading: boolean }) {
+  const archiveEntries = buildArchiveLineage(data);
+  return (
+    <section className="archives-spine">
+      <div>
+        <div className="archive-mark"><Archive className="h-4 w-4" /> The Archives</div>
+        <h2>Historical lineage</h2>
+        <p>Permanent record of votes, executions, disagreements, policy changes, escalations, and institutional transitions.</p>
+      </div>
+      <div className="archive-line">
+        {archiveEntries.map((entry) => (
+          <div key={entry.id}>
+            <b>{entry.kind}</b>
+            <span>{entry.subject}</span>
+            <code>{entry.hash}</code>
+          </div>
+        ))}
+        {!archiveEntries.length && <EmptyLine text={isLoading ? "Reconstructing lineage." : "No archive lineage available from live telemetry yet."} />}
+      </div>
+    </section>
+  );
+}
+
+function PanelChrome({ label, icon: Icon, action }: { label: string; icon: ComponentType<{ className?: string }>; action?: ReactNode }) {
+  return (
+    <div className="panel-chrome">
+      <span><Icon className="h-3.5 w-3.5" /> {label}</span>
+      {action && <div>{action}</div>}
+    </div>
+  );
+}
+
+function SectionTitle({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
+  return (
+    <div className="command-section-title">
+      <span>{eyebrow}</span>
+      <h2>{title}</h2>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function SignalReadout({ label, value, icon: Icon }: { label: string; value: string; icon: ComponentType<{ className?: string }> }) {
+  return (
+    <div className="signal-readout">
+      <Icon className="h-3.5 w-3.5" />
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+function TrajectoryBand({ label, value, tone }: { label: string; value: number; tone: "cyan" | "teal" | "amber" }) {
+  return (
+    <div className={cn("trajectory-band", tone)}>
+      <div><span>{label}</span><b>{value}%</b></div>
+      <i style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+function StatusDatum({ label, value, tone }: { label: string; value: string; tone: "stable" | "watch" | "critical" | "neutral" }) {
+  return (
+    <div className={cn("status-datum", tone)}>
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+function EventLine({ event }: { event: StrategicEvent }) {
+  return (
+    <div className={cn("event-line", event.tone)}>
+      <span />
+      <div>
+        <b>{event.title}</b>
+        <small>{event.detail}</small>
+      </div>
+      <time>{event.when}</time>
+    </div>
+  );
+}
+
+function PolicySeal({ policy }: { policy: RecentRun["policy"] }) {
+  return (
+    <span className={cn("policy-seal", policy)}>
+      {policy === "passed" ? <ShieldCheck className="h-3 w-3" /> : policy === "redacted" ? <BadgeCheck className="h-3 w-3" /> : <OctagonAlert className="h-3 w-3" />}
+      {policy}
+    </span>
+  );
+}
+
+function EmptyLine({ text }: { text: string }) {
+  return <div className="empty-line">{text}</div>;
+}
+
+interface InstitutionalState {
+  posture: string;
+  tone: "stable" | "watch" | "critical" | "neutral";
+  narrative: string;
+  systemCoherence: number;
+  convergencePressure: number;
+  operationalDrift: number;
+  executionConfidence: number;
+  routeIntegrity: number;
+  memoryContinuity: number;
+  policyStability: number;
+  committeeAlignment: number;
+}
+
+interface StrategicEvent {
+  id: string;
+  title: string;
+  detail: string;
+  when: string;
+  tone: "stable" | "watch" | "critical" | "neutral";
+}
+
+function deriveInstitutionalState(data: OverviewPayload, pulse: PlatformPulse | null): InstitutionalState {
+  const totalRuns = data.recent_runs.length;
+  const passedRuns = data.recent_runs.filter((run) => run.policy === "passed").length;
+  const blockedRuns = data.recent_runs.filter((run) => run.policy === "blocked").length;
+  const executionConfidence = totalRuns ? pct(passedRuns, totalRuns) : data.kpi.audit_verified_pct;
+  const routeIntegrity = Math.max(0, Math.round(100 - data.routing.burst_util_pct));
+  const memoryContinuity = data.kpi.audit_entries ? data.kpi.audit_verified_pct : 0;
+  const policyStability = Math.max(0, Math.round(100 - blockedRuns * 18 - data.alerts.length * 12));
+  const operationalDrift = Math.min(100, Math.round(Math.max(0, data.kpi.p50_delta_ms) / 20 + data.routing.burst_util_pct + data.alerts.length * 8));
+  const convergencePressure = Math.min(100, Math.round(data.policy_events.length * 10 + data.alerts.length * 16 + (pulse?.orders_30d.delta_pct_vs_prior ?? 0) / 2));
+  const committeeAlignment = Math.max(0, Math.round((executionConfidence + policyStability + routeIntegrity) / 3));
+  const systemCoherence = Math.max(0, Math.round((executionConfidence + routeIntegrity + memoryContinuity + policyStability) / 4));
+  const tone: InstitutionalState["tone"] = data.alerts.some((alert) => alert.severity === "error") || blockedRuns > 0
+    ? "critical"
+    : operationalDrift > 35 || convergencePressure > 55
+      ? "watch"
+      : totalRuns || data.kpi.audit_entries
+        ? "stable"
+        : "neutral";
+  const posture = tone === "critical" ? "Escalation pressure" : tone === "watch" ? "Controlled drift" : tone === "stable" ? "Coherent" : "Awaiting signal";
+  const narrative = `${fmtNumber(data.kpi.audit_entries)} audit entries, ${fmtNumber(totalRuns)} live run traces, ${data.routing.primary_plane} at ${data.routing.primary_util_pct}% with ${data.routing.burst_plane} at ${data.routing.burst_util_pct}%.`;
+
+  return {
+    posture,
+    tone,
+    narrative,
+    systemCoherence,
+    convergencePressure,
+    operationalDrift,
+    executionConfidence,
+    routeIntegrity,
+    memoryContinuity,
+    policyStability,
+    committeeAlignment,
+  };
+}
+
+function pct(part: number, total: number): number {
+  return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+function buildCommittees(data?: OverviewPayload) {
+  const policyEvents = data?.policy_events.length ?? 0;
+  const alerts = data?.alerts.length ?? 0;
+  const burst = data?.routing.burst_util_pct ?? 0;
+  const audit = data?.kpi.audit_verified_pct ?? 0;
+  return [
+    { name: "Policy", state: alerts ? "contested" : "aligned", detail: `${policyEvents} decision event${policyEvents === 1 ? "" : "s"}`, tone: alerts ? "watch" : "stable" },
+    { name: "Routing", state: burst > 20 ? "conflicted" : "aligned", detail: `${burst}% fallback posture`, tone: burst > 20 ? "watch" : "stable" },
+    { name: "Memory", state: audit >= 95 ? "continuous" : "thin", detail: `${audit}% verified lineage`, tone: audit >= 95 ? "stable" : "neutral" },
+    { name: "Fleet", state: data?.kpi.active_models ? "online" : "quiet", detail: `${data?.kpi.active_models ?? 0} model routes`, tone: data?.kpi.active_models ? "stable" : "neutral" },
+  ];
+}
+
+function buildStrategicEvents(data?: OverviewPayload, pulse?: PlatformPulse | null): StrategicEvent[] {
+  const events: StrategicEvent[] = [];
+  (data?.alerts ?? []).slice(0, 3).forEach((alert) => {
+    events.push({
+      id: `alert-${alert.id}`,
+      title: "Escalation path opened",
+      detail: `${alert.title} - ${alert.scope}`,
+      when: relativeTime(alert.when),
+      tone: alert.severity === "error" ? "critical" : "watch",
+    });
+  });
+  (data?.policy_events ?? []).slice(0, 4).forEach((event) => {
+    events.push({
+      id: `policy-${event.id}`,
+      title: event.kind === "audit_signed" ? "Historical lineage written" : "Policy posture shifted",
+      detail: event.summary,
+      when: relativeTime(event.ts),
+      tone: "stable",
+    });
+  });
+  if (pulse) {
+    events.push({
+      id: "pulse-marketplace",
+      title: "External signal changed",
+      detail: `${pulse.active_listings.total} active listings, ${pulse.orders_30d.count} paid orders in 30d`,
+      when: relativeTime(pulse.generated_at),
+      tone: "neutral",
+    });
+  }
+  return events.slice(0, 6);
+}
+
+function buildArchiveLineage(data?: OverviewPayload) {
+  const audits = (data?.audit_trail ?? []).slice(0, 5).map((entry) => ({
+    id: `audit-${entry.id}`,
+    kind: entry.kind,
+    subject: entry.subject,
+    hash: entry.hash_prefix || "unsealed",
+  }));
+  const policies = (data?.policy_events ?? []).slice(0, Math.max(0, 5 - audits.length)).map((event) => ({
+    id: `policy-${event.id}`,
+    kind: event.kind,
+    subject: event.summary,
+    hash: event.id.slice(0, 10),
+  }));
+  return [...audits, ...policies];
 }

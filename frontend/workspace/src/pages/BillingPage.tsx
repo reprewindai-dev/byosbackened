@@ -1,199 +1,459 @@
-import { useEffect, useCallback } from "react";
-import { FileText, Settings, Download } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  CreditCard,
+  History,
+  Loader2,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+  Zap,
+} from "lucide-react";
 import { api } from "@/lib/api";
+import { cn, fmtCents, fmtNumber, formatApiDate, relativeTime } from "@/lib/cn";
 
-const PLANS = [
-  { name: "Community", price: "$0", period: "free", features: ["Local-first via Ollama", "1 deployment", "Basic governance"], current: false },
-  { name: "Growth", price: "$299", period: "/mo", features: ["5 deployments", "Routing controls", "Audit retention 30 d"], current: false },
-  { name: "Sovereign", price: "$799", period: "/mo", features: ["Unlimited deployments", "HIPAA / SOC 2 packs", "Audit retention 1 y"], current: true },
-  { name: "Enterprise", price: "Custom", period: "private", features: ["SAML / SCIM / SSO", "Custom regions", "Procurement-ready"], current: false },
+interface WalletBalance {
+  workspace_id: string;
+  reserve_balance_usd?: string;
+  balance: number;
+  monthly_credits_included: number;
+  monthly_credits_used: number;
+  monthly_period_start: string | null;
+  monthly_period_end: string | null;
+  total_credits_purchased: number;
+  total_credits_used: number;
+}
+
+interface TxnRow {
+  id: string;
+  transaction_type: string;
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  endpoint_path: string | null;
+  endpoint_method: string | null;
+  request_id: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+interface TxnList {
+  transactions: TxnRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+interface TopupOption {
+  pack_name: string;
+  price_cents: number;
+  reserve_usd?: string;
+  credits: number;
+  bonus_percent: number;
+}
+
+interface TopupOptions {
+  options: TopupOption[];
+}
+
+const FREE_EVALUATION_RUNS = 15;
+
+const PRICING_ROWS = [
+  { tier: "Free Evaluation", activation: "$0", reserve: "$0", runs: "15 governed runs", evidence: "Locked" },
+  { tier: "Founding", activation: "$395 one-time", reserve: "$150 min", runs: "$0.25 / run", evidence: "$99" },
+  { tier: "Standard", activation: "$795 one-time", reserve: "$300 min", runs: "$0.40 / run", evidence: "$149" },
+  { tier: "Regulated", activation: "From $2,500", reserve: "$2,500 min", runs: "Contact", evidence: "$199" },
 ];
 
-const CATEGORIES = [
-  { label: "Inference", pct: 64, amount: "$11,820", color: "bg-amber" },
-  { label: "Embeddings", pct: 13, amount: "$2,380", color: "bg-electric" },
-  { label: "GPU burst", pct: 14, amount: "$2,640", color: "bg-violet-400" },
-  { label: "Storage / logs", pct: 9, amount: "$1,636", color: "bg-cyan-400" },
+const EVENT_PRICES = [
+  ["Compare run", "$0.75 Founding / $1.20 Standard"],
+  ["BYOK governance calls", "$6 Founding / $8 Standard per 1K"],
+  ["Managed governance calls", "$12 Founding / $16 Standard per 1K"],
+  ["Auditor bundle", "$249 Founding / $349 Standard / $499 Regulated"],
 ];
 
-const TEAMS = [
-  { name: "Clinical AI", amount: "$8,120", color: "bg-amber" },
-  { name: "Risk & Audit", amount: "$4,212", color: "bg-electric" },
-  { name: "Customer Ops", amount: "$3,810", color: "bg-moss" },
-  { name: "Internal R&D", amount: "$2,334", color: "bg-violet-400" },
-];
+async function fetchBalance() {
+  return (await api.get<WalletBalance>("/wallet/balance")).data;
+}
+async function fetchTransactions() {
+  return (await api.get<TxnList>("/wallet/transactions", { params: { limit: 25, offset: 0 } })).data;
+}
+async function fetchTopupOptions() {
+  return (await api.get<TopupOptions>("/wallet/topup/options")).data;
+}
 
-const INVOICE_LINES = [
-  { desc: "Sovereign tier · 1 seat × 12", amount: "$9,588.00" },
-  { desc: "Seat overages × 4", amount: "$1,196.00" },
-  { desc: "AI request overage · 18.4M", amount: "$3,212.00" },
-  { desc: "GPU burst hours · 88h", amount: "$2,640.00" },
-  { desc: "Managed deployment fees", amount: "$1,200.00" },
-  { desc: "Log retention extension (12 mo)", amount: "$640.00" },
-];
+async function createTopup(pack: string) {
+  const origin = window.location.origin;
+  const resp = await api.post<{ checkout_url: string; session_id: string }>("/wallet/topup/checkout", {
+    pack_name: pack,
+    success_url: `${origin}/workspace-app#/billing?topup=success`,
+    cancel_url: `${origin}/workspace-app#/billing?topup=cancel`,
+  });
+  return resp.data;
+}
 
-const CAPS = [
-  { label: "Org daily cap", value: "$1,000 hard-stop" },
-  { label: "Inference monthly cap", value: "$24,000 hard-stop" },
-  { label: "AWS burst cap", value: "$3,000 alert" },
-  { label: "Per-team cap · Clinical", value: "$10,000 alert" },
-];
+function fmtReserveUsd(balance: WalletBalance): string {
+  const amount = Number(balance.reserve_balance_usd ?? balance.balance / 1000);
+  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtReserveUnitsAsUsd(units: number): string {
+  const sign = units < 0 ? "-" : "";
+  const amount = Math.abs(units) / 1000;
+  return `${sign}$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export function BillingPage() {
-  const fetchData = useCallback(async () => {
-    try { await api.get("/wallet/balance"); } catch { /* static */ }
-  }, []);
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const balance = useQuery({ queryKey: ["wallet-balance"], queryFn: fetchBalance, refetchInterval: 30_000 });
+  const txns = useQuery({ queryKey: ["wallet-txns"], queryFn: fetchTransactions });
+  const packs = useQuery({ queryKey: ["wallet-topup-options"], queryFn: fetchTopupOptions });
+  const [selectedPack, setSelectedPack] = useState<string | null>(null);
+
+  const topup = useMutation({
+    mutationFn: createTopup,
+    onSuccess: (data) => {
+      if (data.checkout_url) window.location.href = data.checkout_url;
+    },
+  });
+
+  const evaluationRunsUsed = useMemo(() => {
+    return (txns.data?.transactions ?? []).filter((txn) => txn.transaction_type === "usage").length;
+  }, [txns.data?.transactions]);
+  const evaluationPct = Math.min(100, Math.round((evaluationRunsUsed / FREE_EVALUATION_RUNS) * 100));
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-start justify-between">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="v-section-label">Billing</p>
-          <h1 className="mt-1 text-2xl font-bold text-bone">Spend · usage · invoices</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Real-time meters, hard-stop caps, customer portal, and per-team allocation. No surprise invoices.
+          <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
+            Workspace · Billing
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Operating reserve &amp; governed execution</h1>
+          <p className="mt-2 max-w-2xl text-sm text-bone-2">
+            Activate once, fund a reserve, and debit governed runs in real time. Stripe checkout funds the workspace
+            reserve while the ledger records every debit and funding event.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="v-chip v-chip-ok">
+              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
+              live · <span className="font-mono">/api/v1/wallet</span>
+            </span>
+            <span className="v-chip v-chip-brass">Stripe Checkout</span>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 rounded-md border border-rule px-3 py-1.5 text-xs text-muted hover:text-bone">
-            <FileText className="h-3.5 w-3.5" /> Invoices
+      </header>
+
+      {balance.isError && (
+        <div className="v-card flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <div className="flex-1">
+            <div className="font-semibold">Reserve unavailable</div>
+            <div className="mt-1 text-xs opacity-80">
+              {(balance.error as Error)?.message ?? "Unknown error"} · log in or confirm workspace is provisioned.
+            </div>
+          </div>
+          <button className="v-btn-ghost" onClick={() => balance.refetch()}>
+            Retry
           </button>
-          <button className="v-btn-primary text-xs"><Settings className="h-3.5 w-3.5" /> Manage plan</button>
         </div>
-      </div>
+      )}
 
-      {/* Spend + Per-team */}
-      <div className="grid gap-4 lg:grid-cols-5">
-        <div className="v-card lg:col-span-3">
-          <div className="flex items-center justify-between">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="v-card p-5 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="v-section-label">Spend · This Month</p>
-              <p className="mt-0.5 text-lg font-bold text-bone">$18,476.00 of $24,000 cap</p>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Reserve balance</div>
+              <h3 className="mt-1 text-sm font-semibold">Current operating reserve</h3>
             </div>
-            <span className="rounded bg-moss/15 px-2 py-0.5 text-[9px] font-mono font-semibold text-moss">● ON-PACE</span>
+            <Wallet className="h-5 w-5 text-brass-2" />
           </div>
-          <div className="mt-4 h-36 relative">
-            <svg viewBox="0 0 460 130" className="w-full h-full" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="spend-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f0b340" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#f0b340" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <line x1="0" y1="10" x2="460" y2="10" stroke="#ff4d6d" strokeWidth="0.5" strokeDasharray="4 3" opacity="0.5" />
-              <path d="M0 120 C30 110, 60 95, 80 90 C100 85, 120 75, 150 70 C180 65, 200 55, 230 48 C260 42, 290 38, 320 32 C350 28, 380 25, 410 22 C430 20, 450 18, 460 16 L460 130 L0 130 Z" fill="url(#spend-grad)" />
-              <path d="M0 120 C30 110, 60 95, 80 90 C100 85, 120 75, 150 70 C180 65, 200 55, 230 48 C260 42, 290 38, 320 32 C350 28, 380 25, 410 22 C430 20, 450 18, 460 16" fill="none" stroke="#f0b340" strokeWidth="2" />
-            </svg>
-            <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[9px] font-mono text-muted px-1">
-              {["0h","1h","2h","3h","4h","5h","6h","7h","8h","9h","10h","11h","12h","13h","14h","15h","16h","17h","18h","20h","22h","23h"].map(h => <span key={h}>{h}</span>)}
+
+          <div className="flex items-baseline gap-3">
+            <div className="font-mono text-4xl font-semibold text-bone">
+              {balance.isLoading ? (
+                <span className="inline-block h-9 w-40 animate-pulse rounded bg-rule" />
+              ) : balance.data ? (
+                fmtReserveUsd(balance.data)
+              ) : (
+                "-"
+              )}
             </div>
+            <span className="font-mono text-[12px] uppercase tracking-widest text-muted">available</span>
           </div>
-          {/* Category breakdown */}
-          <div className="mt-4 grid grid-cols-4 gap-3">
-            {CATEGORIES.map(c => (
-              <div key={c.label} className="rounded-md border border-rule/40 bg-ink-3/20 px-3 py-2.5">
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-muted">{c.label}</span>
-                  <span className="font-mono text-muted">{c.pct}%</span>
-                </div>
-                <p className="mt-1 text-sm font-bold text-bone">{c.amount}</p>
-                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-ink-2">
-                  <div className={`h-full rounded-full ${c.color}`} style={{ width: `${c.pct}%` }} />
-                </div>
+
+          <div className="mt-5">
+            <div className="mb-1 flex justify-between font-mono text-[11px] text-muted">
+              <span>Free Evaluation governed runs</span>
+              <span className="text-bone">
+                {txns.isLoading ? "-" : `${Math.min(evaluationRunsUsed, FREE_EVALUATION_RUNS)} / ${FREE_EVALUATION_RUNS}`}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded bg-rule">
+              <div
+                className={cn(
+                  "h-full rounded transition-all",
+                  evaluationPct > 80 ? "bg-crimson" : evaluationPct > 60 ? "bg-brass" : "bg-moss",
+                )}
+                style={{ width: `${evaluationPct}%` }}
+              />
+            </div>
+            {balance.data?.monthly_period_end && (
+              <div className="mt-2 font-mono text-[10px] text-muted">
+                resets {formatApiDate(balance.data.monthly_period_end)}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 font-mono text-[11px]">
+            <Stat
+              icon={<ArrowUpRight className="h-3 w-3 text-moss" />}
+              label="Reserve funded"
+              value={balance.data ? fmtReserveUnitsAsUsd(balance.data.total_credits_purchased) : "-"}
+            />
+            <Stat
+              icon={<TrendingUp className="h-3 w-3 text-electric" />}
+              label="Reserve consumed"
+              value={balance.data ? fmtReserveUnitsAsUsd(balance.data.total_credits_used) : "-"}
+            />
+          </div>
+        </div>
+
+        <div className="v-card p-5">
+          <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Quick actions</div>
+          <button
+            className="v-btn-primary w-full"
+            onClick={() => setSelectedPack(packs.data?.options[0]?.pack_name ?? "founding")}
+            disabled={packs.isLoading}
+          >
+            <Sparkles className="h-4 w-4" /> Add reserve
+          </button>
+          <button
+            className="v-btn-ghost mt-2 w-full cursor-not-allowed justify-center opacity-70"
+            disabled
+            title="Stripe customer portal requires a completed billing account. Reserve checkout is live; portal access appears after account provisioning."
+          >
+            <CreditCard className="h-4 w-4" /> Customer portal locked
+          </button>
+          <div className="mt-4 rounded-lg border border-rule p-3 text-[11px] text-bone-2">
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Burn-rate guard</div>
+            <div>Spend caps, alerts, and auto-throttle live in <a href="#/monitoring" className="text-brass-2 hover:underline">Monitoring</a>.</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <div className="v-card p-0">
+          <header className="border-b border-rule px-5 py-3">
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Access model</div>
+            <h2 className="mt-1 text-lg font-semibold">Free lets you see governed AI. Paid lets you prove it.</h2>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead className="border-b border-rule font-mono text-[10px] uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-5 py-2 text-left font-medium">Tier</th>
+                  <th className="px-5 py-2 text-left font-medium">Activation</th>
+                  <th className="px-5 py-2 text-left font-medium">Reserve</th>
+                  <th className="px-5 py-2 text-left font-medium">Governed run</th>
+                  <th className="px-5 py-2 text-left font-medium">Evidence package</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PRICING_ROWS.map((row) => (
+                  <tr key={row.tier} className="border-b border-rule/60 last:border-0">
+                    <td className="px-5 py-2.5 font-semibold text-bone">{row.tier}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.activation}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.reserve}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.runs}</td>
+                    <td className="px-5 py-2.5 font-mono text-bone-2">{row.evidence}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="v-card p-5">
+          <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Paid-only evidence</div>
+          <h2 className="mt-1 text-lg font-semibold">Compliance exports stay locked until activation</h2>
+          <p className="mt-2 text-sm text-bone-2">
+            The free playground is for evaluation only. Signed artifacts, retention controls, evidence packs, and auditor
+            bundles require an activated workspace.
+          </p>
+          <div className="mt-4 space-y-2">
+            {EVENT_PRICES.map(([label, value]) => (
+              <div key={label} className="flex items-start justify-between gap-4 rounded-lg border border-rule bg-ink/35 px-3 py-2 text-[12px]">
+                <span className="text-muted">{label}</span>
+                <span className="text-right font-mono text-bone">{value}</span>
               </div>
             ))}
           </div>
         </div>
+      </section>
 
-        <div className="v-card lg:col-span-2">
-          <p className="v-section-label">Per-Team Allocation</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">Tagged usage · cost center reports</p>
-          <div className="mt-4 space-y-3">
-            {TEAMS.map(t => (
-              <div key={t.name} className="rounded-md border border-rule/40 bg-ink-3/20 px-4 py-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-bone">{t.name}</span>
-                  <span className="font-mono text-bone">{t.amount}</span>
+      <section>
+        <header className="mb-3 flex items-end justify-between">
+          <div>
+            <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Reserve packs</div>
+            <h2 className="mt-1 text-lg font-semibold">Fund operating reserve</h2>
+          </div>
+          {packs.isLoading && (
+            <span className="font-mono text-[11px] text-muted">loading…</span>
+          )}
+        </header>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {(packs.data?.options ?? []).map((p) => {
+            const reserveUsd = Number(p.reserve_usd ?? p.credits / 1000);
+            const runCount = Math.floor(reserveUsd / 0.25);
+            const active = selectedPack === p.pack_name;
+            return (
+              <div
+                key={p.pack_name}
+                className={cn(
+                  "v-card flex flex-col gap-3 p-4 transition",
+                  active && "border-brass/60 ring-1 ring-brass/40",
+                  p.bonus_percent >= 50 && "border-brass/30",
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                      {p.pack_name}
+                    </div>
+                    <div className="mt-1 font-mono text-2xl font-semibold text-bone">
+                      {fmtCents(p.price_cents)}
+                    </div>
+                  </div>
+                  {p.bonus_percent > 0 && (
+                    <span className="v-chip v-chip-brass font-mono text-[10px]">
+                      +{p.bonus_percent}% reserve bonus
+                    </span>
+                  )}
                 </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-ink-2">
-                  <div className={`h-full rounded-full ${t.color}`} style={{ width: `${parseInt(t.amount.replace(/[$,]/g, "")) / 120}%` }} />
+                <div>
+                  <div className="font-mono text-[14px] font-semibold text-bone">
+                    ${reserveUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} operating reserve
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10px] text-muted">
+                    up to {fmtNumber(runCount)} Founding governed runs
+                  </div>
                 </div>
+                <button
+                  className={cn("mt-auto w-full", active ? "v-btn-primary" : "v-btn-ghost")}
+                  onClick={() => {
+                    setSelectedPack(p.pack_name);
+                    topup.mutate(p.pack_name);
+                  }}
+                  disabled={topup.isPending}
+                >
+                  {topup.isPending && active ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                  {topup.isPending && active ? "Opening Stripe…" : "Purchase"}
+                </button>
               </div>
-            ))}
-          </div>
+            );
+          })}
+          {!packs.isLoading && !packs.data?.options?.length && (
+            <div className="v-card col-span-full p-5 text-center text-muted">
+              Reserve packs unavailable - Stripe may not be configured.
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Pricing tiers */}
-      <div className="grid gap-4 md:grid-cols-4">
-        {PLANS.map((plan) => (
-          <div key={plan.name} className={`v-card relative ${plan.current ? "border-amber/30" : ""}`}>
-            <div className="flex items-center justify-between">
-              <p className="v-section-label">{plan.name}</p>
-              {plan.current && <span className="rounded bg-moss/15 px-1.5 py-0.5 text-[8px] font-mono font-semibold text-moss">● CURRENT</span>}
-            </div>
-            <div className="mt-2">
-              <span className="text-2xl font-bold text-bone">{plan.price}</span>
-              <span className="ml-1 text-xs text-muted">{plan.period}</span>
-            </div>
-            <ul className="mt-4 space-y-1.5">
-              {plan.features.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-xs text-muted">
-                  <span className="h-1 w-1 rounded-full bg-amber" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <button className={`mt-4 w-full rounded py-2 text-xs font-semibold ${plan.current ? "bg-ink-3 text-bone border border-rule" : "bg-amber/15 border border-amber/30 text-amber hover:bg-amber/25"}`}>
-              {plan.current ? "Manage" : "Upgrade"}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Invoice + Caps */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Latest invoice */}
-        <div className="v-card">
-          <div className="flex items-center justify-between mb-4">
+      <section className="v-card p-0">
+        <header className="flex items-center justify-between border-b border-rule px-5 py-3">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-muted" />
             <div>
-              <p className="v-section-label">Latest Invoice</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">May 1, 2026 · acme-prod</p>
-            </div>
-            <button className="flex items-center gap-1 rounded border border-rule px-2.5 py-1 text-xs text-muted hover:text-bone">
-              <Download className="h-3 w-3" /> PDF
-            </button>
-          </div>
-          <div className="space-y-2">
-            {INVOICE_LINES.map((line) => (
-              <div key={line.desc} className="flex items-center justify-between border-b border-rule/20 pb-2 text-xs">
-                <span className="text-muted">{line.desc}</span>
-                <span className="font-mono text-bone">{line.amount}</span>
+              <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+                Recent transactions
               </div>
-            ))}
-            <div className="flex items-center justify-between pt-1 text-xs">
-              <span className="font-semibold text-bone">Total</span>
-              <span className="font-mono font-bold text-bone">$18,476.00</span>
+              <h3 className="mt-0.5 text-sm font-semibold">Debit &amp; funding ledger</h3>
             </div>
           </div>
-        </div>
+          <span className="v-chip font-mono">
+            {txns.data ? `${txns.data.transactions.length} / ${txns.data.total}` : "-"}
+          </span>
+        </header>
 
-        {/* Caps & Alerts */}
-        <div className="v-card">
-          <p className="v-section-label">Caps & Alerts</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">Hard-stop · alert · forecast</p>
-          <div className="mt-4 space-y-3">
-            {CAPS.map((cap) => (
-              <div key={cap.label} className="flex items-center justify-between border-b border-rule/20 pb-2 text-xs">
-                <span className="text-muted">{cap.label}</span>
-                <span className="font-mono text-bone">{cap.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="border-b border-rule font-mono text-[10px] uppercase tracking-wider text-muted">
+              <th className="px-5 py-2 text-left font-medium">When</th>
+              <th className="px-5 py-2 text-left font-medium">Type</th>
+              <th className="px-5 py-2 text-left font-medium">Description</th>
+              <th className="px-5 py-2 text-right font-medium">Delta reserve</th>
+              <th className="px-5 py-2 text-right font-medium">Balance after</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono">
+            {txns.isLoading && (
+              <tr>
+                <td colSpan={5} className="px-5 py-6 text-center text-muted">
+                  loading…
+                </td>
+              </tr>
+            )}
+            {!txns.isLoading && (!txns.data || txns.data.transactions.length === 0) && (
+              <tr>
+                <td colSpan={5} className="px-5 py-6 text-center text-muted">
+                  No transactions yet. Top up or start using the Playground to generate ledger entries.
+                </td>
+              </tr>
+            )}
+            {txns.data?.transactions.map((t) => {
+              const credit = t.amount > 0;
+              return (
+                <tr key={t.id} className="border-b border-rule/60 last:border-0">
+                  <td className="px-5 py-2.5 text-muted">{relativeTime(t.created_at)}</td>
+                  <td className="px-5 py-2.5">
+                    <span
+                      className={cn(
+                        "v-chip font-mono",
+                        credit ? "v-chip-ok" : "v-chip-warn",
+                      )}
+                    >
+                      {t.transaction_type}
+                    </span>
+                  </td>
+                  <td className="max-w-[280px] truncate px-5 py-2.5 text-bone-2">
+                    {t.description ?? t.endpoint_path ?? "-"}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-5 py-2.5 text-right",
+                      credit ? "text-moss" : "text-crimson",
+                    )}
+                  >
+                    {credit ? "+" : ""}
+                    {fmtReserveUnitsAsUsd(t.amount)}
+                  </td>
+                  <td className="px-5 py-2.5 text-right text-bone">{fmtReserveUnitsAsUsd(t.balance_after)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+}
+
+function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-rule px-3 py-2">
+      <div className="mb-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted">
+        {icon}
+        {label}
       </div>
+      <div className="text-bone">{value}</div>
     </div>
   );
 }

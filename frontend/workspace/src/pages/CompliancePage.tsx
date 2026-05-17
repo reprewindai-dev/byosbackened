@@ -1,220 +1,380 @@
-import { useEffect, useState, useCallback } from "react";
-import { Download, ExternalLink } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  CalendarClock,
+  Download,
+  FileDown,
+  Loader2,
+  LockKeyhole,
+  MoreHorizontal,
+  ShieldCheck,
+} from "lucide-react";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/cn";
 
-interface Framework {
+interface Regulation {
   id: string;
-  name?: string;
-  status?: string;
-  coverage_pct?: number;
-  controls_total?: number;
-  evidence_rows?: number;
+  name: string;
+  region: string;
 }
 
-interface Control {
-  id: string;
-  name?: string;
-  framework?: string;
-  last_test?: string;
-  evidence_count?: number;
-  status?: string;
+interface RegulationsResp {
+  regulations: Regulation[];
 }
 
-const FALLBACK_FRAMEWORKS: Framework[] = [
-  { id: "hipaa", name: "HIPAA", status: "AUDIT-READY", coverage_pct: 96, controls_total: 54, evidence_rows: 1420 },
-  { id: "soc2", name: "SOC 2 Type II", status: "CONTINUOUS", coverage_pct: 92, controls_total: 67, evidence_rows: 2940 },
-  { id: "pci", name: "PCI-DSS v4", status: "IN-PROGRESS", coverage_pct: 88, controls_total: 312, evidence_rows: 5120 },
-  { id: "iso27001", name: "ISO 27001", status: "AUDIT-READY", coverage_pct: 94, controls_total: 114, evidence_rows: 1180 },
-  { id: "gdpr", name: "GDPR", status: "CONTINUOUS", coverage_pct: 99, controls_total: 32, evidence_rows: 880 },
-  { id: "fedramp", name: "FedRAMP Moderate", status: "IN-PROGRESS", coverage_pct: 71, controls_total: 325, evidence_rows: 0 },
-];
+interface CheckResult {
+  regulation_id: string;
+  compliant: boolean;
+  score?: number;
+  checks?: Array<{ name: string; passed: boolean; detail?: string }>;
+  summary?: string;
+  issues?: string[];
+}
 
-const FALLBACK_CONTROLS: Control[] = [
-  { id: "ac2", name: "AC-2 · Account management", framework: "NIST AC", last_test: "12 min", evidence_count: 14, status: "PASSING" },
-  { id: "au3", name: "AU-3 · Audit log content", framework: "NIST AU", last_test: "9 min", evidence_count: 8, status: "PASSING" },
-  { id: "ia2", name: "IA-2 · Identification & auth", framework: "NIST IA", last_test: "1 hr", evidence_count: 12, status: "PASSING" },
-  { id: "phi1", name: "PHI-1 · PHI redaction at gateway", framework: "HIPAA", last_test: "live", evidence_count: 38, status: "PASSING" },
-  { id: "pci35", name: "PCI-3.5 · Cardholder data masked", framework: "PCI-DSS v4", last_test: "1 d", evidence_count: 4, status: "REVIEW" },
-  { id: "sc13", name: "SC-13 · Cryptographic protection", framework: "FedRAMP", last_test: "3 hr", evidence_count: 6, status: "PASSING" },
-  { id: "dpaeu", name: "DPA-EU · Data residency · EU only", framework: "GDPR", last_test: "live", evidence_count: 22, status: "PASSING" },
-];
+async function fetchRegulations(): Promise<Regulation[]> {
+  const resp = await api.get<RegulationsResp>("/compliance/regulations");
+  return resp.data.regulations ?? [];
+}
+
+async function runCheck(regulation_id: string): Promise<CheckResult> {
+  const resp = await api.post<CheckResult>("/compliance/check", { regulation_id });
+  return {
+    ...resp.data,
+    regulation_id: resp.data.regulation_id ?? (resp.data as CheckResult & { regulation?: string }).regulation ?? regulation_id,
+    checks: resp.data.checks ?? [],
+    issues: resp.data.issues ?? [],
+  };
+}
 
 export function CompliancePage() {
-  const [frameworks, setFrameworks] = useState<Framework[]>(FALLBACK_FRAMEWORKS);
-  const [controls, setControls] = useState<Control[]>(FALLBACK_CONTROLS);
+  const regs = useQuery({ queryKey: ["compliance-regs"], queryFn: fetchRegulations });
+  const [selected, setSelected] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, CheckResult>>({});
 
-  const fetchData = useCallback(async () => {
-    try {
-      const { data } = await api.get("/compliance/regulations");
-      if (Array.isArray(data) && data.length > 0) setFrameworks(data);
-    } catch { /* use fallback */ }
-    try {
-      const { data } = await api.get("/compliance/check");
-      if (Array.isArray(data) && data.length > 0) setControls(data);
-    } catch { /* use fallback */ }
-  }, []);
+  const check = useMutation({
+    mutationFn: runCheck,
+    onSuccess: (data) => {
+      setResults((current) => ({ ...current, [data.regulation_id]: data }));
+      setSelected(data.regulation_id);
+    },
+  });
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  function statusColor(s?: string) {
-    if (s === "AUDIT-READY") return "bg-moss/15 text-moss";
-    if (s === "CONTINUOUS") return "bg-electric/15 text-electric";
-    return "bg-amber/15 text-amber";
-  }
-
-  const barColors: Record<string, string> = {
-    hipaa: "bg-amber", soc2: "bg-electric", pci: "bg-violet-400",
-    iso27001: "bg-moss", gdpr: "bg-cyan-400", fedramp: "bg-electric",
-  };
-
-  const sparkColors: Record<string, string> = {
-    hipaa: "#e5a832", soc2: "#3b82f6", pci: "#a78bfa",
-    iso27001: "#4ade80", gdpr: "#22d3ee", fedramp: "#3b82f6",
-  };
+  const selectedResult = selected ? results[selected] : null;
+  const selectedReg = useMemo(
+    () => (regs.data ?? []).find((regulation) => regulation.id === selected) ?? null,
+    [regs.data, selected],
+  );
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="v-section-label">Compliance Center</p>
-          <h1 className="mt-1 text-2xl font-bold text-bone">Operational evidence — not a marketing page</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Pre-wired control mappings across frameworks, continuous evidence collection, and signed auditor packages on demand.
-          </p>
+    <div className="mx-auto w-full max-w-[1400px]">
+      <PageHeader />
+
+      {regs.isError && (
+        <div className="frame mb-4 flex items-start gap-3 border-crimson/40 bg-crimson/5 p-4 text-sm text-crimson">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <div className="flex-1">
+            <div className="font-semibold">Failed to load frameworks</div>
+            <div className="mt-0.5 text-xs opacity-80">{(regs.error as Error)?.message ?? "Unknown"}</div>
+          </div>
+          <button className="v-btn-ghost h-8 px-3 text-xs" onClick={() => regs.refetch()}>
+            Retry
+          </button>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 rounded-md border border-rule px-3 py-1.5 text-xs text-muted hover:text-bone">Schedule export</button>
-          <button className="v-btn-primary text-xs"><Download className="h-3.5 w-3.5" /> Export auditor pkg</button>
+      )}
+
+      <section>
+        <FrameworkGrid
+          regulations={regs.data ?? []}
+          results={results}
+          loading={regs.isLoading}
+          selected={selected}
+          pendingId={check.isPending ? selected : null}
+          onRun={(id) => {
+            setSelected(id);
+            check.mutate(id);
+          }}
+        />
+
+        <ControlsTable regulation={selectedReg} result={selectedResult} pending={check.isPending} error={check.error} />
+
+        <div className="mt-4 grid grid-cols-12 gap-4">
+          <EvidencePackagesPanel result={selectedResult} />
+          <EvidenceSchedulePanel />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function PageHeader() {
+  return (
+    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <div className="text-eyebrow">Compliance Center</div>
+        <h1 className="font-display mt-1 text-[30px] font-semibold tracking-tight text-bone">
+          Operational evidence - not a marketing page
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm text-bone-2">
+          Pre-wired control mappings across supported frameworks, live checks against the audit ledger, and locked
+          auditor packages when export is available.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge tone="ok" dot>
+            live · <span className="font-mono">/api/v1/compliance</span>
+          </Badge>
+          <Badge tone="primary">audit-ledger backed</Badge>
         </div>
       </div>
+      <div className="flex flex-wrap gap-2">
+        <button className="v-btn-ghost h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Scheduled evidence export is not wired yet.">
+          <CalendarClock className="h-3.5 w-3.5" /> Schedule export
+        </button>
+        <button className="v-btn-primary h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled title="Activation required. Free evaluation cannot export compliance-grade evidence.">
+          <Download className="h-3.5 w-3.5" /> Export auditor pkg
+        </button>
+      </div>
+    </header>
+  );
+}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {frameworks.map((fw) => (
-          <div key={fw.id} className="v-card">
+function FrameworkGrid({
+  regulations,
+  results,
+  loading,
+  selected,
+  pendingId,
+  onRun,
+}: {
+  regulations: Regulation[];
+  results: Record<string, CheckResult>;
+  loading: boolean;
+  selected: string | null;
+  pendingId: string | null;
+  onRun: (id: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {loading &&
+        Array.from({ length: 6 }).map((_, index) => <div key={index} className="frame h-44 animate-pulse bg-ink-2" />)}
+      {!loading && regulations.length === 0 && (
+        <div className="frame col-span-full px-6 py-12 text-center text-sm text-muted">No frameworks returned by the backend.</div>
+      )}
+      {regulations.map((regulation) => {
+        const result = results[regulation.id];
+        const score = typeof result?.score === "number" ? result.score : result ? result.compliant ? 100 : 0 : 0;
+        const state = result ? (result.compliant ? "Audit-ready" : "Review") : "Not run";
+        return (
+          <div
+            key={regulation.id}
+            className={cn("frame p-4 transition", selected === regulation.id && "border-brass/60 ring-1 ring-brass/30")}
+          >
             <div className="flex items-center justify-between">
-              <p className="v-section-label">Framework</p>
-              <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono font-semibold ${statusColor(fw.status)}`}>● {fw.status}</span>
+              <div>
+                <div className="text-eyebrow">Framework</div>
+                <div className="font-display text-[15px] font-semibold text-bone">{regulation.name}</div>
+              </div>
+              <Badge tone={result ? (result.compliant ? "ok" : "warn") : "muted"} dot={Boolean(result)}>
+                {state}
+              </Badge>
             </div>
-            <p className="mt-1 text-sm font-semibold text-bone">{fw.name}</p>
-            <div className="mt-2 flex items-end justify-between">
-              <span className="text-3xl font-bold text-bone">{fw.coverage_pct}%</span>
-              <span className="font-mono text-[10px] text-muted">coverage · {fw.controls_total} controls</span>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="font-display text-[24px] font-semibold text-bone">{result ? `${score}%` : "--"}</span>
+              <span className="text-[11px] text-muted">{result?.checks?.length ?? 0} controls checked</span>
             </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-2">
-              <div className={`h-full rounded-full ${barColors[fw.id] || "bg-moss"}`} style={{ width: `${fw.coverage_pct}%` }} />
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink-3">
+              <div className={cn("h-full", result?.compliant ? "bg-moss" : result ? "bg-amber" : "bg-rule")} style={{ width: `${score}%` }} />
             </div>
-            {/* Sparkline */}
-            <div className="mt-3 h-10 rounded bg-ink-3/50 overflow-hidden">
-              <svg viewBox="0 0 200 40" className="w-full h-full" preserveAspectRatio="none">
-                <path d={`M0,28 Q30,${15 + Math.random() * 12} 60,${20 + Math.random() * 8} T120,${18 + Math.random() * 10} T180,${22 + Math.random() * 6} L200,${20 + Math.random() * 8}`}
-                  fill="none" stroke={sparkColors[fw.id] || "#e5a832"} strokeWidth="1.5" opacity="0.6" />
-              </svg>
+            <div className="mt-3 h-9">
+              <MiniLine data={result?.checks?.map((check) => (check.passed ? 1 : 0)) ?? []} />
             </div>
-            <div className="mt-2 flex justify-between text-[10px] text-muted">
-              <span>Evidence rows: {fw.evidence_rows !== undefined && fw.evidence_rows > 0 ? fw.evidence_rows.toLocaleString() : "—"}</span>
-              <ExternalLink className="h-3 w-3 cursor-pointer hover:text-bone" />
+            <div className="mt-3 flex items-center justify-between border-t border-rule/80 pt-3 text-[11px] text-muted">
+              <span>
+                Region: <span className="font-mono text-bone">{regulation.region}</span>
+              </span>
+              <button className="v-btn-ghost h-7 px-2 text-xs" onClick={() => onRun(regulation.id)} disabled={pendingId === regulation.id}>
+                {pendingId === regulation.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                Run check
+              </button>
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </div>
+  );
+}
 
-      <div className="v-card-flush">
-        <div className="flex items-center justify-between p-4 pb-3">
-          <div>
-            <p className="v-section-label">Controls · Live Test Status</p>
-            <p className="mt-0.5 text-sm font-semibold text-bone">Mapped to NIST families & framework requirements</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {["HIPAA", "PCI", "SOC2", "GDPR"].map((f) => (
-              <span key={f} className="rounded bg-amber/15 px-1.5 py-0.5 text-[8px] font-mono font-semibold text-amber">{f}</span>
-            ))}
+function ControlsTable({
+  regulation,
+  result,
+  pending,
+  error,
+}: {
+  regulation: Regulation | null;
+  result: CheckResult | null | undefined;
+  pending: boolean;
+  error: unknown;
+}) {
+  const checks = result?.checks ?? [];
+  return (
+    <div className="frame mt-4 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule/80 px-4 py-3">
+        <div>
+          <div className="text-eyebrow">Controls · live test status</div>
+          <div className="font-display text-[14px] text-bone">
+            {regulation ? `${regulation.name} · ${regulation.id}` : "Pick a framework to run controls"}
           </div>
         </div>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-y border-rule text-left">
-              <th className="px-4 py-2 font-mono text-[9px] uppercase text-muted">Control</th>
-              <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Framework</th>
-              <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Last Test</th>
-              <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Evidence</th>
-              <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Status</th>
-              <th className="w-8"></th>
+        <div className="flex flex-wrap items-center gap-2">
+          {["HIPAA", "PCI", "SOC2", "GDPR"].map((tag) => (
+            <Badge key={tag} tone="muted">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-[12.5px]">
+          <thead className="border-b border-rule/70 bg-ink-1/70 text-eyebrow">
+            <tr>
+              <th className="px-4 py-2 text-left">Control</th>
+              <th className="px-4 py-2 text-left">Framework</th>
+              <th className="px-4 py-2 text-left">Last test</th>
+              <th className="px-4 py-2 text-right">Evidence</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right" />
             </tr>
           </thead>
           <tbody>
-            {controls.map((c) => (
-              <tr key={c.id} className="border-b border-rule/50 hover:bg-ink-3/40">
-                <td className="px-4 py-2 font-medium text-bone">{c.name}</td>
-                <td className="px-2 py-2 text-muted">{c.framework}</td>
-                <td className="px-2 py-2 font-mono text-muted">{c.last_test}</td>
-                <td className="px-2 py-2 font-mono text-bone-2">{c.evidence_count}</td>
-                <td className="px-2 py-2">
-                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-semibold ${c.status === "PASSING" ? "bg-moss/20 text-moss" : "bg-amber/20 text-amber"}`}>
-                    ● {c.status}
-                  </span>
+            {pending && (
+              <tr>
+                <td colSpan={6} className="px-5 py-8 text-center font-mono text-[12px] text-muted">
+                  running compliance check...
                 </td>
-                <td className="px-2 py-2">
-                  <ExternalLink className="h-3 w-3 text-muted cursor-pointer hover:text-bone" />
+              </tr>
+            )}
+            {!pending && Boolean(error) && (
+              <tr>
+                <td colSpan={6} className="px-5 py-8 text-center text-crimson">
+                  {(error as Error)?.message ?? "Check failed"}
+                </td>
+              </tr>
+            )}
+            {!pending && !error && checks.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-5 py-8 text-center font-mono text-[12px] text-muted">
+                  No live control rows yet. Run a framework check above.
+                </td>
+              </tr>
+            )}
+            {checks.map((check, index) => (
+              <tr key={`${check.name}-${index}`} className="border-b border-rule/50 last:border-0 hover-elevate">
+                <td className="px-4 py-2">
+                  <span className="font-mono text-[12px]">{index + 1}</span> · {check.name}
+                </td>
+                <td className="px-4 py-2 text-muted">{regulation?.id ?? "framework"}</td>
+                <td className="px-4 py-2 text-muted">live</td>
+                <td className="px-4 py-2 text-right font-mono">{check.detail ? 1 : 0}</td>
+                <td className="px-4 py-2">
+                  <Badge tone={check.passed ? "ok" : "warn"} dot>
+                    {check.passed ? "passing" : "review"}
+                  </Badge>
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button className="v-btn-ghost h-7 cursor-not-allowed px-2 opacity-70" disabled title={check.detail ?? "No detail returned"}>
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
 
-      {/* Evidence Packages + Schedule */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Evidence Packages */}
-        <div className="v-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="v-section-label">Evidence Packages · One-Click</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">Signed log archives · control mapping PDFs · access review CSVs</p>
-            </div>
-            <span className="rounded bg-amber/15 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber">AUDITOR-GRADE</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {[
-              { name: "soc2-q2-2026-evidence.tar.gz", detail: "67 controls · 284 MB · sha256 e9b7...2941" },
-              { name: "hipaa-2026-mid-year.tar.gz", detail: "54 controls · 142 MB · sha256 7b02...bf34" },
-              { name: "pci-dss-v4-quarterly.tar.gz", detail: "312 controls · 612 MB · sha256 0cf1...9eef" },
-            ].map((pkg) => (
-              <div key={pkg.name} className="flex items-center gap-3 rounded-md border border-rule/40 bg-ink-3/30 px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded bg-amber/10">
-                  <Download className="h-4 w-4 text-amber" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-bone">{pkg.name}</p>
-                  <p className="font-mono text-[9px] text-muted">{pkg.detail}</p>
-                </div>
-                <button className="rounded bg-amber/15 border border-amber/30 px-3 py-1 text-[10px] font-semibold text-amber">Download</button>
-              </div>
-            ))}
-          </div>
+function EvidencePackagesPanel({ result }: { result: CheckResult | null | undefined }) {
+  return (
+    <div className="frame col-span-12 p-4 lg:col-span-7">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-eyebrow">Evidence packages · one-click</div>
+          <div className="font-display text-[14px] text-bone">Signed log archives · control mappings · access review exports</div>
         </div>
+        <Badge tone="primary">
+          <LockKeyhole className="h-3 w-3" /> activation required
+        </Badge>
+      </div>
+      <div className="mt-3 rounded-md border border-dashed border-rule bg-ink-1/40 px-4 py-5 text-sm text-bone-2">
+        Free evaluation lets you inspect governed runs, but signed artifacts, evidence packs, retention controls, bulk
+        export, and auditor bundles require an activated workspace.
+        {result?.summary && <div className="mt-2 font-mono text-[11px] text-muted">Last check summary: {result.summary}</div>}
+        {result?.issues?.length ? (
+          <div className="mt-2 font-mono text-[11px] text-amber">
+            Open issues: {result.issues.join("; ")}
+          </div>
+        ) : null}
+      </div>
+      <button className="v-btn-primary mt-3 h-8 cursor-not-allowed px-3 text-xs opacity-70" disabled>
+        <FileDown className="h-3.5 w-3.5" /> Export Evidence Pack (Activation Required)
+      </button>
+    </div>
+  );
+}
 
-        {/* Schedule */}
-        <div className="v-card">
-          <p className="v-section-label">Schedule</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">Continuous evidence to S3</p>
-          <div className="mt-4 space-y-3">
-            {[
-              { schedule: "Daily · 02:00 UTC", target: "audit-trail.signed.json → s3://acme-evidence/", status: "ACTIVE" },
-              { schedule: "Weekly · Monday", target: "soc2-evidence-pkg.tar.gz", status: "ACTIVE" },
-              { schedule: "Monthly · 1st", target: "hipaa-evidence-pkg.tar.gz", status: "ACTIVE" },
-              { schedule: "On change", target: "policy-diff.signed.json", status: "ACTIVE" },
-            ].map((s) => (
-              <div key={s.schedule} className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-bone">{s.schedule}</p>
-                  <p className="font-mono text-[9px] text-muted">{s.target}</p>
-                </div>
-                <span className="rounded bg-moss/15 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-moss">● {s.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+function EvidenceSchedulePanel() {
+  return (
+    <div className="frame col-span-12 p-4 lg:col-span-5">
+      <div className="text-eyebrow">Schedule</div>
+      <div className="font-display text-[14px] text-bone">Continuous evidence export</div>
+      <div className="mt-3 rounded-md border border-dashed border-rule bg-ink-1/40 px-4 py-5 text-sm text-bone-2">
+        No live schedule endpoint is wired yet. Scheduled exports stay disabled until real destinations and signing
+        jobs are available.
       </div>
     </div>
+  );
+}
+
+function MiniLine({ data }: { data: number[] }) {
+  const points = data.length ? data : [0];
+  const max = Math.max(1, ...points);
+  const path = points
+    .map((value, index) => {
+      const x = points.length === 1 ? 80 : (index / (points.length - 1)) * 160;
+      const y = 34 - (value / max) * 28;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox="0 0 160 40" className="h-full w-full rounded-md border border-rule bg-ink-1/30" preserveAspectRatio="none">
+      <path d={path} fill="none" stroke="rgba(229,177,110,0.95)" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Badge({
+  children,
+  tone = "muted",
+  dot,
+}: {
+  children: ReactNode;
+  tone?: "muted" | "primary" | "ok" | "warn" | "info";
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "chip",
+        tone === "muted" && "border-rule bg-white/[0.02] text-bone-2",
+        tone === "primary" && "border-brass/40 bg-brass/5 text-brass-2",
+        tone === "ok" && "border-moss/30 bg-moss/5 text-moss",
+        tone === "warn" && "border-amber/30 bg-amber/5 text-amber",
+        tone === "info" && "border-electric/30 bg-electric/5 text-electric",
+      )}
+    >
+      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+      {children}
+    </span>
   );
 }

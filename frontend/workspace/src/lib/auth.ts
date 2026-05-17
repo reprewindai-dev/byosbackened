@@ -1,61 +1,46 @@
 import { api } from "./api";
-import { useAuthStore, type User } from "@/store/auth-store";
+import type { AcceptInviteRequest, AuthResponse, LoginRequest, RegisterRequest, User } from "@/types/api";
+import { useAuthStore } from "@/store/auth-store";
 
-interface LoginPayload {
-  email: string;
-  password: string;
-  mfa_code?: string;
+export async function login(payload: LoginRequest): Promise<User> {
+  const resp = await api.post<AuthResponse>("/auth/login", payload);
+  return persistAuth(resp.data);
 }
 
-interface RegisterPayload {
-  email: string;
-  password: string;
-  full_name?: string;
-  workspace_name?: string;
-  signup_type?: string;
+export async function register(payload: RegisterRequest): Promise<User> {
+  const resp = await api.post<AuthResponse>("/auth/register", payload);
+  return persistAuth(resp.data);
 }
 
-interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  user_id: string;
-  workspace_id: string;
-  role: string;
-}
-
-export async function login(payload: LoginPayload): Promise<User | null> {
-  const { data } = await api.post<AuthResponse>("/auth/login", payload);
-  useAuthStore.getState().setTokens(data.access_token, data.refresh_token, data.expires_in);
+export async function acceptInvite(payload: AcceptInviteRequest): Promise<User> {
+  const resp = await api.post<AuthResponse>("/auth/accept-invite", payload);
+  persistAuth(resp.data);
   return fetchMe();
-}
-
-export async function register(payload: RegisterPayload): Promise<User | null> {
-  const { data } = await api.post<AuthResponse>("/auth/register", payload);
-  useAuthStore.getState().setTokens(data.access_token, data.refresh_token, data.expires_in);
-  return fetchMe();
-}
-
-export async function fetchMe(): Promise<User | null> {
-  try {
-    const { data } = await api.get<User>("/auth/me");
-    useAuthStore.getState().setUser(data);
-    return data;
-  } catch {
-    return null;
-  }
 }
 
 export async function logout(): Promise<void> {
   try {
-    await api.post("/auth/logout");
+    await api.post("/auth/logout", {});
   } catch {
-    // ignore
+    /* best-effort */
   }
-  useAuthStore.getState().logout();
+  useAuthStore.getState().clear();
 }
 
-export async function beginGithubLogin(): Promise<{ auth_url: string }> {
-  const { data } = await api.get<{ auth_url: string }>("/auth/github/login");
-  return data;
+export async function fetchMe(): Promise<User> {
+  const resp = await api.get<{ user: User } | User>("/auth/me");
+  const user = "user" in (resp.data as { user?: User }) ? (resp.data as { user: User }).user : (resp.data as User);
+  useAuthStore.getState().setUser(user);
+  return user;
+}
+
+function persistAuth(payload: AuthResponse): User {
+  const store = useAuthStore.getState();
+  store.setTokens({
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+    expiresAt: Date.now() + payload.expires_in * 1000,
+  });
+  if (payload.user) store.setUser(payload.user);
+  return payload.user ?? ({} as User);
 }

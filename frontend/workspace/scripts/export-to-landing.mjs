@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 // in the same commit as the new assets.
 // ---------------------------------------------------------------------------
 
-const FROZEN_JS = "index-D1S6RkmY.js";
-const FROZEN_CSS = "index-CMJt3KhQ.css";
+const FROZEN_JS = "index-eAs5tLiA.js";
+const FROZEN_CSS = "index-vbsDaPra.css";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(here, "..");

@@ -1,90 +1,129 @@
-import axios, { type AxiosInstance } from "axios";
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
 
 declare global {
   interface Window {
     __VEKLOM_API_BASE__?: string;
+    __VEKLOM_ENV__?: string;
+    __VEKLOM_STRIPE_PK__?: string;
   }
 }
 
-const API_PREFIX = "/api/v1";
-
-function resolveBase(): string {
-  const configured = window.__VEKLOM_API_BASE__;
-  if (configured) return `${configured}${API_PREFIX}`;
-  // Dev mode — point to Vite dev server so proxy works even from external preview
-  if (import.meta.env.DEV) return `http://localhost:5173${API_PREFIX}`;
-  return API_PREFIX;
-}
-
-export const api: AxiosInstance = axios.create({
-  baseURL: resolveBase(),
-  headers: { "Content-Type": "application/json" },
-  timeout: 10_000,
-});
-
-// Attach bearer token to every request
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export function resolveApiBase(): string {
+  if (typeof window !== "undefined" && window.__VEKLOM_API_BASE__) {
+    return window.__VEKLOM_API_BASE__.replace(/\/+$/, "");
   }
-  return config;
-});
-
-// Handle 401 → attempt refresh (skip for auth endpoints)
-api.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const original = error.config;
-    const url = original?.url || "";
-    const isAuthEndpoint = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
-
-    if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
-      original._retry = true;
-      const refreshToken = useAuthStore.getState().refreshToken;
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${resolveBase()}/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-          useAuthStore.getState().setTokens(data.access_token, data.refresh_token, data.expires_in);
-          original.headers.Authorization = `Bearer ${data.access_token}`;
-          return api(original);
-        } catch {
-          useAuthStore.getState().logout();
-        }
-      }
-    }
-    return Promise.reject(error);
-  },
-);
-
-export function sseUrl(path: string): string {
-  const token = useAuthStore.getState().accessToken;
-  const base = `${resolveBase()}${path}`;
-  return token ? `${base}${base.includes("?") ? "&" : "?"}token=${token}` : base;
-}
-
-/**
- * For top-level backend routes that live outside /api/v1
- * e.g. /v1/exec, /status, /health
- */
-function resolveRawBase(): string {
-  const configured = window.__VEKLOM_API_BASE__;
-  if (configured) return configured;
-  if (import.meta.env.DEV) return "http://localhost:5173";
+  const buildTime = import.meta.env.VITE_VEKLOM_API_BASE as string | undefined;
+  if (buildTime) return buildTime.replace(/\/+$/, "");
+  if (typeof location !== "undefined") {
+    const h = location.hostname;
+    if (/^localhost$|^127\.|^0\.0\.0\.0$/.test(h)) return "";
+    if (/veklom\.dev$/i.test(h)) return "https://api.veklom.dev";
+    if (/veklom\.com$/i.test(h)) return "https://api.veklom.com";
+  }
   return "";
 }
 
-export const rawApi = axios.create({
-  baseURL: resolveRawBase(),
-  headers: { "Content-Type": "application/json" },
-  timeout: 10_000,
+export function resolveStripePk(): string {
+  if (typeof window !== "undefined" && window.__VEKLOM_STRIPE_PK__) return window.__VEKLOM_STRIPE_PK__;
+  return (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) ?? "";
+}
+
+const API_BASE = resolveApiBase();
+const API_PREFIX = "/api/v1";
+const DEFAULT_API_TIMEOUT_MS = 7_000;
+
+export const api: AxiosInstance = axios.create({
+  baseURL: `${API_BASE}${API_PREFIX}`,
+  timeout: DEFAULT_API_TIMEOUT_MS,
+  withCredentials: false,
 });
 
-rawApi.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+export const apiRoot: AxiosInstance = axios.create({
+  baseURL: API_BASE || "/",
+  timeout: DEFAULT_API_TIMEOUT_MS,
 });
+
+function attachAuthHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  const token = useAuthStore.getState().accessToken;
+  if (token) {
+    config.headers = config.headers ?? {};
+    (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+  }
+  return config;
+}
+
+api.interceptors.request.use(attachAuthHeader);
+apiRoot.interceptors.request.use(attachAuthHeader);
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const { refreshToken, setTokens, clear } = useAuthStore.getState();
+  if (!refreshToken) {
+    clear();
+    return null;
+  }
+  refreshInFlight = (async () => {
+    try {
+      const resp = await axios.post(
+        `${API_BASE}${API_PREFIX}/auth/refresh`,
+        { refresh_token: refreshToken },
+        { timeout: DEFAULT_API_TIMEOUT_MS },
+      );
+      const { access_token, refresh_token, expires_in } = resp.data as {
+        access_token: string;
+        refresh_token?: string;
+        expires_in: number;
+      };
+      setTokens({
+        accessToken: access_token,
+        refreshToken: refresh_token ?? refreshToken,
+        expiresAt: Date.now() + expires_in * 1000,
+      });
+      return access_token;
+    } catch {
+      clear();
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+function makeResponseInterceptor(instance: AxiosInstance) {
+  instance.interceptors.response.use(
+    (r) => r,
+    async (error: AxiosError) => {
+      const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+      if (error.response?.status === 401 && original && !original._retried) {
+        original._retried = true;
+        const fresh = await refreshAccessToken();
+        if (fresh) {
+          original.headers = original.headers ?? {};
+          (original.headers as Record<string, string>).Authorization = `Bearer ${fresh}`;
+          return instance.request(original);
+        }
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
+      return Promise.reject(error);
+    },
+  );
+}
+
+makeResponseInterceptor(api);
+makeResponseInterceptor(apiRoot);
+
+export function sseUrl(path: string, params?: Record<string, string | number | boolean>): string {
+  const url = new URL(`${API_BASE}${API_PREFIX}${path}`, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  if (params) {
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+  }
+  const token = useAuthStore.getState().accessToken;
+  if (token) url.searchParams.set("access_token", token);
+  return url.toString();
+}

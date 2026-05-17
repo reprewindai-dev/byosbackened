@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#FFB800" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0A0A0A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="vGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFB800"/>
+      <stop offset="100%" stop-color="#E5A832"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0A0A0A"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <!-- Grid lines -->
+  <g stroke="#1a1a1a" stroke-width="0.5" opacity="0.4">
+    <line x1="0" y1="157" x2="1200" y2="157"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="473" x2="1200" y2="473"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+  </g>
+  <!-- V mark (the V IS the V in Veklom) -->
+  <g transform="translate(340, 160)">
+    <path d="M0 0 L52 130 L65 130 L104 0" fill="none" stroke="url(#vGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="52" cy="80" r="10" fill="#FFB800"/>
+  </g>
+  <!-- "eklom" text -->
+  <text x="460" y="280" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="120" font-weight="300" fill="#FFFFFF" letter-spacing="-2">eklom</text>
+  <!-- Tagline -->
+  <text x="345" y="340" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="22" font-weight="600" fill="#FFB800" letter-spacing="8" text-transform="uppercase">SOVEREIGN CONTROL PLANE</text>
+  <!-- Subtitle -->
+  <text x="345" y="380" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="18" fill="#A1A1A6" letter-spacing="1">Governed inference. Policy enforced. Evidence ready.</text>
+  <!-- Bottom pillars -->
+  <g transform="translate(120, 480)">
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="36" height="36" rx="8" fill="#1a1a1a" stroke="#FFB800" stroke-width="1" opacity="0.6"/>
+      <text x="48" y="14" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#FFB800" letter-spacing="2">SOVEREIGN</text>
+      <text x="48" y="30" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#A1A1A6">Infrastructure independence</text>
+    </g>
+    <g transform="translate(240, 0)">
+      <rect x="0" y="0" width="36" height="36" rx="8" fill="#1a1a1a" stroke="#FFB800" stroke-width="1" opacity="0.6"/>
+      <text x="48" y="14" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#FFB800" letter-spacing="2">GOVERNED</text>
+      <text x="48" y="30" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#A1A1A6">Policy enforced by design</text>
+    </g>
+    <g transform="translate(480, 0)">
+      <rect x="0" y="0" width="36" height="36" rx="8" fill="#1a1a1a" stroke="#FFB800" stroke-width="1" opacity="0.6"/>
+      <text x="48" y="14" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#FFB800" letter-spacing="2">EVIDENCE READY</text>
+      <text x="48" y="30" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#A1A1A6">Audit trails. Always on.</text>
+    </g>
+    <g transform="translate(720, 0)">
+      <rect x="0" y="0" width="36" height="36" rx="8" fill="#1a1a1a" stroke="#FFB800" stroke-width="1" opacity="0.6"/>
+      <text x="48" y="14" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#FFB800" letter-spacing="2">CLOUD AGNOSTIC</text>
+      <text x="48" y="30" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#A1A1A6">Deploy anywhere. Stay sovereign.</text>
+    </g>
+  </g>
+  <!-- Bottom border accent -->
+  <rect x="0" y="625" width="1200" height="5" fill="#FFB800" opacity="0.6"/>
+</svg>

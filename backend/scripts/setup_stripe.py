@@ -1,12 +1,11 @@
 """
-Veklom — Stripe one-shot setup script.
+Veklom — Stripe one-shot setup script (activation + operating reserve model).
 
 Creates / verifies all the Stripe objects the backend needs:
-  • 3 Products (Sovereign Standard / Pro / Enterprise)
-  • 6 Prices (monthly + yearly per tier)
+  • 4 Products (Founding / Standard / Regulated / Enterprise)
+  • 4 One-time Activation Prices (matching subscriptions.py PLANS)
   • 1 Webhook endpoint
   • Customer Portal configuration
-  • Tax automation toggle
 
 Run:
     python scripts/setup_stripe.py
@@ -28,7 +27,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 # ─── Pretty terminal output ──────────────────────────────────────────────────
 
@@ -58,47 +57,59 @@ def header(msg: str) -> None:
 
 
 # ─── Config: Veklom plan catalog (mirrors apps/api/routers/subscriptions.py) ──
+# Pricing model: one-time activation fee + USD operating reserve (wallet).
+# No recurring subscriptions — customers pre-fund a reserve, events draw from it.
 
 PLANS = [
     {
-        "veklom_id": "veklom_sovereign_standard",
-        "name": "Sovereign · Standard",
+        "veklom_id": "veklom_founding",
+        "name": "Veklom Founding",
         "description": (
-            "Self-host in your VPC or on-prem. Perpetual source access. "
-            "14 business-day SLA. Quarterly version updates. Async written support."
+            "Activation fee for the Founding tier. Governed playground, "
+            "model compare, pipeline testing, deployment verification. "
+            "Async written support. $150 minimum operating reserve."
         ),
-        "monthly_cents":  750_000,    # $7,500
-        "yearly_cents": 7_500_000,    # $75,000 (2 months free)
+        "activation_cents": 39_500,       # $395
+        "minimum_reserve_cents": 15_000,   # $150
         "internal_tier": "starter",
     },
     {
-        "veklom_id": "veklom_sovereign_pro",
-        "name": "Sovereign · Pro",
+        "veklom_id": "veklom_standard",
+        "name": "Veklom Standard",
         "description": (
-            "Self-host. Perpetual source. 5 business-day SLA. Monthly updates. "
-            "Direct-email support, 24h first response. Annual architecture review. "
-            "White-label rights."
+            "Activation fee for the Standard tier. Everything in Founding plus "
+            "UACP autonomous control plane, signed audit exports, compliance "
+            "evidence packages. 24h email support. $300 minimum operating reserve."
         ),
-        "monthly_cents":  1_800_000,  # $18,000
-        "yearly_cents": 18_000_000,   # $180,000
+        "activation_cents": 79_500,       # $795
+        "minimum_reserve_cents": 30_000,   # $300
         "internal_tier": "pro",
     },
     {
-        "veklom_id": "veklom_sovereign_enterprise",
-        "name": "Sovereign · Enterprise",
+        "veklom_id": "veklom_regulated",
+        "name": "Veklom Regulated",
         "description": (
-            "Self-host. Perpetual source. 24-hour SLA. Monthly updates. Priority "
-            "engineering channel. Per-quarter feature commitments. Compliance docs "
-            "(SOC 2 mapping, pen-test report). Procurement-friendly MSA."
+            "Activation fee for the Regulated tier. Full sovereign deployment, "
+            "kill-switch, auditor bundles, white-label rights, dedicated Slack "
+            "channel. $2,500 minimum operating reserve."
         ),
-        "monthly_cents":  4_500_000,  # $45,000
-        "yearly_cents": 45_000_000,   # $450,000
+        "activation_cents": 250_000,      # $2,500
+        "minimum_reserve_cents": 250_000,  # $2,500
+        "internal_tier": "sovereign",
+    },
+    {
+        "veklom_id": "veklom_enterprise",
+        "name": "Veklom Enterprise",
+        "description": (
+            "Enterprise tier — custom pricing, procurement-friendly MSA, "
+            "dedicated engineering channel, quarterly feature commitments, "
+            "SOC 2 mapping, pen-test report. Contact sales."
+        ),
+        "activation_cents": None,  # sales-led, no self-serve price
+        "minimum_reserve_cents": None,
         "internal_tier": "enterprise",
     },
 ]
-
-# The acquisition tier ($750k IP transfer) is intentionally NOT in this script.
-# It is negotiated outside self-serve checkout — see landing page §vii.
 
 WEBHOOK_EVENTS = [
     "checkout.session.completed",
@@ -109,6 +120,8 @@ WEBHOOK_EVENTS = [
     "invoice.payment_failed",
     "customer.created",
     "customer.updated",
+    "payment_intent.succeeded",
+    "payment_intent.payment_failed",
 ]
 
 DEFAULT_WEBHOOK_URL = "https://api.veklom.com/api/v1/subscriptions/webhook"
@@ -143,16 +156,20 @@ def load_env() -> dict:
 
 # ─── Stripe operations (idempotent) ──────────────────────────────────────────
 
-def find_by_veklom_id(stripe, resource, veklom_id: str):
+def find_by_veklom_id(stripe: Any, resource: Any, veklom_id: str):
     """Look up an existing Stripe object by metadata.veklom_id."""
-    items = resource.list(limit=100, active=None if resource is stripe.Product else True)
+    kwargs: dict[str, Any] = {"limit": 100}
+    if resource is stripe.Product:
+        # Products don't support active filter the same way
+        pass
+    items = resource.list(**kwargs)
     for obj in items.auto_paging_iter():
         if (obj.metadata or {}).get("veklom_id") == veklom_id:
             return obj
     return None
 
 
-def upsert_product(stripe, plan: dict, dry_run: bool):
+def upsert_product(stripe: Any, plan: dict, dry_run: bool):
     veklom_id = plan["veklom_id"]
     existing = find_by_veklom_id(stripe, stripe.Product, veklom_id)
     if existing:
@@ -166,6 +183,7 @@ def upsert_product(stripe, plan: dict, dry_run: bool):
             metadata={
                 "veklom_id": veklom_id,
                 "internal_tier": plan["internal_tier"],
+                "pricing_model": "activation_plus_reserve",
             },
         )
         ok(f"product updated  {product.id}  {plan['name']}")
@@ -179,44 +197,48 @@ def upsert_product(stripe, plan: dict, dry_run: bool):
         metadata={
             "veklom_id": veklom_id,
             "internal_tier": plan["internal_tier"],
+            "pricing_model": "activation_plus_reserve",
         },
     )
     ok(f"product created  {product.id}  {plan['name']}")
     return product
 
 
-def upsert_price(stripe, product_id: str, plan: dict, interval: str, amount_cents: int, dry_run: bool):
-    veklom_id = f"{plan['veklom_id']}__{interval}"
+def upsert_activation_price(stripe: Any, product_id: str, plan: dict, dry_run: bool):
+    """Create a one-time activation price for a plan tier."""
+    if plan["activation_cents"] is None:
+        info(f"  {plan['name']}: no self-serve price (sales-led)")
+        return None
+
+    veklom_id = f"{plan['veklom_id']}__activation"
     existing = find_by_veklom_id(stripe, stripe.Price, veklom_id)
     if existing:
-        # Stripe prices are immutable. If the amount matches, reuse. Else archive + recreate.
-        if existing.unit_amount == amount_cents and existing.recurring and existing.recurring.interval == interval:
-            ok(f"price reused     {existing.id}  {plan['name']}/{interval}  ${amount_cents/100:,.2f}")
+        if existing.unit_amount == plan["activation_cents"] and existing.type == "one_time":
+            ok(f"  price reused     {existing.id}  ${plan['activation_cents']/100:,.2f} one-time")
             return existing
         if dry_run:
-            info(f"[dry-run] would archive {existing.id} and recreate")
+            info(f"  [dry-run] would archive {existing.id} and recreate")
         else:
             stripe.Price.modify(existing.id, active=False)
-            warn(f"archived stale price {existing.id} (amount changed)")
+            warn(f"  archived stale price {existing.id} (amount changed)")
     if dry_run:
-        info(f"[dry-run] would create price {plan['name']}/{interval} ${amount_cents/100:,.2f}")
+        info(f"  [dry-run] would create price ${plan['activation_cents']/100:,.2f} one-time")
         return None
     price = stripe.Price.create(
         product=product_id,
-        unit_amount=amount_cents,
+        unit_amount=plan["activation_cents"],
         currency="usd",
-        recurring={"interval": interval},
         metadata={
             "veklom_id": veklom_id,
             "internal_tier": plan["internal_tier"],
-            "interval": interval,
+            "price_type": "activation",
         },
     )
-    ok(f"price created    {price.id}  {plan['name']}/{interval}  ${amount_cents/100:,.2f}")
+    ok(f"  price created    {price.id}  ${plan['activation_cents']/100:,.2f} one-time")
     return price
 
 
-def upsert_webhook(stripe, url: str, dry_run: bool):
+def upsert_webhook(stripe: Any, url: str, dry_run: bool):
     """
     Find a Veklom-tagged webhook endpoint or create one.
     Returns (endpoint, signing_secret_or_none).
@@ -245,9 +267,9 @@ def upsert_webhook(stripe, url: str, dry_run: bool):
     return ep, ep.secret  # only present on first create
 
 
-def configure_customer_portal(stripe, products: list, dry_run: bool):
+def configure_customer_portal(stripe: Any, dry_run: bool):
     """
-    Configure the Stripe customer portal so customers can self-manage subscriptions.
+    Configure the Stripe customer portal so customers can manage billing.
     """
     if dry_run:
         info("[dry-run] would configure customer portal")
@@ -255,7 +277,7 @@ def configure_customer_portal(stripe, products: list, dry_run: bool):
 
     config = stripe.billing_portal.Configuration.create(
         business_profile={
-            "headline": "Manage your Veklom subscription",
+            "headline": "Manage your Veklom account",
             "privacy_policy_url": "https://veklom.com/legal/privacy.html",
             "terms_of_service_url": "https://veklom.com/legal/terms.html",
         },
@@ -266,32 +288,6 @@ def configure_customer_portal(stripe, products: list, dry_run: bool):
             },
             "invoice_history": {"enabled": True},
             "payment_method_update": {"enabled": True},
-            "subscription_cancel": {
-                "enabled": True,
-                "mode": "at_period_end",
-                "cancellation_reason": {
-                    "enabled": True,
-                    "options": [
-                        "too_expensive",
-                        "missing_features",
-                        "switched_service",
-                        "unused",
-                        "customer_service",
-                        "too_complex",
-                        "low_quality",
-                        "other",
-                    ],
-                },
-            },
-            "subscription_update": {
-                "default_allowed_updates": ["price"],
-                "enabled": True,
-                "products": [
-                    {"product": p.id, "prices": [pr.id for pr in p._veklom_prices]}
-                    for p in products if hasattr(p, "_veklom_prices")
-                ],
-                "proration_behavior": "create_prorations",
-            },
         },
         metadata={"veklom_id": "veklom_primary_portal"},
     )
@@ -302,21 +298,18 @@ def configure_customer_portal(stripe, products: list, dry_run: bool):
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    fail("setup_stripe.py is retired for the old recurring subscription model.")
-    info("Current model: one-time activation plus USD Operating Reserve.")
-    info("Use backend/PRICING_TRUTH.md and apps/api/routers/subscriptions.py as the source of truth.")
-    return 2
-
-    parser = argparse.ArgumentParser(description="Veklom Stripe setup")
+    parser = argparse.ArgumentParser(description="Veklom Stripe setup (activation + reserve model)")
     parser.add_argument("--webhook-url", default=DEFAULT_WEBHOOK_URL,
                         help=f"Webhook endpoint URL (default: {DEFAULT_WEBHOOK_URL})")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would happen without making changes")
     parser.add_argument("--skip-portal", action="store_true",
                         help="Skip customer-portal configuration")
+    parser.add_argument("--skip-webhook", action="store_true",
+                        help="Skip webhook endpoint creation")
     args = parser.parse_args()
 
-    header("Veklom · Stripe setup")
+    header("Veklom · Stripe setup (activation + operating reserve)")
     print(DIM + "Idempotent: safe to run multiple times. Reads .env.stripe.\n" + END)
 
     # 1. Load + sanity-check key
@@ -332,7 +325,7 @@ def main() -> int:
     if secret_key.startswith("sk_test_") or secret_key.startswith("rk_test_"):
         warn("TEST mode key detected — no real charges will occur.")
     elif secret_key.startswith("sk_live_") or secret_key.startswith("rk_live_"):
-        warn("LIVE mode key detected — real money will be touched. Continuing in 3 seconds…")
+        warn("LIVE mode key detected — real products will be created.")
         import time; time.sleep(3)
     else:
         fail(f"Unrecognized key prefix: {secret_key[:10]}...  expected sk_/rk_/test_/live_")
@@ -345,9 +338,6 @@ def main() -> int:
         fail("`stripe` Python library not installed. Run: pip install stripe")
         return 3
     stripe.api_key = secret_key
-    # Pin the API version — Stripe's "stripe-best-practices" skill recommends
-    # always using the latest, and pinning prevents silent breakage on Stripe-side updates.
-    stripe.api_version = "2026-04-22.dahlia"
 
     # 3. Whoami
     header("1. Verifying Stripe credentials")
@@ -369,71 +359,69 @@ def main() -> int:
         charges_enabled = getattr(acct, "charges_enabled", False)
         payouts_enabled = getattr(acct, "payouts_enabled", False)
         if not charges_enabled:
-            warn("charges_enabled = False  → account not fully activated. Setup will continue (test-mode products will be created); flip to live after dashboard activation.")
+            warn("charges_enabled = False  → account not fully activated.")
         if not payouts_enabled:
             warn("payouts_enabled = False  → bank account not yet verified.")
     except Exception as e:
         fail(f"could not authenticate ({type(e).__name__}): {e}")
         return 4
 
-    # 4. Products + prices
-    header("2. Products + prices")
+    # 4. Products + activation prices
+    header("2. Products + activation prices")
     output: dict = {"products": [], "prices": []}
-    products_with_prices = []
     for plan in PLANS:
         product = upsert_product(stripe, plan, args.dry_run)
         if product is None:
             continue
-        prices = []
-        prices.append(upsert_price(stripe, product.id, plan, "month", plan["monthly_cents"], args.dry_run))
-        prices.append(upsert_price(stripe, product.id, plan, "year", plan["yearly_cents"], args.dry_run))
+        price = upsert_activation_price(stripe, product.id, plan, args.dry_run)
         if not args.dry_run:
-            product._veklom_prices = [p for p in prices if p]
-            products_with_prices.append(product)
-            output["products"].append({"id": product.id, "name": product.name, "veklom_id": plan["veklom_id"]})
-            for pr in prices:
-                if pr is None: continue
+            product_entry: dict = {
+                "id": product.id,
+                "name": product.name,
+                "veklom_id": plan["veklom_id"],
+                "internal_tier": plan["internal_tier"],
+            }
+            output["products"].append(product_entry)
+            if price:
                 output["prices"].append({
-                    "id": pr.id,
+                    "id": price.id,
                     "product": product.id,
-                    "interval": pr.recurring.interval,
-                    "amount_cents": pr.unit_amount,
-                    "veklom_id": pr.metadata.get("veklom_id"),
+                    "type": "one_time",
+                    "amount_cents": price.unit_amount,
+                    "veklom_id": price.metadata.get("veklom_id"),
                 })
 
     # 5. Webhook
-    header("3. Webhook endpoint")
-    ep, fresh_secret = upsert_webhook(stripe, args.webhook_url, args.dry_run)
-    if ep and not args.dry_run:
-        output["webhook"] = {"id": ep.id, "url": ep.url, "events": list(ep.enabled_events)}
-        if fresh_secret:
-            # Save the secret to .env.stripe (gitignored) instead of stdout.
-            # This way the secret never crosses chat / logs / CI output.
-            env_path = Path(__file__).resolve().parent.parent / ".env.stripe"
-            existing = {}
-            if env_path.exists():
-                for line in env_path.read_text(encoding="utf-8").splitlines():
-                    if "=" in line and not line.strip().startswith("#"):
-                        k, v = line.split("=", 1)
-                        existing[k.strip()] = v.strip()
-            existing["STRIPE_WEBHOOK_SECRET"] = fresh_secret
-            env_path.write_text(
-                "# Veklom Stripe credentials — gitignored, never commit.\n"
-                + "\n".join(f"{k}={v}" for k, v in existing.items()) + "\n",
-                encoding="utf-8",
-            )
-            ok(f"webhook signing secret saved to .env.stripe (length={len(fresh_secret)})")
-            # Also drop it under a redacted marker in the JSON summary so the file isn't useless.
-            output["webhook"]["signing_secret_saved_to"] = ".env.stripe"
-        else:
-            info("Existing webhook reused. If you don't have its signing secret saved,")
-            info("delete it in dashboard and re-run this script to regenerate.")
+    if not args.skip_webhook:
+        header("3. Webhook endpoint")
+        ep, fresh_secret = upsert_webhook(stripe, args.webhook_url, args.dry_run)
+        if ep and not args.dry_run:
+            output["webhook"] = {"id": ep.id, "url": ep.url, "events": list(ep.enabled_events)}
+            if fresh_secret:
+                env_path = Path(__file__).resolve().parent.parent / ".env.stripe"
+                existing = {}
+                if env_path.exists():
+                    for line in env_path.read_text(encoding="utf-8").splitlines():
+                        if "=" in line and not line.strip().startswith("#"):
+                            k, v = line.split("=", 1)
+                            existing[k.strip()] = v.strip()
+                existing["STRIPE_WEBHOOK_SECRET"] = fresh_secret
+                env_path.write_text(
+                    "# Veklom Stripe credentials — gitignored, never commit.\n"
+                    + "\n".join(f"{k}={v}" for k, v in existing.items()) + "\n",
+                    encoding="utf-8",
+                )
+                ok(f"webhook signing secret saved to .env.stripe (length={len(fresh_secret)})")
+                output["webhook"]["signing_secret_saved_to"] = ".env.stripe"
+            else:
+                info("Existing webhook reused. If you don't have its signing secret saved,")
+                info("delete it in dashboard and re-run this script to regenerate.")
 
     # 6. Customer portal
     if not args.skip_portal:
         header("4. Customer portal")
         try:
-            cfg = configure_customer_portal(stripe, products_with_prices, args.dry_run)
+            cfg = configure_customer_portal(stripe, args.dry_run)
             if cfg:
                 output["portal"] = {"id": cfg.id}
         except Exception as e:
@@ -446,8 +434,8 @@ def main() -> int:
         ok(f"summary written: {out_path}")
 
     header("Done")
-    info("Next: run  python scripts/verify_stripe.py")
-    info("Then : add the webhook signing secret to .env.stripe (if newly generated above)")
+    info("Veklom products created in Stripe dashboard.")
+    info("Next: verify with  python scripts/verify_stripe.py")
     return 0
 
 

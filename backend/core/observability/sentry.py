@@ -31,6 +31,21 @@ def configure_sentry() -> bool:
         logger.exception("sentry_sdk_import_failed")
         return False
 
+    def _before_send(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any] | None:
+        """Suppress expected auth/rate-limit errors from flooding Sentry as fatal."""
+        exc_info = hint.get("exc_info")
+        if exc_info:
+            exc_type, exc_value = exc_info[0], exc_info[1]
+            # FastAPI/Starlette HTTPException with expected status codes
+            status_code = getattr(exc_value, "status_code", None)
+            if status_code in (401, 403, 404, 429):
+                return None  # drop — these are expected operational responses
+        # Downgrade login-lockout / rate-limit log messages from error to warning
+        log_message = (event.get("logentry") or {}).get("message", "")
+        if any(kw in log_message.lower() for kw in ("rate limit", "login_failed", "account temporarily locked")):
+            event["level"] = "warning"
+        return event
+
     kwargs: dict[str, Any] = {
         "dsn": settings.sentry_dsn,
         "environment": settings.sentry_environment or settings.environment,
@@ -39,6 +54,7 @@ def configure_sentry() -> bool:
         "traces_sample_rate": settings.sentry_traces_sample_rate,
         "profile_session_sample_rate": settings.sentry_profile_session_sample_rate,
         "enable_logs": settings.sentry_enable_logs,
+        "before_send": _before_send,
         "integrations": [
             FastApiIntegration(),
             StarletteIntegration(),

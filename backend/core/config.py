@@ -136,8 +136,8 @@ class Settings(BaseSettings):
     serpapi_key: str = ""
     resend_api_key: str = ""
     resend_webhook_secret: str = ""
-    resend_from_vendor: str = "Marketplace <noreply@example.com>"
-    resend_from_compliance: str = "Compliance <compliance@example.com>"
+    resend_from_vendor: str = "Veklom Marketplace <marketplace@mail.veklom.com>"
+    resend_from_compliance: str = "Veklom <noreply@mail.veklom.com>"
     resend_vendor_audience_id: str = ""
     resend_regulated_audience_id: str = ""
 
@@ -159,7 +159,10 @@ class Settings(BaseSettings):
     ]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    cors_allow_headers: list[str] = ["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "stripe-signature"]
+    cors_allow_headers: list[str] = [
+        "Accept", "Accept-Language", "Authorization", "Content-Language",
+        "Content-Type", "X-API-Key", "X-Request-ID", "stripe-signature",
+    ]
 
     # Stripe
     stripe_secret_key: str = ""
@@ -219,8 +222,8 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
-    mail_from: str = ""
-    mail_reply_to: str = ""
+    mail_from: str = "Veklom <noreply@mail.veklom.com>"
+    mail_reply_to: str = "support@veklom.com"
 
     # Content safety
     content_filtering_enabled: bool = True

@@ -19,6 +19,7 @@ const LISTINGS = [
   { title: "Veklom On-Call · Managed", vendor: "Veklom Native", desc: "24/7 SRE on-call for your Veklom estate. Deploy review, GPU re-balancing, and audit prep included.", tags: ["SOC2", "HIPAA"], badge: "24/7 SLD-Backed", infra: "Hetzner + AWS", type: "Managed", price: "$6,800 / mo", rating: "4.9", category: "Managed Services" },
   { title: "Veklom Python SDK Pro", vendor: "Veklom Native", desc: "Typed clients with auto-failover, in-flight redaction, and OpenTelemetry baked in.", tags: [], badge: "Typed Open Source", infra: "Hetzner + AWS", type: "SDK", price: "Free", rating: "4.8", category: "SDK Extensions" },
   { title: "MedDx-Triage 13B", vendor: "Northern Health", desc: "PHI-aware triage model fine-tuned on 1.4M de-identified intake notes. License-bound, watermarked.", tags: ["HIPAA"], badge: "PHI-Aware Watermarked", infra: "Hetzner", type: "Container", price: "$3,200 / mo", rating: "4.7", category: "Models" },
+  { title: "EU-Sovereign Residency Pack", vendor: "Veklom Native", desc: "Region-pinning, policy templates, and procurement letter generator for EU-sovereign deployments.", tags: ["GDPR", "SOC2"], badge: "EU-Only Procurement-Ready", infra: "Hetzner", type: "Managed", price: "$1,100 / mo", rating: "4.9", category: "Compliance Packs" },
 ];
 
 export function MarketplacePage() {

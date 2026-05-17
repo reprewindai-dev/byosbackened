@@ -20,6 +20,7 @@ function resolveBase(): string {
 export const api: AxiosInstance = axios.create({
   baseURL: resolveBase(),
   headers: { "Content-Type": "application/json" },
+  timeout: 10_000,
 });
 
 // Attach bearer token to every request
@@ -79,6 +80,7 @@ function resolveRawBase(): string {
 export const rawApi = axios.create({
   baseURL: resolveRawBase(),
   headers: { "Content-Type": "application/json" },
+  timeout: 10_000,
 });
 
 rawApi.interceptors.request.use((config) => {

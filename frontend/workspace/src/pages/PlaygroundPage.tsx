@@ -41,7 +41,7 @@ export function PlaygroundPage() {
   const [prompt, setPrompt] = useState("");
   const [models, setModels] = useState<string[]>(DEFAULT_MODELS);
   const [model, setModel] = useState(DEFAULT_MODELS[0]);
-  const [convId, setConvId] = useState(genConvId);
+  const [_convId, setConvId] = useState(genConvId);
   const [sending, setSending] = useState(false);
   const [temperature, setTemperature] = useState(0.70);
   const [topP, setTopP] = useState(0.95);
@@ -60,12 +60,13 @@ export function PlaygroundPage() {
           api.get("/workspace/models").then(r => r.data),
           rawApi.get("/status").then(r => r.data),
         ]);
+        let modelsSet = false;
         if (results[0].status === "fulfilled") {
           const wm = results[0].value;
           const modelList = Array.isArray(wm) ? wm.map((m: { id?: string; name?: string }) => m.id || m.name || "").filter(Boolean) : wm?.models?.map((m: { id?: string; name?: string }) => m.id || m.name || "").filter(Boolean) || [];
-          if (modelList.length) { setModels(modelList); setModel(modelList[0]); }
+          if (modelList.length) { setModels(modelList); setModel(modelList[0]); modelsSet = true; }
         }
-        if (results[1].status === "fulfilled") {
+        if (results[1].status === "fulfilled" && !modelsSet) {
           const data = results[1].value;
           if (data?.llm_models_available?.length) {
             setModels(data.llm_models_available);
@@ -88,21 +89,21 @@ export function PlaygroundPage() {
     setSending(true);
 
     try {
-      const { data } = await rawApi.post("/v1/exec", {
+      const { data } = await api.post("/ai/complete", {
         prompt: userMsg,
         model,
-        conversation_id: convId,
-        use_memory: true,
-        temperature,
         max_tokens: maxTokens,
+        temperature,
+        session_tag: complianceTag,
       });
       const meta = [
         data.model || model,
         data.provider || "—",
         data.latency_ms ? `${data.latency_ms}ms` : null,
         data.total_tokens ? `${data.total_tokens} tok` : null,
+        data.cost_usd ? `$${data.cost_usd}` : null,
       ].filter(Boolean).join(" · ");
-      setMessages((m) => [...m, { role: "assistant", content: data.response || "(empty response)", meta }]);
+      setMessages((m) => [...m, { role: "assistant", content: data.response_text || data.response || "(empty response)", meta }]);
     } catch (err: unknown) {
       const axErr = err as { response?: { data?: { detail?: string }; status?: number }; message?: string };
       const detail = axErr.response?.data?.detail || axErr.message || "Inference failed";
@@ -110,7 +111,7 @@ export function PlaygroundPage() {
     } finally {
       setSending(false);
     }
-  }, [prompt, model, convId, sending, temperature, maxTokens]);
+  }, [prompt, model, sending, temperature, maxTokens, complianceTag]);
 
   function clearChat() {
     setMessages([{ role: "system", content: "You are a sovereign AI assistant operating inside the Veklom control plane. Never emit PHI." }]);

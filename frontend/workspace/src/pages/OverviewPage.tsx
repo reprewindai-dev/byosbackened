@@ -5,6 +5,9 @@ import { api, rawApi } from "@/lib/api";
 
 interface StatusData {
   status?: string;
+  db_ok?: boolean;
+  redis_ok?: boolean;
+  llm_ok?: boolean;
   requests_per_min?: number;
   tokens_per_sec?: number;
   error_rate?: number;
@@ -36,7 +39,11 @@ export function OverviewPage() {
 
   const fetchData = useCallback(async () => {
     const results = await Promise.allSettled([
-      rawApi.get("/health").then(r => r.data),
+      api.get("/monitoring/health").then(r => r.data).catch(() =>
+        rawApi.get("/status").then(r => r.data).catch(() =>
+          rawApi.get("/health").then(r => r.data)
+        )
+      ),
       api.get("/wallet/balance").then(r => r.data),
     ]);
     if (results[0].status === "fulfilled") setStatus(results[0].value);
@@ -69,7 +76,7 @@ export function OverviewPage() {
           Every prompt routed, policed, and audited — across Hetzner primary and AWS burst — without leaving your perimeter.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="v-badge-green">● {loading ? "Connecting..." : status?.status === "ok" ? "Live Backend Connected" : "Backend Active"}</span>
+          <span className="v-badge-green">● {loading ? "Connecting..." : (status?.status === "ok" || status?.status === "healthy" || (status?.db_ok && status?.redis_ok)) ? "Live Backend Connected" : status ? "Backend Active" : "Connecting..."}</span>
           <span className="v-badge-muted">SOC2-Ready</span>
           <span className="v-badge-muted">HIPAA-Aware</span>
           <span className="v-badge-muted">EU-Sovereign</span>

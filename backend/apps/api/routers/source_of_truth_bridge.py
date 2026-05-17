@@ -77,11 +77,21 @@ async def _proxy_request(
     method: str | None = None,
     override_body: dict[str, Any] | str | bytes | None = None,
 ) -> Response:
+    # ── Self-loop guard: if we are already inside a bridge proxy, stop. ──
+    if request.headers.get("x-bridge-proxy") == "1":
+        return Response(
+            content=json.dumps({"detail": "Bridge loop detected"}),
+            status_code=508,
+            media_type="application/json",
+        )
+
     start = time.perf_counter()
 
     mounted_target_path = _mounted_target_path(target_path)
     method = (method or request.method).upper()
     headers = _clean_headers(request)
+    # Tag the proxied request so we can detect loops
+    headers["x-bridge-proxy"] = "1"
     body: bytes | None = None
 
     if isinstance(override_body, (dict, list)):
@@ -95,7 +105,9 @@ async def _proxy_request(
         body = await request.body()
 
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=request.app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=request.app),
+        base_url="http://testserver",
+        timeout=10.0,
     ) as client:
         proxied = await client.request(
             method=method,

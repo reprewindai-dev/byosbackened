@@ -206,7 +206,6 @@ app.include_router(admin_router, prefix=settings.api_prefix)
 app.include_router(subscriptions_router, prefix=settings.api_prefix)
 app.include_router(content_safety_router, prefix=settings.api_prefix)
 app.include_router(kill_switch_router, prefix=settings.api_prefix)
-app.include_router(source_of_truth_bridge_router, prefix=settings.api_prefix)
 
 # LockerPhycer Security Routers (now fully integrated into BYOS)
 app.include_router(locker_security_router, prefix=settings.api_prefix)
@@ -241,6 +240,10 @@ app.include_router(exec_router)
 
 # Public Veklom Live Pipeline Theater SSE demo (no auth, IP rate-limited)
 app.include_router(demo_pipeline_router, prefix=settings.api_prefix)
+
+# Source-of-truth bridge: LAST — acts as alias/compat layer. Real routes above
+# take priority; the bridge only catches requests no real router handles.
+app.include_router(source_of_truth_bridge_router, prefix=settings.api_prefix)
 
 
 @app.get("/health")

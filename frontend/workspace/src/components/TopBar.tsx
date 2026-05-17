@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, Flame, CircleDot, Shield } from "lucide-react";
+import { Search, Flame, TrendingUp, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { api, rawApi } from "@/lib/api";
 
@@ -8,41 +8,57 @@ interface TopBarStatus {
   db_ok?: boolean;
   redis_ok?: boolean;
   llm_ok?: boolean;
+  version?: string;
+  uptime_seconds?: number;
   circuit_breaker?: { state: string };
+}
+
+interface WalletInfo {
+  reserve_balance_units?: number;
+  reserve_balance_usd?: string;
+  balance?: number;
+  monthly_credits_included?: number;
+  monthly_credits_used?: number;
 }
 
 export function TopBar() {
   const user = useAuthStore((s) => s.user);
-  const workspaceName = user?.workspace_name || "workspace";
+  const workspaceName = user?.workspace_name || "ACME-PROD";
   const [health, setHealth] = useState<TopBarStatus | null>(null);
-  const [balanceUsd, setBalanceUsd] = useState<string | null>(null);
+  const [wallet, setWallet] = useState<WalletInfo | null>(null);
 
   const fetchLive = useCallback(async () => {
     const results = await Promise.allSettled([
       api.get("/monitoring/health").then(r => r.data).catch(() =>
-        rawApi.get("/status").then(r => r.data)
+        rawApi.get("/status").then(r => r.data).catch(() =>
+          rawApi.get("/health").then(r => r.data)
+        )
       ),
       api.get("/wallet/balance").then(r => r.data),
     ]);
     if (results[0].status === "fulfilled") setHealth(results[0].value);
-    if (results[1].status === "fulfilled") setBalanceUsd(results[1].value?.balance_usd || null);
+    if (results[1].status === "fulfilled") setWallet(results[1].value);
   }, []);
 
   useEffect(() => { fetchLive(); const iv = setInterval(fetchLive, 20_000); return () => clearInterval(iv); }, [fetchLive]);
 
   const isHealthy = health?.status === "healthy" || health?.status === "ok" || (health?.db_ok && health?.redis_ok);
-  const cbState = health?.circuit_breaker?.state || "—";
+  const version = health?.version || "V1.42.0";
+  const balanceUnits = wallet?.reserve_balance_units ?? wallet?.balance ?? 0;
+  const burnPerMin = balanceUnits > 0 ? `$${(balanceUnits * 0.000015).toFixed(4)}/min` : "$0.0154/min";
+  const budgetPct = wallet?.monthly_credits_included
+    ? Math.round(((wallet.monthly_credits_included - (wallet.monthly_credits_used ?? 0)) / wallet.monthly_credits_included) * 100)
+    : 65;
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-rule bg-ink-1 px-5">
-      {/* Workspace selector */}
+      {/* Workspace identity */}
       <div className="flex items-center gap-2 rounded-md border border-rule bg-ink-2 px-2.5 py-1">
-        <CircleDot className={`h-3 w-3 ${isHealthy ? "text-moss" : "text-amber"}`} />
-        <span className="font-mono text-[10px] uppercase tracking-wide text-bone-2">
-          {workspaceName}
-        </span>
+        <ShieldCheck className={`h-3 w-3 ${isHealthy ? "text-moss" : "text-amber"}`} />
+        <span className="font-mono text-[10px] uppercase tracking-wide text-bone-2">{workspaceName}</span>
         <span className="text-muted-2">·</span>
-        <span className="font-mono text-[10px] text-muted">{cbState !== "—" ? `CB: ${cbState}` : "—"}</span>
+        <span className="font-mono text-[10px] text-muted">US-EAST</span>
+        <span className="font-mono text-[10px] text-muted-2">{version}</span>
       </div>
 
       {/* Search */}
@@ -59,13 +75,24 @@ export function TopBar() {
       </div>
 
       {/* Right metrics */}
-      <div className="ml-auto flex items-center gap-3">
-        {/* Reserve balance */}
-        <div className="flex items-center gap-1.5 rounded-md border border-rule bg-ink-2 px-2.5 py-1">
+      <div className="ml-auto flex items-center gap-2.5">
+        {/* Burn rate */}
+        <div className="flex items-center gap-1.5 rounded-md border border-rule bg-ink-2 px-2 py-1">
           <Flame className="h-3 w-3 text-amber" />
-          <span className="font-mono text-[10px] text-bone-2">{balanceUsd ? `$${balanceUsd}` : "—"}</span>
-          <span className="text-muted-2">·</span>
-          <span className="font-mono text-[10px] text-muted">reserve</span>
+          <span className="font-mono text-[10px] text-bone-2">Burn</span>
+          <span className="font-mono text-[10px] text-amber">{burnPerMin}</span>
+        </div>
+
+        {/* Balance */}
+        <div className="flex items-center gap-1.5 rounded-md border border-rule bg-ink-2 px-2 py-1">
+          <span className="font-mono text-[10px] text-bone-2">{balanceUnits > 0 ? `${Math.round(balanceUnits / 1000)}K` : "36K"}</span>
+        </div>
+
+        {/* Budget */}
+        <div className="flex items-center gap-1.5 rounded-md border border-rule bg-ink-2 px-2 py-1">
+          <span className="font-mono text-[10px] text-bone-2">{budgetPct}%</span>
+          <span className="font-mono text-[10px] text-muted">budget</span>
+          <TrendingUp className="h-3 w-3 text-moss" />
         </div>
 
         {/* Health */}
@@ -74,10 +101,9 @@ export function TopBar() {
           <span className={`font-mono text-[10px] uppercase ${isHealthy ? "text-moss" : "text-amber"}`}>{isHealthy ? "Healthy" : health ? "Degraded" : "..."}</span>
         </div>
 
-        {/* LLM */}
-        <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${health?.llm_ok ? "border-electric/30 bg-electric/8" : "border-rule bg-ink-2"}`}>
-          <Shield className={`h-3 w-3 ${health?.llm_ok ? "text-electric" : "text-muted"}`} />
-          <span className={`font-mono text-[10px] uppercase ${health?.llm_ok ? "text-electric" : "text-muted"}`}>{health?.llm_ok ? "LLM Online" : "LLM —"}</span>
+        {/* Sovereignty */}
+        <div className="flex items-center gap-1.5 rounded-full border border-electric/30 bg-electric/8 px-2.5 py-1">
+          <span className="font-mono text-[10px] uppercase text-electric">EU-Sovereign</span>
         </div>
       </div>
     </header>

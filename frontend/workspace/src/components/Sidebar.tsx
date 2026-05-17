@@ -1,110 +1,121 @@
 import { NavLink } from "react-router-dom";
-import { cn } from "@/lib/cn";
 import {
-  LayoutDashboard,
-  TerminalSquare,
-  Store,
-  Cpu,
-  Workflow,
-  Rocket,
-  KeyRound,
-  ShieldCheck,
   Activity,
+  Box,
+  ChevronLeft,
+  CircuitBoard,
   CreditCard,
+  FileCheck2,
+  Gauge,
+  KeyRound,
+  LineChart,
+  Settings2,
+  ShieldCheck,
+  ShoppingBag,
+  TerminalSquare,
   Users,
-  Server,
-  Cloudy,
-  Bot,
-  Settings,
 } from "lucide-react";
+import { cn } from "@/lib/cn";
 
-const NAV_GROUPS = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+}
+
+const CUSTOMER_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
-    label: "Workspace",
+    title: "Workspace",
     items: [
-      { to: "/overview", icon: LayoutDashboard, label: "Overview" },
-      { to: "/playground", icon: TerminalSquare, label: "Playground", badge: "LIVE" },
-      { to: "/marketplace", icon: Store, label: "Marketplace" },
+      { to: "/overview", label: "Overview", icon: Gauge },
+      { to: "/playground", label: "Playground", icon: TerminalSquare, badge: "LIVE" },
+      { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
     ],
   },
   {
-    label: "Infrastructure",
+    title: "Infrastructure",
     items: [
-      { to: "/models", icon: Cpu, label: "Models" },
-      { to: "/pipelines", icon: Workflow, label: "Pipelines" },
-      { to: "/deployments", icon: Rocket, label: "Deployments" },
+      { to: "/models", label: "Models", icon: Box },
+      { to: "/pipelines", label: "Pipelines", icon: CircuitBoard },
+      { to: "/deployments", label: "Endpoints", icon: Gauge },
     ],
   },
   {
-    label: "Governance",
+    title: "Governance",
     items: [
-      { to: "/vault", icon: KeyRound, label: "Vault" },
-      { to: "/compliance", icon: ShieldCheck, label: "Compliance" },
+      { to: "/vault", label: "Vault", icon: KeyRound },
+      { to: "/compliance", label: "Compliance", icon: FileCheck2 },
     ],
   },
   {
-    label: "Operations",
+    title: "Operations",
     items: [
-      { to: "/monitoring", icon: Activity, label: "Monitoring" },
-      { to: "/billing", icon: CreditCard, label: "Billing" },
-      { to: "/team", icon: Users, label: "Team" },
-      { to: "/settings", icon: Settings, label: "Settings" },
+      { to: "/monitoring", label: "Monitoring", icon: LineChart },
+      { to: "/billing", label: "Billing", icon: CreditCard },
     ],
   },
   {
-    label: "Control Plane",
+    title: "Access",
     items: [
-      { to: "/gpc", icon: Bot, label: "GPC Terminal", badge: "UACP" },
+      { to: "/team", label: "Team", icon: Users },
+      { to: "/settings", label: "Settings", icon: Settings2 },
     ],
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ collapsed = false, onToggle = () => {} }: { collapsed?: boolean; onToggle?: () => void } = {}) {
   return (
-    <aside className="flex w-[200px] shrink-0 flex-col border-r border-rule bg-ink-1">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-4">
-        <svg viewBox="0 0 32 32" className="h-7 w-7 shrink-0">
-          <path
-            d="M16 4 L6 24 L10 24 L16 13 L22 24 L26 24 Z"
-            fill="#e5a832"
-          />
-          <circle cx="16" cy="20" r="2.5" fill="#e5a832" />
-        </svg>
-        <div className="leading-none">
-          <span className="text-sm font-bold tracking-tight text-bone">Veklom</span>
-          <span className="mt-0.5 block font-mono text-[8px] uppercase tracking-[0.15em] text-muted">
-            sovereign control node
-          </span>
-        </div>
+    <aside
+      className={cn(
+        "sticky top-0 flex h-screen shrink-0 flex-col border-r border-rule bg-ink-1/70 backdrop-blur-md transition-all",
+        collapsed ? "w-14" : "w-60",
+      )}
+    >
+      <div className="flex h-14 items-center justify-between border-b border-rule px-3">
+        <NavLink to="/overview" className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brass/20 font-mono text-[11px] font-bold text-brass-2">
+            V
+          </div>
+          {!collapsed && (
+            <div className="flex flex-col leading-none">
+              <span className="text-[13px] font-semibold tracking-tight">Veklom</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted">sovereign control node</span>
+            </div>
+          )}
+        </NavLink>
+        <button
+          onClick={onToggle}
+          className="rounded p-1 text-muted hover:bg-white/5 hover:text-bone"
+          aria-label="Toggle sidebar"
+        >
+          <ChevronLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
+        </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="mb-4">
-            <div className="mb-1.5 px-2 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-2">
-              {group.label}
-            </div>
-            {group.items.map((item) => (
+      <nav className="flex-1 overflow-y-auto py-2">
+        {CUSTOMER_SECTIONS.map((section) => (
+          <div key={section.title ?? section.items.map((item) => item.to).join("-")} className="px-2">
+            {!collapsed && section.title && <div className="v-sidebar-section">{section.title}</div>}
+            {section.items.map(({ to, label, icon: Icon, badge }) => (
               <NavLink
-                key={item.to}
-                to={item.to}
+                key={to}
+                to={to}
                 className={({ isActive }) =>
-                  cn(
-                    "group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
-                    isActive
-                      ? "bg-brass/10 text-brass-2"
-                      : "text-bone/70 hover:bg-ink-3 hover:text-bone",
-                  )
+                  cn("v-sidebar-item", isActive && "v-sidebar-item-active", collapsed && "justify-center")
                 }
+                title={collapsed ? label : undefined}
               >
-                <item.icon className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100" />
-                <span>{item.label}</span>
-                {item.badge && (
-                  <span className="ml-auto rounded bg-moss/15 px-1.5 py-0.5 font-mono text-[9px] text-moss">
-                    {item.badge}
-                  </span>
+                <Icon className="h-4 w-4 shrink-0" />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 truncate">{label}</span>
+                    {badge && (
+                      <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-moss">
+                        {badge}
+                      </span>
+                    )}
+                  </>
                 )}
               </NavLink>
             ))}
@@ -112,29 +123,35 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer — Sovereign Mode */}
-      <div className="border-t border-rule px-4 py-3">
-        <div className="flex items-center gap-1.5">
-          <span className="v-section-label">Sovereign Mode</span>
-          <span className="ml-auto flex items-center gap-1">
-            <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-moss" />
-            <span className="font-mono text-[9px] uppercase text-moss">on-prem</span>
-          </span>
+      {!collapsed && (
+        <div className="m-3 rounded-lg border border-rule p-3 text-[11px] text-bone-2">
+          <div className="mb-2 flex items-center justify-between font-mono uppercase tracking-[0.12em]">
+            <span className="text-muted">Sovereign Mode</span>
+            <span className="inline-flex items-center gap-1 text-moss">
+              <Activity className="h-3 w-3" />
+              ON-PREM
+            </span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-muted">
+            All requests evaluated by policy on Hetzner. AWS burst gated by tenant rule.
+          </p>
+          <div className="mt-2 flex gap-1.5">
+            <span className="rounded border border-brass/30 bg-brass/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-brass-2">
+              Hetzner
+            </span>
+            <span className="rounded border border-electric/30 bg-electric/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-electric">
+              AWS
+            </span>
+          </div>
         </div>
-        <p className="mt-1.5 text-[10px] leading-relaxed text-muted-2">
-          All requests evaluated by policy on Hetzner. AWS burst gated by tenant rule.
-        </p>
-        <div className="mt-2 flex gap-1.5">
-          <span className="rounded bg-amber/15 px-1.5 py-0.5 font-mono text-[9px] text-amber">
-            <Server className="mr-0.5 inline h-2.5 w-2.5" />
-            Hetzner
-          </span>
-          <span className="rounded bg-electric/15 px-1.5 py-0.5 font-mono text-[9px] text-electric">
-            <Cloudy className="mr-0.5 inline h-2.5 w-2.5" />
-            AWS
-          </span>
+      )}
+
+      {!collapsed && (
+        <div className="border-t border-rule px-3 py-2 text-[10px] text-muted">
+          <ShieldCheck className="mr-1 inline h-3 w-3" />
+          mTLS internal - v1.42.0
         </div>
-      </div>
+      )}
     </aside>
   );
 }

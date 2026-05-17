@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "export:landing": "npm run build && node scripts/export-to-landing.mjs",
+    "export:landing": "node scripts/export-to-landing.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx"

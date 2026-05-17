@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // in the same commit as the new assets.
 // ---------------------------------------------------------------------------
 
-const FROZEN_JS = "index-BRBIiAH2.js";
+const FROZEN_JS = "index-DAUyp2g9.js";
 const FROZEN_CSS = "index-CcFQfCmo.css";
 
 const here = dirname(fileURLToPath(import.meta.url));

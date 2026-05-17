@@ -1,0 +1,4 @@
+[build]
+  publish = "."
+
+# No build step — pre-built static assets

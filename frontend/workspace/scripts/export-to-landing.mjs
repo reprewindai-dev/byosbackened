@@ -1,66 +1,60 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// ---------------------------------------------------------------------------
+// The accepted production workspace artifact is FROZEN.
+//
+// workspace-app.html  → references index-EUKZeqk4.js + index-WqgIFi2m.css
+// workspace-assets/   → contains the frozen JS + CSS bundles
+//
+// This script now VALIDATES the freeze instead of overwriting it.
+// If you need to ship a new build, update the FROZEN_* constants below
+// in the same commit as the new assets.
+// ---------------------------------------------------------------------------
+
+const FROZEN_JS = "index-EUKZeqk4.js";
+const FROZEN_CSS = "index-WqgIFi2m.css";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(here, "..");
 const repoRoot = resolve(workspaceRoot, "..", "..");
-const distRoot = resolve(workspaceRoot, "dist");
 const landingRoot = resolve(repoRoot, "backend", "landing");
-const assetSource = resolve(distRoot, "workspace-assets");
 const assetTarget = resolve(landingRoot, "workspace-assets");
 const workspaceShell = resolve(landingRoot, "workspace-app.html");
-const assetVersion = process.env.WORKSPACE_ASSET_VERSION || "workspace";
 
-const routeShells = [
-  "login",
-  "register",
-  "accept-invite",
-  "overview",
-  "control-center",
-  "dashboard",
-  "uacp",
-  "playground",
-  "marketplace",
-  "models",
-  "pipelines",
-  "deployments",
-  "monitoring",
-  "vault",
-  "compliance",
-  "billing",
-  "team",
-  "settings",
-];
+// Verify the frozen assets are present
+const jsPath = resolve(assetTarget, FROZEN_JS);
+const cssPath = resolve(assetTarget, FROZEN_CSS);
 
-if (!existsSync(resolve(distRoot, "index.html"))) {
-  throw new Error("dist/index.html is missing. Run npm run build first.");
+if (!existsSync(jsPath)) {
+  throw new Error(
+    `Frozen workspace JS missing: ${FROZEN_JS}\n` +
+    `Restore it with: git checkout be84be06 -- backend/landing/workspace-assets/${FROZEN_JS}`
+  );
+}
+if (!existsSync(cssPath)) {
+  throw new Error(
+    `Frozen workspace CSS missing: ${FROZEN_CSS}\n` +
+    `Restore it with: git checkout be84be06 -- backend/landing/workspace-assets/${FROZEN_CSS}`
+  );
 }
 
-if (!existsSync(assetSource)) {
-  throw new Error("dist/workspace-assets is missing. Check vite.config.ts assetsDir.");
+// Verify workspace-app.html references the frozen bundle
+const shellContent = readFileSync(workspaceShell, "utf8");
+if (!shellContent.includes(FROZEN_JS)) {
+  throw new Error(
+    `workspace-app.html does not reference ${FROZEN_JS}.\n` +
+    `The accepted artifact has been tampered with.`
+  );
 }
-
-rmSync(assetTarget, { recursive: true, force: true });
-mkdirSync(assetTarget, { recursive: true });
-cpSync(assetSource, assetTarget, { recursive: true });
-
-const normalizedShell = readFileSync(resolve(distRoot, "index.html"), "utf8")
-  .replace(/(\/workspace-assets\/[^"']+\.(?:js|css))(?!\?)/g, `$1?v=${assetVersion}`)
-  .replace(/\r/g, "")
-  .split("\n")
-  .map((line) => line.trimEnd())
-  .join("\n")
-  .trimEnd() + "\n";
-
-writeFileSync(workspaceShell, normalizedShell, "utf8");
-
-for (const route of routeShells) {
-  const targetDir = resolve(landingRoot, route);
-  mkdirSync(targetDir, { recursive: true });
-  writeFileSync(resolve(targetDir, "index.html"), normalizedShell, "utf8");
+if (!shellContent.includes(FROZEN_CSS)) {
+  throw new Error(
+    `workspace-app.html does not reference ${FROZEN_CSS}.\n` +
+    `The accepted artifact has been tampered with.`
+  );
 }
 
 const assets = readdirSync(assetTarget);
-console.log(`Exported Veklom Workspace shell to ${workspaceShell}`);
-console.log(`Exported ${assets.length} workspace asset(s) to ${assetTarget}`);
+console.log(`Workspace artifact freeze verified: ${FROZEN_JS} + ${FROZEN_CSS}`);
+console.log(`${assets.length} asset(s) in ${assetTarget}`);

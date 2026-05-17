@@ -1,27 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { FileText, Settings, Download } from "lucide-react";
 import { api } from "@/lib/api";
-
-interface WalletBalance {
-  balance_units?: number;
-  balance_usd?: string;
-}
-
-interface Transaction {
-  id: string;
-  type?: string;
-  amount_units?: number;
-  amount_usd?: string;
-  description?: string;
-  created_at?: string;
-}
-
-interface TopupOption {
-  id: string;
-  label?: string;
-  units?: number;
-  price_usd?: string;
-}
 
 const PLANS = [
   { name: "Community", price: "$0", period: "free", features: ["Local-first via Ollama", "1 deployment", "Basic governance"], current: false },
@@ -30,72 +9,70 @@ const PLANS = [
   { name: "Enterprise", price: "Custom", period: "private", features: ["SAML / SCIM / SSO", "Custom regions", "Procurement-ready"], current: false },
 ];
 
+const CATEGORIES = [
+  { label: "Inference", pct: 64, amount: "$11,820", color: "bg-amber" },
+  { label: "Embeddings", pct: 13, amount: "$2,380", color: "bg-electric" },
+  { label: "GPU burst", pct: 14, amount: "$2,640", color: "bg-violet-400" },
+  { label: "Storage / logs", pct: 9, amount: "$1,636", color: "bg-cyan-400" },
+];
+
+const TEAMS = [
+  { name: "Clinical AI", amount: "$8,120", color: "bg-amber" },
+  { name: "Risk & Audit", amount: "$4,212", color: "bg-electric" },
+  { name: "Customer Ops", amount: "$3,810", color: "bg-moss" },
+  { name: "Internal R&D", amount: "$2,334", color: "bg-violet-400" },
+];
+
+const INVOICE_LINES = [
+  { desc: "Sovereign tier · 1 seat × 12", amount: "$9,588.00" },
+  { desc: "Seat overages × 4", amount: "$1,196.00" },
+  { desc: "AI request overage · 18.4M", amount: "$3,212.00" },
+  { desc: "GPU burst hours · 88h", amount: "$2,640.00" },
+  { desc: "Managed deployment fees", amount: "$1,200.00" },
+  { desc: "Log retention extension (12 mo)", amount: "$640.00" },
+];
+
+const CAPS = [
+  { label: "Org daily cap", value: "$1,000 hard-stop" },
+  { label: "Inference monthly cap", value: "$24,000 hard-stop" },
+  { label: "AWS burst cap", value: "$3,000 alert" },
+  { label: "Per-team cap · Clinical", value: "$10,000 alert" },
+];
+
 export function BillingPage() {
-  const [wallet, setWallet] = useState<WalletBalance | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [topupOptions, setTopupOptions] = useState<TopupOption[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const fetchData = useCallback(async () => {
-    const results = await Promise.allSettled([
-      api.get("/wallet/balance").then(r => r.data),
-      api.get("/wallet/transactions").then(r => r.data),
-      api.get("/wallet/topup/options").then(r => r.data),
-    ]);
-    if (results[0].status === "fulfilled") setWallet(results[0].value);
-    if (results[1].status === "fulfilled") {
-      const txs = Array.isArray(results[1].value) ? results[1].value : results[1].value?.items || [];
-      setTransactions(txs);
-    }
-    if (results[2].status === "fulfilled") {
-      const opts = Array.isArray(results[2].value) ? results[2].value : results[2].value?.options || [];
-      setTopupOptions(opts);
-    }
-    setLoading(false);
+    try { await api.get("/wallet/balance"); } catch { /* static */ }
   }, []);
-
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  async function handleTopup(optionId: string) {
-    try {
-      const { data } = await api.post("/wallet/topup/checkout", { option_id: optionId });
-      if (data?.checkout_url) window.location.href = data.checkout_url;
-    } catch { /* handled by interceptor */ }
-  }
-
-  const balanceUsd = wallet?.balance_usd || "0.00";
-  const balanceUnits = wallet?.balance_units || 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <p className="v-section-label">Billing</p>
-          <h1 className="mt-1 text-2xl font-bold text-bone">Operating Reserve · Usage · Top-Up</h1>
-          <p className="mt-1 text-sm text-muted">
-            Real-time reserve balance, transaction history, and top-up options. No surprise invoices.
+          <h1 className="mt-1 text-2xl font-bold text-bone">Spend · usage · invoices</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Real-time meters, hard-stop caps, customer portal, and per-team allocation. No surprise invoices.
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost text-xs"><FileText className="h-3.5 w-3.5" /> Transactions</button>
-          <button className="v-btn-ghost text-xs"><Settings className="h-3.5 w-3.5" /> Manage plan</button>
+          <button className="flex items-center gap-1.5 rounded-md border border-rule px-3 py-1.5 text-xs text-muted hover:text-bone">
+            <FileText className="h-3.5 w-3.5" /> Invoices
+          </button>
+          <button className="v-btn-primary text-xs"><Settings className="h-3.5 w-3.5" /> Manage plan</button>
         </div>
       </div>
 
+      {/* Spend + Per-team */}
       <div className="grid gap-4 lg:grid-cols-5">
         <div className="v-card lg:col-span-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="v-section-label">Operating Reserve</p>
-              <p className="mt-0.5 text-lg font-bold text-bone">
-                {loading ? "Loading..." : `$${balanceUsd}`}
-                <span className="ml-2 text-xs font-normal text-muted">{balanceUnits.toLocaleString()} units</span>
-              </p>
+              <p className="v-section-label">Spend · This Month</p>
+              <p className="mt-0.5 text-lg font-bold text-bone">$18,476.00 of $24,000 cap</p>
             </div>
-            <span className="v-badge-amber">● Reserve</span>
-          </div>
-          <div className="v-progress mt-3">
-            <div className="v-progress-fill bg-amber" style={{ width: "77%" }} />
+            <span className="rounded bg-moss/15 px-2 py-0.5 text-[9px] font-mono font-semibold text-moss">● ON-PACE</span>
           </div>
           <div className="mt-4 h-36 relative">
             <svg viewBox="0 0 460 130" className="w-full h-full" preserveAspectRatio="none">
@@ -110,45 +87,53 @@ export function BillingPage() {
               <path d="M0 120 C30 110, 60 95, 80 90 C100 85, 120 75, 150 70 C180 65, 200 55, 230 48 C260 42, 290 38, 320 32 C350 28, 380 25, 410 22 C430 20, 450 18, 460 16" fill="none" stroke="#f0b340" strokeWidth="2" />
             </svg>
             <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[9px] font-mono text-muted px-1">
-              <span>1h</span><span>3h</span><span>6h</span><span>9h</span><span>12h</span><span>15h</span><span>18h</span><span>20h</span><span>23h</span>
+              {["0h","1h","2h","3h","4h","5h","6h","7h","8h","9h","10h","11h","12h","13h","14h","15h","16h","17h","18h","20h","22h","23h"].map(h => <span key={h}>{h}</span>)}
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Balance (USD)</span>
-              <span className="font-mono text-xs font-medium text-bone">${balanceUsd}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Balance (Units)</span>
-              <span className="font-mono text-xs font-medium text-bone">{balanceUnits.toLocaleString()}</span>
-            </div>
+          {/* Category breakdown */}
+          <div className="mt-4 grid grid-cols-4 gap-3">
+            {CATEGORIES.map(c => (
+              <div key={c.label} className="rounded-md border border-rule/40 bg-ink-3/20 px-3 py-2.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-muted">{c.label}</span>
+                  <span className="font-mono text-muted">{c.pct}%</span>
+                </div>
+                <p className="mt-1 text-sm font-bold text-bone">{c.amount}</p>
+                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-ink-2">
+                  <div className={`h-full rounded-full ${c.color}`} style={{ width: `${c.pct}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         <div className="v-card lg:col-span-2">
-          <p className="v-section-label">Top-Up Options</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">Fund your operating reserve</p>
+          <p className="v-section-label">Per-Team Allocation</p>
+          <p className="mt-0.5 text-sm font-semibold text-bone">Tagged usage · cost center reports</p>
           <div className="mt-4 space-y-3">
-            {topupOptions.length > 0 ? topupOptions.map((opt) => (
-              <div key={opt.id} className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
-                <div>
-                  <span className="text-xs text-bone">{opt.label || `${opt.units?.toLocaleString()} units`}</span>
-                  <span className="ml-2 font-mono text-[10px] text-muted">${opt.price_usd}</span>
+            {TEAMS.map(t => (
+              <div key={t.name} className="rounded-md border border-rule/40 bg-ink-3/20 px-4 py-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-bone">{t.name}</span>
+                  <span className="font-mono text-bone">{t.amount}</span>
                 </div>
-                <button onClick={() => handleTopup(opt.id)} className="v-btn-primary px-3 py-1 text-[10px]">Top Up</button>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-ink-2">
+                  <div className={`h-full rounded-full ${t.color}`} style={{ width: `${parseInt(t.amount.replace(/[$,]/g, "")) / 120}%` }} />
+                </div>
               </div>
-            )) : (
-              <p className="text-xs text-muted py-2">{loading ? "Loading options..." : "No top-up options available"}</p>
-            )}
+            ))}
           </div>
         </div>
       </div>
 
+      {/* Pricing tiers */}
       <div className="grid gap-4 md:grid-cols-4">
         {PLANS.map((plan) => (
-          <div key={plan.name} className={`v-card relative ${plan.current ? "border-brass/50 shadow-brass-glow" : ""}`}>
-            {plan.current && <span className="v-badge-green absolute right-3 top-3">● Current</span>}
-            <p className="v-section-label">{plan.name}</p>
+          <div key={plan.name} className={`v-card relative ${plan.current ? "border-amber/30" : ""}`}>
+            <div className="flex items-center justify-between">
+              <p className="v-section-label">{plan.name}</p>
+              {plan.current && <span className="rounded bg-moss/15 px-1.5 py-0.5 text-[8px] font-mono font-semibold text-moss">● CURRENT</span>}
+            </div>
             <div className="mt-2">
               <span className="text-2xl font-bold text-bone">{plan.price}</span>
               <span className="ml-1 text-xs text-muted">{plan.period}</span>
@@ -156,62 +141,56 @@ export function BillingPage() {
             <ul className="mt-4 space-y-1.5">
               {plan.features.map((f) => (
                 <li key={f} className="flex items-center gap-2 text-xs text-muted">
-                  <span className="h-1 w-1 rounded-full bg-muted" />
+                  <span className="h-1 w-1 rounded-full bg-amber" />
                   {f}
                 </li>
               ))}
             </ul>
-            <button className={`mt-4 w-full ${plan.current ? "v-btn-ghost" : "v-btn-primary"} text-xs`}>
+            <button className={`mt-4 w-full rounded py-2 text-xs font-semibold ${plan.current ? "bg-ink-3 text-bone border border-rule" : "bg-amber/15 border border-amber/30 text-amber hover:bg-amber/25"}`}>
               {plan.current ? "Manage" : "Upgrade"}
             </button>
           </div>
         ))}
       </div>
 
+      {/* Invoice + Caps */}
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* Latest invoice */}
         <div className="v-card">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="v-section-label">Transaction History</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">Recent wallet activity</p>
+              <p className="v-section-label">Latest Invoice</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">May 1, 2026 · acme-prod</p>
             </div>
-            <button className="v-btn-ghost text-xs"><Download className="h-3 w-3" /> Export</button>
+            <button className="flex items-center gap-1 rounded border border-rule px-2.5 py-1 text-xs text-muted hover:text-bone">
+              <Download className="h-3 w-3" /> PDF
+            </button>
           </div>
           <div className="space-y-2">
-            {transactions.length > 0 ? transactions.slice(0, 8).map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-muted">{tx.description || tx.type || "Transaction"}</span>
-                  {tx.created_at && <span className="ml-2 font-mono text-[9px] text-muted-2">{new Date(tx.created_at).toLocaleDateString()}</span>}
-                </div>
-                <span className={`font-mono ${(tx.amount_units || 0) >= 0 ? "text-moss" : "text-crimson"}`}>
-                  {tx.amount_usd ? `$${tx.amount_usd}` : `${tx.amount_units?.toLocaleString()} units`}
-                </span>
+            {INVOICE_LINES.map((line) => (
+              <div key={line.desc} className="flex items-center justify-between border-b border-rule/20 pb-2 text-xs">
+                <span className="text-muted">{line.desc}</span>
+                <span className="font-mono text-bone">{line.amount}</span>
               </div>
-            )) : (
-              <p className="py-4 text-center text-xs text-muted">{loading ? "Loading..." : "No transactions yet"}</p>
-            )}
+            ))}
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <span className="font-semibold text-bone">Total</span>
+              <span className="font-mono font-bold text-bone">$18,476.00</span>
+            </div>
           </div>
         </div>
 
+        {/* Caps & Alerts */}
         <div className="v-card">
-          <div className="mb-3">
-            <p className="v-section-label">Reserve Info</p>
-            <p className="mt-0.5 text-sm font-semibold text-bone">Operating reserve details</p>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
-              <span className="text-xs text-bone">Current Balance</span>
-              <span className="font-mono text-xs font-medium text-bone">${balanceUsd}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
-              <span className="text-xs text-bone">Unit Balance</span>
-              <span className="font-mono text-xs font-medium text-bone">{balanceUnits.toLocaleString()} units</span>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
-              <span className="text-xs text-bone">Exchange Rate</span>
-              <span className="font-mono text-xs font-medium text-muted">1,000 units = $1.00</span>
-            </div>
+          <p className="v-section-label">Caps & Alerts</p>
+          <p className="mt-0.5 text-sm font-semibold text-bone">Hard-stop · alert · forecast</p>
+          <div className="mt-4 space-y-3">
+            {CAPS.map((cap) => (
+              <div key={cap.label} className="flex items-center justify-between border-b border-rule/20 pb-2 text-xs">
+                <span className="text-muted">{cap.label}</span>
+                <span className="font-mono text-bone">{cap.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

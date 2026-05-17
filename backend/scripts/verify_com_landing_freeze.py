@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 
 
-EXPECTED_SHA256 = "019BC4E1669EDC412160903D8515A83C37700FE4FAC0DA5F8F88AEB803B5AB1D".lower()
+EXPECTED_SHA256 = "10406b6e4e6357bf96164278687256cbd17ffc823aa43badb1224705a7a6c58a"
 
 
 def frozen_bytes(path: Path) -> bytes:

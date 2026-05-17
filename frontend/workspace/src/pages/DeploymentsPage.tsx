@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Webhook, Lock, Key, Globe, Copy, ExternalLink, Server } from "lucide-react";
 import { MiniChart } from "@/components/MiniChart";
+import { api } from "@/lib/api";
 
 interface Endpoint {
   name: string; url: string; type: string; model: string; region: string;
@@ -21,6 +22,18 @@ const ENDPOINTS: Endpoint[] = [
 export function DeploymentsPage() {
   const [selected] = useState(0);
   const ep = ENDPOINTS[selected];
+  const [liveModels, setLiveModels] = useState<string[]>([]);
+
+  const fetchLive = useCallback(async () => {
+    try {
+      const { data } = await api.get("/monitoring/health").catch(() =>
+        fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json()).then(data => ({ data }))
+      );
+      if (data?.llm_models_available) setLiveModels(data.llm_models_available);
+    } catch { /* fallback */ }
+  }, []);
+
+  useEffect(() => { fetchLive(); }, [fetchLive]);
 
   return (
     <div className="space-y-6 animate-fade-in">

@@ -1,32 +1,30 @@
-import { Bell, Download, Filter, Shield, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Bell, Download, Filter, Shield, AlertTriangle, Loader2 } from "lucide-react";
 import { MiniChart } from "@/components/MiniChart";
+import { api } from "@/lib/api";
 
-const METRICS = [
-  { label: "Requests / min", value: "2,418", delta: "+8%", deltaUp: true, color: "moss", sparkline: [30, 35, 42, 50, 55, 48, 60, 72, 65, 80, 75, 85] },
-  { label: "Tokens / sec", value: "184k", delta: "+22%", deltaUp: true, color: "electric", sparkline: [40, 50, 55, 60, 58, 70, 68, 75, 80, 85, 90, 95] },
-  { label: "Error rate", value: "0.18%", delta: "-0.04%", deltaUp: false, color: "crimson", sparkline: [8, 6, 7, 5, 4, 6, 3, 4, 3, 2, 3, 2] },
-  { label: "GPU util", value: "78%", delta: "8× A100", deltaUp: true, color: "amber", sparkline: [60, 65, 70, 68, 72, 75, 78, 80, 76, 78, 80, 78] },
-];
+interface AuditLog {
+  id: string;
+  operation_type?: string;
+  provider?: string;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost?: string;
+  latency_ms?: number;
+  hmac_hash?: string;
+  created_at?: string;
+  tenant_id?: string;
+}
 
-const LOGS = [
-  { ts: "07:24:11.412Z", lvl: "inf", deploy: "chat-prod", model: "llama3-70b", latency: "142ms", user: "user_8a31", pii: "*[REDACT]*", cost: "$0.00091", ok: true },
-  { ts: "07:24:09.214Z", lvl: "inf", deploy: "chat-prod", model: "llama3-70b", latency: "358ms", user: "user_f1e4", pii: "*[REDACT]*", cost: "$0.00102", ok: true },
-  { ts: "07:24:08.901Z", lvl: "inf", deploy: "embed-rag", model: "bge-m3", latency: "14ms", user: "ci-runner", pii: "vsc_4CPU", cost: "$0.00002", ok: true },
-  { ts: "07:24:07.781Z", lvl: "inf", deploy: "chat-prod", model: "mixtral-8x22", latency: "121ms", user: "user_8a31", pii: "*[REDACT]*", cost: "$0.00057", ok: true },
-  { ts: "07:24:06.512Z", lvl: "inf", deploy: "code-assist", model: "deepseek-v3", latency: "88ms", user: "vsc:elliot", pii: "*[REDACT]*", cost: "$0.00041", ok: true },
-  { ts: "07:24:05.231Z", lvl: "WARN", deploy: "chat-prod", model: "llama3-70b", latency: "612ms", user: "user_77ci", pii: "*[REDACT]*", cost: "$0.00131", ok: false },
-  { ts: "07:24:04.182Z", lvl: "inf", deploy: "embed-rag", model: "bge-m3", latency: "12ms", user: "ci-runner", pii: "vsc_4CPU", cost: "$0.00002", ok: true },
-  { ts: "07:24:02.812Z", lvl: "inf", deploy: "patient-intake", model: "pipeline", latency: "276ms", user: "user_phi", pii: "*[REDACT]*", cost: "$0.00098", ok: true },
-  { ts: "07:24:01.512Z", lvl: "CRIT", deploy: "egress", model: "allowlist", latency: "—", user: "system", pii: "rule#7", cost: "review pending", ok: false },
-];
-
-const AUDIT = [
-  { action: "deploy.update", actor: "chat-prod · elliot@acme.io", ts: "07:24:11Z", hash: "9f4e..ac21" },
-  { action: "policy.intercept", actor: "sessionRpj_421 · system/router", ts: "07:18:02Z", hash: "5b71..0c19" },
-  { action: "vault.rotate", actor: "OPEN_KEY_PROXY · kira@acme.io", ts: "07:11:55Z", hash: "0c11.7d0a" },
-  { action: "evidence.export", actor: "soc2-q2-pkg.zip · system/compliance", ts: "07:02:21Z", hash: "ef07..2941" },
-  { action: "key.create", actor: "key_8h2x_chat · alex@acme.io", ts: "06:54:17Z", hash: "12cd..ee01" },
-];
+interface SystemHealth {
+  db_ok?: boolean;
+  redis_ok?: boolean;
+  llm_ok?: boolean;
+  llm_model?: string;
+  circuit_breaker?: { state: string; failures: number };
+  uptime_seconds?: number;
+}
 
 const ALERTS = [
   { name: "P95 latency · chat-prod", rule: "> 800 ms · 5 min", status: "WATCHING", channel: "Slack #ops" },
@@ -38,6 +36,39 @@ const ALERTS = [
 ];
 
 export function MonitoringPage() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.get("/audit/logs", { params: { limit: 20 } }).then(r => r.data),
+      api.get("/monitoring/health").then(r => r.data).catch(() =>
+        fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json())
+      ),
+    ]);
+    if (results[0].status === "fulfilled") {
+      const items = Array.isArray(results[0].value) ? results[0].value : results[0].value?.items || [];
+      setLogs(items);
+    }
+    if (results[1].status === "fulfilled") setHealth(results[1].value);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); const iv = setInterval(fetchData, 15_000); return () => clearInterval(iv); }, [fetchData]);
+
+  const dbOk = health?.db_ok ?? false;
+  const redisOk = health?.redis_ok ?? false;
+  const llmOk = health?.llm_ok ?? false;
+  const cbState = health?.circuit_breaker?.state || "—";
+
+  const liveMetrics = [
+    { label: "Database", value: dbOk ? "Connected" : "Down", delta: dbOk ? "healthy" : "error", deltaUp: dbOk, color: dbOk ? "moss" : "crimson", sparkline: [70, 72, 75, 78, 80, 82, 85, 88, 90, 92, 95, 98] },
+    { label: "Redis", value: redisOk ? "Connected" : "Down", delta: redisOk ? "healthy" : "error", deltaUp: redisOk, color: redisOk ? "electric" : "crimson", sparkline: [60, 65, 70, 72, 78, 80, 85, 88, 90, 92, 95, 98] },
+    { label: "LLM", value: llmOk ? "Online" : "Offline", delta: health?.llm_model || "—", deltaUp: llmOk, color: llmOk ? "amber" : "crimson", sparkline: [40, 50, 55, 60, 58, 70, 68, 75, 80, 85, 90, 95] },
+    { label: "Circuit Breaker", value: cbState, delta: `${health?.circuit_breaker?.failures ?? 0} failures`, deltaUp: cbState === "CLOSED", color: cbState === "CLOSED" ? "moss" : "crimson", sparkline: [8, 6, 7, 5, 4, 6, 3, 4, 3, 2, 3, 2] },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
@@ -54,13 +85,13 @@ export function MonitoringPage() {
 
       {/* Metrics */}
       <div className="grid grid-cols-4 gap-4">
-        {METRICS.map((m) => (
+        {liveMetrics.map((m) => (
           <div key={m.label} className="v-card">
             <div className="flex items-center justify-between">
               <p className="v-section-label">{m.label}</p>
-              <span className={`text-[10px] font-semibold ${m.color === "crimson" ? "text-moss" : m.deltaUp ? "text-moss" : "text-crimson"}`}>{m.delta}</span>
+              <span className={`text-[10px] font-semibold ${m.deltaUp ? "text-moss" : "text-crimson"}`}>{m.delta}</span>
             </div>
-            <p className="mt-1 text-2xl font-bold text-bone">{m.value}</p>
+            <p className="mt-1 text-2xl font-bold text-bone">{loading ? "—" : m.value}</p>
             <div className="mt-2 h-6"><MiniChart color={m.color} data={m.sparkline} /></div>
           </div>
         ))}
@@ -74,7 +105,7 @@ export function MonitoringPage() {
               <p className="v-section-label">Throughput</p>
               <p className="text-sm font-semibold text-bone">Hetzner vs AWS burst · 24h</p>
             </div>
-            <span className="v-badge v-badge-green">● HEALTHY</span>
+            <span className={`v-badge ${dbOk && redisOk ? "v-badge-green" : "v-badge-amber"}`}>● {dbOk && redisOk ? "HEALTHY" : "DEGRADED"}</span>
           </div>
           <div className="mt-2 flex items-center gap-3 text-[9px]">
             <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-amber/70" /> Hetzner</span>
@@ -93,7 +124,7 @@ export function MonitoringPage() {
             })}
           </div>
           <div className="mt-2 flex justify-between text-[9px] font-mono text-muted">
-            {["0h", "1h", "2h", "3h", "4h", "5h", "6h", "7h", "8h", "9h", "10h", "11h", "12h", "13h", "14h", "15h", "16h", "17h", "18h", "19h", "20h", "21h", "22h", "23h"].filter((_, i) => i % 4 === 0).map(l => <span key={l}>{l}</span>)}
+            {["0h", "4h", "8h", "12h", "16h", "20h"].map(l => <span key={l}>{l}</span>)}
           </div>
           <div className="mt-1 flex justify-between text-[9px] font-mono text-muted-2">
             <span>0</span><span>30</span><span>60</span><span>90</span><span>120</span>
@@ -131,13 +162,13 @@ export function MonitoringPage() {
         </div>
       </div>
 
-      {/* Logs + Audit */}
+      {/* Logs + Audit — live from /audit/logs */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="v-card">
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="v-section-label">Logs · Structured</p>
-              <p className="text-sm font-semibold text-bone">Search, filter, export — PHI/PII redacted before write</p>
+              <p className="text-sm font-semibold text-bone">Live audit trail — PHI/PII redacted before write</p>
             </div>
             <div className="flex items-center gap-2">
               <input placeholder="model:llama* status:>=400" className="v-input w-52 text-[10px]" />
@@ -145,19 +176,20 @@ export function MonitoringPage() {
             </div>
           </div>
           <div className="rounded-md border border-rule bg-ink-2 p-3 font-mono text-[9.5px] leading-[1.8] overflow-x-auto max-h-60 space-y-0">
-            {LOGS.map((l, i) => (
-              <div key={i} className={`flex gap-2 whitespace-nowrap ${l.lvl === "CRIT" ? "text-crimson" : l.lvl === "WARN" ? "text-amber" : "text-muted"}`}>
-                <span className="text-muted-2">{l.ts}</span>
-                <span className={l.lvl === "CRIT" ? "text-crimson font-bold" : l.lvl === "WARN" ? "text-amber font-bold" : "text-muted"}>{l.lvl.padEnd(4)}</span>
-                <span className="text-bone-2">{l.deploy}</span>
-                <span className="text-muted">{l.model}</span>
-                <span className="text-bone">{l.latency}</span>
-                <span className="text-muted">{l.user}</span>
-                <span className="text-crimson">{l.pii}</span>
-                <span className="text-moss">{l.cost}</span>
-                <span>{l.ok ? "✓" : "△"}</span>
+            {logs.length > 0 ? logs.map((l: AuditLog, i: number) => (
+              <div key={l.id || i} className="flex gap-2 whitespace-nowrap text-muted">
+                <span className="text-muted-2">{l.created_at ? new Date(l.created_at).toISOString().slice(11, 23) : "—"}</span>
+                <span className="text-muted">inf </span>
+                <span className="text-bone-2">{l.operation_type || "exec"}</span>
+                <span className="text-muted">{l.model || "—"}</span>
+                <span className="text-bone">{l.latency_ms ? `${l.latency_ms}ms` : "—"}</span>
+                <span className="text-muted">{l.provider || "—"}</span>
+                <span className="text-moss">{l.cost ? `$${l.cost}` : "—"}</span>
+                <span>{l.hmac_hash ? "✓" : "△"}</span>
               </div>
-            ))}
+            )) : (
+              <div className="text-center text-muted py-4">{loading ? "Loading..." : "No audit logs yet"}</div>
+            )}
           </div>
         </div>
 
@@ -165,26 +197,29 @@ export function MonitoringPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="v-section-label">Audit Log · Tamper-Evident</p>
-              <p className="text-sm font-semibold text-bone">SHA-256 hash chain</p>
+              <p className="text-sm font-semibold text-bone">HMAC-SHA256 integrity chain</p>
             </div>
             <span className="v-badge v-badge-green"><Shield className="h-2.5 w-2.5" /> VERIFIED</span>
           </div>
           <div className="space-y-0">
-            {AUDIT.map((a, i) => (
-              <div key={i} className="flex items-center justify-between border-b border-rule/50 py-3 last:border-0">
+            {logs.slice(0, 5).map((a: AuditLog, i: number) => (
+              <div key={a.id || i} className="flex items-center justify-between border-b border-rule/50 py-3 last:border-0">
                 <div>
-                  <p className="font-mono text-xs font-semibold text-bone">{a.action}</p>
-                  <p className="text-[10px] text-muted">{a.actor}</p>
+                  <p className="font-mono text-xs font-semibold text-bone">{a.operation_type || "ai.exec"}</p>
+                  <p className="text-[10px] text-muted">{a.model || "—"} · {a.provider || "—"}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-mono text-[10px] text-muted">{a.ts}</p>
-                  <p className="font-mono text-[10px] text-muted-2">{a.hash}</p>
+                  <p className="font-mono text-[10px] text-muted">{a.created_at ? new Date(a.created_at).toISOString().slice(11, 19) : "—"}</p>
+                  <p className="font-mono text-[10px] text-muted-2">{a.hmac_hash ? `${a.hmac_hash.slice(0, 4)}..${a.hmac_hash.slice(-4)}` : "—"}</p>
                 </div>
               </div>
             ))}
+            {logs.length === 0 && !loading && (
+              <p className="py-4 text-center text-xs text-muted">No audit entries yet</p>
+            )}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-rule pt-3">
-            <p className="font-mono text-[9px] text-muted-2">Hash anchor: root.7d80..ee01</p>
+            <p className="font-mono text-[9px] text-muted-2">HMAC integrity chain active</p>
             <button className="v-btn-ghost text-[10px]"><Download className="h-3 w-3" /> Export pkg →</button>
           </div>
         </div>

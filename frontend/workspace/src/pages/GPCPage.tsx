@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Terminal, Shield, Activity, Users, Zap, AlertTriangle, ChevronRight,
   Eye, Bot, Gauge, BookOpen, Search as SearchIcon, Lock, Sparkles,
@@ -6,6 +6,7 @@ import {
   XCircle, Clock, Download, Server,
 } from "lucide-react";
 import { MiniChart } from "@/components/MiniChart";
+import { api } from "@/lib/api";
 
 /* ──────────────────────────────────────────────────────────────────────────
    UACP GOVERNED PROCESS CONTROL
@@ -85,6 +86,19 @@ type Tab = "command" | "workers" | "committees" | "events" | "eval";
 
 export function GPCPage() {
   const [tab, setTab] = useState<Tab>("command");
+  const [backendConnected, setBackendConnected] = useState(false);
+
+  const fetchGPC = useCallback(async () => {
+    try {
+      await Promise.allSettled([
+        api.get("/internal/uacp/workers").then(() => setBackendConnected(true)),
+        api.get("/internal/operators").then(() => setBackendConnected(true)),
+      ]);
+    } catch { /* static fallback */ }
+  }, []);
+
+  useEffect(() => { fetchGPC(); }, [fetchGPC]);
+
   const live = WORKERS.filter(w => w.status === "ok").length;
   const warn = WORKERS.filter(w => w.status === "warning").length;
 

@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Plus, Upload, GitBranch, ExternalLink, Search, Server, Cloud } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Upload, GitBranch, ExternalLink, Search, Server, Cloud, Loader2 } from "lucide-react";
 import { MiniChart } from "@/components/MiniChart";
+import { api } from "@/lib/api";
 
 interface Model {
   type: string; provider: string; name: string; slug: string;
@@ -30,6 +31,22 @@ const VERSIONS = [
 
 export function ModelsPage() {
   const [view, setView] = useState<"grid" | "table">("grid");
+  const [liveModels, setLiveModels] = useState<string[]>([]);
+  const [llmModel, setLlmModel] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  const fetchLive = useCallback(async () => {
+    try {
+      const { data } = await api.get("/monitoring/health").catch(() =>
+        fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json()).then(data => ({ data }))
+      );
+      if (data?.llm_models_available) setLiveModels(data.llm_models_available);
+      if (data?.llm_model) setLlmModel(data.llm_model);
+    } catch { /* fallback */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchLive(); }, [fetchLive]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -45,6 +62,26 @@ export function ModelsPage() {
           <button className="v-btn-primary text-xs"><Plus className="h-3.5 w-3.5" /> Deploy from catalog</button>
         </div>
       </div>
+
+      {/* Live models from backend */}
+      {liveModels.length > 0 && (
+        <div className="v-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="v-section-label">Live · Ollama Models</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">Available via backend — active model: <span className="text-amber">{llmModel || "—"}</span></p>
+            </div>
+            <span className="v-badge v-badge-green">● {liveModels.length} available</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {liveModels.map((m) => (
+              <span key={m} className={`rounded-md border px-3 py-1.5 font-mono text-xs ${m === llmModel ? "border-amber/50 bg-amber/10 text-amber font-bold" : "border-rule bg-ink-3 text-bone-2"}`}>
+                {m}{m === llmModel && " ●"}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3">

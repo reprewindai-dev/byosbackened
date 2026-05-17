@@ -1,22 +1,48 @@
+import { useEffect, useState, useCallback } from "react";
 import { Search, Flame, CircleDot, Shield } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { api } from "@/lib/api";
+
+interface TopBarStatus {
+  status?: string;
+  db_ok?: boolean;
+  redis_ok?: boolean;
+  llm_ok?: boolean;
+  circuit_breaker?: { state: string };
+}
 
 export function TopBar() {
   const user = useAuthStore((s) => s.user);
   const workspaceName = user?.workspace_name || "workspace";
+  const [health, setHealth] = useState<TopBarStatus | null>(null);
+  const [balanceUsd, setBalanceUsd] = useState<string | null>(null);
+
+  const fetchLive = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.get("/monitoring/health").then(r => r.data).catch(() =>
+        fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json())
+      ),
+      api.get("/wallet/balance").then(r => r.data),
+    ]);
+    if (results[0].status === "fulfilled") setHealth(results[0].value);
+    if (results[1].status === "fulfilled") setBalanceUsd(results[1].value?.balance_usd || null);
+  }, []);
+
+  useEffect(() => { fetchLive(); const iv = setInterval(fetchLive, 20_000); return () => clearInterval(iv); }, [fetchLive]);
+
+  const isHealthy = health?.status === "healthy" || health?.status === "ok" || (health?.db_ok && health?.redis_ok);
+  const cbState = health?.circuit_breaker?.state || "—";
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-rule bg-ink-1 px-5">
       {/* Workspace selector */}
       <div className="flex items-center gap-2 rounded-md border border-rule bg-ink-2 px-2.5 py-1">
-        <CircleDot className="h-3 w-3 text-moss" />
+        <CircleDot className={`h-3 w-3 ${isHealthy ? "text-moss" : "text-amber"}`} />
         <span className="font-mono text-[10px] uppercase tracking-wide text-bone-2">
           {workspaceName}
         </span>
         <span className="text-muted-2">·</span>
-        <span className="font-mono text-[10px] text-muted">US-East</span>
-        <span className="text-muted-2">·</span>
-        <span className="font-mono text-[10px] text-muted">V1.42.0</span>
+        <span className="font-mono text-[10px] text-muted">{cbState !== "—" ? `CB: ${cbState}` : "—"}</span>
       </div>
 
       {/* Search */}
@@ -34,24 +60,24 @@ export function TopBar() {
 
       {/* Right metrics */}
       <div className="ml-auto flex items-center gap-3">
-        {/* Burn rate */}
+        {/* Reserve balance */}
         <div className="flex items-center gap-1.5 rounded-md border border-rule bg-ink-2 px-2.5 py-1">
           <Flame className="h-3 w-3 text-amber" />
-          <span className="font-mono text-[10px] text-bone-2">$0.0154/min</span>
+          <span className="font-mono text-[10px] text-bone-2">{balanceUsd ? `$${balanceUsd}` : "—"}</span>
           <span className="text-muted-2">·</span>
-          <span className="font-mono text-[10px] text-muted">66% budget</span>
+          <span className="font-mono text-[10px] text-muted">reserve</span>
         </div>
 
         {/* Health */}
-        <div className="flex items-center gap-1.5 rounded-full border border-moss/30 bg-moss/8 px-2.5 py-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-moss" />
-          <span className="font-mono text-[10px] uppercase text-moss">Healthy</span>
+        <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${isHealthy ? "border-moss/30 bg-moss/8" : "border-amber/30 bg-amber/8"}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${isHealthy ? "bg-moss" : "bg-amber animate-pulse"}`} />
+          <span className={`font-mono text-[10px] uppercase ${isHealthy ? "text-moss" : "text-amber"}`}>{isHealthy ? "Healthy" : health ? "Degraded" : "..."}</span>
         </div>
 
-        {/* Region */}
-        <div className="flex items-center gap-1.5 rounded-full border border-electric/30 bg-electric/8 px-2.5 py-1">
-          <Shield className="h-3 w-3 text-electric" />
-          <span className="font-mono text-[10px] uppercase text-electric">EU-Sovereign</span>
+        {/* LLM */}
+        <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${health?.llm_ok ? "border-electric/30 bg-electric/8" : "border-rule bg-ink-2"}`}>
+          <Shield className={`h-3 w-3 ${health?.llm_ok ? "text-electric" : "text-muted"}`} />
+          <span className={`font-mono text-[10px] uppercase ${health?.llm_ok ? "text-electric" : "text-muted"}`}>{health?.llm_ok ? "LLM Online" : "LLM —"}</span>
         </div>
       </div>
     </header>

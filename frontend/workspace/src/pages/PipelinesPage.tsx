@@ -1,4 +1,6 @@
-import { Plus, Play, Pause } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Play, Pause, Plus, ExternalLink } from "lucide-react";
+import { api } from "@/lib/api";
 
 const PIPELINES = [
   { name: "patient-intake-rag", desc: "PHI redaction → chunking → embedding → vector store", status: "running", steps: 4, lastRun: "2 min ago", throughput: "1.2k docs/hr" },
@@ -9,6 +11,18 @@ const PIPELINES = [
 ];
 
 export function PipelinesPage() {
+  const [recentRuns, setRecentRuns] = useState<number>(0);
+
+  const fetchRuns = useCallback(async () => {
+    try {
+      const { data } = await api.get("/audit/logs", { params: { limit: 50 } });
+      const items = Array.isArray(data) ? data : data?.items || [];
+      setRecentRuns(items.length);
+    } catch { /* fallback */ }
+  }, []);
+
+  useEffect(() => { fetchRuns(); }, [fetchRuns]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">

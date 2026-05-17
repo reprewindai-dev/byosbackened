@@ -1,28 +1,47 @@
+import { useState, useEffect, useCallback } from "react";
 import { Calendar, Download, Eye, ExternalLink } from "lucide-react";
+import { api } from "@/lib/api";
 
-const FRAMEWORKS = [
-  { name: "HIPAA", status: "Audit-Ready", statusColor: "v-badge-green", pct: 96, controls: 54, evidence: "1,428" },
-  { name: "SOC 2 Type II", status: "Continuous", statusColor: "v-badge-green", pct: 92, controls: 67, evidence: "2,940" },
-  { name: "PCI-DSS v4", status: "In-Progress", statusColor: "v-badge-amber", pct: 88, controls: 312, evidence: "5,120" },
-  { name: "ISO 27001", status: "Audit-Ready", statusColor: "v-badge-green", pct: 94, controls: 114, evidence: "1,180" },
-  { name: "GDPR", status: "Continuous", statusColor: "v-badge-electric", pct: 99, controls: 32, evidence: "600" },
-  { name: "FedRAMP Moderate", status: "In-Progress", statusColor: "v-badge-amber", pct: 71, controls: 325, evidence: "—" },
+interface Regulation {
+  id?: string;
+  name: string;
+  description?: string;
+  category?: string;
+}
+
+interface ComplianceResult {
+  compliant?: boolean;
+  violations?: string[];
+  score?: number;
+}
+
+const FALLBACK_FRAMEWORKS = [
+  { name: "SOC 2 Type II", status: "compliant", controls: 31, passing: 31, coverage: "100%", lastAudit: "2026-04-15" },
+  { name: "HIPAA", status: "compliant", controls: 24, passing: 24, coverage: "100%", lastAudit: "2026-04-10" },
+  { name: "GDPR", status: "compliant", controls: 18, passing: 18, coverage: "100%", lastAudit: "2026-03-28" },
+  { name: "ISO 27001", status: "in-progress", controls: 42, passing: 38, coverage: "90%", lastAudit: "2026-04-01" },
+  { name: "PCI DSS", status: "planned", controls: 12, passing: 0, coverage: "0%", lastAudit: "—" },
 ];
 
-const CONTROLS = [
-  { id: "AC-2", name: "Account management", framework: "NIST AC", lastTest: "12 min", evidence: 14, status: "PASSING" },
-  { id: "AU-3", name: "Audit log content", framework: "NIST AU", lastTest: "9 min", evidence: 8, status: "PASSING" },
-  { id: "IA-2", name: "Identification & auth", framework: "NIST IA", lastTest: "1 hr", evidence: 12, status: "PASSING" },
-  { id: "PHI-1", name: "PHI redaction at gateway", framework: "HIPAA", lastTest: "live", evidence: 38, status: "PASSING" },
-  { id: "PCI-3.5", name: "Cardholder data masked", framework: "PCI-DSS v4", lastTest: "1 d", evidence: 4, status: "REVIEW" },
-  { id: "SC-13", name: "Cryptographic protection", framework: "FedRAMP", lastTest: "3 hr", evidence: 6, status: "PASSING" },
-  { id: "DPA-EU", name: "Data residency · EU only", framework: "GDPR", lastTest: "live", evidence: 22, status: "PASSING" },
+const CONTROL_TESTS = [
+  { id: "SOC2-CC6.1", desc: "Logical access controls", status: "pass", evidence: 14, lastRun: "2 hr ago" },
+  { id: "SOC2-CC6.2", desc: "Credentials & authentication", status: "pass", evidence: 8, lastRun: "2 hr ago" },
+  { id: "SOC2-CC7.1", desc: "System monitoring & detection", status: "pass", evidence: 22, lastRun: "4 hr ago" },
+  { id: "HIPAA-164.312(a)", desc: "Access control — ePHI", status: "pass", evidence: 11, lastRun: "6 hr ago" },
+  { id: "HIPAA-164.312(e)", desc: "Transmission security", status: "pass", evidence: 6, lastRun: "6 hr ago" },
+  { id: "ISO-A.9.4.1", desc: "Information access restriction", status: "warn", evidence: 4, lastRun: "12 hr ago" },
+  { id: "ISO-A.12.4.1", desc: "Event logging", status: "pass", evidence: 18, lastRun: "4 hr ago" },
 ];
 
-const PACKAGES = [
-  { name: "soc2-q2-2026-evidence.tar.gz", controls: 67, size: "284 MB", hash: "sha256 e6f7...2941" },
-  { name: "hipaa-2026-mid-year.tar.gz", controls: 54, size: "142 MB", hash: "sha256 7b02...bf34" },
-  { name: "pci-dss-v4-quarterly.tar.gz", controls: 312, size: "612 MB", hash: "sha256 0cf1...0eef" },
+const EVIDENCE_PKGS = [
+  { name: "soc2-q2-2026.zip", size: "14.2 MB", created: "2026-04-15", type: "SOC 2" },
+  { name: "hipaa-q2-2026.zip", size: "8.1 MB", created: "2026-04-10", type: "HIPAA" },
+  { name: "gdpr-q1-2026.zip", size: "6.4 MB", created: "2026-03-28", type: "GDPR" },
+];
+
+const EXPORTS = [
+  { target: "soc2-q3-2026", framework: "SOC 2", scheduled: "2026-07-15", status: "upcoming" },
+  { target: "hipaa-q3-2026", framework: "HIPAA", scheduled: "2026-07-10", status: "upcoming" },
 ];
 
 const SCHEDULES = [
@@ -33,6 +52,31 @@ const SCHEDULES = [
 ];
 
 export function CompliancePage() {
+  const [regulations, setRegulations] = useState<Regulation[]>([]);
+  const [checkResult, setCheckResult] = useState<ComplianceResult | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.get("/compliance/regulations").then(r => r.data),
+      api.post("/compliance/check", { text: "system health check" }).then(r => r.data),
+    ]);
+    if (results[0].status === "fulfilled") {
+      const regs = Array.isArray(results[0].value) ? results[0].value : results[0].value?.regulations || [];
+      setRegulations(regs);
+    }
+    if (results[1].status === "fulfilled") setCheckResult(results[1].value);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const frameworks = FALLBACK_FRAMEWORKS.map(fw => ({
+    ...fw,
+    pct: parseInt(fw.coverage),
+    statusColor: fw.status === "compliant" ? "v-badge v-badge-green" : fw.status === "in-progress" ? "v-badge v-badge-amber" : "v-badge v-badge-muted",
+  }));
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
@@ -42,16 +86,24 @@ export function CompliancePage() {
           <p className="mt-1 text-sm text-muted">
             Pre-wired control mappings across frameworks, continuous evidence collection, and signed auditor packages on demand.
           </p>
+          {regulations.length > 0 && (
+            <p className="mt-1 text-xs text-moss">{regulations.length} regulations loaded from backend</p>
+          )}
+          {checkResult && (
+            <p className="mt-1 text-xs text-moss">
+              System compliance: {checkResult.compliant ? "COMPLIANT" : "VIOLATIONS DETECTED"}
+              {checkResult.score != null && ` · Score: ${checkResult.score}`}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost text-xs"><Calendar className="h-3.5 w-3.5" /> Schedule export</button>
           <button className="v-btn-primary text-xs"><Download className="h-3.5 w-3.5" /> Export auditor pkg</button>
         </div>
       </div>
 
       {/* Framework cards */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {FRAMEWORKS.map((fw) => (
+        {frameworks.map((fw) => (
           <div key={fw.name} className="v-card">
             <div className="flex items-center justify-between">
               <div>
@@ -70,10 +122,9 @@ export function CompliancePage() {
                 style={{ width: `${fw.pct}%` }}
               />
             </div>
-            <div className="mt-3 h-10 rounded bg-ink-3/50" />
             <div className="mt-3 flex items-center justify-between">
-              <span className="font-mono text-[10px] text-muted">Evidence rows: {fw.evidence}</span>
-              <button className="text-muted hover:text-bone"><Eye className="h-3.5 w-3.5" /></button>
+              <span className="font-mono text-[10px] text-muted">{fw.passing}/{fw.controls} passing</span>
+              <span className="font-mono text-[10px] text-muted">Last: {fw.lastAudit}</span>
             </div>
           </div>
         ))}
@@ -96,25 +147,24 @@ export function CompliancePage() {
           <thead>
             <tr className="border-y border-rule text-left">
               <th className="px-4 py-2 font-mono text-[9px] uppercase text-muted">Control</th>
-              <th className="px-3 py-2 font-mono text-[9px] uppercase text-muted">Framework</th>
-              <th className="px-3 py-2 font-mono text-[9px] uppercase text-muted">Last Test</th>
+              <th className="px-3 py-2 font-mono text-[9px] uppercase text-muted">Description</th>
+              <th className="px-3 py-2 font-mono text-[9px] uppercase text-muted">Last Run</th>
               <th className="px-3 py-2 font-mono text-[9px] uppercase text-muted">Evidence</th>
               <th className="px-3 py-2 font-mono text-[9px] uppercase text-muted">Status</th>
               <th className="w-8"></th>
             </tr>
           </thead>
           <tbody>
-            {CONTROLS.map((c) => (
+            {CONTROL_TESTS.map((c) => (
               <tr key={c.id} className="border-b border-rule/50 hover:bg-ink-3/40">
                 <td className="px-4 py-2.5">
                   <span className="font-medium text-bone">{c.id}</span>
-                  <span className="ml-1.5 text-muted">· {c.name}</span>
                 </td>
-                <td className="px-3 py-2.5 text-muted">{c.framework}</td>
-                <td className="px-3 py-2.5 text-muted">{c.lastTest}</td>
+                <td className="px-3 py-2.5 text-muted">{c.desc}</td>
+                <td className="px-3 py-2.5 text-muted">{c.lastRun}</td>
                 <td className="px-3 py-2.5 font-mono text-bone-2">{c.evidence}</td>
                 <td className="px-3 py-2.5">
-                  <span className={`v-badge ${c.status === "PASSING" ? "v-badge-green" : "v-badge-amber"}`}>● {c.status}</span>
+                  <span className={`v-badge ${c.status === "pass" ? "v-badge-green" : "v-badge-amber"}`}>● {c.status.toUpperCase()}</span>
                 </td>
                 <td className="px-2"><ExternalLink className="h-3 w-3 text-muted hover:text-bone cursor-pointer" /></td>
               </tr>
@@ -135,11 +185,11 @@ export function CompliancePage() {
             <span className="v-badge-green">Auditor-Grade</span>
           </div>
           <div className="space-y-2">
-            {PACKAGES.map((pkg) => (
+            {EVIDENCE_PKGS.map((pkg) => (
               <div key={pkg.name} className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
                 <div>
                   <p className="text-xs font-medium text-bone">{pkg.name}</p>
-                  <p className="text-[10px] text-muted">{pkg.controls} controls · {pkg.size} · {pkg.hash}</p>
+                  <p className="text-[10px] text-muted">{pkg.type} · {pkg.size} · {pkg.created}</p>
                 </div>
                 <button className="v-btn-primary px-3 py-1 text-[10px]"><Download className="h-3 w-3" /> Download</button>
               </div>

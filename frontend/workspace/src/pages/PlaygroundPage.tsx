@@ -1,19 +1,86 @@
-import { useState } from "react";
-import { Send, RotateCcw, Sliders } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Send, RotateCcw, Sliders, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
 
-const MODELS = ["llama-3.1-70b", "mixtral-8x22b", "qwen-2.5-72b", "claude-3.5-haiku", "deepseek-v3", "bge-m3"];
+const DEFAULT_MODELS = ["qwen2.5:3b"];
+
+interface ChatMessage {
+  role: string;
+  content: string;
+  meta?: string;
+}
+
+function genConvId() {
+  return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export function PlaygroundPage() {
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(MODELS[0]);
-  const [messages, setMessages] = useState<{ role: string; content: string; meta?: string }[]>([
+  const [models, setModels] = useState<string[]>(DEFAULT_MODELS);
+  const [model, setModel] = useState(DEFAULT_MODELS[0]);
+  const [convId, setConvId] = useState(genConvId);
+  const [sending, setSending] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "system", content: "Sovereign AI playground. All prompts are policy-checked, routed, audited, and evidence-signed before execution." },
   ]);
+  const [lastProvider, setLastProvider] = useState<string>("—");
+  const [lastCbState, setLastCbState] = useState<string>("—");
+  const chatRef = useRef<HTMLDivElement>(null);
 
-  function onSend() {
-    if (!prompt.trim()) return;
-    setMessages((m) => [...m, { role: "user", content: prompt }, { role: "assistant", content: "Response will appear here once connected to live backend.", meta: `${model} · Hetzner FSN1 · 142ms · $0.00091 · policy: PASSED` }]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/monitoring/health").catch(() =>
+          fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json()).then(data => ({ data }))
+        );
+        if (data?.llm_models_available?.length) {
+          setModels(data.llm_models_available);
+          setModel(data.llm_model || data.llm_models_available[0]);
+        }
+        if (data?.circuit_breaker?.state) setLastCbState(data.circuit_breaker.state);
+      } catch { /* fallback models */ }
+    })();
+  }, []);
+
+  useEffect(() => {
+    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  const onSend = useCallback(async () => {
+    if (!prompt.trim() || sending) return;
+    const userMsg = prompt;
     setPrompt("");
+    setMessages((m) => [...m, { role: "user", content: userMsg }]);
+    setSending(true);
+
+    try {
+      const { data } = await api.post("/exec", {
+        prompt: userMsg,
+        model,
+        conversation_id: convId,
+        use_memory: true,
+      });
+      const meta = [
+        data.model || model,
+        data.provider || "—",
+        data.latency_ms ? `${data.latency_ms}ms` : null,
+        data.total_tokens ? `${data.total_tokens} tok` : null,
+        data.log_id ? `audit: ${data.log_id}` : null,
+      ].filter(Boolean).join(" · ");
+      setMessages((m) => [...m, { role: "assistant", content: data.response || "(empty response)", meta }]);
+      if (data.provider) setLastProvider(data.provider);
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { detail?: string }; status?: number }; code?: string; message?: string };
+      const detail = axErr.response?.data?.detail || axErr.message || "Inference failed";
+      setMessages((m) => [...m, { role: "assistant", content: `Error: ${detail}`, meta: `status: ${axErr.response?.status || "network"}` }]);
+    } finally {
+      setSending(false);
+    }
+  }, [prompt, model, convId, sending]);
+
+  function clearChat() {
+    setMessages([{ role: "system", content: "Sovereign AI playground. All prompts are policy-checked, routed, audited, and evidence-signed before execution." }]);
+    setConvId(genConvId());
   }
 
   return (
@@ -25,15 +92,15 @@ export function PlaygroundPage() {
         </div>
         <div className="flex items-center gap-3">
           <select value={model} onChange={(e) => setModel(e.target.value)} className="v-input w-48 text-xs">
-            {MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
+            {models.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           <button className="v-btn-ghost text-xs"><Sliders className="h-3.5 w-3.5" /> Params</button>
-          <button className="v-btn-ghost text-xs" onClick={() => setMessages([])}><RotateCcw className="h-3.5 w-3.5" /> Clear</button>
+          <button className="v-btn-ghost text-xs" onClick={clearChat}><RotateCcw className="h-3.5 w-3.5" /> Clear</button>
         </div>
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 overflow-y-auto rounded-lg border border-rule bg-ink-2 p-4 space-y-4">
+      <div ref={chatRef} className="flex-1 overflow-y-auto rounded-lg border border-rule bg-ink-2 p-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
             {msg.role !== "user" && (
@@ -52,6 +119,14 @@ export function PlaygroundPage() {
             </div>
           </div>
         ))}
+        {sending && (
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ink-3 border border-rule">
+              <Loader2 className="h-4 w-4 animate-spin text-amber" />
+            </div>
+            <div className="rounded-lg bg-ink-3 px-3 py-2 text-sm text-muted">Thinking...</div>
+          </div>
+        )}
       </div>
 
       {/* Input */}
@@ -60,20 +135,23 @@ export function PlaygroundPage() {
           type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onSend()}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend()}
           placeholder="Enter prompt — policy engine evaluates before routing..."
           className="v-input flex-1"
+          disabled={sending}
         />
-        <button onClick={onSend} className="v-btn-primary"><Send className="h-4 w-4" /></button>
+        <button onClick={onSend} disabled={sending} className="v-btn-primary">
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Status bar */}
       <div className="mt-2 flex items-center gap-4 font-mono text-[9px] text-muted-2">
-        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-moss animate-pulse-soft" /> Live</span>
+        <span className="flex items-center gap-1"><span className={`h-1.5 w-1.5 rounded-full ${sending ? "bg-amber animate-pulse" : "bg-moss animate-pulse-soft"}`} /> {sending ? "Inferring" : "Live"}</span>
         <span>Model: {model}</span>
-        <span>Route: Hetzner FSN1 (primary)</span>
-        <span>Policy: outbound.public.v3</span>
-        <span>Audit: SHA-256 chain active</span>
+        <span>Provider: {lastProvider}</span>
+        <span>Circuit: {lastCbState}</span>
+        <span>Conv: {convId.slice(0, 16)}</span>
       </div>
     </div>
   );

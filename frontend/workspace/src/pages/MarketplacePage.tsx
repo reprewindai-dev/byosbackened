@@ -1,4 +1,6 @@
+import { useState, useEffect, useCallback } from "react";
 import { Search, Filter, Star, ExternalLink } from "lucide-react";
+import { api } from "@/lib/api";
 
 const CATEGORIES = ["All", "Models", "Pipelines", "RAG Templates", "Prompt Packs", "Compliance Packs", "Connectors", "SDK Extensions", "Deployment Images", "Managed Services"];
 
@@ -20,6 +22,22 @@ const LISTINGS = [
 ];
 
 export function MarketplacePage() {
+  const [listings, setListings] = useState(LISTINGS);
+  const [liveCount, setLiveCount] = useState<number | null>(null);
+
+  const fetchListings = useCallback(async () => {
+    try {
+      const { data } = await api.get("/marketplace/listings");
+      const items = Array.isArray(data) ? data : data?.listings || data?.items || [];
+      if (items.length > 0) {
+        setListings(items);
+        setLiveCount(items.length);
+      }
+    } catch { /* use static fallback */ }
+  }, []);
+
+  useEffect(() => { fetchListings(); }, [fetchListings]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -27,12 +45,12 @@ export function MarketplacePage() {
         <p className="v-section-label">Marketplace</p>
         <h1 className="mt-1 text-2xl font-bold text-bone">Sovereign-ready assets, governed distribution</h1>
         <p className="mt-1 text-sm text-muted">
-          Models, pipelines, compliance packs, connectors, and managed services — every listing inherits Veklom's policy engine and audit trail.
+          Models, pipelines, compliance packs, connectors, and managed services — every listing inherits Veklom’s policy engine and audit trail.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <span className="v-badge-amber">License-Bound · Watermarked · Signed</span>
-          <span className="font-mono text-[10px] text-muted">10 Listings</span>
-          <span className="font-mono text-[10px] text-muted">52 Verified Providers</span>
+          <span className="font-mono text-[10px] text-muted">{liveCount ?? listings.length} Listings</span>
+          {liveCount && <span className="v-badge v-badge-green">● Live from backend</span>}
         </div>
       </div>
 

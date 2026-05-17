@@ -1,18 +1,27 @@
-import { FileText, Settings, Download } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { FileText, Settings, Download, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
 
-const ALLOCATION = [
-  { team: "Clinical AI", spend: "$8,120", color: "bg-brass-2" },
-  { team: "Risk & Audit", spend: "$4,212", color: "bg-electric" },
-  { team: "Customer Ops", spend: "$3,810", color: "bg-moss" },
-  { team: "Internal R&D", spend: "$2,334", color: "bg-violet" },
-];
+interface WalletBalance {
+  balance_units?: number;
+  balance_usd?: string;
+}
 
-const BREAKDOWN = [
-  { label: "Inference", pct: 64, value: "$11,820", color: "bg-brass-2" },
-  { label: "Embeddings", pct: 13, value: "$2,380", color: "bg-electric" },
-  { label: "GPU burst", pct: 14, value: "$2,640", color: "bg-violet" },
-  { label: "Storage / logs", pct: 9, value: "$1,636", color: "bg-moss" },
-];
+interface Transaction {
+  id: string;
+  type?: string;
+  amount_units?: number;
+  amount_usd?: string;
+  description?: string;
+  created_at?: string;
+}
+
+interface TopupOption {
+  id: string;
+  label?: string;
+  units?: number;
+  price_usd?: string;
+}
 
 const PLANS = [
   { name: "Community", price: "$0", period: "free", features: ["Local-first via Ollama", "1 deployment", "Basic governance"], current: false },
@@ -21,49 +30,71 @@ const PLANS = [
   { name: "Enterprise", price: "Custom", period: "private", features: ["SAML / SCIM / SSO", "Custom regions", "Procurement-ready"], current: false },
 ];
 
-const INVOICE_LINES = [
-  { desc: "Sovereign tier · 1 seat × 12", amount: "$9,588.00" },
-  { desc: "Seat overages × 4", amount: "$1,196.00" },
-  { desc: "AI request overage · 18.4M", amount: "$3,212.00" },
-  { desc: "GPU burst hours · 88h", amount: "$2,640.00" },
-  { desc: "Managed deployment hours", amount: "$1,200.00" },
-  { desc: "Log retention extension (12 mo)", amount: "$640.00" },
-];
-
-const CAPS = [
-  { label: "Org daily cap", value: "$1,900", type: "hard-stop" },
-  { label: "Inference monthly cap", value: "$24,000", type: "hard-stop" },
-  { label: "AWS burst cap", value: "$3,000", type: "alert" },
-  { label: "Per-team cap · Clinical", value: "$10,000", type: "alert" },
-];
-
 export function BillingPage() {
+  const [wallet, setWallet] = useState<WalletBalance | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [topupOptions, setTopupOptions] = useState<TopupOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.get("/wallet/balance").then(r => r.data),
+      api.get("/wallet/transactions").then(r => r.data),
+      api.get("/wallet/topup/options").then(r => r.data),
+    ]);
+    if (results[0].status === "fulfilled") setWallet(results[0].value);
+    if (results[1].status === "fulfilled") {
+      const txs = Array.isArray(results[1].value) ? results[1].value : results[1].value?.items || [];
+      setTransactions(txs);
+    }
+    if (results[2].status === "fulfilled") {
+      const opts = Array.isArray(results[2].value) ? results[2].value : results[2].value?.options || [];
+      setTopupOptions(opts);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  async function handleTopup(optionId: string) {
+    try {
+      const { data } = await api.post("/wallet/topup/checkout", { option_id: optionId });
+      if (data?.checkout_url) window.location.href = data.checkout_url;
+    } catch { /* handled by interceptor */ }
+  }
+
+  const balanceUsd = wallet?.balance_usd || "0.00";
+  const balanceUnits = wallet?.balance_units || 0;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
         <div>
           <p className="v-section-label">Billing</p>
-          <h1 className="mt-1 text-2xl font-bold text-bone">Spend · usage · invoices</h1>
+          <h1 className="mt-1 text-2xl font-bold text-bone">Operating Reserve · Usage · Top-Up</h1>
           <p className="mt-1 text-sm text-muted">
-            Real-time meters, hard-stop caps, customer portal, and per-team allocation. No surprise invoices.
+            Real-time reserve balance, transaction history, and top-up options. No surprise invoices.
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost text-xs"><FileText className="h-3.5 w-3.5" /> Invoices</button>
+          <button className="v-btn-ghost text-xs"><FileText className="h-3.5 w-3.5" /> Transactions</button>
           <button className="v-btn-ghost text-xs"><Settings className="h-3.5 w-3.5" /> Manage plan</button>
         </div>
       </div>
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-5">
-        {/* Spend chart */}
+        {/* Reserve balance */}
         <div className="v-card lg:col-span-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="v-section-label">Spend · This Month</p>
-              <p className="mt-0.5 text-lg font-bold text-bone">$18,476.00 of $24,000 cap</p>
+              <p className="v-section-label">Operating Reserve</p>
+              <p className="mt-0.5 text-lg font-bold text-bone">
+                {loading ? "Loading..." : `$${balanceUsd}`}
+                <span className="ml-2 text-xs font-normal text-muted">{balanceUnits.toLocaleString()} units</span>
+              </p>
             </div>
-            <span className="v-badge-amber">● On-Pace</span>
+            <span className="v-badge-amber">● Reserve</span>
           </div>
           <div className="v-progress mt-3">
             <div className="v-progress-fill bg-amber" style={{ width: "77%" }} />
@@ -86,38 +117,34 @@ export function BillingPage() {
               <span>1h</span><span>3h</span><span>6h</span><span>9h</span><span>12h</span><span>15h</span><span>18h</span><span>20h</span><span>23h</span>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-4 gap-3">
-            {BREAKDOWN.map((b) => (
-              <div key={b.label}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted">{b.label}</span>
-                  <span className="font-mono text-[10px] text-muted-2">{b.pct}%</span>
-                </div>
-                <p className="mt-0.5 text-sm font-bold text-bone">{b.value}</p>
-                <div className="v-progress mt-1">
-                  <div className={`v-progress-fill ${b.color}`} style={{ width: `${b.pct}%` }} />
-                </div>
-              </div>
-            ))}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted">Balance (USD)</span>
+              <span className="font-mono text-xs font-medium text-bone">${balanceUsd}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted">Balance (Units)</span>
+              <span className="font-mono text-xs font-medium text-bone">{balanceUnits.toLocaleString()}</span>
+            </div>
           </div>
         </div>
 
-        {/* Per-team */}
+        {/* Top-up options */}
         <div className="v-card lg:col-span-2">
-          <p className="v-section-label">Per-Team Allocation</p>
-          <p className="mt-0.5 text-sm font-semibold text-bone">Tagged usage · cost center reports</p>
+          <p className="v-section-label">Top-Up Options</p>
+          <p className="mt-0.5 text-sm font-semibold text-bone">Fund your operating reserve</p>
           <div className="mt-4 space-y-3">
-            {ALLOCATION.map((a) => (
-              <div key={a.team}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-bone">{a.team}</span>
-                  <span className="font-mono text-xs font-medium text-bone">{a.spend}</span>
+            {topupOptions.length > 0 ? topupOptions.map((opt) => (
+              <div key={opt.id} className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
+                <div>
+                  <span className="text-xs text-bone">{opt.label || `${opt.units?.toLocaleString()} units`}</span>
+                  <span className="ml-2 font-mono text-[10px] text-muted">${opt.price_usd}</span>
                 </div>
-                <div className="v-progress mt-1">
-                  <div className={`v-progress-fill ${a.color}`} style={{ width: `${parseInt(a.spend.replace(/[$,]/g, "")) / 100}%` }} />
-                </div>
+                <button onClick={() => handleTopup(opt.id)} className="v-btn-primary px-3 py-1 text-[10px]">Top Up</button>
               </div>
-            ))}
+            )) : (
+              <p className="text-xs text-muted py-2">{loading ? "Loading options..." : "No top-up options available"}</p>
+            )}
           </div>
         </div>
       </div>
@@ -147,47 +174,52 @@ export function BillingPage() {
         ))}
       </div>
 
-      {/* Bottom grid */}
+      {/* Transaction history */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Invoice */}
         <div className="v-card">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="v-section-label">Latest Invoice</p>
-              <p className="mt-0.5 text-sm font-semibold text-bone">May 1, 2026 · acme-prod</p>
+              <p className="v-section-label">Transaction History</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">Recent wallet activity</p>
             </div>
-            <button className="v-btn-ghost text-xs"><Download className="h-3 w-3" /> PDF</button>
+            <button className="v-btn-ghost text-xs"><Download className="h-3 w-3" /> Export</button>
           </div>
           <div className="space-y-2">
-            {INVOICE_LINES.map((line) => (
-              <div key={line.desc} className="flex items-center justify-between text-xs">
-                <span className="text-muted">{line.desc}</span>
-                <span className="font-mono text-bone">{line.amount}</span>
+            {transactions.length > 0 ? transactions.slice(0, 8).map((tx) => (
+              <div key={tx.id} className="flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-muted">{tx.description || tx.type || "Transaction"}</span>
+                  {tx.created_at && <span className="ml-2 font-mono text-[9px] text-muted-2">{new Date(tx.created_at).toLocaleDateString()}</span>}
+                </div>
+                <span className={`font-mono ${(tx.amount_units || 0) >= 0 ? "text-moss" : "text-crimson"}`}>
+                  {tx.amount_usd ? `$${tx.amount_usd}` : `${tx.amount_units?.toLocaleString()} units`}
+                </span>
               </div>
-            ))}
-            <div className="flex items-center justify-between border-t border-rule pt-2 text-sm font-bold">
-              <span className="text-bone">Total</span>
-              <span className="font-mono text-bone">$18,476.00</span>
-            </div>
+            )) : (
+              <p className="py-4 text-center text-xs text-muted">{loading ? "Loading..." : "No transactions yet"}</p>
+            )}
           </div>
         </div>
 
-        {/* Caps */}
+        {/* Reserve info */}
         <div className="v-card">
           <div className="mb-3">
-            <p className="v-section-label">Caps & Alerts</p>
-            <p className="mt-0.5 text-sm font-semibold text-bone">Hard-stop · alert · forecast</p>
+            <p className="v-section-label">Reserve Info</p>
+            <p className="mt-0.5 text-sm font-semibold text-bone">Operating reserve details</p>
           </div>
           <div className="space-y-2">
-            {CAPS.map((cap) => (
-              <div key={cap.label} className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
-                <span className="text-xs text-bone">{cap.label}</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-medium text-bone">{cap.value}</span>
-                  <span className={`v-badge ${cap.type === "hard-stop" ? "v-badge-crimson" : "v-badge-amber"}`}>{cap.type}</span>
-                </div>
-              </div>
-            ))}
+            <div className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
+              <span className="text-xs text-bone">Current Balance</span>
+              <span className="font-mono text-xs font-medium text-bone">${balanceUsd}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
+              <span className="text-xs text-bone">Unit Balance</span>
+              <span className="font-mono text-xs font-medium text-bone">{balanceUnits.toLocaleString()} units</span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
+              <span className="text-xs text-bone">Exchange Rate</span>
+              <span className="font-mono text-xs font-medium text-muted">1,000 units = $1.00</span>
+            </div>
           </div>
         </div>
       </div>

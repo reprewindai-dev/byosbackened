@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/landing/**'
       - 'backend/landing-dev/**'
+      - 'backend/scripts/verify_com_landing_freeze.py'
       - 'frontend/workspace/**'
       - 'landing/**'
       - '.github/workflows/deploy-pricing-page.yml'

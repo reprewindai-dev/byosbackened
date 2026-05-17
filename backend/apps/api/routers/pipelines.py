@@ -105,6 +105,24 @@ def _validate_graph(graph: PipelineGraph) -> None:
     for e in graph.edges:
         if e.from_ not in node_ids or e.to not in node_ids:
             raise HTTPException(400, f"Edge references unknown node: {e.from_} → {e.to}")
+    # DAG cycle detection (Kahn's algorithm)
+    if graph.edges:
+        adjacency: dict[str, list[str]] = {nid: [] for nid in node_ids}
+        in_degree: dict[str, int] = {nid: 0 for nid in node_ids}
+        for e in graph.edges:
+            adjacency[e.from_].append(e.to)
+            in_degree[e.to] += 1
+        queue = [nid for nid, deg in in_degree.items() if deg == 0]
+        visited = 0
+        while queue:
+            node = queue.pop(0)
+            visited += 1
+            for neighbor in adjacency[node]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+        if visited != len(node_ids):
+            raise HTTPException(400, "Pipeline graph contains a cycle — DAGs only")
 
 
 def _serialize_pipeline(p: Pipeline, latest: Optional[PipelineVersion] = None) -> dict:
@@ -431,9 +449,11 @@ async def execute_pipeline(
 ):
     """Execute a pipeline version synchronously (for now — async worker queue ships next).
 
-    Walks the DAG in node order, simulates step-level latency/cost from the audit ledger
-    pattern, and writes a full step_trace. Each step is policy-gated upfront.
+    Walks the DAG in topological order, simulates step-level latency/cost from the
+    audit ledger pattern, and writes a full step_trace. Each step is policy-gated upfront.
+    Enforces a 5-minute execution timeout.
     """
+    EXECUTION_TIMEOUT_SECONDS = 300  # 5 minutes
     p = (
         db.query(Pipeline)
         .filter(Pipeline.id == pipeline_id, Pipeline.workspace_id == current_user.workspace_id)

@@ -25,6 +25,9 @@ from apps.api.middleware.locker_security_integration import LockerSecurityMiddle
 from apps.api.middleware.request_security import RequestSecurityMiddleware
 from apps.api.middleware.performance import PerformanceMiddleware, GzipMiddleware
 from apps.api.middleware.fast_path import FastPathMiddleware
+from apps.api.middleware.exception_handler import GlobalExceptionMiddleware
+from apps.api.middleware.csp_headers import CSPHeadersMiddleware
+from apps.api.middleware.input_sanitization import InputSanitizationMiddleware
 from apps.api.routers import (
     upload,
     transcribe,
@@ -75,6 +78,10 @@ from apps.api.routers.platform_pulse import router as platform_pulse_router
 from apps.api.routers.internal_operators import router as internal_operators_router
 from apps.api.routers.internal_uacp import router as internal_uacp_router
 from apps.api.routers.source_of_truth_bridge import router as source_of_truth_bridge_router
+from apps.api.routers.pipeline_interactive import router as pipeline_interactive_router
+from apps.api.routers.referrals import router as referrals_router
+from apps.api.routers.onboarding import router as onboarding_router
+from apps.api.routers.stripe_connect import router as stripe_connect_router
 from apps.api.routers.subscriptions import stripe_webhook as subscriptions_webhook_handler
 from apps.api.workflows import register_workflows
 from edge.routers.edge_ingest import router as edge_ingest_router
@@ -147,11 +154,13 @@ async def shutdown_scheduler():
 
 
 # Middleware stack (outermost = first to run)
+# 0. Global exception handler — catches all unhandled errors, returns safe JSON with request_id
+app.add_middleware(GlobalExceptionMiddleware)
 # 1. LockerPhycer Security (IDS, rate limiting, security headers) - First line of defense
 app.add_middleware(LockerSecurityMiddleware)
 # 2. Request security (request ID, IP blocking, brute force protection)
 app.add_middleware(RequestSecurityMiddleware)
-# 3. Rate limiting (Redis-backed)
+# 3. Rate limiting (Redis-backed with in-memory fallback)
 app.add_middleware(RateLimitMiddleware)
 # 4. Zero-trust authentication
 app.add_middleware(ZeroTrustMiddleware)
@@ -168,6 +177,10 @@ app.add_middleware(
     allow_methods=settings.cors_allow_methods,
     allow_headers=settings.cors_allow_headers,
 )
+# Input sanitization (SQL injection, XSS, path traversal detection)
+app.add_middleware(InputSanitizationMiddleware)
+# Security headers (CSP, X-Frame-Options, etc.)
+app.add_middleware(CSPHeadersMiddleware)
 # Performance optimization layer (for 777ms latency target)
 app.add_middleware(GzipMiddleware)  # Compress responses > 1KB
 app.add_middleware(PerformanceMiddleware)  # Caching + keep-alive
@@ -235,6 +248,10 @@ app.include_router(marketplace_automation_router, prefix=settings.api_prefix)
 app.include_router(platform_pulse_router, prefix=settings.api_prefix)
 app.include_router(internal_operators_router, prefix=settings.api_prefix)
 app.include_router(internal_uacp_router, prefix=settings.api_prefix)
+app.include_router(pipeline_interactive_router, prefix=settings.api_prefix)
+app.include_router(referrals_router, prefix=settings.api_prefix)
+app.include_router(onboarding_router, prefix=settings.api_prefix)
+app.include_router(stripe_connect_router, prefix=settings.api_prefix)
 
 # Ollama exec + status (no api_prefix - /v1/exec and /status are top-level)
 app.include_router(exec_router)
@@ -245,8 +262,41 @@ app.include_router(demo_pipeline_router, prefix=settings.api_prefix)
 
 @app.get("/health")
 async def health():
-    """Health check."""
-    return {"status": "ok", "version": settings.app_version, "service": settings.app_name}
+    """Health check with DB and Redis connectivity."""
+    checks: dict[str, str] = {}
+    overall = "ok"
+
+    # Database check
+    try:
+        db = SessionLocal()
+        db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        db.close()
+        checks["database"] = "ok"
+    except Exception:
+        checks["database"] = "unavailable"
+        overall = "degraded"
+
+    # Redis check
+    try:
+        from apps.api.middleware.rate_limit import RateLimiter
+        limiter = RateLimiter()
+        r = limiter._get_redis()
+        if r:
+            r.ping()
+            checks["redis"] = "ok"
+        else:
+            checks["redis"] = "unavailable"
+            overall = "degraded"
+    except Exception:
+        checks["redis"] = "unavailable"
+        overall = "degraded"
+
+    return {
+        "status": overall,
+        "version": settings.app_version,
+        "service": settings.app_name,
+        "checks": checks,
+    }
 
 
 @app.get("/", include_in_schema=False)

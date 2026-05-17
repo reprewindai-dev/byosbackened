@@ -51,6 +51,8 @@ from db.models.signup_lead import SignupLead
 from db.models.product_usage_event import ProductUsageEvent
 from db.models.commercial_artifact import CommercialArtifact
 from db.models.workspace_github_repo_selection import WorkspaceGithubRepoSelection
+from db.models.referral import Referral, ReferralStatus, RewardType
+from db.models.onboarding import WorkspaceOnboarding, OnboardingStep
 
 
 def _optional_import(path: str, names: tuple[str, ...]) -> tuple[object, ...]:
@@ -114,6 +116,8 @@ __all__ = [
     "ProductUsageEvent",
     "CommercialArtifact",
     "WorkspaceGithubRepoSelection",
+    "Referral", "ReferralStatus", "RewardType",
+    "WorkspaceOnboarding", "OnboardingStep",
     "Vendor",
     "Listing",
     "MarketplaceFile",

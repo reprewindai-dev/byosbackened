@@ -36,5 +36,9 @@ access_log_format = (
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 preload_app = True            # share imports across workers - faster boot
-forwarded_allow_ips = "*"     # honour X-Forwarded-* from reverse proxy
-proxy_allow_ips = "*"
+
+# X-Forwarded-* trust — restrict to known reverse proxies in production.
+# Override via FORWARDED_ALLOW_IPS env var (comma-separated CIDRs).
+# Defaults to "*" only in dev; production deployments should set this.
+forwarded_allow_ips = os.getenv("FORWARDED_ALLOW_IPS", "*")
+proxy_allow_ips = os.getenv("PROXY_ALLOW_IPS", "*")

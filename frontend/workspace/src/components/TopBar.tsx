@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Search, Flame, CircleDot, Shield } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
-import { api } from "@/lib/api";
+import { api, rawApi } from "@/lib/api";
 
 interface TopBarStatus {
   status?: string;
@@ -20,7 +20,7 @@ export function TopBar() {
   const fetchLive = useCallback(async () => {
     const results = await Promise.allSettled([
       api.get("/monitoring/health").then(r => r.data).catch(() =>
-        fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json())
+        rawApi.get("/status").then(r => r.data)
       ),
       api.get("/wallet/balance").then(r => r.data),
     ]);

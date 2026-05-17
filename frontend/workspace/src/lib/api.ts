@@ -64,3 +64,25 @@ export function sseUrl(path: string): string {
   const base = `${resolveBase()}${path}`;
   return token ? `${base}${base.includes("?") ? "&" : "?"}token=${token}` : base;
 }
+
+/**
+ * For top-level backend routes that live outside /api/v1
+ * e.g. /v1/exec, /status, /health
+ */
+function resolveRawBase(): string {
+  const configured = window.__VEKLOM_API_BASE__;
+  if (configured) return configured;
+  if (import.meta.env.DEV) return "http://localhost:5173";
+  return "";
+}
+
+export const rawApi = axios.create({
+  baseURL: resolveRawBase(),
+  headers: { "Content-Type": "application/json" },
+});
+
+rawApi.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().accessToken;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});

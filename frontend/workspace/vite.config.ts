@@ -18,6 +18,21 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
+      "/v1/exec": {
+        target: process.env.VITE_UACP_BACKEND_BASE_URL || "https://api.veklom.com",
+        changeOrigin: true,
+        secure: true,
+      },
+      "/status": {
+        target: process.env.VITE_UACP_BACKEND_BASE_URL || "https://api.veklom.com",
+        changeOrigin: true,
+        secure: true,
+      },
+      "/health": {
+        target: process.env.VITE_UACP_BACKEND_BASE_URL || "https://api.veklom.com",
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
   build: {

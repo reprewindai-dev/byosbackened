@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Activity, Zap, DollarSign, Cpu, ShieldCheck, TrendingUp } from "lucide-react";
 import { MiniChart } from "@/components/MiniChart";
-import { api } from "@/lib/api";
+import { api, rawApi } from "@/lib/api";
 
 interface StatusData {
   status?: string;
@@ -36,7 +36,7 @@ export function OverviewPage() {
 
   const fetchData = useCallback(async () => {
     const results = await Promise.allSettled([
-      api.get("/health").then(r => r.data),
+      rawApi.get("/health").then(r => r.data),
       api.get("/wallet/balance").then(r => r.data),
     ]);
     if (results[0].status === "fulfilled") setStatus(results[0].value);

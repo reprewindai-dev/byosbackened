@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, RotateCcw, Sliders, Loader2 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, rawApi } from "@/lib/api";
 
 const DEFAULT_MODELS = ["qwen2.5:3b"];
 
@@ -30,14 +30,24 @@ export function PlaygroundPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get("/monitoring/health").catch(() =>
-          fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json()).then(data => ({ data }))
-        );
-        if (data?.llm_models_available?.length) {
-          setModels(data.llm_models_available);
-          setModel(data.llm_model || data.llm_models_available[0]);
+        // Try workspace models first, then fall back to /status for available models
+        const results = await Promise.allSettled([
+          api.get("/workspace/models").then(r => r.data),
+          rawApi.get("/status").then(r => r.data),
+        ]);
+        if (results[0].status === "fulfilled") {
+          const wm = results[0].value;
+          const modelList = Array.isArray(wm) ? wm.map((m: { id?: string; name?: string }) => m.id || m.name || "").filter(Boolean) : wm?.models?.map((m: { id?: string; name?: string }) => m.id || m.name || "").filter(Boolean) || [];
+          if (modelList.length) { setModels(modelList); setModel(modelList[0]); }
         }
-        if (data?.circuit_breaker?.state) setLastCbState(data.circuit_breaker.state);
+        if (results[1].status === "fulfilled") {
+          const data = results[1].value;
+          if (!models.length && data?.llm_models_available?.length) {
+            setModels(data.llm_models_available);
+            setModel(data.llm_model || data.llm_models_available[0]);
+          }
+          if (data?.circuit_breaker?.state) setLastCbState(data.circuit_breaker.state);
+        }
       } catch { /* fallback models */ }
     })();
   }, []);
@@ -54,7 +64,7 @@ export function PlaygroundPage() {
     setSending(true);
 
     try {
-      const { data } = await api.post("/exec", {
+      const { data } = await rawApi.post("/v1/exec", {
         prompt: userMsg,
         model,
         conversation_id: convId,

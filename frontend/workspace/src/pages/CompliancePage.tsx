@@ -57,10 +57,20 @@ export function CompliancePage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   function statusColor(s?: string) {
-    if (s === "AUDIT-READY") return "v-badge-green";
-    if (s === "CONTINUOUS") return "v-badge-electric";
-    return "v-badge-amber";
+    if (s === "AUDIT-READY") return "bg-moss/15 text-moss";
+    if (s === "CONTINUOUS") return "bg-electric/15 text-electric";
+    return "bg-amber/15 text-amber";
   }
+
+  const barColors: Record<string, string> = {
+    hipaa: "bg-amber", soc2: "bg-electric", pci: "bg-violet-400",
+    iso27001: "bg-moss", gdpr: "bg-cyan-400", fedramp: "bg-electric",
+  };
+
+  const sparkColors: Record<string, string> = {
+    hipaa: "#e5a832", soc2: "#3b82f6", pci: "#a78bfa",
+    iso27001: "#4ade80", gdpr: "#22d3ee", fedramp: "#3b82f6",
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -68,12 +78,12 @@ export function CompliancePage() {
         <div>
           <p className="v-section-label">Compliance Center</p>
           <h1 className="mt-1 text-2xl font-bold text-bone">Operational evidence — not a marketing page</h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 max-w-2xl text-sm text-muted">
             Pre-wired control mappings across frameworks, continuous evidence collection, and signed auditor packages on demand.
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="v-btn-ghost text-xs">Schedule export</button>
+          <button className="flex items-center gap-1.5 rounded-md border border-rule px-3 py-1.5 text-xs text-muted hover:text-bone">Schedule export</button>
           <button className="v-btn-primary text-xs"><Download className="h-3.5 w-3.5" /> Export auditor pkg</button>
         </div>
       </div>
@@ -83,22 +93,27 @@ export function CompliancePage() {
           <div key={fw.id} className="v-card">
             <div className="flex items-center justify-between">
               <p className="v-section-label">Framework</p>
-              <span className={statusColor(fw.status)}>{fw.status}</span>
+              <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono font-semibold ${statusColor(fw.status)}`}>● {fw.status}</span>
             </div>
             <p className="mt-1 text-sm font-semibold text-bone">{fw.name}</p>
-            <div className="mt-2">
+            <div className="mt-2 flex items-end justify-between">
               <span className="text-3xl font-bold text-bone">{fw.coverage_pct}%</span>
+              <span className="font-mono text-[10px] text-muted">coverage · {fw.controls_total} controls</span>
             </div>
-            <div className="v-progress mt-2">
-              <div className="v-progress-fill bg-moss" style={{ width: `${fw.coverage_pct}%` }} />
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-2">
+              <div className={`h-full rounded-full ${barColors[fw.id] || "bg-moss"}`} style={{ width: `${fw.coverage_pct}%` }} />
+            </div>
+            {/* Sparkline */}
+            <div className="mt-3 h-10 rounded bg-ink-3/50 overflow-hidden">
+              <svg viewBox="0 0 200 40" className="w-full h-full" preserveAspectRatio="none">
+                <path d={`M0,28 Q30,${15 + Math.random() * 12} 60,${20 + Math.random() * 8} T120,${18 + Math.random() * 10} T180,${22 + Math.random() * 6} L200,${20 + Math.random() * 8}`}
+                  fill="none" stroke={sparkColors[fw.id] || "#e5a832"} strokeWidth="1.5" opacity="0.6" />
+              </svg>
             </div>
             <div className="mt-2 flex justify-between text-[10px] text-muted">
-              <span>coverage · {fw.controls_total} controls</span>
-              <button className="text-electric"><ExternalLink className="h-3 w-3" /></button>
+              <span>Evidence rows: {fw.evidence_rows !== undefined && fw.evidence_rows > 0 ? fw.evidence_rows.toLocaleString() : "—"}</span>
+              <ExternalLink className="h-3 w-3 cursor-pointer hover:text-bone" />
             </div>
-            {fw.evidence_rows !== undefined && (
-              <p className="mt-1 text-[10px] text-muted-2">Evidence rows: {fw.evidence_rows?.toLocaleString() || "—"}</p>
-            )}
           </div>
         ))}
       </div>
@@ -109,6 +124,11 @@ export function CompliancePage() {
             <p className="v-section-label">Controls · Live Test Status</p>
             <p className="mt-0.5 text-sm font-semibold text-bone">Mapped to NIST families & framework requirements</p>
           </div>
+          <div className="flex items-center gap-2">
+            {["HIPAA", "PCI", "SOC2", "GDPR"].map((f) => (
+              <span key={f} className="rounded bg-amber/15 px-1.5 py-0.5 text-[8px] font-mono font-semibold text-amber">{f}</span>
+            ))}
+          </div>
         </div>
         <table className="w-full text-xs">
           <thead>
@@ -118,6 +138,7 @@ export function CompliancePage() {
               <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Last Test</th>
               <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Evidence</th>
               <th className="px-2 py-2 font-mono text-[9px] uppercase text-muted">Status</th>
+              <th className="w-8"></th>
             </tr>
           </thead>
           <tbody>
@@ -128,12 +149,71 @@ export function CompliancePage() {
                 <td className="px-2 py-2 font-mono text-muted">{c.last_test}</td>
                 <td className="px-2 py-2 font-mono text-bone-2">{c.evidence_count}</td>
                 <td className="px-2 py-2">
-                  <span className={`v-badge ${c.status === "PASSING" ? "v-badge-green" : "v-badge-amber"}`}>{c.status}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-semibold ${c.status === "PASSING" ? "bg-moss/20 text-moss" : "bg-amber/20 text-amber"}`}>
+                    ● {c.status}
+                  </span>
+                </td>
+                <td className="px-2 py-2">
+                  <ExternalLink className="h-3 w-3 text-muted cursor-pointer hover:text-bone" />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Evidence Packages + Schedule */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Evidence Packages */}
+        <div className="v-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="v-section-label">Evidence Packages · One-Click</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">Signed log archives · control mapping PDFs · access review CSVs</p>
+            </div>
+            <span className="rounded bg-amber/15 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber">AUDITOR-GRADE</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {[
+              { name: "soc2-q2-2026-evidence.tar.gz", detail: "67 controls · 284 MB · sha256 e9b7...2941" },
+              { name: "hipaa-2026-mid-year.tar.gz", detail: "54 controls · 142 MB · sha256 7b02...bf34" },
+              { name: "pci-dss-v4-quarterly.tar.gz", detail: "312 controls · 612 MB · sha256 0cf1...9eef" },
+            ].map((pkg) => (
+              <div key={pkg.name} className="flex items-center gap-3 rounded-md border border-rule/40 bg-ink-3/30 px-4 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded bg-amber/10">
+                  <Download className="h-4 w-4 text-amber" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-bone">{pkg.name}</p>
+                  <p className="font-mono text-[9px] text-muted">{pkg.detail}</p>
+                </div>
+                <button className="rounded bg-amber/15 border border-amber/30 px-3 py-1 text-[10px] font-semibold text-amber">Download</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Schedule */}
+        <div className="v-card">
+          <p className="v-section-label">Schedule</p>
+          <p className="mt-0.5 text-sm font-semibold text-bone">Continuous evidence to S3</p>
+          <div className="mt-4 space-y-3">
+            {[
+              { schedule: "Daily · 02:00 UTC", target: "audit-trail.signed.json → s3://acme-evidence/", status: "ACTIVE" },
+              { schedule: "Weekly · Monday", target: "soc2-evidence-pkg.tar.gz", status: "ACTIVE" },
+              { schedule: "Monthly · 1st", target: "hipaa-evidence-pkg.tar.gz", status: "ACTIVE" },
+              { schedule: "On change", target: "policy-diff.signed.json", status: "ACTIVE" },
+            ].map((s) => (
+              <div key={s.schedule} className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-bone">{s.schedule}</p>
+                  <p className="font-mono text-[9px] text-muted">{s.target}</p>
+                </div>
+                <span className="rounded bg-moss/15 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-moss">● {s.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -78,10 +78,10 @@ export function MonitoringPage() {
 
       <div className="grid gap-3 md:grid-cols-4">
         {[
-          { label: "Requests / min", value: reqPerMin.toLocaleString(), delta: "+8%", color: "text-amber" },
-          { label: "Tokens / sec", value: (tokPerSec / 1000).toFixed(0) + "k", delta: "+22%", color: "text-electric" },
-          { label: "Error Rate", value: (errorRate * 100).toFixed(2) + "%", delta: "-0.04%", color: "text-crimson" },
-          { label: "GPU Util", value: gpuUtil + "%", delta: "8× A100", color: "text-violet" },
+          { label: "Requests / min", value: reqPerMin.toLocaleString(), delta: "+8%", color: "text-amber", spark: "#e5a832" },
+          { label: "Tokens / sec", value: (tokPerSec / 1000).toFixed(0) + "k", delta: "+22%", color: "text-electric", spark: "#3b82f6" },
+          { label: "Error Rate", value: (errorRate * 100).toFixed(2) + "%", delta: "-0.04%", color: "text-crimson", spark: "#ef4444" },
+          { label: "GPU Util", value: gpuUtil + "%", delta: "8× A100", color: "text-violet-400", spark: "#a78bfa" },
         ].map(m => (
           <div key={m.label} className="v-card">
             <p className="v-section-label">{m.label}</p>
@@ -89,11 +89,54 @@ export function MonitoringPage() {
               <span className="text-2xl font-bold text-bone">{m.value}</span>
               <span className={`mb-0.5 font-mono text-[10px] ${m.color}`}>{m.delta}</span>
             </div>
-            <div className="mt-2 h-12 rounded bg-ink-3/50" />
+            <div className="mt-2 h-12 rounded bg-ink-3/50 overflow-hidden">
+              <svg viewBox="0 0 200 48" className="w-full h-full" preserveAspectRatio="none">
+                <path d={`M0,35 Q30,${20 + Math.random() * 15} 60,${25 + Math.random() * 10} T120,${22 + Math.random() * 12} T180,${28 + Math.random() * 8} L200,${24 + Math.random() * 10}`}
+                  fill="none" stroke={m.spark} strokeWidth="2" opacity="0.7" />
+              </svg>
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Throughput + Latency charts */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="v-card">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="v-section-label">Throughput</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">Hetzner vs AWS burst · 24h</p>
+            </div>
+            <span className="flex items-center gap-1.5 rounded bg-moss/15 px-2 py-0.5 text-[9px] font-mono text-moss">
+              <span className="h-1.5 w-1.5 rounded-full bg-moss" /> HEALTHY
+            </span>
+          </div>
+          <div className="h-40 rounded bg-ink-3/50 overflow-hidden">
+            <svg viewBox="0 0 400 140" className="w-full h-full" preserveAspectRatio="none">
+              <path d="M0,100 Q40,80 80,85 T160,60 T240,70 T320,50 T400,65" fill="none" stroke="#e5a832" strokeWidth="2" opacity="0.7" />
+              <path d="M0,120 Q40,110 80,115 T160,100 T240,108 T320,95 T400,105" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" />
+            </svg>
+          </div>
+        </div>
+        <div className="v-card">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="v-section-label">Latency · P50 / P95 / P99</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">All deployments</p>
+            </div>
+          </div>
+          <div className="h-40 rounded bg-ink-3/50 overflow-hidden">
+            <svg viewBox="0 0 400 140" className="w-full h-full" preserveAspectRatio="none">
+              <path d="M0,90 Q50,70 100,80 T200,60 T300,75 T400,55" fill="none" stroke="#a78bfa" strokeWidth="2" opacity="0.7" />
+              <path d="M0,60 Q50,40 100,50 T200,35 T300,45 T400,30" fill="none" stroke="#e5a832" strokeWidth="1.5" opacity="0.6" />
+              <path d="M0,40 Q50,25 100,30 T200,20 T300,28 T400,15" fill="none" stroke="#ef4444" strokeWidth="1" opacity="0.4" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Logs + Audit side-by-side */}
+      <div className="grid gap-4 lg:grid-cols-2">
       <div className="v-card">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -143,7 +186,7 @@ export function MonitoringPage() {
             <p className="v-section-label">Audit Log · Tamper-Evident</p>
             <p className="mt-0.5 text-sm font-semibold text-bone">SHA-256 hash chain</p>
           </div>
-          <span className="v-badge-green">● VERIFIED</span>
+          <span className="rounded bg-moss/15 px-2 py-0.5 text-[9px] font-mono font-semibold text-moss">● VERIFIED</span>
         </div>
         <div className="space-y-2">
           {["deploy.update","policy.intercept","vault.rotate","evidence.export","key.create"].map((action, i) => (
@@ -159,23 +202,38 @@ export function MonitoringPage() {
             </div>
           ))}
         </div>
+        <div className="mt-3 flex items-center justify-between border-t border-rule/30 pt-3">
+          <span className="font-mono text-[9px] text-muted">Hash anchor: root.7d80_ee01</span>
+          <button className="flex items-center gap-1 text-[10px] text-muted hover:text-bone">
+            <Download className="h-3 w-3" /> Export pkg
+          </button>
+        </div>
+      </div>
       </div>
 
+      {/* Alerts */}
       <div className="v-card">
         <div className="mb-3 flex items-center justify-between">
-          <p className="v-section-label">Alerts · Routes & Thresholds</p>
-          <button className="v-btn-ghost text-xs"><AlertTriangle className="h-3.5 w-3.5" /> + New alert</button>
+          <div>
+            <p className="v-section-label">Alerts · Routes & Thresholds</p>
+            <p className="mt-0.5 text-sm font-semibold text-bone">Email · Slack · PagerDuty</p>
+          </div>
+          <button className="flex items-center gap-1 rounded border border-rule px-2.5 py-1 text-xs text-muted hover:text-bone">
+            <AlertTriangle className="h-3.5 w-3.5" /> + New alert
+          </button>
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {ALERTS.map((alert) => (
             <div key={alert.label} className="flex items-start gap-3 rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
               <span className={`mt-0.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${alert.status === "ACTIVE" ? "bg-amber animate-pulse" : "bg-muted"}`} />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-bone">{alert.label}</p>
                 <p className="text-[10px] text-muted">{alert.threshold}</p>
                 <p className="text-[10px] text-muted-2">{alert.channel}</p>
               </div>
-              <span className={`ml-auto v-badge ${alert.status === "ACTIVE" ? "v-badge-amber" : "v-badge-muted"}`}>{alert.status}</span>
+              <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono font-semibold ${alert.status === "ACTIVE" ? "bg-crimson/20 text-crimson" : "bg-bone/10 text-muted"}`}>
+                ● {alert.status}
+              </span>
             </div>
           ))}
         </div>

@@ -147,7 +147,60 @@ export function OverviewPage() {
         </div>
       </div>
 
+      {/* Recent Runs + Policy Interception */}
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* Recent Runs */}
+        <div className="v-card">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="v-section-label">Recent Runs · Live</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">Per-call routing, latency, cost</p>
+            </div>
+            <button className="flex items-center gap-1 text-xs text-brass hover:text-brass-2">Playground →</button>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-rule text-left">
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Model</th>
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Route</th>
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Latency</th>
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Tokens</th>
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Cost</th>
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">Policy</th>
+                <th className="pb-2 font-mono text-[9px] uppercase text-muted">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { model: "Llama 3.1 70B", route: "Hetzner · Primary", latency: "142 ms", tokens: "1240", cost: "$0.00091", policy: "Passed", when: "12s ago" },
+                { model: "Mixtral 8×22B", route: "Hetzner · Primary", latency: "121 ms", tokens: "980", cost: "$0.00057", policy: "Passed", when: "44s ago" },
+                { model: "Claude 3.5 Haiku", route: "AWS · Burst", latency: "228 ms", tokens: "2100", cost: "$0.00858", policy: "Redacted", when: "1m ago" },
+                { model: "Qwen 2.5 72B", route: "Hetzner · Primary", latency: "96 ms", tokens: "720", cost: "$0.00021", policy: "Passed", when: "2m ago" },
+                { model: "BGE-M3", route: "Hetzner · Primary", latency: "14 ms", tokens: "480", cost: "$0.00001", policy: "Passed", when: "2m ago" },
+              ].map((run, i) => (
+                <tr key={i} className="border-b border-rule/30">
+                  <td className="py-2 font-medium text-bone">{run.model}</td>
+                  <td className="py-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono ${run.route.includes("AWS") ? "bg-electric/15 text-electric" : "bg-amber/15 text-amber"}`}>
+                      {run.route}
+                    </span>
+                  </td>
+                  <td className="py-2 font-mono text-muted">{run.latency}</td>
+                  <td className="py-2 font-mono text-muted">{run.tokens}</td>
+                  <td className="py-2 font-mono text-muted">{run.cost}</td>
+                  <td className="py-2">
+                    <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${run.policy === "Passed" ? "bg-moss/15 text-moss" : "bg-crimson/15 text-crimson"}`}>
+                      {run.policy}
+                    </span>
+                  </td>
+                  <td className="py-2 font-mono text-[10px] text-muted-2">{run.when}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Policy Interception */}
         <div className="v-card">
           <div className="mb-3 flex items-center justify-between">
             <div>
@@ -172,14 +225,82 @@ export function OverviewPage() {
             ))}
           </div>
         </div>
+      </div>
 
+      {/* Alerts + Audit Trail + Fleet */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Alerts */}
         <div className="v-card">
-          <p className="v-section-label mb-3">System Health</p>
-          <div className="space-y-2">
-            {[{label:"Backend API",status:status?.status==="ok"?"HEALTHY":loading?"CONNECTING":"ACTIVE",ok:true},{label:"Hetzner FSN1",status:"HEALTHY",ok:true},{label:"Hetzner FRA1",status:"HEALTHY",ok:true},{label:"AWS Burst",status:"STANDBY",ok:true},{label:"Audit Chain",status:"VERIFIED",ok:true},{label:"Policy Engine",status:"ACTIVE",ok:true}].map(item=>(
-              <div key={item.label} className="flex items-center justify-between rounded border border-rule/50 bg-ink-3/30 px-3 py-2">
-                <span className="text-xs text-bone">{item.label}</span>
-                <span className={`font-mono text-[10px] ${item.ok?"text-moss":"text-crimson"}`}>{item.status}</span>
+          <p className="v-section-label">Alerts</p>
+          <p className="mt-0.5 text-sm font-semibold text-bone">3 open</p>
+          <div className="mt-4 space-y-3">
+            {[
+              { text: "P95 latency above 600 ms on chat-prod (2 spikes)", source: "Monitoring · 4m ago", color: "bg-amber" },
+              { text: "AWS burst engaged (12% of traffic)", source: "Router · 9m ago", color: "bg-electric" },
+              { text: "Egress allowlist updated — 1 rule needs review", source: "Compliance · 1h ago", color: "bg-crimson" },
+            ].map((alert, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${alert.color}`} />
+                <div>
+                  <p className="text-xs text-bone">{alert.text}</p>
+                  <p className="mt-0.5 font-mono text-[9px] text-muted">{alert.source}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Audit Trail */}
+        <div className="v-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="v-section-label">Audit Trail · Tamper-Evident</p>
+              <p className="mt-0.5 text-sm font-semibold text-bone">Hash-chained</p>
+            </div>
+            <span className="rounded bg-moss/15 px-1.5 py-0.5 text-[9px] font-mono text-moss">Verified</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {[
+              { action: "deploy.update", actor: "chat-prod · elliot@acme.io", hash: "9f4e...ac21", time: "07:24:112" },
+              { action: "policy.intercept", actor: "session#pri_421 · system/router", hash: "5b71...dc19", time: "07:18:822" },
+              { action: "vault.rotate", actor: "OPENAI_KEY_PROXY · kira@acme.io", hash: "0c11...7d2a", time: "07:11:552" },
+              { action: "evidence.export", actor: "soc2-q2 pkg.zip · system/compliance", hash: "ef87...2941", time: "07:00:212" },
+              { action: "key.create", actor: "key_8h2x_chat · alex@acme.io", hash: "12cd...ee81", time: "06:54:172" },
+            ].map((entry, i) => (
+              <div key={i} className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[11px] font-medium text-bone">{entry.action}</p>
+                  <p className="truncate font-mono text-[9px] text-muted">{entry.actor}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-mono text-[9px] text-muted-2">{entry.time}</p>
+                  <p className="font-mono text-[8px] text-muted/50">{entry.hash}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Fleet */}
+        <div className="v-card">
+          <p className="v-section-label">Fleet</p>
+          <p className="mt-0.5 text-sm font-semibold text-bone">Models · deployments</p>
+          <div className="mt-4 space-y-3">
+            {[
+              { model: "Llama 3.1 70B Instruct", quant: "FP16 · 4", replicas: 4, zone: "Hetzner · Primary", latency: "142 ms" },
+              { model: "Mixtral 8×22B", quant: "INT8 · 6", replicas: 6, zone: "Hetzner · Primary", latency: "121 ms" },
+              { model: "Qwen 2.5 72B", quant: "INT4 · 8", replicas: 8, zone: "Hetzner · Primary", latency: "96 ms" },
+              { model: "Claude 3.5 Haiku (proxy)", quant: "FP16 · 2", replicas: 2, zone: "AWS · Burst", latency: "228 ms" },
+            ].map((m, i) => (
+              <div key={i} className="rounded-md border border-rule/40 bg-ink-3/30 px-3 py-2">
+                <p className="text-xs font-medium text-bone">{m.model}</p>
+                <div className="mt-1 flex items-center gap-2 text-[9px]">
+                  <span className="font-mono text-muted">{m.quant} replicas</span>
+                  <span className={`rounded px-1 py-0.5 font-mono ${m.zone.includes("AWS") ? "bg-electric/15 text-electric" : "bg-amber/15 text-amber"}`}>
+                    {m.zone}
+                  </span>
+                  <span className="ml-auto font-mono text-muted">P50 {m.latency}</span>
+                </div>
               </div>
             ))}
           </div>

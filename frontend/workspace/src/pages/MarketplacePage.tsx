@@ -41,16 +41,24 @@ export function MarketplacePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <p className="v-section-label">Marketplace</p>
-        <h1 className="mt-1 text-2xl font-bold text-bone">Sovereign-ready assets, governed distribution</h1>
-        <p className="mt-1 text-sm text-muted">
-          Models, pipelines, compliance packs, connectors, and managed services — every listing inherits Veklom’s policy engine and audit trail.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="v-badge-amber">License-Bound · Watermarked · Signed</span>
-          <span className="font-mono text-[10px] text-muted">{liveCount ?? listings.length} Listings</span>
-          {liveCount && <span className="v-badge v-badge-green">● Live from backend</span>}
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="v-section-label">Marketplace</p>
+          <h1 className="mt-1 text-2xl font-bold text-bone">Sovereign-ready assets, governed distribution</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Models, pipelines, compliance packs, connectors, and managed services — every listing inherits Veklom's policy engine and audit trail.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <span className="rounded bg-amber/15 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber">License-Bound · Watermarked · Signed</span>
+            <span className="font-mono text-[10px] text-muted">{liveCount ?? listings.length} Listings</span>
+            <span className="font-mono text-[10px] text-muted">52 Verified Providers</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 rounded-md border border-rule px-3 py-1.5 text-xs text-muted hover:text-bone hover:border-muted transition-colors">
+            My purchases
+          </button>
+          <button className="v-btn-primary text-xs">Become a provider</button>
         </div>
       </div>
 
@@ -124,7 +132,25 @@ export function MarketplacePage() {
                 <span className="font-mono text-[9px] text-muted">{item.infra}</span>
                 {item.type && <span className="font-mono text-[9px] text-muted-2">{item.type}</span>}
               </div>
-              <span className="font-mono text-xs font-semibold text-bone">{item.price}</span>
+              <span className="font-mono text-xs font-semibold text-bone">{item.price} <ExternalLink className="inline h-2.5 w-2.5" /></span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Governance bar */}
+      <div className="grid grid-cols-2 gap-4 rounded-lg border border-rule bg-ink-2/50 p-4 md:grid-cols-4">
+        {[
+          { icon: "📦", title: "Governed packaging", desc: "Hosted APIs · containers · CLI · SDK · signed builds." },
+          { icon: "🔐", title: "License-bound", desc: "Activation, account binding, watermarking, metering, expiry." },
+          { icon: "✓", title: "Vetted providers", desc: "Identity verified · signed builds · evidence-linked." },
+          { icon: "💳", title: "One bill", desc: "Marketplace charges roll into your Veklom invoice." },
+        ].map((item) => (
+          <div key={item.title} className="flex items-start gap-2.5">
+            <span className="text-sm">{item.icon}</span>
+            <div>
+              <p className="text-xs font-semibold text-bone">{item.title}</p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-muted">{item.desc}</p>
             </div>
           </div>
         ))}

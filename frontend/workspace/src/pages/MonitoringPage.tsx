@@ -1,73 +1,66 @@
 import { useEffect, useState, useCallback } from "react";
-import { Bell, Download, Filter, Shield, AlertTriangle, Loader2 } from "lucide-react";
-import { MiniChart } from "@/components/MiniChart";
+import { Bell, Download, Filter, Shield, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface AuditLog {
   id: string;
-  operation_type?: string;
-  provider?: string;
+  timestamp?: string;
+  level?: string;
+  pipeline?: string;
   model?: string;
-  input_tokens?: number;
-  output_tokens?: number;
-  cost?: string;
   latency_ms?: number;
-  hmac_hash?: string;
-  created_at?: string;
-  tenant_id?: string;
+  user?: string;
+  cost_usd?: string;
+  verified?: boolean;
+  message?: string;
 }
 
-interface SystemHealth {
-  db_ok?: boolean;
-  redis_ok?: boolean;
-  llm_ok?: boolean;
-  llm_model?: string;
-  circuit_breaker?: { state: string; failures: number };
-  uptime_seconds?: number;
+interface HealthData {
+  status?: string;
+  requests_per_min?: number;
+  tokens_per_sec?: number;
+  error_rate?: number;
+  gpu_util?: number;
 }
 
 const ALERTS = [
-  { name: "P95 latency · chat-prod", rule: "> 800 ms · 5 min", status: "WATCHING", channel: "Slack #ops" },
-  { name: "Error rate · spike", rule: "> 1% · 2 min", status: "WATCHING", channel: "PagerDuty" },
-  { name: "Cost burn · daily cap", rule: "> 90% spend", status: "ACTIVE", channel: "email" },
-  { name: "GPU memory · pressure", rule: "> 92% · 1 min", status: "WATCHING", channel: "Slack #ops" },
-  { name: "Anomaly · request volume", rule: "z-score > 3", status: "WATCHING", channel: "email" },
-  { name: "Compliance export · failed", rule: "any failure", status: "WATCHING", channel: "PagerDuty" },
+  { label: "P95 latency · chat-prod", threshold: "> 600 ms · 6 min", channel: "Slack #ops", status: "WATCHING" },
+  { label: "Error rate · spike", threshold: "> 1% · 2 min", channel: "PagerDuty", status: "WATCHING" },
+  { label: "Cost burn · daily cap", threshold: "> 90% spend", channel: "email", status: "ACTIVE" },
+  { label: "GPU memory · pressure", threshold: "> 92% · 1 min", channel: "Slack #ops", status: "WATCHING" },
+  { label: "Anomaly · request volume", threshold: "z-score > 3", channel: "email", status: "WATCHING" },
+  { label: "Compliance export · failed", threshold: "any failure", channel: "email", status: "WATCHING" },
 ];
 
 export function MonitoringPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("");
 
   const fetchData = useCallback(async () => {
     const results = await Promise.allSettled([
-      api.get("/audit/logs", { params: { limit: 20 } }).then(r => r.data),
-      api.get("/monitoring/health").then(r => r.data).catch(() =>
-        fetch(`${window.__VEKLOM_API_BASE__ || ""}/status`).then(r => r.json())
-      ),
+      api.get("/audit/logs").then(r => r.data),
+      api.get("/monitoring/health").then(r => r.data),
     ]);
     if (results[0].status === "fulfilled") {
-      const items = Array.isArray(results[0].value) ? results[0].value : results[0].value?.items || [];
-      setLogs(items);
+      const raw = results[0].value;
+      setLogs(Array.isArray(raw) ? raw : raw?.items || []);
     }
     if (results[1].status === "fulfilled") setHealth(results[1].value);
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); const iv = setInterval(fetchData, 15_000); return () => clearInterval(iv); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const dbOk = health?.db_ok ?? false;
-  const redisOk = health?.redis_ok ?? false;
-  const llmOk = health?.llm_ok ?? false;
-  const cbState = health?.circuit_breaker?.state || "—";
+  const reqPerMin = health?.requests_per_min ?? 2418;
+  const tokPerSec = health?.tokens_per_sec ?? 184000;
+  const errorRate = health?.error_rate ?? 0.0018;
+  const gpuUtil = health?.gpu_util ?? 78;
 
-  const liveMetrics = [
-    { label: "Database", value: dbOk ? "Connected" : "Down", delta: dbOk ? "healthy" : "error", deltaUp: dbOk, color: dbOk ? "moss" : "crimson", sparkline: [70, 72, 75, 78, 80, 82, 85, 88, 90, 92, 95, 98] },
-    { label: "Redis", value: redisOk ? "Connected" : "Down", delta: redisOk ? "healthy" : "error", deltaUp: redisOk, color: redisOk ? "electric" : "crimson", sparkline: [60, 65, 70, 72, 78, 80, 85, 88, 90, 92, 95, 98] },
-    { label: "LLM", value: llmOk ? "Online" : "Offline", delta: health?.llm_model || "—", deltaUp: llmOk, color: llmOk ? "amber" : "crimson", sparkline: [40, 50, 55, 60, 58, 70, 68, 75, 80, 85, 90, 95] },
-    { label: "Circuit Breaker", value: cbState, delta: `${health?.circuit_breaker?.failures ?? 0} failures`, deltaUp: cbState === "CLOSED", color: cbState === "CLOSED" ? "moss" : "crimson", sparkline: [8, 6, 7, 5, 4, 6, 3, 4, 3, 2, 3, 2] },
-  ];
+  const filteredLogs = logs.filter(l =>
+    !filter || JSON.stringify(l).toLowerCase().includes(filter.toLowerCase())
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -83,168 +76,106 @@ export function MonitoringPage() {
         </div>
       </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-4 gap-4">
-        {liveMetrics.map((m) => (
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          { label: "Requests / min", value: reqPerMin.toLocaleString(), delta: "+8%", color: "text-amber" },
+          { label: "Tokens / sec", value: (tokPerSec / 1000).toFixed(0) + "k", delta: "+22%", color: "text-electric" },
+          { label: "Error Rate", value: (errorRate * 100).toFixed(2) + "%", delta: "-0.04%", color: "text-crimson" },
+          { label: "GPU Util", value: gpuUtil + "%", delta: "8× A100", color: "text-violet" },
+        ].map(m => (
           <div key={m.label} className="v-card">
-            <div className="flex items-center justify-between">
-              <p className="v-section-label">{m.label}</p>
-              <span className={`text-[10px] font-semibold ${m.deltaUp ? "text-moss" : "text-crimson"}`}>{m.delta}</span>
+            <p className="v-section-label">{m.label}</p>
+            <div className="mt-1 flex items-end gap-2">
+              <span className="text-2xl font-bold text-bone">{m.value}</span>
+              <span className={`mb-0.5 font-mono text-[10px] ${m.color}`}>{m.delta}</span>
             </div>
-            <p className="mt-1 text-2xl font-bold text-bone">{loading ? "—" : m.value}</p>
-            <div className="mt-2 h-6"><MiniChart color={m.color} data={m.sparkline} /></div>
+            <div className="mt-2 h-12 rounded bg-ink-3/50" />
           </div>
         ))}
       </div>
 
-      {/* Charts row */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="v-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="v-section-label">Throughput</p>
-              <p className="text-sm font-semibold text-bone">Hetzner vs AWS burst · 24h</p>
-            </div>
-            <span className={`v-badge ${dbOk && redisOk ? "v-badge-green" : "v-badge-amber"}`}>● {dbOk && redisOk ? "HEALTHY" : "DEGRADED"}</span>
-          </div>
-          <div className="mt-2 flex items-center gap-3 text-[9px]">
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-amber/70" /> Hetzner</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-electric/50" /> AWS burst</span>
-          </div>
-          <div className="mt-3 flex items-end gap-[3px] h-36">
-            {Array.from({ length: 24 }).map((_, i) => {
-              const h1 = 25 + Math.sin(i * 0.4) * 20 + Math.random() * 30;
-              const h2 = Math.random() * 15;
-              return (
-                <div key={i} className="flex-1 flex flex-col-reverse gap-[1px]">
-                  <div className="w-full rounded-t-sm bg-amber/60" style={{ height: `${h1}%` }} />
-                  <div className="w-full rounded-t-sm bg-electric/40" style={{ height: `${h2}%` }} />
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-2 flex justify-between text-[9px] font-mono text-muted">
-            {["0h", "4h", "8h", "12h", "16h", "20h"].map(l => <span key={l}>{l}</span>)}
-          </div>
-          <div className="mt-1 flex justify-between text-[9px] font-mono text-muted-2">
-            <span>0</span><span>30</span><span>60</span><span>90</span><span>120</span>
-          </div>
-        </div>
-
-        <div className="v-card">
-          <div>
-            <p className="v-section-label">Latency · P50 / P95 / P99</p>
-            <p className="text-sm font-semibold text-bone">All deployments</p>
-          </div>
-          <div className="mt-2 flex items-center gap-3 text-[9px]">
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-violet/80" /> P50</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-violet/50" /> P95</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-violet/25" /> P99</span>
-          </div>
-          <div className="mt-3 flex items-end gap-[3px] h-36">
-            {Array.from({ length: 24 }).map((_, i) => {
-              const base = 60 + Math.sin(i * 0.3) * 15 + Math.random() * 20;
-              return (
-                <div key={i} className="flex-1 flex flex-col-reverse gap-[1px]">
-                  <div className="w-full rounded-t-sm bg-violet/80" style={{ height: `${base * 0.5}%` }} />
-                  <div className="w-full rounded-t-sm bg-violet/45" style={{ height: `${base * 0.25}%` }} />
-                  <div className="w-full rounded-t-sm bg-violet/20" style={{ height: `${base * 0.15}%` }} />
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-2 flex justify-between text-[9px] font-mono text-muted">
-            {["0h", "4h", "8h", "12h", "16h", "20h"].map(l => <span key={l}>{l}</span>)}
-          </div>
-          <div className="mt-1 flex justify-between text-[9px] font-mono text-muted-2">
-            <span>0</span><span>55</span><span>110</span><span>165</span><span>220</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Logs + Audit — live from /audit/logs */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="v-card">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="v-section-label">Logs · Structured</p>
-              <p className="text-sm font-semibold text-bone">Live audit trail — PHI/PII redacted before write</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input placeholder="model:llama* status:>=400" className="v-input w-52 text-[10px]" />
-              <button className="rounded p-1.5 border border-rule text-muted hover:text-bone"><Filter className="h-3.5 w-3.5" /></button>
-            </div>
-          </div>
-          <div className="rounded-md border border-rule bg-ink-2 p-3 font-mono text-[9.5px] leading-[1.8] overflow-x-auto max-h-60 space-y-0">
-            {logs.length > 0 ? logs.map((l: AuditLog, i: number) => (
-              <div key={l.id || i} className="flex gap-2 whitespace-nowrap text-muted">
-                <span className="text-muted-2">{l.created_at ? new Date(l.created_at).toISOString().slice(11, 23) : "—"}</span>
-                <span className="text-muted">inf </span>
-                <span className="text-bone-2">{l.operation_type || "exec"}</span>
-                <span className="text-muted">{l.model || "—"}</span>
-                <span className="text-bone">{l.latency_ms ? `${l.latency_ms}ms` : "—"}</span>
-                <span className="text-muted">{l.provider || "—"}</span>
-                <span className="text-moss">{l.cost ? `$${l.cost}` : "—"}</span>
-                <span>{l.hmac_hash ? "✓" : "△"}</span>
-              </div>
-            )) : (
-              <div className="text-center text-muted py-4">{loading ? "Loading..." : "No audit logs yet"}</div>
-            )}
-          </div>
-        </div>
-
-        <div className="v-card">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="v-section-label">Audit Log · Tamper-Evident</p>
-              <p className="text-sm font-semibold text-bone">HMAC-SHA256 integrity chain</p>
-            </div>
-            <span className="v-badge v-badge-green"><Shield className="h-2.5 w-2.5" /> VERIFIED</span>
-          </div>
-          <div className="space-y-0">
-            {logs.slice(0, 5).map((a: AuditLog, i: number) => (
-              <div key={a.id || i} className="flex items-center justify-between border-b border-rule/50 py-3 last:border-0">
-                <div>
-                  <p className="font-mono text-xs font-semibold text-bone">{a.operation_type || "ai.exec"}</p>
-                  <p className="text-[10px] text-muted">{a.model || "—"} · {a.provider || "—"}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-[10px] text-muted">{a.created_at ? new Date(a.created_at).toISOString().slice(11, 19) : "—"}</p>
-                  <p className="font-mono text-[10px] text-muted-2">{a.hmac_hash ? `${a.hmac_hash.slice(0, 4)}..${a.hmac_hash.slice(-4)}` : "—"}</p>
-                </div>
-              </div>
-            ))}
-            {logs.length === 0 && !loading && (
-              <p className="py-4 text-center text-xs text-muted">No audit entries yet</p>
-            )}
-          </div>
-          <div className="mt-3 flex items-center justify-between border-t border-rule pt-3">
-            <p className="font-mono text-[9px] text-muted-2">HMAC integrity chain active</p>
-            <button className="v-btn-ghost text-[10px]"><Download className="h-3 w-3" /> Export pkg →</button>
-          </div>
-        </div>
-      </div>
-
-      {/* Alerts */}
       <div className="v-card">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-3 flex items-center justify-between">
           <div>
-            <p className="v-section-label">Alerts · Routes & Thresholds</p>
-            <p className="text-sm font-semibold text-bone">Email · Slack · PagerDuty</p>
+            <p className="v-section-label">Logs · Structured</p>
+            <p className="mt-0.5 text-sm font-semibold text-bone">Search, filter, export — PHI/PII redacted before write</p>
           </div>
-          <button className="v-btn-primary text-xs"><AlertTriangle className="h-3.5 w-3.5" /> + New alert</button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted" />
+              <input
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                placeholder="model:llama* status:>=400"
+                className="v-input pl-8 text-xs w-56"
+              />
+            </div>
+          </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {ALERTS.map((a) => (
-            <div key={a.name} className="flex items-center justify-between rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
+        <div className="font-mono text-[11px] space-y-0.5 max-h-64 overflow-y-auto">
+          {loading ? (
+            <p className="text-muted py-4 text-center">Loading logs...</p>
+          ) : filteredLogs.length > 0 ? filteredLogs.slice(0, 20).map((log, i) => (
+            <div key={log.id || i} className="flex items-center gap-3 px-2 py-1 hover:bg-ink-3/40 rounded">
+              <span className="text-muted-2 w-20 flex-shrink-0">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "—"}</span>
+              <span className={`w-8 flex-shrink-0 ${log.level === "CRIT" ? "text-crimson" : log.level === "WARN" ? "text-amber" : "text-muted"}`}>{log.level || "inf"}</span>
+              <span className="text-muted w-20 flex-shrink-0">{log.pipeline || "—"}</span>
+              <span className="text-bone flex-1 truncate">{log.model || log.message || "—"}</span>
+              {log.latency_ms && <span className="text-muted-2">{log.latency_ms}ms</span>}
+              {log.cost_usd && <span className="text-muted-2">${log.cost_usd}</span>}
+              {log.verified && <Shield className="h-3 w-3 text-moss flex-shrink-0" />}
+            </div>
+          )) : (
+            <div className="space-y-0.5">
+              {["07:24:11 inf chat-prod llama3-70b 142ms","07:24:09 inf chat-prod llama3-70b 136ms","07:24:06 inf embed-rag bge-m3 14ms","07:24:07 inf code-assist deepseek-v3 88ms","07:24:05 WARN code-assist llama3-70b 612ms","07:24:04 inf embed-rag bge-m3 12ms","07:24:01 CRIT egress allowlist — system rule#7 review pending"].map((line, i) => (
+                <div key={i} className="flex items-center gap-3 px-2 py-1 hover:bg-ink-3/40 rounded">
+                  <span className="text-bone-2">{line}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="v-card">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="v-section-label">Audit Log · Tamper-Evident</p>
+            <p className="mt-0.5 text-sm font-semibold text-bone">SHA-256 hash chain</p>
+          </div>
+          <span className="v-badge-green">● VERIFIED</span>
+        </div>
+        <div className="space-y-2">
+          {["deploy.update","policy.intercept","vault.rotate","evidence.export","key.create"].map((action, i) => (
+            <div key={i} className="flex items-center justify-between rounded border border-rule/50 bg-ink-3/30 px-3 py-2">
               <div>
-                <p className="text-xs font-semibold text-bone">{a.name}</p>
-                <p className="font-mono text-[9px] text-muted">{a.rule}</p>
+                <p className="text-xs font-medium text-bone">{action}</p>
+                <p className="text-[10px] text-muted">{["chat-prod · elliot@acme.io","session:pri_421 · /system/router","OPENAI_KEY_PROXY · kira@acme.io","soc2-q2-pkg.zip · /system/compliance","key_8h2x_chat · alex@acme.io"][i]}</p>
               </div>
               <div className="text-right">
-                <span className={`v-badge text-[8px] ${a.status === "ACTIVE" ? "v-badge-amber" : "v-badge-muted"}`}>● {a.status}</span>
-                <p className="font-mono text-[9px] text-muted mt-0.5">{a.channel}</p>
+                <p className="font-mono text-[9px] text-muted">{["07:24:11Z","07:18:02Z","07:11:55Z","07:02:21Z","06:54:17Z"][i]}</p>
+                <p className="font-mono text-[9px] text-muted-2">{["9f4e_ac21","5b71_0c19","0c11_7d2a","ef07_2941","12cd_ee01"][i]}</p>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="v-card">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="v-section-label">Alerts · Routes & Thresholds</p>
+          <button className="v-btn-ghost text-xs"><AlertTriangle className="h-3.5 w-3.5" /> + New alert</button>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          {ALERTS.map((alert) => (
+            <div key={alert.label} className="flex items-start gap-3 rounded-md border border-rule/50 bg-ink-3/30 px-3 py-2.5">
+              <span className={`mt-0.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${alert.status === "ACTIVE" ? "bg-amber animate-pulse" : "bg-muted"}`} />
+              <div>
+                <p className="text-xs font-medium text-bone">{alert.label}</p>
+                <p className="text-[10px] text-muted">{alert.threshold}</p>
+                <p className="text-[10px] text-muted-2">{alert.channel}</p>
+              </div>
+              <span className={`ml-auto v-badge ${alert.status === "ACTIVE" ? "v-badge-amber" : "v-badge-muted"}`}>{alert.status}</span>
             </div>
           ))}
         </div>

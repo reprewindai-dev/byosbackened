@@ -1,57 +1,71 @@
-import { useState, useEffect, useCallback } from "react";
-import { Play, Pause, Plus, ExternalLink } from "lucide-react";
+import { useEffect, useCallback } from "react";
+import { Play, Pause, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 
 const PIPELINES = [
-  { name: "patient-intake-rag", desc: "PHI redaction → chunking → embedding → vector store", status: "running", steps: 4, lastRun: "2 min ago", throughput: "1.2k docs/hr" },
-  { name: "contract-redliner", desc: "PDF extract → PII scan → clause diff → signed output", status: "running", steps: 5, lastRun: "8 min ago", throughput: "340 docs/hr" },
-  { name: "compliance-evidence-collector", desc: "Log scan → control mapping → evidence bundling → S3 export", status: "running", steps: 4, lastRun: "1 hr ago", throughput: "continuous" },
-  { name: "model-eval-nightly", desc: "Benchmark suite → drift check → alert if degraded", status: "scheduled", steps: 3, lastRun: "12 hr ago", throughput: "nightly" },
-  { name: "cost-anomaly-detector", desc: "Spend stream → z-score → alert → optional kill-switch", status: "running", steps: 3, lastRun: "live", throughput: "real-time" },
+  { id: "patient-intake", name: "Patient Intake", description: "PHI redaction → triage model → audit", status: "RUNNING", runs: 1240, lastRun: "2m ago", avgLatency: "276ms" },
+  { id: "code-review", name: "Code Review", description: "Static analysis → DeepSeek → PR comment", status: "RUNNING", runs: 340, lastRun: "5m ago", avgLatency: "1.2s" },
+  { id: "rag-ingest", name: "RAG Ingest", description: "Chunking → BGE-M3 embed → vector store", status: "RUNNING", runs: 8420, lastRun: "12s ago", avgLatency: "88ms" },
+  { id: "compliance-scan", name: "Compliance Scan", description: "Evidence collection → SOC2 controls → sign", status: "PAUSED", runs: 42, lastRun: "1h ago", avgLatency: "4.2s" },
+  { id: "cost-report", name: "Cost Report", description: "Wallet aggregation → team allocation → PDF", status: "RUNNING", runs: 24, lastRun: "6h ago", avgLatency: "2.1s" },
 ];
 
 export function PipelinesPage() {
-  const [recentRuns, setRecentRuns] = useState<number>(0);
-
-  const fetchRuns = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const { data } = await api.get("/audit/logs", { params: { limit: 50 } });
-      const items = Array.isArray(data) ? data : data?.items || [];
-      setRecentRuns(items.length);
-    } catch { /* fallback */ }
+      await api.get("/pipelines");
+    } catch { /* use static fallback */ }
   }, []);
 
-  useEffect(() => { fetchRuns(); }, [fetchRuns]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
         <div>
           <p className="v-section-label">Infrastructure · Pipelines</p>
-          <h1 className="mt-1 text-2xl font-bold text-bone">Data & inference pipelines</h1>
-          <p className="mt-1 text-sm text-muted">Composable multi-step workflows — policy-checked at every stage.</p>
+          <h1 className="mt-1 text-2xl font-bold text-bone">Pipelines</h1>
+          <p className="mt-1 text-sm text-muted">Orchestrated multi-step AI workflows with policy enforcement at every stage.</p>
         </div>
         <button className="v-btn-primary text-xs"><Plus className="h-3.5 w-3.5" /> New pipeline</button>
       </div>
 
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="v-card">
+          <p className="v-section-label">Active Pipelines</p>
+          <p className="mt-1 text-2xl font-bold text-bone">{PIPELINES.filter(p => p.status === "RUNNING").length}</p>
+        </div>
+        <div className="v-card">
+          <p className="v-section-label">Total Runs Today</p>
+          <p className="mt-1 text-2xl font-bold text-bone">{PIPELINES.reduce((s, p) => s + p.runs, 0).toLocaleString()}</p>
+        </div>
+        <div className="v-card">
+          <p className="v-section-label">Paused</p>
+          <p className="mt-1 text-2xl font-bold text-amber">{PIPELINES.filter(p => p.status === "PAUSED").length}</p>
+        </div>
+      </div>
+
       <div className="space-y-3">
-        {PIPELINES.map((p) => (
-          <div key={p.name} className="v-card flex items-center gap-4">
-            <div className="flex-1">
+        {PIPELINES.map((pipeline) => (
+          <div key={pipeline.id} className="v-card-flush flex items-center gap-4 px-4 py-3">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-bone">{p.name}</p>
-                <span className={`v-badge ${p.status === "running" ? "v-badge-green" : "v-badge-muted"}`}>● {p.status}</span>
+                <span className="font-medium text-sm text-bone">{pipeline.name}</span>
+                <span className={`v-badge ${pipeline.status === "RUNNING" ? "v-badge-green" : "v-badge-muted"}`}>{pipeline.status}</span>
               </div>
-              <p className="mt-0.5 text-xs text-muted">{p.desc}</p>
+              <p className="mt-0.5 text-[11px] text-muted">{pipeline.description}</p>
             </div>
-            <div className="flex items-center gap-6 text-[11px]">
-              <div className="text-center"><span className="text-muted block">Steps</span><span className="text-bone font-mono">{p.steps}</span></div>
-              <div className="text-center"><span className="text-muted block">Last run</span><span className="text-bone font-mono">{p.lastRun}</span></div>
-              <div className="text-center"><span className="text-muted block">Throughput</span><span className="text-bone font-mono">{p.throughput}</span></div>
+            <div className="hidden md:flex items-center gap-6 text-xs">
+              <div className="text-center"><p className="v-section-label">Runs</p><p className="font-mono text-bone">{pipeline.runs.toLocaleString()}</p></div>
+              <div className="text-center"><p className="v-section-label">Last Run</p><p className="font-mono text-bone">{pipeline.lastRun}</p></div>
+              <div className="text-center"><p className="v-section-label">Avg Latency</p><p className="font-mono text-bone">{pipeline.avgLatency}</p></div>
             </div>
-            <div className="flex gap-1.5">
-              <button className="v-btn-ghost px-2 py-1"><Play className="h-3 w-3" /></button>
-              <button className="v-btn-ghost px-2 py-1"><Pause className="h-3 w-3" /></button>
+            <div className="flex gap-2">
+              {pipeline.status === "RUNNING" ? (
+                <button className="v-btn-ghost text-xs"><Pause className="h-3 w-3" /> Pause</button>
+              ) : (
+                <button className="v-btn-primary text-xs"><Play className="h-3 w-3" /> Resume</button>
+              )}
             </div>
           </div>
         ))}

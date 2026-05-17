@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { FileText, Settings, Download, Loader2 } from "lucide-react";
+import { FileText, Settings, Download } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface WalletBalance {
@@ -82,9 +82,7 @@ export function BillingPage() {
         </div>
       </div>
 
-      {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-5">
-        {/* Reserve balance */}
         <div className="v-card lg:col-span-3">
           <div className="flex items-center justify-between">
             <div>
@@ -107,9 +105,7 @@ export function BillingPage() {
                   <stop offset="100%" stopColor="#f0b340" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              {/* Cap line */}
               <line x1="0" y1="10" x2="460" y2="10" stroke="#ff4d6d" strokeWidth="0.5" strokeDasharray="4 3" opacity="0.5" />
-              {/* Spend area */}
               <path d="M0 120 C30 110, 60 95, 80 90 C100 85, 120 75, 150 70 C180 65, 200 55, 230 48 C260 42, 290 38, 320 32 C350 28, 380 25, 410 22 C430 20, 450 18, 460 16 L460 130 L0 130 Z" fill="url(#spend-grad)" />
               <path d="M0 120 C30 110, 60 95, 80 90 C100 85, 120 75, 150 70 C180 65, 200 55, 230 48 C260 42, 290 38, 320 32 C350 28, 380 25, 410 22 C430 20, 450 18, 460 16" fill="none" stroke="#f0b340" strokeWidth="2" />
             </svg>
@@ -129,7 +125,6 @@ export function BillingPage() {
           </div>
         </div>
 
-        {/* Top-up options */}
         <div className="v-card lg:col-span-2">
           <p className="v-section-label">Top-Up Options</p>
           <p className="mt-0.5 text-sm font-semibold text-bone">Fund your operating reserve</p>
@@ -149,7 +144,6 @@ export function BillingPage() {
         </div>
       </div>
 
-      {/* Plans */}
       <div className="grid gap-4 md:grid-cols-4">
         {PLANS.map((plan) => (
           <div key={plan.name} className={`v-card relative ${plan.current ? "border-brass/50 shadow-brass-glow" : ""}`}>
@@ -174,7 +168,6 @@ export function BillingPage() {
         ))}
       </div>
 
-      {/* Transaction history */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="v-card">
           <div className="mb-3 flex items-center justify-between">
@@ -201,7 +194,6 @@ export function BillingPage() {
           </div>
         </div>
 
-        {/* Reserve info */}
         <div className="v-card">
           <div className="mb-3">
             <p className="v-section-label">Reserve Info</p>

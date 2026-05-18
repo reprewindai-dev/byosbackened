@@ -224,7 +224,7 @@ export function BillingPage() {
           <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Quick actions</div>
           <button
             className="v-btn-primary w-full"
-            onClick={() => setSelectedPack(packs.data?.options[0]?.pack_name ?? "founding")}
+            onClick={() => { const pack = packs.data?.options[0]?.pack_name ?? "founding"; setSelectedPack(pack); topup.mutate(pack); }}
             disabled={packs.isLoading}
           >
             <Sparkles className="h-4 w-4" /> Add reserve

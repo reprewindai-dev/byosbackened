@@ -132,7 +132,7 @@ async def startup_validation():
         if settings.license_enforcement_enabled:
             await bootstrap_license_check()
         # Safety net: ensure core tables exist even if migrations were missed.
-        Base.metadata.create_all(bind=engine)
+                # Safe ENUM guard: create types only if they don't exist, then create tables         with engine.begin() as conn:             conn.execute(__import__('sqlalchemy').text("""                 DO $$ BEGIN                     CREATE TYPE userrole AS ENUM ('admin', 'user', 'viewer', 'readonly', 'billing_admin');                 EXCEPTION WHEN duplicate_object THEN NULL;                 END $$;             """))         Base.metadata.create_all(bind=engine)
         logger.info("Database schema presence check completed")
         start_herald_scheduler()
     except ValueError as e:

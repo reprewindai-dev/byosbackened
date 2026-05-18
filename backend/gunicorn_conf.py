@@ -16,11 +16,11 @@ backlog = 2048
 # ── Workers ──────────────────────────────────────────────────────────────────
 # Rule of thumb: (2 * CPU cores) + 1 for sync, but uvicorn workers are async,
 # so 2 * cores is plenty. Override with WEB_CONCURRENCY env var.
-_default_workers = max(2, multiprocessing.cpu_count() * 2)
+_default_workers = min(4, max(2, multiprocessing.cpu_count()))
 workers = int(os.getenv("WEB_CONCURRENCY", _default_workers))
 worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
-max_requests = 10000          # recycle workers periodically
+max_requests = 500          # recycle workers periodically
 max_requests_jitter = 1000    # avoid thundering herd
 timeout = 120                 # 2 min for slow LLM calls
 graceful_timeout = 30

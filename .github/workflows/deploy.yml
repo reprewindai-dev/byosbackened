@@ -1,0 +1,34 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: SSH Deploy to Hetzner
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          port: 22
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin main
+            echo "--- Installing backend dependencies ---"
+            pip install -r backend/requirements.txt --quiet || true
+            echo "--- Restarting backend service ---"
+            systemctl restart veklom-backend || \
+            pm2 restart veklom-backend || \
+            docker compose -f ops/docker-compose.yml up -d --build || \
+            echo "WARNING: Could not auto-restart service. Check manually."
+            echo "--- Deploy complete ---"

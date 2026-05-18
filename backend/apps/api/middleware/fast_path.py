@@ -206,7 +206,7 @@ class FastPathMiddleware:
                 "status": status_code,
                 "headers": [
                     (b"content-type", content_type.encode("latin-1")),
-                    (b"content-length", str(len(body)).encode("latin-1")),
+                    # content-length intentionally omitted — let uvicorn set it to avoid mismatch on dynamic/compressed responses
                     (b"x-fast-path", source.encode("latin-1")),
                     # Cloudflare / CDN edges respect this and serve from edge.
                     (b"cache-control", b"public, max-age=30, s-maxage=60"),

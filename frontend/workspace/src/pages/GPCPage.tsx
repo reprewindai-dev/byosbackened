@@ -96,14 +96,16 @@ export function GPCPage() {
     setExecuting(true);
     setExecLog(prev => [...prev, `▶ ${execInput}`]);
     try {
-      const { data } = await api.post("/internal/uacp/execute", {
-        command: execInput,
+      // Fixed: was /internal/uacp/execute (404). Correct route is /internal/uacp/command.
+      // Body uses `prompt` field to match backend contract.
+      const { data } = await api.post("/internal/uacp/command", {
+        prompt: execInput,
         version: activeVersion,
         operators: operators.map(o => o.id),
         context: {},
       });
-      const result = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-      setExecLog(prev => [...prev, result]);
+      const out = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      setExecLog(prev => [...prev, out]);
     } catch (err: any) {
       setExecLog(prev => [...prev, `✗ Error: ${err?.response?.data?.detail || err?.message || "execute failed"}`]);
     }
@@ -150,7 +152,7 @@ export function GPCPage() {
         <div className="flex items-center gap-2 mb-3">
           <Zap className="h-4 w-4 text-amber" />
           <span className="text-sm font-semibold text-bone">GPC Execute</span>
-          <span className="ml-auto rounded bg-ink-3 px-1.5 py-0.5 text-[8px] font-mono text-muted">POST /internal/uacp/execute</span>
+          <span className="ml-auto rounded bg-ink-3 px-1.5 py-0.5 text-[8px] font-mono text-muted">POST /internal/uacp/command</span>
         </div>
         <div ref={logRef} className="mb-3 h-40 overflow-y-auto rounded-md bg-[#0d0d0d] border border-rule/30 p-3 font-mono text-[11px] leading-relaxed text-bone">
           {execLog.length === 0 ? (
